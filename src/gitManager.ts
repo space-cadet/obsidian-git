@@ -109,7 +109,6 @@ class GitHttpClient {
     return messages[status] || 'Unknown';
   }
 }
-import * as fs from '@isomorphic-git/lightning-fs';
 import { Notice } from 'obsidian';
 
 export interface GitFileStatus {

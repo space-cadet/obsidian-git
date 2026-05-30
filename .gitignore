@@ -31,4 +31,4 @@ Thumbs.db
 # pnpm specific
 .pnpm-store/
 
-data.json
+data.json*.zip
