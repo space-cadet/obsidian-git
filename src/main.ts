@@ -188,11 +188,15 @@ class VaultFsAdapter {
 		this.stat(path, cb);
 	}
 	
-	unlink(path: string, cb: (err: any) => void) {
+	readlink(path: string, cb: (err: any, result?: any) => void) {
 		this.callbackify(async () => {
-			const normalized = normalizePath(path);
-			const file = this.vault.getAbstractFileByPath(normalized);
-			if (file instanceof TFile) await this.vault.delete(file);
+			throw new Error(`readlink not supported: ${path}`);
+		}, cb);
+	}
+	
+	symlink(target: string, path: string, cb: (err: any) => void) {
+		this.callbackify(async () => {
+			throw new Error(`symlink not supported: ${path} -> ${target}`);
 		}, cb);
 	}
 }

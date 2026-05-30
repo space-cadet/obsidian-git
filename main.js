@@ -20693,12 +20693,14 @@ var VaultFsAdapter = class {
   lstat(path, cb) {
     this.stat(path, cb);
   }
-  unlink(path, cb) {
+  readlink(path, cb) {
     this.callbackify(async () => {
-      const normalized = (0, import_obsidian.normalizePath)(path);
-      const file = this.vault.getAbstractFileByPath(normalized);
-      if (file instanceof import_obsidian.TFile)
-        await this.vault.delete(file);
+      throw new Error(`readlink not supported: ${path}`);
+    }, cb);
+  }
+  symlink(target, path, cb) {
+    this.callbackify(async () => {
+      throw new Error(`symlink not supported: ${path} -> ${target}`);
     }, cb);
   }
 };
