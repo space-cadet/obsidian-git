@@ -55,26 +55,48 @@
     color: var(--text-faint);
 }
 
-/* Sections */
-.git-sidebar-section {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    min-height: 120px;
+.git-local-only {
+    color: var(--text-warning);
+    font-style: italic;
 }
 
-.git-sidebar-section-title {
-    padding: 8px 16px;
-    margin: 0;
-    font-size: var(--font-ui-small);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    background: var(--background-primary);
+/* Tabs */
+.git-sidebar-tabs {
+    display: flex;
     border-bottom: 1px solid var(--background-modifier-border);
-    position: sticky;
-    top: 0;
-    z-index: 1;
+    background: var(--background-primary);
+    flex-shrink: 0;
+}
+
+.git-tab-btn {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+
+.git-tab-btn:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+}
+
+.git-tab-active {
+    color: var(--text-accent);
+    border-bottom-color: var(--interactive-accent);
+    background: var(--background-modifier-accent);
+}
+
+/* Content */
+.git-sidebar-content {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 /* File list */
@@ -160,12 +182,14 @@
 
 .git-commit-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     padding: 6px 12px;
-    gap: 8px;
+    gap: 6px;
     font-size: var(--font-ui-small);
     cursor: pointer;
     transition: background 0.1s;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
 }
 
 .git-commit-row:hover {
@@ -185,12 +209,69 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--text-normal);
+    min-width: 0;
+}
+
+.git-commit-meta {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    padding-left: 26px;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+.git-commit-author {
+    font-weight: 500;
 }
 
 .git-commit-date {
-    color: var(--text-faint);
+    margin-left: auto;
+}
+
+/* Plugin log */
+.git-log-entry {
+    padding: 4px 12px;
     font-size: 11px;
-    flex-shrink: 0;
+    font-family: var(--font-monospace);
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+    line-height: 1.5;
+}
+
+.git-log-entry:hover {
+    background: var(--background-modifier-hover);
+}
+
+.git-log-time {
+    color: var(--text-faint);
+    margin-right: 6px;
+}
+
+.git-log-level {
+    font-weight: 700;
+    margin-right: 6px;
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.git-log-debug { color: var(--text-faint); }
+.git-log-info { color: var(--text-accent); }
+.git-log-warn { color: var(--text-warning); background: var(--background-modifier-warning); }
+.git-log-error { color: var(--text-error); background: var(--background-modifier-error); }
+
+.git-log-message {
+    color: var(--text-normal);
+}
+
+.git-log-detail {
+    padding-left: 8px;
+    margin-top: 2px;
+    color: var(--text-faint);
+    font-size: 10px;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 /* Footer */
@@ -224,6 +305,14 @@
 }
 
 /* Empty state */
+.git-empty-state-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 24px;
+}
+
 .git-empty-state {
     padding: 16px;
     text-align: center;
@@ -233,11 +322,11 @@
 }
 
 /* Scrollbars */
-.git-sidebar-section::-webkit-scrollbar {
+.git-sidebar-content::-webkit-scrollbar {
     width: 4px;
 }
 
-.git-sidebar-section::-webkit-scrollbar-thumb {
+.git-sidebar-content::-webkit-scrollbar-thumb {
     background: var(--background-modifier-border);
     border-radius: 2px;
 }

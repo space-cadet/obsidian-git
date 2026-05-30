@@ -12,10 +12,20 @@ export enum LogLevel {
   ERROR = 3,
 }
 
+export interface LogEntry {
+  timestamp: number;
+  level: string;
+  namespace: string;
+  message: string;
+  data?: any;
+}
+
 export class Logger {
   private static instance: Logger;
   private logLevel: LogLevel = LogLevel.INFO;
   private showNotices: boolean = true;
+  private entries: LogEntry[] = [];
+  private maxEntries: number = 500;
 
   private constructor() {}
 
@@ -27,6 +37,20 @@ export class Logger {
       Logger.instance = new Logger();
     }
     return Logger.instance;
+  }
+
+  /**
+   * Get recent log entries for display
+   */
+  public getEntries(): LogEntry[] {
+    return this.entries;
+  }
+
+  /**
+   * Set the maximum number of entries to keep in memory
+   */
+  public setMaxEntries(max: number): void {
+    this.maxEntries = max;
   }
 
   /**
@@ -47,6 +71,7 @@ export class Logger {
    * Log a debug message
    */
   public debug(context: string, message: string, data?: any): void {
+    this.pushEntry('debug', context, message, data);
     if (this.logLevel <= LogLevel.DEBUG) {
       console.debug(`[Git Sync][${context}] ${message}`, data || '');
     }
@@ -56,6 +81,7 @@ export class Logger {
    * Log an info message
    */
   public info(context: string, message: string, data?: any): void {
+    this.pushEntry('info', context, message, data);
     if (this.logLevel <= LogLevel.INFO) {
       console.info(`[Git Sync][${context}] ${message}`, data || '');
     }
@@ -65,6 +91,7 @@ export class Logger {
    * Log a warning message
    */
   public warn(context: string, message: string, data?: any): void {
+    this.pushEntry('warn', context, message, data);
     if (this.logLevel <= LogLevel.WARN) {
       console.warn(`[Git Sync][${context}] ${message}`, data || '');
       if (this.showNotices) {
@@ -77,6 +104,7 @@ export class Logger {
    * Log an error message
    */
   public error(context: string, message: string, error?: Error): void {
+    this.pushEntry('error', context, message, error?.message || error);
     if (this.logLevel <= LogLevel.ERROR) {
       console.error(`[Git Sync][${context}] ${message}`, error || '');
       if (error?.stack) {
@@ -85,6 +113,19 @@ export class Logger {
       if (this.showNotices) {
         new Notice(`[Error] ${message}${error ? `: ${error.message}` : ''}`);
       }
+    }
+  }
+
+  private pushEntry(level: string, namespace: string, message: string, data?: any): void {
+    this.entries.push({
+      timestamp: Date.now(),
+      level,
+      namespace,
+      message,
+      data
+    });
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries);
     }
   }
 }

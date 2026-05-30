@@ -367,6 +367,46 @@ export default class GitSyncPlugin extends Plugin {
 		}
 	}
 
+	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
+		if (this.gitManager) return this.gitManager;
+
+		const vaultPath = this.app.vault.getRoot().path;
+		
+		// Check if vault has a local git repo
+		const hasRepo = await GitManager.hasGitRepo(this.fs, vaultPath);
+		if (!hasRepo) {
+			return null;
+		}
+
+		// No remote required? We can still work with local repo
+		if (!this.settings.repoUrl && requireRemote) {
+			return null;
+		}
+
+		const credentials: GitCredentials = {
+			username: this.settings.username,
+			password: this.settings.password,
+			author: {
+				name: this.settings.author.name || 'Obsidian Git User',
+				email: this.settings.author.email || 'user@example.com'
+			}
+		};
+
+		if (!this.statusBarItem) {
+			return null;
+		}
+
+		this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
+		
+		if (this.settings.repoUrl) {
+			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+		} else {
+			await this.gitManager.initLocal();
+		}
+		
+		return this.gitManager;
+	}
+
 	async syncVault() {
 		// Get the vault path
 		const vaultPath = this.app.vault.getRoot().path;

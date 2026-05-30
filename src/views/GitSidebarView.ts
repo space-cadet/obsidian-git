@@ -1,16 +1,21 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitFileStatus, GitCommit } from '../gitManager';
-import { log } from '../logger';
+import { log, LogEntry } from '../logger';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
+type SidebarTab = 'status' | 'history' | 'log';
+
 export class GitSidebarView extends ItemView {
     plugin: GitSyncPlugin;
-    private statusContainer: HTMLElement;
-    private logContainer: HTMLElement;
+    private contentContainer: HTMLElement;
     private headerContainer: HTMLElement;
+    private tabsContainer: HTMLElement;
     private refreshInterval: number | null = null;
+    private activeTab: SidebarTab = 'status';
+    private hasRemote: boolean = false;
+    private isLocalOnly: boolean = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
@@ -38,57 +43,19 @@ export class GitSidebarView extends ItemView {
         this.headerContainer = container.createDiv('git-sidebar-header');
         this.renderHeader();
 
-        // Status panel: changed files
-        const statusSection = container.createDiv('git-sidebar-section');
-        statusSection.createEl('h3', { text: 'Changes', cls: 'git-sidebar-section-title' });
-        this.statusContainer = statusSection.createDiv('git-status-list');
+        // Tabs
+        this.tabsContainer = container.createDiv('git-sidebar-tabs');
+        this.renderTabs();
 
-        // Log panel: commit history
-        const logSection = container.createDiv('git-sidebar-section');
-        logSection.createEl('h3', { text: 'History', cls: 'git-sidebar-section-title' });
-        this.logContainer = logSection.createDiv('git-log-list');
+        // Content area (switches based on tab)
+        this.contentContainer = container.createDiv('git-sidebar-content');
 
         // Footer actions
         const footer = container.createDiv('git-sidebar-footer');
-        
-        new ButtonComponent(footer)
-            .setButtonText('Stage All')
-            .setTooltip('Stage all changes')
-            .setClass('git-btn-secondary')
-            .onClick(async () => {
-                try {
-                    if (!this.plugin.gitManager) {
-                        new Notice('Git not initialized');
-                        return;
-                    }
-                    await this.plugin.gitManager.addAll();
-                    new Notice('All changes staged');
-                    await this.refresh();
-                } catch (e: any) {
-                    new Notice('Stage failed: ' + e.message);
-                }
-            });
+        this.renderFooter(footer);
 
-        new ButtonComponent(footer)
-            .setButtonText('Sync')
-            .setTooltip('Pull, commit, push')
-            .setClass('git-btn-primary')
-            .onClick(async () => {
-                try {
-                    await this.plugin.syncVault();
-                    await this.refresh();
-                } catch (e: any) {
-                    new Notice('Sync failed: ' + e.message);
-                }
-            });
-
-        new ButtonComponent(footer)
-            .setButtonText('Refresh')
-            .setTooltip('Refresh git status')
-            .setClass('git-btn-ghost')
-            .onClick(async () => {
-                await this.refresh();
-            });
+        // Try to auto-detect local repo
+        await this.tryInitLocal();
 
         // Initial load
         await this.refresh();
@@ -105,6 +72,17 @@ export class GitSidebarView extends ItemView {
         if (this.refreshInterval !== null) {
             window.clearInterval(this.refreshInterval);
             this.refreshInterval = null;
+        }
+    }
+
+    private async tryInitLocal(): Promise<void> {
+        if (this.plugin.gitManager) return;
+        
+        const gm = await this.plugin.ensureGitManager(false);
+        if (gm) {
+            // Check if we have a remote configured
+            this.hasRemote = !!this.plugin.settings.repoUrl;
+            this.isLocalOnly = !this.hasRemote;
         }
     }
 
@@ -127,7 +105,9 @@ export class GitSidebarView extends ItemView {
         const statusRow = this.headerContainer.querySelector('.git-header-status');
         if (statusRow) {
             statusRow.empty();
-            if (ahead > 0 || behind > 0) {
+            if (this.isLocalOnly) {
+                statusRow.createSpan({ text: 'Local only — no remote', cls: 'git-local-only' });
+            } else if (ahead > 0 || behind > 0) {
                 statusRow.createSpan({ 
                     text: `⬆ ${ahead} ⬇ ${behind}`, 
                     cls: 'git-ahead-behind' + (ahead > 0 ? ' git-ahead' : '') + (behind > 0 ? ' git-behind' : '') 
@@ -138,15 +118,93 @@ export class GitSidebarView extends ItemView {
         }
     }
 
+    private renderTabs(): void {
+        this.tabsContainer.empty();
+        
+        const tabs: { id: SidebarTab; label: string }[] = [
+            { id: 'status', label: 'Changes' },
+            { id: 'history', label: 'History' },
+            { id: 'log', label: 'Log' }
+        ];
+
+        for (const tab of tabs) {
+            const btn = this.tabsContainer.createEl('button', {
+                text: tab.label,
+                cls: 'git-tab-btn' + (tab.id === this.activeTab ? ' git-tab-active' : '')
+            });
+            btn.addEventListener('click', () => {
+                this.activeTab = tab.id;
+                this.renderTabs(); // re-render to update active state
+                this.refresh();
+            });
+        }
+    }
+
+    private renderFooter(container: HTMLElement): void {
+        container.empty();
+
+        new ButtonComponent(container)
+            .setButtonText('Stage All')
+            .setTooltip('Stage all changes')
+            .setClass('git-btn-secondary')
+            .onClick(async () => {
+                try {
+                    if (!this.plugin.gitManager) {
+                        new Notice('Git not initialized');
+                        return;
+                    }
+                    await this.plugin.gitManager.addAll();
+                    new Notice('All changes staged');
+                    await this.refresh();
+                } catch (e: any) {
+                    new Notice('Stage failed: ' + e.message);
+                }
+            });
+
+        if (!this.isLocalOnly) {
+            new ButtonComponent(container)
+                .setButtonText('Sync')
+                .setTooltip('Pull, commit, push')
+                .setClass('git-btn-primary')
+                .onClick(async () => {
+                    try {
+                        await this.plugin.syncVault();
+                        await this.refresh();
+                    } catch (e: any) {
+                        new Notice('Sync failed: ' + e.message);
+                    }
+                });
+        }
+
+        new ButtonComponent(container)
+            .setButtonText('Refresh')
+            .setTooltip('Refresh git status')
+            .setClass('git-btn-ghost')
+            .onClick(async () => {
+                await this.refresh();
+            });
+    }
+
     async refresh(): Promise<void> {
+        // Try to init if not already
         if (!this.plugin.gitManager) {
-            this.statusContainer.empty();
-            this.statusContainer.createEl('p', { text: 'Git not initialized. Configure settings first.', cls: 'git-empty-state' });
+            await this.tryInitLocal();
+        }
+
+        if (!this.plugin.gitManager) {
+            this.contentContainer.empty();
+            this.contentContainer.createEl('div', { 
+                cls: 'git-empty-state-container',
+                text: '' 
+            }).createEl('p', { 
+                text: 'No git repository found in vault.', 
+                cls: 'git-empty-state' 
+            });
+            this.updateHeader('No repo', 0, 0);
             return;
         }
 
         try {
-            // Update branch + ahead/behind
             const branch = await this.plugin.gitManager.getCurrentBranch();
             const { ahead, behind } = await this.plugin.gitManager.getStatus();
             this.updateHeader(branch, ahead, behind);
@@ -155,118 +213,166 @@ export class GitSidebarView extends ItemView {
             this.updateHeader('unknown', 0, 0);
         }
 
-        try {
-            // Update file status list
-            const files = await this.plugin.gitManager.getDetailedStatus();
-            this.renderFileList(files);
-        } catch (e) {
-            log.warn('GitSidebar', 'Failed to get file status', e);
-            this.statusContainer.empty();
-            this.statusContainer.createEl('p', { text: 'Unable to read file status', cls: 'git-empty-state' });
-        }
-
-        try {
-            // Update commit log
-            const commits = await this.plugin.gitManager.getLog(15);
-            this.renderLogList(commits);
-        } catch (e) {
-            log.warn('GitSidebar', 'Failed to get commit log', e);
-            this.logContainer.empty();
-            this.logContainer.createEl('p', { text: 'No commits yet', cls: 'git-empty-state' });
+        // Render active tab content
+        this.contentContainer.empty();
+        
+        switch (this.activeTab) {
+            case 'status':
+                await this.renderStatusTab();
+                break;
+            case 'history':
+                await this.renderHistoryTab();
+                break;
+            case 'log':
+                await this.renderLogTab();
+                break;
         }
     }
 
-    private renderFileList(files: GitFileStatus[]): void {
-        this.statusContainer.empty();
+    private async renderStatusTab(): Promise<void> {
+        const listContainer = this.contentContainer.createDiv('git-status-list');
 
-        if (files.length === 0) {
-            this.statusContainer.createEl('p', { text: 'No changes', cls: 'git-empty-state' });
+        try {
+            const files = await this.plugin.gitManager!.getDetailedStatus();
+            
+            if (files.length === 0) {
+                listContainer.createEl('p', { text: 'No changes', cls: 'git-empty-state' });
+                return;
+            }
+
+            const statusIcons: Record<string, string> = {
+                modified: 'M',
+                added: 'A',
+                deleted: 'D',
+                untracked: '?',
+                staged: 'S',
+                conflict: 'C'
+            };
+
+            const statusClasses: Record<string, string> = {
+                modified: 'git-status-modified',
+                added: 'git-status-added',
+                deleted: 'git-status-deleted',
+                untracked: 'git-status-untracked',
+                staged: 'git-status-staged',
+                conflict: 'git-status-conflict'
+            };
+
+            for (const file of files) {
+                const row = listContainer.createDiv('git-file-row');
+                row.createSpan({ 
+                    text: statusIcons[file.status] || file.status[0].toUpperCase(), 
+                    cls: 'git-status-icon ' + (statusClasses[file.status] || '') 
+                });
+                
+                const pathEl = row.createSpan({ text: file.filepath, cls: 'git-file-path' });
+                pathEl.setAttr('title', file.filepath);
+
+                const actions = row.createDiv('git-file-actions');
+                if (file.status === 'untracked' || file.status === 'modified') {
+                    const btn = actions.createEl('button', { text: '+', cls: 'git-file-btn' });
+                    btn.setAttr('title', 'Stage file');
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        try {
+                            await this.plugin.gitManager!.stageFile(file.filepath);
+                            new Notice(`Staged ${file.filepath}`);
+                            await this.refresh();
+                        } catch (err: any) {
+                            new Notice('Stage failed: ' + err.message);
+                        }
+                    });
+                } else if (file.status === 'staged') {
+                    const btn = actions.createEl('button', { text: '−', cls: 'git-file-btn' });
+                    btn.setAttr('title', 'Unstage file');
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        try {
+                            await this.plugin.gitManager!.unstageFile(file.filepath);
+                            new Notice(`Unstaged ${file.filepath}`);
+                            await this.refresh();
+                        } catch (err: any) {
+                            new Notice('Unstage failed: ' + err.message);
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            log.warn('GitSidebar', 'Failed to get file status', e);
+            listContainer.createEl('p', { text: 'Unable to read file status', cls: 'git-empty-state' });
+        }
+    }
+
+    private async renderHistoryTab(): Promise<void> {
+        const listContainer = this.contentContainer.createDiv('git-log-list');
+
+        try {
+            const commits = await this.plugin.gitManager!.getLog(25);
+            
+            if (commits.length === 0) {
+                listContainer.createEl('p', { text: 'No commits yet', cls: 'git-empty-state' });
+                return;
+            }
+
+            for (const commit of commits) {
+                const row = listContainer.createDiv('git-commit-row');
+                
+                const hash = row.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
+                hash.setAttr('title', commit.oid);
+                
+                const msg = row.createSpan({ text: this.truncateMessage(commit.message), cls: 'git-commit-message' });
+                msg.setAttr('title', commit.message);
+                
+                const meta = row.createDiv('git-commit-meta');
+                meta.createSpan({ text: commit.author, cls: 'git-commit-author' });
+                meta.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
+            }
+        } catch (e) {
+            log.warn('GitSidebar', 'Failed to get commit log', e);
+            listContainer.createEl('p', { text: 'Unable to read commit history', cls: 'git-empty-state' });
+        }
+    }
+
+    private async renderLogTab(): Promise<void> {
+        const listContainer = this.contentContainer.createDiv('git-log-list');
+        
+        const entries = log.getEntries();
+        
+        if (entries.length === 0) {
+            listContainer.createEl('p', { text: 'No activity yet', cls: 'git-empty-state' });
             return;
         }
 
-        const statusIcons: Record<string, string> = {
-            modified: 'M',
-            added: 'A',
-            deleted: 'D',
-            untracked: '?',
-            staged: 'S',
-            conflict: 'C'
-        };
-
-        const statusClasses: Record<string, string> = {
-            modified: 'git-status-modified',
-            added: 'git-status-added',
-            deleted: 'git-status-deleted',
-            untracked: 'git-status-untracked',
-            staged: 'git-status-staged',
-            conflict: 'git-status-conflict'
-        };
-
-        for (const file of files) {
-            const row = this.statusContainer.createDiv('git-file-row');
-            row.createSpan({ text: statusIcons[file.status] || file.status[0].toUpperCase(), cls: 'git-status-icon ' + (statusClasses[file.status] || '') });
+        // Show last 50 entries, newest first
+        const recent = [...entries].reverse().slice(0, 50);
+        
+        for (const entry of recent) {
+            const row = listContainer.createDiv('git-log-entry');
             
-            const pathEl = row.createSpan({ text: file.filepath, cls: 'git-file-path' });
-            pathEl.setAttr('title', file.filepath);
-
-            // Stage/unstage toggle
-            const actions = row.createDiv('git-file-actions');
-            if (file.status === 'untracked' || file.status === 'modified') {
-                const btn = actions.createEl('button', { text: '+', cls: 'git-file-btn' });
-                btn.setAttr('title', 'Stage file');
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    try {
-                        await this.plugin.gitManager!.stageFile(file.filepath);
-                        new Notice(`Staged ${file.filepath}`);
-                        await this.refresh();
-                    } catch (err: any) {
-                        new Notice('Stage failed: ' + err.message);
-                    }
-                });
-            } else if (file.status === 'staged') {
-                const btn = actions.createEl('button', { text: '−', cls: 'git-file-btn' });
-                btn.setAttr('title', 'Unstage file');
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    try {
-                        await this.plugin.gitManager!.unstageFile(file.filepath);
-                        new Notice(`Unstaged ${file.filepath}`);
-                        await this.refresh();
-                    } catch (err: any) {
-                        new Notice('Unstage failed: ' + err.message);
-                    }
-                });
+            const time = row.createSpan({ 
+                text: this.formatDate(new Date(entry.timestamp)), 
+                cls: 'git-log-time' 
+            });
+            
+            const level = row.createSpan({ 
+                text: entry.level.toUpperCase(), 
+                cls: 'git-log-level git-log-' + entry.level 
+            });
+            
+            row.createSpan({ 
+                text: `[${entry.namespace}] ${entry.message}`, 
+                cls: 'git-log-message' 
+            });
+            
+            if (entry.data) {
+                const detail = row.createDiv('git-log-detail');
+                detail.setText(typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data).slice(0, 200));
             }
         }
     }
 
-    private renderLogList(commits: GitCommit[]): void {
-        this.logContainer.empty();
-
-        if (commits.length === 0) {
-            this.logContainer.createEl('p', { text: 'No commits yet', cls: 'git-empty-state' });
-            return;
-        }
-
-        for (const commit of commits) {
-            const row = this.logContainer.createDiv('git-commit-row');
-            
-            const hash = row.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
-            hash.setAttr('title', commit.oid);
-            
-            const msg = row.createSpan({ text: this.truncateMessage(commit.message), cls: 'git-commit-message' });
-            msg.setAttr('title', commit.message);
-            
-            row.createSpan({ 
-                text: this.formatDate(commit.date), 
-                cls: 'git-commit-date' 
-            });
-        }
-    }
-
     private truncateMessage(msg: string, maxLen: number = 40): string {
-        const clean = msg.split('\n')[0]; // first line only
+        const clean = msg.split('\n')[0];
         return clean.length > maxLen ? clean.slice(0, maxLen) + '…' : clean;
     }
 

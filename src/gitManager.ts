@@ -521,6 +521,33 @@ export class GitManager {
     }
 
     /**
+     * Detect if a directory contains a git repository (.git exists)
+     */
+    static async hasGitRepo(fs: any, dir: string): Promise<boolean> {
+        try {
+            const gitDir = dir + '/.git';
+            const stat = await fs.promises.stat(gitDir);
+            return stat.isDirectory();
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Initialize from an existing local repo (no remote URL needed)
+     */
+    async initLocal(): Promise<void> {
+        try {
+            // Just verify it's a valid git repo by reading the current branch
+            await git.currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+            log.info('GitManager', `Initialized local repo at ${this.dir}`);
+        } catch (error) {
+            log.error('GitManager', 'Failed to initialize local repo', error);
+            throw error;
+        }
+    }
+
+    /**
      * Perform a full sync operation: pull, add, commit, push
      */
     async sync(repoUrl: string, branchName: string, commitMessage: string): Promise<void> {
