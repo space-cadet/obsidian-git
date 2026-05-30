@@ -26,5 +26,6 @@
 
 ## Session Context
 - **Session**: 2026-05-30 afternoon
-- **Duration**: Starting now
-- **Commits**: None yet
+- **Duration**: ~1 hour
+- **Commits**: `f16eb6c` — docs: initialize memory-bank following mb-core v6.12 protocol
+- **Pushed to**: origin/simple-git
