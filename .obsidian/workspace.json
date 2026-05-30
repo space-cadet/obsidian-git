@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "7980fb20fe614ce9",
+        "id": "29bf0a4b9667eef2",
         "type": "tabs",
         "children": [
           {
-            "id": "cfb07fa45de51a79",
+            "id": "df75c0da64ff6a4a",
             "type": "leaf",
             "state": {
               "type": "empty",
@@ -172,7 +172,7 @@
       "obsidian-git-sync:Git Sync": false
     }
   },
-  "active": "400bedab0b85326b",
+  "active": "df75c0da64ff6a4a",
   "lastOpenFiles": [
     "src/gitSyncView.ts"
   ]

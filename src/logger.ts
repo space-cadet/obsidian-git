@@ -1,93 +1,40 @@
-/**
- * Logger utility for Obsidian Git Sync plugin
- * Provides consistent logging functionality with different log levels
- */
-
-import { Notice } from 'obsidian';
-
 export enum LogLevel {
-  DEBUG = 0,
-  INFO = 1,
-  WARN = 2,
-  ERROR = 3,
+	DEBUG = 0,
+	INFO = 1,
+	WARN = 2,
+	ERROR = 3
 }
 
 export class Logger {
-  private static instance: Logger;
-  private logLevel: LogLevel = LogLevel.INFO;
-  private showNotices: boolean = true;
+	private static instance: Logger;
+	private level: LogLevel = LogLevel.INFO;
 
-  private constructor() {}
+	static getInstance(): Logger {
+		if (!Logger.instance) {
+			Logger.instance = new Logger();
+		}
+		return Logger.instance;
+	}
 
-  /**
-   * Get the singleton instance of the logger
-   */
-  public static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
-    }
-    return Logger.instance;
-  }
+	setLogLevel(level: LogLevel) {
+		this.level = level;
+	}
 
-  /**
-   * Set the minimum log level to display
-   */
-  public setLogLevel(level: LogLevel): void {
-    this.logLevel = level;
-  }
+	debug(context: string, message: string, ...args: any[]) {
+		if (this.level <= LogLevel.DEBUG) console.log(`[${context}] ${message}`, ...args);
+	}
 
-  /**
-   * Set whether to show notices for warnings and errors
-   */
-  public setShowNotices(show: boolean): void {
-    this.showNotices = show;
-  }
+	info(context: string, message: string, ...args: any[]) {
+		if (this.level <= LogLevel.INFO) console.log(`[${context}] ${message}`, ...args);
+	}
 
-  /**
-   * Log a debug message
-   */
-  public debug(context: string, message: string, data?: any): void {
-    if (this.logLevel <= LogLevel.DEBUG) {
-      console.debug(`[Git Sync][${context}] ${message}`, data || '');
-    }
-  }
+	warn(context: string, message: string, ...args: any[]) {
+		if (this.level <= LogLevel.WARN) console.warn(`[${context}] ${message}`, ...args);
+	}
 
-  /**
-   * Log an info message
-   */
-  public info(context: string, message: string, data?: any): void {
-    if (this.logLevel <= LogLevel.INFO) {
-      console.info(`[Git Sync][${context}] ${message}`, data || '');
-    }
-  }
-
-  /**
-   * Log a warning message
-   */
-  public warn(context: string, message: string, data?: any): void {
-    if (this.logLevel <= LogLevel.WARN) {
-      console.warn(`[Git Sync][${context}] ${message}`, data || '');
-      if (this.showNotices) {
-        new Notice(`[Warning] ${message}`);
-      }
-    }
-  }
-
-  /**
-   * Log an error message
-   */
-  public error(context: string, message: string, error?: Error): void {
-    if (this.logLevel <= LogLevel.ERROR) {
-      console.error(`[Git Sync][${context}] ${message}`, error || '');
-      if (error?.stack) {
-        console.error(`[Git Sync][${context}] Stack trace:`, error.stack);
-      }
-      if (this.showNotices) {
-        new Notice(`[Error] ${message}${error ? `: ${error.message}` : ''}`);
-      }
-    }
-  }
+	error(context: string, message: string, error?: any) {
+		if (this.level <= LogLevel.ERROR) console.error(`[${context}] ${message}`, error || '');
+	}
 }
 
-// Export a default instance for easy import
 export const log = Logger.getInstance();

@@ -1,343 +1,232 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice } from 'obsidian';
-import { SimpleGit } from 'simple-git';
-import { GitManager, GitCredentials } from './gitManager';
-import { VIEW_TYPE_GITSYNC, GitSyncView } from './gitSyncView';
-import { log, LogLevel } from './logger';
+import { App, Plugin, Notice, normalizePath, TFile } from 'obsidian';
+import * as git from 'isomorphic-git';
+import { Buffer } from 'buffer';
 
-interface GitSyncSettings {
-	repoUrl: string;
-	branchName: string;
-	username: string;
-	password: string;
-	author: {
-		name: string;
-		email: string;
-	};
-	autoSyncInterval: number; // in minutes, 0 means disabled
-	autoCommitMessage: string;
+// Polyfill Buffer for browser/mobile environment
+if (typeof window !== 'undefined') {
+	(window as any).Buffer = Buffer;
 }
 
-const DEFAULT_SETTINGS: GitSyncSettings = {
-	repoUrl: '',
-	branchName: 'main',
-	username: '',
-	password: '',
-	author: {
-		name: '',
-		email: ''
-	},
-	autoSyncInterval: 0,
-	autoCommitMessage: 'Vault backup: {{date}}'
-};
+// Minimal fs adapter for isomorphic-git using Obsidian Vault API
+class VaultFsAdapter {
+	constructor(private vault: any) {}
 
-export default class GitSyncPlugin extends Plugin {
-	settings: GitSyncSettings;
-	fs: any;
-	intervalId: number | null = null;
-	gitManager: GitManager | null = null;
-	statusBarItem: HTMLElement | null = null;
+	// Promisify helper
+	private callbackify<T>(fn: () => Promise<T>, cb: (err: any, result?: T) => void) {
+		fn().then(result => cb(null, result)).catch(err => cb(err));
+	}
 
-	async onload() {
-		log.info('GitSyncPlugin', 'ONLOAD FUNCTION IS BEING EXECUTED');
-		await this.loadSettings();
+	readFile(path: string, ...args: any[]) {
+		const cb = typeof args[args.length - 1] === 'function' ? args.pop() : () => {};
+		const options = args[0] || {};
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			const file = this.vault.getAbstractFileByPath(normalized);
+			if (file instanceof TFile) {
+				const content = await this.vault.read(file);
+				if (options.encoding === 'utf8') return content;
+				return Buffer.from(content);
+			}
+			throw new Error(`ENOENT: ${path}`);
+		}, cb);
+	}
 
-		// Configure logger
-		log.setLogLevel(LogLevel.DEBUG); // Set to DEBUG during development, INFO for production
-		log.info('GitSyncPlugin', 'Initializing Git Sync plugin');
+	writeFile(path: string, data: any, ...args: any[]) {
+		const cb = typeof args[args.length - 1] === 'function' ? args.pop() : () => {};
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			const content = data instanceof Buffer ? data.toString('utf8') : data;
+			const existing = this.vault.getAbstractFileByPath(normalized);
+			if (existing instanceof TFile) {
+				await this.vault.modify(existing, content);
+			} else {
+				await this.vault.create(normalized, content);
+			}
+		}, cb);
+	}
 
-		// Initialize the status bar item first since GitManager needs it
-		this.statusBarItem = this.addStatusBarItem();
-		this.statusBarItem.setText('Git: Ready');
-
-		// Initialize GitManager
-		try {
-			log.debug('GitSyncPlugin', 'Getting vault path...');
-			const vaultPath = this.app.vault.getRoot().path;
-			log.debug('GitSyncPlugin', `Vault path: ${vaultPath}`);
-			const credentials: GitCredentials = {
-				username: this.settings.username,
-				password: this.settings.password,
-				author: {
-					name: this.settings.author.name || 'Default Name',
-					email: this.settings.author.email
-				}
-			};
-			this.gitManager = new GitManager(vaultPath, credentials, this.statusBarItem);
-			log.debug('GitSyncPlugin', `GitManager initialized with vault path: ${vaultPath}`);
-		} catch (error) {
-			log.error('GitSyncPlugin', 'Failed to initialize GitManager', error);
-		}
-
-		// Add ribbon icon for manual sync
-		const ribbonIconEl = this.addRibbonIcon('refresh-cw', 'Git Sync', async () => {
-			log.info('GitSyncPlugin', 'Manual sync triggered from ribbon');
+	mkdir(path: string, ...args: any[]) {
+		const cb = typeof args[args.length - 1] === 'function' ? args.pop() : () => {};
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			// Obsidian creates folders automatically on file create, but let's try adapter
 			try {
-				await this.syncVault();
-				new Notice('Git sync completed successfully');
-			} catch (error) {
-				log.error('GitSyncPlugin', 'Manual sync failed', error);
-				new Notice(`Git sync failed: ${error.message}`);
+				await this.vault.adapter.mkdir(normalized);
+			} catch (e) {
+				// Folder might already exist or adapter doesn't support it
+			}
+		}, cb);
+	}
+
+	rmdir(path: string, cb: (err: any) => void) {
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			try {
+				await this.vault.adapter.rmdir(normalized);
+			} catch (e) {
+				// Ignore
+			}
+		}, cb);
+	}
+
+	readdir(path: string, ...args: any[]) {
+		const cb = typeof args[args.length - 1] === 'function' ? args.pop() : () => {};
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			try {
+				const result = await this.vault.adapter.list(normalized);
+				// Obsidian adapter.list returns { files: string[], folders: string[] }
+				const entries: string[] = [];
+				if (result && typeof result === 'object') {
+					if (Array.isArray(result.folders)) entries.push(...result.folders);
+					if (Array.isArray(result.files)) entries.push(...result.files);
+				}
+				return entries;
+			} catch (e) {
+				return [];
+			}
+		}, cb);
+	}
+
+	stat(path: string, cb: (err: any, stats?: any) => void) {
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			const file = this.vault.getAbstractFileByPath(normalized);
+			if (file instanceof TFile) {
+				return {
+					isFile: () => true,
+					isDirectory: () => false,
+					size: file.stat.size,
+					mtimeMs: file.stat.mtime,
+					ctimeMs: file.stat.ctime,
+				};
+			}
+			// Try to see if it's a directory
+			try {
+				const result = await this.vault.adapter.list(normalized);
+				if (result) {
+					return {
+						isFile: () => false,
+						isDirectory: () => true,
+						size: 0,
+						mtimeMs: Date.now(),
+						ctimeMs: Date.now(),
+					};
+				}
+			} catch (e) {
+				// Not a directory either
+			}
+			throw new Error(`ENOENT: ${path}`);
+		}, cb);
+	}
+
+	lstat(path: string, cb: (err: any, stats?: any) => void) {
+		this.stat(path, cb);
+	}
+
+	unlink(path: string, cb: (err: any) => void) {
+		this.callbackify(async () => {
+			const normalized = normalizePath(path);
+			const file = this.vault.getAbstractFileByPath(normalized);
+			if (file instanceof TFile) {
+				await this.vault.delete(file);
+			}
+		}, cb);
+	}
+}
+
+export default class IsomorphicGitTestPlugin extends Plugin {
+	async onload() {
+		console.log('[IsoGitTest] Plugin loaded');
+
+		this.addCommand({
+			id: 'test-isomorphic-git',
+			name: 'Test isomorphic-git (mobile spike)',
+			callback: async () => {
+				await this.runTest();
 			}
 		});
 
-		// Register the Git Sync view for the right sidebar
-		this.registerView(VIEW_TYPE_GITSYNC, (leaf) => new GitSyncView(leaf, this));
-		// Open the Git Sync view in the right sidebar, if available
-		const rightLeaf = this.app.workspace.getRightLeaf(false);
-		if (rightLeaf) {
-		    rightLeaf.setViewState({
-		        type: VIEW_TYPE_GITSYNC,
-		        active: true
-		    });
+		new Notice('IsoGit Test Plugin loaded. Run command "Test isomorphic-git" from palette.');
+	}
+
+	async runTest() {
+		const notices: string[] = [];
+		const log = (msg: string) => {
+			console.log('[IsoGitTest]', msg);
+			notices.push(msg);
+		};
+
+		try {
+			log('Starting isomorphic-git test...');
+
+			// Create fs adapter
+			const fs = new VaultFsAdapter(this.app.vault);
+			const dir = '.'; // Vault root
+
+			// Step 1: Init repo
+			log('Step 1: git.init...');
+			await git.init({ fs, dir, defaultBranch: 'main' });
+			log('✅ git.init succeeded');
+
+			// Step 2: Create a test file
+			log('Step 2: Creating test file...');
+			const testFile = 'iso-git-test.md';
+			const testContent = `# Test\n\nCreated at ${new Date().toISOString()}`;
+			
+			const existing = this.app.vault.getAbstractFileByPath(testFile);
+			if (existing instanceof TFile) {
+				await this.app.vault.modify(existing, testContent);
+			} else {
+				await this.app.vault.create(testFile, testContent);
+			}
+			log('✅ Test file created');
+
+			// Step 3: Git add
+			log('Step 3: git.add...');
+			await git.add({ fs, dir, filepath: testFile });
+			log('✅ git.add succeeded');
+
+			// Step 4: Git commit
+			log('Step 4: git.commit...');
+			await git.commit({
+				fs,
+				dir,
+				message: 'Test commit from isomorphic-git spike',
+				author: {
+					name: 'Test User',
+					email: 'test@example.com',
+				}
+			});
+			log('✅ git.commit succeeded');
+
+			// Step 5: Git log
+			log('Step 5: git.log...');
+			const commits = await git.log({ fs, dir, depth: 5 });
+			log(`✅ git.log succeeded, found ${commits.length} commits`);
+
+			// Step 6: Git status
+			log('Step 6: git.status...');
+			const status = await git.statusMatrix({ fs, dir });
+			log(`✅ git.statusMatrix succeeded, ${status.length} entries`);
+
+			// Success summary
+			const summary = notices.join('\n');
+			new Notice(`IsoGit Test ✅ PASSED\n${commits.length} commits found\nSee console for details`, 10000);
+			console.log('=== IsoGit Test Results ===');
+			console.log(summary);
+			console.log('Commits:', commits);
+			console.log('Status:', status);
+
+		} catch (error) {
+			const errMsg = error instanceof Error ? error.message : String(error);
+			log(`❌ FAILED: ${errMsg}`);
+			console.error('IsoGit Test Error:', error);
+			new Notice(`IsoGit Test ❌ FAILED\n${errMsg}\nSee console for stack trace`, 10000);
 		}
-
-		// Add settings tab
-		this.addSettingTab(new GitSyncSettingTab(this.app, this));
-
-		// Set up auto sync if enabled
-		this.setupAutoSync();
 	}
 
 	onunload() {
-		this.clearAutoSync();
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-		this.setupAutoSync(); // Reconfigure auto sync with new settings
-	}
-
-	setupAutoSync() {
-		// Clear any existing interval
-		this.clearAutoSync();
-
-		// Set up new interval if enabled
-		if (this.settings.autoSyncInterval > 0) {
-			const intervalMs = this.settings.autoSyncInterval * 60 * 1000;
-			this.intervalId = window.setInterval(async () => {
-				try {
-					await this.syncVault();
-					console.log('Auto sync completed');
-				} catch (error) {
-					console.error('Auto sync failed:', error);
-				}
-			}, intervalMs);
-		}
-	}
-
-	clearAutoSync() {
-		if (this.intervalId !== null) {
-			window.clearInterval(this.intervalId);
-			this.intervalId = null;
-		}
-	}
-
-	async syncVault() {
-		// Get the vault path
-		const vaultPath = this.app.vault.getRoot().path;
-		
-		// Format commit message with date
-		const commitMessage = this.settings.autoCommitMessage.replace(
-			'{{date}}', 
-			new Date().toLocaleString()
-		);
-	
-		// Initialize GitManager if not already done
-		if (!this.gitManager) {
-			const credentials: GitCredentials = {
-				username: this.settings.username,
-				password: this.settings.password,
-				author: {
-					name: this.settings.author.name || 'Default Name', // Ensure a default name is provided
-					email: this.settings.author.email
-				}
-			};
-			if (this.statusBarItem) {
-				this.gitManager = new GitManager(vaultPath, credentials, this.statusBarItem);
-			} else {
-				throw new Error('Status bar item not initialized');
-			}
-		}
-	
-		// Perform the sync operation
-		try {
-			await this.gitManager.sync(
-				this.settings.repoUrl,
-				this.settings.branchName,
-				commitMessage
-			);
-			return true;
-		} catch (error) {
-			console.error('Sync failed:', error);
-			throw error;
-		}
-	}
-}
-
-class GitSyncSettingTab extends PluginSettingTab {
-	plugin: GitSyncPlugin;
-
-	constructor(app: App, plugin: GitSyncPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		containerEl.createEl('h2', {text: 'Git Sync Settings'});
-
-		new Setting(containerEl)
-			.setName('Repository URL')
-			.setDesc('The URL of your Git repository')
-			.addText(text => text
-				.setPlaceholder('https://github.com/username/repo.git')
-				.setValue(this.plugin.settings.repoUrl)
-				.onChange(async (value) => {
-					this.plugin.settings.repoUrl = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Branch')
-			.setDesc('The branch to sync with')
-			.addText(text => text
-				.setPlaceholder('main')
-				.setValue(this.plugin.settings.branchName)
-				.onChange(async (value) => {
-					this.plugin.settings.branchName = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Username')
-			.setDesc('Your Git username')
-			.addText(text => text
-				.setPlaceholder('username')
-				.setValue(this.plugin.settings.username)
-				.onChange(async (value) => {
-					this.plugin.settings.username = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Password/Token')
-			.setDesc('Your Git password or personal access token')
-			.addText(text => text
-				.setPlaceholder('password or token')
-				.setValue(this.plugin.settings.password)
-				.onChange(async (value: string) => {
-					text.inputEl.type = 'password';
-					this.plugin.settings.password = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Author Name')
-			.setDesc('Your name for Git commits')
-			.addText(text => text
-				.setPlaceholder('Your Name')
-				.setValue(this.plugin.settings.author.name)
-				.onChange(async (value) => {
-					this.plugin.settings.author.name = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Author Email')
-			.setDesc('Your email for Git commits')
-			.addText(text => text
-				.setPlaceholder('your.email@example.com')
-				.setValue(this.plugin.settings.author.email)
-				.onChange(async (value) => {
-					this.plugin.settings.author.email = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Auto Sync Interval')
-			.setDesc('How often to automatically sync (in minutes, 0 to disable)')
-			.addText(text => text
-				.setPlaceholder('0')
-				.setValue(String(this.plugin.settings.autoSyncInterval))
-				.onChange(async (value) => {
-					const numValue = Number(value);
-					if (!isNaN(numValue) && numValue >= 0) {
-						this.plugin.settings.autoSyncInterval = numValue;
-						await this.plugin.saveSettings();
-					}
-				}));
-
-		new Setting(containerEl)
-			.setName('Auto Commit Message')
-			.setDesc('Message for automatic commits. Use {{date}} for current date/time')
-			.addText(text => text
-				.setPlaceholder('Vault backup: {{date}}')
-				.setValue(this.plugin.settings.autoCommitMessage)
-				.onChange(async (value) => {
-					this.plugin.settings.autoCommitMessage = value;
-					await this.plugin.saveSettings();
-				}));
-
-		// Add a button to test the connection
-		new Setting(containerEl)
-			.setName('Test Connection')
-			.setDesc('Test the connection to your Git repository')
-			.addButton(button => button
-				.setButtonText('Test')
-				.onClick(async () => {
-					try {
-						if (!this.plugin.settings.repoUrl) {
-							new Notice('Please enter a repository URL first');
-							return;
-						}
-
-						if (!this.plugin.gitManager) {
-							const vaultPath = this.plugin.app.vault.getRoot().path;
-							const credentials: GitCredentials = {
-								username: this.plugin.settings.username,
-								password: this.plugin.settings.password,
-								author: {
-									name: this.plugin.settings.author.name,
-									email: this.plugin.settings.author.email
-								}
-							};
-							if (this.plugin.statusBarItem) {
-								this.plugin.gitManager = new GitManager(vaultPath, credentials, this.plugin.statusBarItem);
-							} else {
-								throw new Error('Status bar item not initialized');
-							}
-						}
-
-						new Notice('Testing connection...');
-						await this.plugin.gitManager.testConnection(
-						    this.plugin.settings.repoUrl
-						);
-						new Notice('Connection successful!');
-					} catch (error) {
-						new Notice(`Connection test failed: ${error.message}`);
-					}
-				}));
-
-		// Add a button to manually sync
-		new Setting(containerEl)
-			.setName('Manual Sync')
-			.setDesc('Manually sync your vault with the Git repository')
-			.addButton(button => button
-				.setButtonText('Sync Now')
-				.onClick(async () => {
-					try {
-						await this.plugin.syncVault();
-						new Notice('Git sync completed successfully');
-					} catch (error) {
-						new Notice(`Git sync failed: ${error.message}`);
-					}
-				}));
+		console.log('[IsoGitTest] Plugin unloaded');
 	}
 }
