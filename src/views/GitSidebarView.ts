@@ -54,9 +54,6 @@ export class GitSidebarView extends ItemView {
         const footer = container.createDiv('git-sidebar-footer');
         this.renderFooter(footer);
 
-        // Try to auto-detect local repo
-        await this.tryInitLocal();
-
         // Initial load
         await this.refresh();
 
@@ -72,17 +69,6 @@ export class GitSidebarView extends ItemView {
         if (this.refreshInterval !== null) {
             window.clearInterval(this.refreshInterval);
             this.refreshInterval = null;
-        }
-    }
-
-    private async tryInitLocal(): Promise<void> {
-        if (this.plugin.gitManager) return;
-        
-        const gm = await this.plugin.ensureGitManager(false);
-        if (gm) {
-            // Check if we have a remote configured
-            this.hasRemote = !!this.plugin.settings.repoUrl;
-            this.isLocalOnly = !this.hasRemote;
         }
     }
 
@@ -188,19 +174,64 @@ export class GitSidebarView extends ItemView {
     async refresh(): Promise<void> {
         // Try to init if not already
         if (!this.plugin.gitManager) {
-            await this.tryInitLocal();
-        }
-
-        if (!this.plugin.gitManager) {
-            this.contentContainer.empty();
-            this.contentContainer.createEl('div', { 
-                cls: 'git-empty-state-container',
-                text: '' 
-            }).createEl('p', { 
-                text: 'No git repository found in vault.', 
-                cls: 'git-empty-state' 
-            });
-            this.updateHeader('No repo', 0, 0);
+            const hasRealRepo = await this.plugin.detectRealGitRepo();
+            
+            if (hasRealRepo) {
+                // Real repo exists but plugin storage not initialized
+                this.contentContainer.empty();
+                const wrapper = this.contentContainer.createDiv('git-empty-state-container');
+                wrapper.createEl('p', { 
+                    text: 'Git repo detected in vault.', 
+                    cls: 'git-empty-state git-empty-state-title' 
+                });
+                wrapper.createEl('p', { 
+                    text: this.plugin.settings.repoUrl 
+                        ? 'Click Sync to initialize plugin storage from remote.'
+                        : 'Configure a remote URL in settings to sync, or use Stage All to track changes locally.',
+                    cls: 'git-empty-state' 
+                });
+                
+                const btnRow = wrapper.createDiv('git-empty-state-actions');
+                new ButtonComponent(btnRow)
+                    .setButtonText('Initialize')
+                    .setClass('git-btn-primary')
+                    .onClick(async () => {
+                        try {
+                            await this.plugin.ensureGitManager(false);
+                            new Notice('Git storage initialized');
+                            await this.refresh();
+                        } catch (e: any) {
+                            new Notice('Initialize failed: ' + e.message);
+                        }
+                    });
+                
+                if (this.plugin.settings.repoUrl) {
+                    new ButtonComponent(btnRow)
+                        .setButtonText('Clone Remote')
+                        .setClass('git-btn-secondary')
+                        .onClick(async () => {
+                            try {
+                                await this.plugin.syncVault();
+                                new Notice('Remote repo cloned');
+                                await this.refresh();
+                            } catch (e: any) {
+                                new Notice('Clone failed: ' + e.message);
+                            }
+                        });
+                }
+                
+                this.updateHeader('local', 0, 0);
+            } else {
+                this.contentContainer.empty();
+                this.contentContainer.createEl('div', { 
+                    cls: 'git-empty-state-container',
+                    text: '' 
+                }).createEl('p', { 
+                    text: 'No git repository found in vault.', 
+                    cls: 'git-empty-state' 
+                });
+                this.updateHeader('No repo', 0, 0);
+            }
             return;
         }
 

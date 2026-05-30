@@ -535,12 +535,22 @@ export class GitManager {
 
     /**
      * Initialize from an existing local repo (no remote URL needed)
+     * Creates an empty repo in LightningFS if one doesn't exist
      */
     async initLocal(): Promise<void> {
         try {
-            // Just verify it's a valid git repo by reading the current branch
-            await git.currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
-            log.info('GitManager', `Initialized local repo at ${this.dir}`);
+            // Check if .git exists in LightningFS
+            const hasVirtualRepo = await GitManager.hasGitRepo(this.fs, this.dir);
+            
+            if (!hasVirtualRepo) {
+                // Initialize an empty repo in the virtual filesystem
+                await git.init({ fs: this.fs, dir: this.dir, defaultBranch: 'main' });
+                log.info('GitManager', `Initialized empty local repo at ${this.dir}`);
+            } else {
+                // Just verify it's a valid git repo by reading the current branch
+                await git.currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+                log.info('GitManager', `Initialized local repo at ${this.dir}`);
+            }
         } catch (error) {
             log.error('GitManager', 'Failed to initialize local repo', error);
             throw error;

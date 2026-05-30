@@ -307,10 +307,25 @@
 /* Empty state */
 .git-empty-state-container {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100%;
     padding: 24px;
+    gap: 12px;
+}
+
+.git-empty-state-title {
+    font-weight: 600;
+    color: var(--text-normal) !important;
+    font-style: normal !important;
+    margin-bottom: 4px;
+}
+
+.git-empty-state-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
 }
 
 .git-empty-state {

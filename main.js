@@ -17022,7 +17022,7 @@ var GitHttpClient = class {
     return messages[status] || "Unknown";
   }
 };
-var GitManager = class {
+var GitManager = class _GitManager {
   constructor(fs, dir, credentials, statusBarItem) {
     this.statusBarItem = null;
     this.fs = fs;
@@ -17371,11 +17371,18 @@ var GitManager = class {
   }
   /**
    * Initialize from an existing local repo (no remote URL needed)
+   * Creates an empty repo in LightningFS if one doesn't exist
    */
   async initLocal() {
     try {
-      await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
-      log2.info("GitManager", `Initialized local repo at ${this.dir}`);
+      const hasVirtualRepo = await _GitManager.hasGitRepo(this.fs, this.dir);
+      if (!hasVirtualRepo) {
+        await init({ fs: this.fs, dir: this.dir, defaultBranch: "main" });
+        log2.info("GitManager", `Initialized empty local repo at ${this.dir}`);
+      } else {
+        await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+        log2.info("GitManager", `Initialized local repo at ${this.dir}`);
+      }
     } catch (error) {
       log2.error("GitManager", "Failed to initialize local repo", error);
       throw error;
@@ -17445,7 +17452,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.contentContainer = container.createDiv("git-sidebar-content");
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
-    await this.tryInitLocal();
     await this.refresh();
     this.refreshInterval = window.setInterval(() => {
       if (this.containerEl.isShown()) {
@@ -17457,15 +17463,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     if (this.refreshInterval !== null) {
       window.clearInterval(this.refreshInterval);
       this.refreshInterval = null;
-    }
-  }
-  async tryInitLocal() {
-    if (this.plugin.gitManager)
-      return;
-    const gm = await this.plugin.ensureGitManager(false);
-    if (gm) {
-      this.hasRemote = !!this.plugin.settings.repoUrl;
-      this.isLocalOnly = !this.hasRemote;
     }
   }
   renderHeader() {
@@ -17546,18 +17543,51 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   async refresh() {
     if (!this.plugin.gitManager) {
-      await this.tryInitLocal();
-    }
-    if (!this.plugin.gitManager) {
-      this.contentContainer.empty();
-      this.contentContainer.createEl("div", {
-        cls: "git-empty-state-container",
-        text: ""
-      }).createEl("p", {
-        text: "No git repository found in vault.",
-        cls: "git-empty-state"
-      });
-      this.updateHeader("No repo", 0, 0);
+      const hasRealRepo = await this.plugin.detectRealGitRepo();
+      if (hasRealRepo) {
+        this.contentContainer.empty();
+        const wrapper = this.contentContainer.createDiv("git-empty-state-container");
+        wrapper.createEl("p", {
+          text: "Git repo detected in vault.",
+          cls: "git-empty-state git-empty-state-title"
+        });
+        wrapper.createEl("p", {
+          text: this.plugin.settings.repoUrl ? "Click Sync to initialize plugin storage from remote." : "Configure a remote URL in settings to sync, or use Stage All to track changes locally.",
+          cls: "git-empty-state"
+        });
+        const btnRow = wrapper.createDiv("git-empty-state-actions");
+        new import_obsidian4.ButtonComponent(btnRow).setButtonText("Initialize").setClass("git-btn-primary").onClick(async () => {
+          try {
+            await this.plugin.ensureGitManager(false);
+            new import_obsidian4.Notice("Git storage initialized");
+            await this.refresh();
+          } catch (e) {
+            new import_obsidian4.Notice("Initialize failed: " + e.message);
+          }
+        });
+        if (this.plugin.settings.repoUrl) {
+          new import_obsidian4.ButtonComponent(btnRow).setButtonText("Clone Remote").setClass("git-btn-secondary").onClick(async () => {
+            try {
+              await this.plugin.syncVault();
+              new import_obsidian4.Notice("Remote repo cloned");
+              await this.refresh();
+            } catch (e) {
+              new import_obsidian4.Notice("Clone failed: " + e.message);
+            }
+          });
+        }
+        this.updateHeader("local", 0, 0);
+      } else {
+        this.contentContainer.empty();
+        this.contentContainer.createEl("div", {
+          cls: "git-empty-state-container",
+          text: ""
+        }).createEl("p", {
+          text: "No git repository found in vault.",
+          cls: "git-empty-state"
+        });
+        this.updateHeader("No repo", 0, 0);
+      }
       return;
     }
     try {
@@ -18013,8 +18043,8 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     if (this.gitManager)
       return this.gitManager;
     const vaultPath = this.app.vault.getRoot().path;
-    const hasRepo = await GitManager.hasGitRepo(this.fs, vaultPath);
-    if (!hasRepo) {
+    const hasRealRepo = await this.detectRealGitRepo();
+    if (!hasRealRepo) {
       return null;
     }
     if (!this.settings.repoUrl && requireRemote) {
@@ -18038,6 +18068,25 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
       await this.gitManager.initLocal();
     }
     return this.gitManager;
+  }
+  /**
+   * Detect if vault has a real .git repo on the actual filesystem
+   */
+  async detectRealGitRepo() {
+    try {
+      const headFile = this.app.vault.getAbstractFileByPath(".git/HEAD");
+      if (headFile)
+        return true;
+      const adapter = this.app.vault.adapter;
+      if ("stat" in adapter) {
+        const stat = await adapter.stat(".git");
+        if (stat && stat.type === "folder")
+          return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
   async syncVault() {
     const vaultPath = this.app.vault.getRoot().path;

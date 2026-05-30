@@ -372,9 +372,9 @@ export default class GitSyncPlugin extends Plugin {
 
 		const vaultPath = this.app.vault.getRoot().path;
 		
-		// Check if vault has a local git repo
-		const hasRepo = await GitManager.hasGitRepo(this.fs, vaultPath);
-		if (!hasRepo) {
+		// Check REAL filesystem (not LightningFS) for .git
+		const hasRealRepo = await this.detectRealGitRepo();
+		if (!hasRealRepo) {
 			return null;
 		}
 
@@ -405,6 +405,28 @@ export default class GitSyncPlugin extends Plugin {
 		}
 		
 		return this.gitManager;
+	}
+
+	/**
+	 * Detect if vault has a real .git repo on the actual filesystem
+	 */
+	async detectRealGitRepo(): Promise<boolean> {
+		try {
+			// Check for .git/HEAD in the real vault filesystem
+			const headFile = this.app.vault.getAbstractFileByPath('.git/HEAD');
+			if (headFile) return true;
+			
+			// Fallback: try adapter.stat for .git directory
+			const adapter = this.app.vault.adapter;
+			if ('stat' in adapter) {
+				const stat = await (adapter as any).stat('.git');
+				if (stat && stat.type === 'folder') return true;
+			}
+			
+			return false;
+		} catch {
+			return false;
+		}
 	}
 
 	async syncVault() {
