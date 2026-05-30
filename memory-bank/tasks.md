@@ -20,11 +20,11 @@
 **Phases:**
 - ✅ Phase 1: Foundation & Research (code analysis, dependency analysis, memory bank setup)
 - ✅ Phase 1.5: Design & Planning (techContext, systemPatterns, detailed implementation plan)
-- ⏳ Phase 2: Branch Setup & Dependency Swap
-- ⏳ Phase 3: Vault FS Adapter (Critical)
-- ⏳ Phase 4: GitManager Rewrite
-- ⏳ Phase 5: HTTP Client & Auth
-- ⏳ Phase 6: Integration & Testing
+- ⏳ Phase 2: Branch Setup & Dependency Swap ✅ (spike branch created)
+- ⏳ Phase 3: Vault FS Adapter (Critical) — Validated in spike, needs extraction
+- ⏳ Phase 4: GitManager Rewrite — Core operations validated (init, add, commit, log, status)
+- ⏳ Phase 5: HTTP Client & Auth — NOT tested in spike (network ops)
+- ⏳ Phase 6: Integration & Testing — Pending mobile field test
 - ⏳ Phase 7: Cleanup & Documentation
 
 **Completion Criteria**: See `tasks/T1.md` for detailed checklist

@@ -3,6 +3,20 @@
 *Created: 2026-05-30 16:05:00 IST*
 *Last Updated: 2026-05-30 17:45:00 IST*
 
+#### 18:15:00 IST - T1: Mobile Spike Complete
+- Created `isomorphic-git-spike` branch from `simple-git`
+- Rewrote `src/main.ts` — Minimal test plugin with single command
+- Added `isomorphic-git` + `buffer` to `package.json`
+- Created `VaultFsAdapter` embedded in main.ts — bridges Obsidian Vault API to isomorphic-git fs
+- Fixed `src/logger.ts` — corrupted file, replaced with minimal stub
+- Fixed `src/gitSyncView.ts` — removed old plugin references
+- Build passes: 370KB bundle, no Node built-ins
+- Desktop test: init → create file → add → commit → log → statusMatrix ✅ all pass
+- Created `spike-results.md` — Spike test results and mobile test instructions
+- Updated `manifest.json` — version 1.0.0-spike, name "Git Sync (IsoGit Test)"
+- Pushed branch `isomorphic-git-spike` to origin
+- Updated memory bank: tasks/T1.md, tasks.md, activeContext.md, session_cache.md
+
 ## File Modification Log
 
 ### 2026-05-30
