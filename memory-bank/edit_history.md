@@ -1,9 +1,24 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-05-30 21:35:00 IST*
+*Last Updated: 2026-05-30 22:56:00 IST*
 
 ### 2026-05-30
+
+#### 22:56:00 IST - T3: Mobile compatibility achieved — v9 works on mobile!
+- Modified `esbuild.config.mjs` — Banner now always ensures `process.cwd` exists (even if `process` partially defined on mobile)
+- Post-processed `main.js` — Added `globalThis.Buffer = require_buffer().Buffer;` at end of bundle
+- Built `dist/obsidian-git-sync-v9.zip` — tested and confirmed working on mobile device
+- Updated `memory-bank/tasks/T3.md` — Status changed to COMPLETED
+- Updated `memory-bank/activeContext.md` — T3 marked complete
+- Updated `memory-bank/progress.md` — Mobile milestones marked complete
+
+#### 21:46:00 IST - T3: Build and verify mobile bundle
+- Modified `esbuild.config.mjs` — Removed `buffer` and `path` from `builtins` external list so they are bundled
+- Modified `package.json` — Added `buffer` npm package dependency (needed by `safe-buffer` via `isomorphic-git` → `sha.js`)
+- Modified `esbuild.config.mjs` — Added banner that stubs `process` and `Buffer` for mobile WebView
+- Built `main.js` (526K) — verified no `require("buffer")` or `require("path")` in bundle
+- Created `dist/obsidian-git-sync-v6.zip` — 107K zip with main.js + manifest.json
 
 #### 21:35:00 IST - T1-T5: Memory bank expansion and task separation
 - Created `memory-bank/tasks/T1.md` — Core Git Integration task details
