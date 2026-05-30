@@ -9339,7 +9339,7 @@ __export(main_exports, {
   default: () => GitSyncPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // node_modules/.pnpm/isomorphic-git@1.29.0/node_modules/isomorphic-git/index.js
 var import_async_lock = __toESM(require_async_lock(), 1);
@@ -16682,6 +16682,76 @@ async function push({
     throw err;
   }
 }
+async function hashObject$1({ gitdir, type, object }) {
+  return shasum(GitObject.wrap({ type, object }));
+}
+async function resetIndex({
+  fs: _fs,
+  dir,
+  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  filepath,
+  ref,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fs = new FileSystem(_fs);
+    let oid;
+    let workdirOid;
+    try {
+      oid = await GitRefManager.resolve({ fs, gitdir, ref: ref || "HEAD" });
+    } catch (e) {
+      if (ref) {
+        throw e;
+      }
+    }
+    if (oid) {
+      try {
+        oid = await resolveFilepath({
+          fs,
+          cache,
+          gitdir,
+          oid,
+          filepath
+        });
+      } catch (e) {
+        oid = null;
+      }
+    }
+    let stats = {
+      ctime: /* @__PURE__ */ new Date(0),
+      mtime: /* @__PURE__ */ new Date(0),
+      dev: 0,
+      ino: 0,
+      mode: 0,
+      uid: 0,
+      gid: 0,
+      size: 0
+    };
+    const object = dir && await fs.read((0, import_path_browserify.join)(dir, filepath));
+    if (object) {
+      workdirOid = await hashObject$1({
+        gitdir,
+        type: "blob",
+        object
+      });
+      if (oid === workdirOid) {
+        stats = await fs.lstat((0, import_path_browserify.join)(dir, filepath));
+      }
+    }
+    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index) {
+      index.delete({ filepath });
+      if (oid) {
+        index.insert({ filepath, stats, oid });
+      }
+    });
+  } catch (err) {
+    err.caller = "git.reset";
+    throw err;
+  }
+}
 async function statusMatrix({
   fs: _fs,
   dir,
@@ -17162,6 +17232,102 @@ var GitManager = class {
     }
   }
   /**
+   * Get detailed status of all files (staged, modified, untracked, etc.)
+   */
+  async getDetailedStatus() {
+    try {
+      const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+      const result = [];
+      for (const row of matrix) {
+        const [filepath, head, workdir, stage] = row;
+        if (head === 1 && workdir === 1 && stage === 1)
+          continue;
+        let status;
+        if (head === 0 && workdir === 2 && stage === 0)
+          status = "untracked";
+        else if (head === 0 && (stage === 2 || stage === 3))
+          status = "added";
+        else if (workdir === 0)
+          status = "deleted";
+        else if (head === 1 && workdir === 2 && stage === 1)
+          status = "modified";
+        else if (head === 1 && workdir === 1 && stage === 2)
+          status = "staged";
+        else if (head === 1 && workdir === 2 && stage === 2)
+          status = "modified";
+        else
+          status = "modified";
+        result.push({ filepath, status });
+      }
+      return result;
+    } catch (error) {
+      log2.error("GitManager", "Failed to get detailed status", error);
+      throw error;
+    }
+  }
+  /**
+   * Stage a single file
+   */
+  async stageFile(filepath) {
+    try {
+      await add({ fs: this.fs, dir: this.dir, filepath });
+      log2.debug("GitManager", `Staged file: ${filepath}`);
+    } catch (error) {
+      log2.error("GitManager", `Failed to stage file: ${filepath}`, error);
+      throw error;
+    }
+  }
+  /**
+   * Unstage a single file (reset to HEAD)
+   */
+  async unstageFile(filepath) {
+    var _a;
+    try {
+      await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
+      log2.debug("GitManager", `Unstaged file: ${filepath}`);
+    } catch (error) {
+      if ((_a = error.message) == null ? void 0 : _a.includes("resetIndex")) {
+        log2.warn("GitManager", `resetIndex not available, file remains staged: ${filepath}`);
+        throw new Error("Unstaging not supported in this isomorphic-git version");
+      }
+      log2.error("GitManager", `Failed to unstage file: ${filepath}`, error);
+      throw error;
+    }
+  }
+  /**
+   * Get commit log (history)
+   */
+  async getLog(maxCount = 20) {
+    try {
+      const commits = await log({ fs: this.fs, dir: this.dir, ref: "HEAD", depth: maxCount });
+      return commits.map((c) => {
+        var _a, _b, _c, _d, _e;
+        return {
+          oid: c.oid,
+          message: ((_a = c.commit) == null ? void 0 : _a.message) || "",
+          author: ((_c = (_b = c.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
+          date: new Date((((_e = (_d = c.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
+          commit: c.commit
+        };
+      });
+    } catch (error) {
+      log2.error("GitManager", "Failed to get commit log", error);
+      throw error;
+    }
+  }
+  /**
+   * Get the current branch name
+   */
+  async getCurrentBranch() {
+    try {
+      const branch = await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+      return branch || "HEAD";
+    } catch (error) {
+      log2.error("GitManager", "Failed to get current branch", error);
+      throw error;
+    }
+  }
+  /**
    * Perform a full sync operation: pull, add, commit, push
    */
   async sync(repoUrl, branchName, commitMessage) {
@@ -17193,6 +17359,228 @@ var GitManager = class {
   }
 };
 
+// src/views/GitSidebarView.ts
+var import_obsidian4 = require("obsidian");
+var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
+var GitSidebarView = class extends import_obsidian4.ItemView {
+  constructor(leaf, plugin) {
+    super(leaf);
+    this.refreshInterval = null;
+    this.plugin = plugin;
+  }
+  getViewType() {
+    return VIEW_TYPE_GIT_SIDEBAR;
+  }
+  getDisplayText() {
+    return "Git Sync";
+  }
+  getIcon() {
+    return "git-branch";
+  }
+  async onOpen() {
+    const container = this.containerEl.children[1];
+    container.empty();
+    container.addClass("git-sidebar-container");
+    this.headerContainer = container.createDiv("git-sidebar-header");
+    this.renderHeader();
+    const statusSection = container.createDiv("git-sidebar-section");
+    statusSection.createEl("h3", { text: "Changes", cls: "git-sidebar-section-title" });
+    this.statusContainer = statusSection.createDiv("git-status-list");
+    const logSection = container.createDiv("git-sidebar-section");
+    logSection.createEl("h3", { text: "History", cls: "git-sidebar-section-title" });
+    this.logContainer = logSection.createDiv("git-log-list");
+    const footer = container.createDiv("git-sidebar-footer");
+    new import_obsidian4.ButtonComponent(footer).setButtonText("Stage All").setTooltip("Stage all changes").setClass("git-btn-secondary").onClick(async () => {
+      try {
+        if (!this.plugin.gitManager) {
+          new import_obsidian4.Notice("Git not initialized");
+          return;
+        }
+        await this.plugin.gitManager.addAll();
+        new import_obsidian4.Notice("All changes staged");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Stage failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(footer).setButtonText("Sync").setTooltip("Pull, commit, push").setClass("git-btn-primary").onClick(async () => {
+      try {
+        await this.plugin.syncVault();
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Sync failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(footer).setButtonText("Refresh").setTooltip("Refresh git status").setClass("git-btn-ghost").onClick(async () => {
+      await this.refresh();
+    });
+    await this.refresh();
+    this.refreshInterval = window.setInterval(() => {
+      if (this.containerEl.isShown()) {
+        this.refresh();
+      }
+    }, 3e4);
+  }
+  async onClose() {
+    if (this.refreshInterval !== null) {
+      window.clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+  }
+  renderHeader() {
+    this.headerContainer.empty();
+    const branchRow = this.headerContainer.createDiv("git-header-branch");
+    branchRow.createSpan({ text: "\u25CF", cls: "git-branch-dot" });
+    const branchName = this.headerContainer.createDiv("git-branch-name");
+    branchName.setText("Loading...");
+    const statusRow = this.headerContainer.createDiv("git-header-status");
+    statusRow.createSpan({ text: "\u2B06 0 \u2B07 0", cls: "git-ahead-behind" });
+  }
+  updateHeader(branch, ahead, behind) {
+    const branchName = this.headerContainer.querySelector(".git-branch-name");
+    if (branchName)
+      branchName.setText(branch);
+    const statusRow = this.headerContainer.querySelector(".git-header-status");
+    if (statusRow) {
+      statusRow.empty();
+      if (ahead > 0 || behind > 0) {
+        statusRow.createSpan({
+          text: `\u2B06 ${ahead} \u2B07 ${behind}`,
+          cls: "git-ahead-behind" + (ahead > 0 ? " git-ahead" : "") + (behind > 0 ? " git-behind" : "")
+        });
+      } else {
+        statusRow.createSpan({ text: "Up to date", cls: "git-up-to-date" });
+      }
+    }
+  }
+  async refresh() {
+    if (!this.plugin.gitManager) {
+      this.statusContainer.empty();
+      this.statusContainer.createEl("p", { text: "Git not initialized. Configure settings first.", cls: "git-empty-state" });
+      return;
+    }
+    try {
+      const branch = await this.plugin.gitManager.getCurrentBranch();
+      const { ahead, behind } = await this.plugin.gitManager.getStatus();
+      this.updateHeader(branch, ahead, behind);
+    } catch (e) {
+      log2.warn("GitSidebar", "Failed to get branch/status", e);
+      this.updateHeader("unknown", 0, 0);
+    }
+    try {
+      const files = await this.plugin.gitManager.getDetailedStatus();
+      this.renderFileList(files);
+    } catch (e) {
+      log2.warn("GitSidebar", "Failed to get file status", e);
+      this.statusContainer.empty();
+      this.statusContainer.createEl("p", { text: "Unable to read file status", cls: "git-empty-state" });
+    }
+    try {
+      const commits = await this.plugin.gitManager.getLog(15);
+      this.renderLogList(commits);
+    } catch (e) {
+      log2.warn("GitSidebar", "Failed to get commit log", e);
+      this.logContainer.empty();
+      this.logContainer.createEl("p", { text: "No commits yet", cls: "git-empty-state" });
+    }
+  }
+  renderFileList(files) {
+    this.statusContainer.empty();
+    if (files.length === 0) {
+      this.statusContainer.createEl("p", { text: "No changes", cls: "git-empty-state" });
+      return;
+    }
+    const statusIcons = {
+      modified: "M",
+      added: "A",
+      deleted: "D",
+      untracked: "?",
+      staged: "S",
+      conflict: "C"
+    };
+    const statusClasses = {
+      modified: "git-status-modified",
+      added: "git-status-added",
+      deleted: "git-status-deleted",
+      untracked: "git-status-untracked",
+      staged: "git-status-staged",
+      conflict: "git-status-conflict"
+    };
+    for (const file of files) {
+      const row = this.statusContainer.createDiv("git-file-row");
+      row.createSpan({ text: statusIcons[file.status] || file.status[0].toUpperCase(), cls: "git-status-icon " + (statusClasses[file.status] || "") });
+      const pathEl = row.createSpan({ text: file.filepath, cls: "git-file-path" });
+      pathEl.setAttr("title", file.filepath);
+      const actions = row.createDiv("git-file-actions");
+      if (file.status === "untracked" || file.status === "modified") {
+        const btn = actions.createEl("button", { text: "+", cls: "git-file-btn" });
+        btn.setAttr("title", "Stage file");
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.gitManager.stageFile(file.filepath);
+            new import_obsidian4.Notice(`Staged ${file.filepath}`);
+            await this.refresh();
+          } catch (err) {
+            new import_obsidian4.Notice("Stage failed: " + err.message);
+          }
+        });
+      } else if (file.status === "staged") {
+        const btn = actions.createEl("button", { text: "\u2212", cls: "git-file-btn" });
+        btn.setAttr("title", "Unstage file");
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await this.plugin.gitManager.unstageFile(file.filepath);
+            new import_obsidian4.Notice(`Unstaged ${file.filepath}`);
+            await this.refresh();
+          } catch (err) {
+            new import_obsidian4.Notice("Unstage failed: " + err.message);
+          }
+        });
+      }
+    }
+  }
+  renderLogList(commits) {
+    this.logContainer.empty();
+    if (commits.length === 0) {
+      this.logContainer.createEl("p", { text: "No commits yet", cls: "git-empty-state" });
+      return;
+    }
+    for (const commit2 of commits) {
+      const row = this.logContainer.createDiv("git-commit-row");
+      const hash = row.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
+      hash.setAttr("title", commit2.oid);
+      const msg = row.createSpan({ text: this.truncateMessage(commit2.message), cls: "git-commit-message" });
+      msg.setAttr("title", commit2.message);
+      row.createSpan({
+        text: this.formatDate(commit2.date),
+        cls: "git-commit-date"
+      });
+    }
+  }
+  truncateMessage(msg, maxLen = 40) {
+    const clean = msg.split("\n")[0];
+    return clean.length > maxLen ? clean.slice(0, maxLen) + "\u2026" : clean;
+  }
+  formatDate(date) {
+    const now = /* @__PURE__ */ new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 6e4);
+    const diffHours = Math.floor(diffMs / 36e5);
+    const diffDays = Math.floor(diffMs / 864e5);
+    if (diffMins < 1)
+      return "just now";
+    if (diffMins < 60)
+      return `${diffMins}m ago`;
+    if (diffHours < 24)
+      return `${diffHours}h ago`;
+    if (diffDays < 7)
+      return `${diffDays}d ago`;
+    return date.toLocaleDateString(void 0, { month: "short", day: "numeric" });
+  }
+};
+
 // src/main.ts
 var DEFAULT_SETTINGS = {
   repoUrl: "",
@@ -17206,7 +17594,7 @@ var DEFAULT_SETTINGS = {
   autoSyncInterval: 0,
   autoCommitMessage: "Vault backup: {{date}}"
 };
-var GitSyncPlugin = class extends import_obsidian4.Plugin {
+var GitSyncPlugin = class extends import_obsidian5.Plugin {
   constructor() {
     super(...arguments);
     this.intervalId = null;
@@ -17223,12 +17611,16 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
       log2.info("GitSyncPlugin", "Manual sync triggered from ribbon");
       try {
         await this.syncVault();
-        new import_obsidian4.Notice("Git sync completed successfully");
+        new import_obsidian5.Notice("Git sync completed successfully");
       } catch (error) {
         log2.error("GitSyncPlugin", "Manual sync failed", error);
-        new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
+        new import_obsidian5.Notice(`Git sync failed: ${error.message}`);
       }
     });
+    const sidebarRibbonEl = this.addRibbonIcon("git-branch", "Open Git Sidebar", async () => {
+      this.activateGitSidebarView();
+    });
+    this.registerView(VIEW_TYPE_GIT_SIDEBAR, (leaf) => new GitSidebarView(leaf, this));
     this.statusBarItem = this.addStatusBarItem();
     this.statusBarItem.setText("Git: Ready");
     this.addSettingTab(new GitSyncSettingTab(this.app, this));
@@ -17239,10 +17631,10 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
         log2.info("GitSyncPlugin", "Manual sync triggered from command palette");
         try {
           await this.syncVault();
-          new import_obsidian4.Notice("Git sync completed successfully");
+          new import_obsidian5.Notice("Git sync completed successfully");
         } catch (error) {
           log2.error("GitSyncPlugin", "Manual sync failed", error);
-          new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
+          new import_obsidian5.Notice(`Git sync failed: ${error.message}`);
         }
       }
     });
@@ -17270,10 +17662,10 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
           }
           await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
           await this.gitManager.pull(this.settings.branchName);
-          new import_obsidian4.Notice("Git pull completed successfully");
+          new import_obsidian5.Notice("Git pull completed successfully");
         } catch (error) {
           log2.error("GitSyncPlugin", "Pull failed", error);
-          new import_obsidian4.Notice(`Git pull failed: ${error.message}`);
+          new import_obsidian5.Notice(`Git pull failed: ${error.message}`);
         }
       }
     });
@@ -17301,10 +17693,10 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
           }
           await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
           await this.gitManager.push(this.settings.branchName);
-          new import_obsidian4.Notice("Git push completed successfully");
+          new import_obsidian5.Notice("Git push completed successfully");
         } catch (error) {
           log2.error("GitSyncPlugin", "Push failed", error);
-          new import_obsidian4.Notice(`Git push failed: ${error.message}`);
+          new import_obsidian5.Notice(`Git push failed: ${error.message}`);
         }
       }
     });
@@ -17332,11 +17724,18 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
           }
           await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
           const status = await this.gitManager.getStatus();
-          new import_obsidian4.Notice(`Git status: ${status.branch} \u2014 ${status.ahead} ahead, ${status.behind} behind`);
+          new import_obsidian5.Notice(`Git status: ${status.branch} \u2014 ${status.ahead} ahead, ${status.behind} behind`);
         } catch (error) {
           log2.error("GitSyncPlugin", "Status check failed", error);
-          new import_obsidian4.Notice(`Git status failed: ${error.message}`);
+          new import_obsidian5.Notice(`Git status failed: ${error.message}`);
         }
+      }
+    });
+    this.addCommand({
+      id: "git-sync-open-sidebar",
+      name: "Open Git sidebar",
+      callback: async () => {
+        await this.activateGitSidebarView();
       }
     });
     this.addCommand({
@@ -17399,8 +17798,8 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
           }
           const passed = results.filter((r) => r.startsWith("\u2705")).length;
           const failed = results.filter((r) => r.startsWith("\u274C")).length;
-          new import_obsidian4.Notice(`Git compat: ${passed}/${results.length} passed${failed > 0 ? ", " + failed + " failed" : ""}`);
-          class TestResultsModal extends import_obsidian4.Modal {
+          new import_obsidian5.Notice(`Git compat: ${passed}/${results.length} passed${failed > 0 ? ", " + failed + " failed" : ""}`);
+          class TestResultsModal extends import_obsidian5.Modal {
             constructor(app, results2) {
               super(app);
               this.results = results2;
@@ -17420,7 +17819,7 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
           new TestResultsModal(this.app, results).open();
         } catch (e) {
           log2.error("GitSyncPlugin", "Compatibility test failed", e);
-          new import_obsidian4.Notice("Compatibility test error: " + e.message);
+          new import_obsidian5.Notice("Compatibility test error: " + e.message);
         }
       }
     });
@@ -17454,6 +17853,21 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
     if (this.intervalId !== null) {
       window.clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+  }
+  async activateGitSidebarView() {
+    const { workspace } = this.app;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+    if (leaves.length > 0) {
+      workspace.revealLeaf(leaves[0]);
+      return;
+    }
+    const leaf = workspace.getRightLeaf(false);
+    if (leaf) {
+      await leaf.setViewState({ type: VIEW_TYPE_GIT_SIDEBAR });
+      workspace.revealLeaf(leaf);
+    } else {
+      new import_obsidian5.Notice("Failed to open Git sidebar");
     }
   }
   async syncVault() {
@@ -17501,7 +17915,7 @@ var GitSyncPlugin = class extends import_obsidian4.Plugin {
     }
   }
 };
-var GitSyncSettingTab = class extends import_obsidian4.PluginSettingTab {
+var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -17510,46 +17924,46 @@ var GitSyncSettingTab = class extends import_obsidian4.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Git Sync Settings" });
-    new import_obsidian4.Setting(containerEl).setName("Repository URL").setDesc("The URL of your Git repository").addText((text) => text.setPlaceholder("https://github.com/username/repo.git").setValue(this.plugin.settings.repoUrl).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Repository URL").setDesc("The URL of your Git repository").addText((text) => text.setPlaceholder("https://github.com/username/repo.git").setValue(this.plugin.settings.repoUrl).onChange(async (value) => {
       this.plugin.settings.repoUrl = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Branch").setDesc("The branch to sync with").addText((text) => text.setPlaceholder("main").setValue(this.plugin.settings.branchName).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Branch").setDesc("The branch to sync with").addText((text) => text.setPlaceholder("main").setValue(this.plugin.settings.branchName).onChange(async (value) => {
       this.plugin.settings.branchName = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Username").setDesc("Your Git username").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Username").setDesc("Your Git username").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Password/Token").setDesc("Your Git password or personal access token").addText((text) => text.setPlaceholder("password or token").setValue(this.plugin.settings.password).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Password/Token").setDesc("Your Git password or personal access token").addText((text) => text.setPlaceholder("password or token").setValue(this.plugin.settings.password).onChange(async (value) => {
       text.inputEl.type = "password";
       this.plugin.settings.password = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Author Name").setDesc("Your name for Git commits").addText((text) => text.setPlaceholder("Your Name").setValue(this.plugin.settings.author.name).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Author Name").setDesc("Your name for Git commits").addText((text) => text.setPlaceholder("Your Name").setValue(this.plugin.settings.author.name).onChange(async (value) => {
       this.plugin.settings.author.name = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Author Email").setDesc("Your email for Git commits").addText((text) => text.setPlaceholder("your.email@example.com").setValue(this.plugin.settings.author.email).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Author Email").setDesc("Your email for Git commits").addText((text) => text.setPlaceholder("your.email@example.com").setValue(this.plugin.settings.author.email).onChange(async (value) => {
       this.plugin.settings.author.email = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Auto Sync Interval").setDesc("How often to automatically sync (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.autoSyncInterval)).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Auto Sync Interval").setDesc("How often to automatically sync (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.autoSyncInterval)).onChange(async (value) => {
       const numValue = Number(value);
       if (!isNaN(numValue) && numValue >= 0) {
         this.plugin.settings.autoSyncInterval = numValue;
         await this.plugin.saveSettings();
       }
     }));
-    new import_obsidian4.Setting(containerEl).setName("Auto Commit Message").setDesc("Message for automatic commits. Use {{date}} for current date/time").addText((text) => text.setPlaceholder("Vault backup: {{date}}").setValue(this.plugin.settings.autoCommitMessage).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Auto Commit Message").setDesc("Message for automatic commits. Use {{date}} for current date/time").addText((text) => text.setPlaceholder("Vault backup: {{date}}").setValue(this.plugin.settings.autoCommitMessage).onChange(async (value) => {
       this.plugin.settings.autoCommitMessage = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian4.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
+    new import_obsidian5.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
       try {
         if (!this.plugin.settings.repoUrl) {
-          new import_obsidian4.Notice("Please enter a repository URL first");
+          new import_obsidian5.Notice("Please enter a repository URL first");
           return;
         }
         if (!this.plugin.gitManager) {
@@ -17568,27 +17982,26 @@ var GitSyncSettingTab = class extends import_obsidian4.PluginSettingTab {
             throw new Error("Status bar item not initialized");
           }
         }
-        new import_obsidian4.Notice("Testing connection...");
+        new import_obsidian5.Notice("Testing connection...");
         await this.plugin.gitManager.initializeRepo(
           this.plugin.settings.repoUrl,
           this.plugin.settings.branchName
         );
-        new import_obsidian4.Notice("Connection successful!");
+        new import_obsidian5.Notice("Connection successful!");
       } catch (error) {
-        new import_obsidian4.Notice(`Connection test failed: ${error.message}`);
+        new import_obsidian5.Notice(`Connection test failed: ${error.message}`);
       }
     }));
-    new import_obsidian4.Setting(containerEl).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
+    new import_obsidian5.Setting(containerEl).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
       try {
         await this.plugin.syncVault();
-        new import_obsidian4.Notice("Git sync completed successfully");
+        new import_obsidian5.Notice("Git sync completed successfully");
       } catch (error) {
-        new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
+        new import_obsidian5.Notice(`Git sync failed: ${error.message}`);
       }
     }));
   }
 };
-globalThis.Buffer = require_buffer().Buffer;
 /*! Bundled license information:
 
 ieee754/index.js:

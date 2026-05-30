@@ -1,9 +1,10 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, Modal } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, Notice, Modal, WorkspaceLeaf } from 'obsidian';
 import * as git from 'isomorphic-git';
 import * as http from 'isomorphic-git/http/web';
 import FS from '@isomorphic-git/lightning-fs';
 import { GitManager, GitCredentials } from './gitManager';
 import { log, LogLevel } from './logger';
+import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
 
 interface GitSyncSettings {
 	repoUrl: string;
@@ -60,6 +61,14 @@ export default class GitSyncPlugin extends Plugin {
 				new Notice(`Git sync failed: ${error.message}`);
 			}
 		});
+
+		// Add ribbon icon to open Git sidebar
+		const sidebarRibbonEl = this.addRibbonIcon('git-branch', 'Open Git Sidebar', async () => {
+			this.activateGitSidebarView();
+		});
+
+		// Register the Git sidebar view
+		this.registerView(VIEW_TYPE_GIT_SIDEBAR, (leaf) => new GitSidebarView(leaf, this));
 
 		// Add status bar item
 		this.statusBarItem = this.addStatusBarItem();
@@ -177,6 +186,14 @@ export default class GitSyncPlugin extends Plugin {
 					log.error('GitSyncPlugin', 'Status check failed', error);
 					new Notice(`Git status failed: ${error.message}`);
 				}
+			}
+		});
+
+		this.addCommand({
+			id: 'git-sync-open-sidebar',
+			name: 'Open Git sidebar',
+			callback: async () => {
+				await this.activateGitSidebarView();
 			}
 		});
 
@@ -326,6 +343,27 @@ export default class GitSyncPlugin extends Plugin {
 		if (this.intervalId !== null) {
 			window.clearInterval(this.intervalId);
 			this.intervalId = null;
+		}
+	}
+
+	async activateGitSidebarView(): Promise<void> {
+		const { workspace } = this.app;
+		
+		// Check if view is already open
+		const leaves = workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+		if (leaves.length > 0) {
+			// Reveal existing view
+			workspace.revealLeaf(leaves[0]);
+			return;
+		}
+		
+		// Open new leaf in right sidebar
+		const leaf = workspace.getRightLeaf(false);
+		if (leaf) {
+			await leaf.setViewState({ type: VIEW_TYPE_GIT_SIDEBAR });
+			workspace.revealLeaf(leaf);
+		} else {
+			new Notice('Failed to open Git sidebar');
 		}
 	}
 

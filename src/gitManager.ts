@@ -112,6 +112,19 @@ class GitHttpClient {
 import * as fs from '@isomorphic-git/lightning-fs';
 import { Notice } from 'obsidian';
 
+export interface GitFileStatus {
+    filepath: string;
+    status: 'modified' | 'added' | 'deleted' | 'untracked' | 'staged' | 'conflict';
+}
+
+export interface GitCommit {
+    oid: string;
+    message: string;
+    author: string;
+    date: Date;
+    commit: any;
+}
+
 export interface GitCredentials {
     username: string;
     password: string;
@@ -402,6 +415,107 @@ export class GitManager {
             };
         } catch (error) {
             log.error('GitManager', 'Failed to get repository status', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get detailed status of all files (staged, modified, untracked, etc.)
+     */
+    async getDetailedStatus(): Promise<GitFileStatus[]> {
+        try {
+            const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+            const result: GitFileStatus[] = [];
+            
+            for (const row of matrix) {
+                const [filepath, head, workdir, stage] = row;
+                // head: 0=absent, 1=same as HEAD, 2=different from HEAD
+                // workdir: 0=absent, 1=same as HEAD, 2=different from HEAD
+                // stage: 0=absent, 1=same as HEAD, 2=different from HEAD, 3=untracked
+                
+                if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
+                
+                let status: 'modified' | 'added' | 'deleted' | 'untracked' | 'staged' | 'conflict';
+                if (head === 0 && workdir === 2 && stage === 0) status = 'untracked';
+                else if (head === 0 && (stage === 2 || stage === 3)) status = 'added';
+                else if (workdir === 0) status = 'deleted';
+                else if (head === 1 && workdir === 2 && stage === 1) status = 'modified';
+                else if (head === 1 && workdir === 1 && stage === 2) status = 'staged';
+                else if (head === 1 && workdir === 2 && stage === 2) status = 'modified'; // staged + modified
+                else status = 'modified';
+                
+                result.push({ filepath, status });
+            }
+            return result;
+        } catch (error) {
+            log.error('GitManager', 'Failed to get detailed status', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stage a single file
+     */
+    async stageFile(filepath: string): Promise<void> {
+        try {
+            await git.add({ fs: this.fs, dir: this.dir, filepath });
+            log.debug('GitManager', `Staged file: ${filepath}`);
+        } catch (error) {
+            log.error('GitManager', `Failed to stage file: ${filepath}`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Unstage a single file (reset to HEAD)
+     */
+    async unstageFile(filepath: string): Promise<void> {
+        try {
+            // isomorphic-git doesn't have direct unstage, but we can use remove/add trick
+            // For now, we'll re-read the file from HEAD and write it back
+            // Actually, isomorphic-git resetIndex exists in newer versions
+            // Fallback: use git.resetIndex if available, otherwise just log
+            await git.resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
+            log.debug('GitManager', `Unstaged file: ${filepath}`);
+        } catch (error: any) {
+            // If resetIndex fails, try alternative approach
+            if (error.message?.includes('resetIndex')) {
+                log.warn('GitManager', `resetIndex not available, file remains staged: ${filepath}`);
+                throw new Error('Unstaging not supported in this isomorphic-git version');
+            }
+            log.error('GitManager', `Failed to unstage file: ${filepath}`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get commit log (history)
+     */
+    async getLog(maxCount: number = 20): Promise<GitCommit[]> {
+        try {
+            const commits = await git.log({ fs: this.fs, dir: this.dir, ref: 'HEAD', depth: maxCount });
+            return commits.map(c => ({
+                oid: c.oid,
+                message: c.commit?.message || '',
+                author: c.commit?.author?.name || 'Unknown',
+                date: new Date((c.commit?.author?.timestamp || 0) * 1000),
+                commit: c.commit
+            }));
+        } catch (error) {
+            log.error('GitManager', 'Failed to get commit log', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get the current branch name
+     */
+    async getCurrentBranch(): Promise<string> {
+        try {
+            const branch = await git.currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+            return branch || 'HEAD';
+        } catch (error) {
+            log.error('GitManager', 'Failed to get current branch', error);
             throw error;
         }
     }
