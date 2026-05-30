@@ -11,7 +11,8 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
-| T3 | Mobile Compatibility | 🔄 | HIGH | 2026-05-30 | T1, T2 | [Details](tasks/T3.md) |
+| T6 | Git Sidebar UI | 🆕 | HIGH | 2026-05-30 | T3 | [Details](tasks/T6.md) |
+| T7 | Multi-Repo Support | 🆕 | MEDIUM | 2026-05-30 | T3 | [Details](tasks/T7.md) |
 
 ## Completed Tasks
 
@@ -19,12 +20,13 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 |----|-------|--------|----------|---------|-----------|--------------|---------|
 | T1 | Core Git Integration | ✅ | HIGH | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T1.md) |
 | T2 | Plugin Commands & UI | ✅ | HIGH | 2026-05-28 | 2026-05-30 | T1 | [Details](tasks/T2.md) |
+| T3 | Mobile Compatibility | ✅ | HIGH | 2026-05-30 | 2026-05-30 | T1, T2 | [Details](tasks/T3.md) |
 | T4 | Auto-sync & Background | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | T1, T2 | [Details](tasks/T4.md) |
 | T5 | Error Handling & Logging | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T5.md) |
 
 ## Status Summary
 
-- **Active**: 1
-- **Completed**: 4
+- **Active**: 2
+- **Completed**: 5
 - **Paused**: 0
-- **Total**: 5
+- **Total**: 7

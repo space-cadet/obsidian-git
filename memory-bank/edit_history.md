@@ -5,6 +5,13 @@
 
 ### 2026-05-30
 
+#### 23:25:00 IST - T6, T7: New tasks created per user request
+- Created `memory-bank/tasks/T6.md` — Git Sidebar UI (status panel, log view, commit history, branch info)
+- Created `memory-bank/tasks/T7.md` — Multi-Repo Support (repos in subfolders, per-repo settings, auto-detection)
+- Updated `memory-bank/tasks.md` — Registry now shows 7 tasks (5 completed, 2 active)
+- Updated `memory-bank/activeContext.md` — Current focus on T6 and T7
+- Updated `memory-bank/session_cache.md` — Session updated with new tasks
+
 #### 22:56:00 IST - T3: Mobile compatibility achieved — v9 works on mobile!
 - Modified `esbuild.config.mjs` — Banner now always ensures `process.cwd` exists (even if `process` partially defined on mobile)
 - Post-processed `main.js` — Added `globalThis.Buffer = require_buffer().Buffer;` at end of bundle
