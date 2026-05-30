@@ -1,46 +1,51 @@
 # Project Progress
 
-*Last Updated: 2026-05-30 19:53:13 IST*
+*Last Updated: 2026-05-30 21:35:00 IST*
 
-## What Works
+## Completed Phases
 
-- [x] Basic plugin structure with Obsidian API integration
-- [x] GitManager with clone, pull, add, commit, push, status operations
-- [x] Settings UI with repository URL, credentials, author info, auto-sync interval
-- [x] Manual sync via ribbon icon
-- [x] Auto-sync with configurable interval
-- [x] Status bar indicator
-- [x] Connection test button in settings
-- [x] Winston-based structured logging
-- [x] CORS proxy server for mobile Git HTTP
+### Phase 1: Core Git Integration (T1) ✅
+- GitHttpClient using `requestUrl`
+- GitManager with clone, pull, push, add, commit, status
+- Binary pack file handling via ArrayBuffer
+- Basic Auth for GitHub/GitLab
+
+### Phase 2: Plugin UI & Commands (T2) ✅
+- Ribbon icon for manual sync
+- Status bar showing current operation
+- Settings tab with repo config, auth, auto-sync
+- Commands: sync, pull, push, status, test-compatibility
+
+### Phase 3: Auto-sync & Background (T4) ✅
+- Configurable interval (minutes)
+- Cleanup on plugin unload
+- Date placeholder in commit message
+
+### Phase 4: Error Handling & Logging (T5) ✅
+- Replaced winston with simple Logger
+- No external dependencies
+- Structured logging with component prefixes
 
 ## In Progress
 
-- [ ] Memory bank initialization (this session)
+### Phase 5: Mobile Compatibility (T3) 🔄
+- Replaced winston (no more `require("buffer")`)
+- Need to verify bundle is clean
+- Need to test on mobile device
 
-## To Do
+## Pending
 
-- [ ] Add test suite
-- [ ] Review error handling in GitManager
-- [ ] Evaluate mobile platform compatibility
-- [ ] Consider conflict resolution strategy
-- [ ] Add gitignore management
-- [ ] Review security of credential storage
+- README and user documentation
+- Conflict resolution UI
+- SSH key authentication
+- Plugin store submission
 
-## Known Issues
+## Milestones
 
-- No test coverage
-- Credentials stored in Obsidian plugin data (not encrypted)
-- Proxy server required for mobile — needs external hosting option
-- No conflict resolution UI
-
-## Next Priorities
-
-1. Stabilize core sync workflow
-2. Add automated tests
-3. Improve mobile experience
-4. Add conflict resolution
-
-## Project Status
-
-Early development — core features functional, needs hardening and testing.
+| Milestone | Status | Date |
+|-----------|--------|------|
+| Desktop working | ✅ | 2026-05-28 |
+| Proxy replaced with requestUrl | ✅ | 2026-05-30 |
+| Mobile bundle clean | 🔄 | 2026-05-30 |
+| Mobile tested | ⬜ | - |
+| v1.0 release | ⬜ | - |

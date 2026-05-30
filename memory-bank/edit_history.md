@@ -1,29 +1,52 @@
 # Edit History
 
-*Last Updated: 2026-05-30 15:48:12 IST*
+*Created: 2026-05-28 20:16:00 IST*
+*Last Updated: 2026-05-30 21:35:00 IST*
 
----
+### 2026-05-30
 
-## 2026-05-30
+#### 21:35:00 IST - T1-T5: Memory bank expansion and task separation
+- Created `memory-bank/tasks/T1.md` — Core Git Integration task details
+- Created `memory-bank/tasks/T2.md` — Plugin Commands & UI task details
+- Created `memory-bank/tasks/T3.md` — Mobile Compatibility task details
+- Created `memory-bank/tasks/T4.md` — Auto-sync & Background task details
+- Created `memory-bank/tasks/T5.md` — Error Handling & Logging task details
+- Updated `memory-bank/tasks.md` — Expanded registry with 5 tasks (1 active, 4 completed)
+- Created `memory-bank/implementation-details/git-http-client.md` — requestUrl architecture documentation
+- Created `memory-bank/implementation-details/mobile-compatibility.md` — Mobile strategy and winston replacement docs
+- Updated `memory-bank/activeContext.md` — Current focus on T3, completed tasks listed
+- Updated `memory-bank/progress.md` — Phase tracking with milestones
+- Updated `memory-bank/session_cache.md` — Evening session tracking
+- Created `memory-bank/sessions/2026-05-30-evening.md` — Session log
 
-#### 21:18:12 IST - T1: Mobile compatibility investigation and fixes for obsidian-git plugin
-- Fixed `src/gitManager.ts` - Removed fs param from listServerRefs; fixed ahead/behind swap bug; replaced proxy-based HTTP with requestUrl native bridge
-- Fixed `src/main.ts` - Added 5 command palette commands (sync, pull, push, status, test-compatibility); removed dynamic import of obsidian; added Modal to static imports
-- Created `scripts/build-archive.mjs` - Pure Node.js ZIP archive builder for plugin distribution
-- Created `test-isomorphic-git.mjs` - Standalone isomorphic-git functionality test with MemFS
-- Deleted `proxy/proxyServer.js` - Removed Express proxy server - no longer needed with requestUrl
-- Updated `package.json` - Added archive script
-- Updated `memory-bank/` - Initialized memory bank with DB workflow from mb-core framework
+#### 21:20:00 IST - T1: Replace proxy with requestUrl, add commands, fix bugs
+- Modified `src/gitManager.ts` — Replaced proxy-based GitHttpClient with requestUrl-based client
+- Modified `src/gitManager.ts` — Added requestUrl to handle binary pack files via ArrayBuffer
+- Modified `src/main.ts` — Added commands: sync-now, pull, push, status, test-compatibility
+- Modified `src/main.ts` — Added settings UI for repo URL, auth, auto-sync interval
+- Modified `src/main.ts` — Added ribbon icon and status bar
+- Created `src/logger.ts` — Simple Logger to replace winston (no Node.js deps)
+- Modified `esbuild.config.mjs` — Added `path-browserify` for mobile compatibility
+- Modified `package.json` — Added `isomorphic-git`, `path-browserify`, `@isomorphic-git/lightning-fs`
+- Modified `package.json` — Removed `winston` dependency
 
-#### 20:03:51 IST - T1: Test regenerate mode — regenerate markdown from DB
-- Updated `memory-bank/progress.md` - Updated with DB workflow status
-- Updated `memory-bank/session_cache.md` - Updated session cache with DB info
+#### 21:15:00 IST - T1: Build verification and mobile prep
+- Modified `src/main.ts` — Added test-compatibility command with 7 tests
+- Modified `src/main.ts` — Added LightningFS initialization and GitManager setup
+- Modified `src/gitManager.ts` — Added `getStatus()` with ahead/behind calculation
+- Modified `src/gitManager.ts` — Added `sync()` with pull, add, commit, push sequence
+- Modified `src/gitManager.ts` — Added `getChangedFiles()` via statusMatrix
 
-#### 20:03:40 IST - T1: Initialized DB workflow for obsidian-git project
-- Created `memory-bank/database/schema.sql` - SQLite schema for memory bank
-- Created `memory-bank/database/lib/sqlite.js` - sql.js adapter module
-- Created `memory-bank/database/lib/inserts.js` - DB insert functions
-- Created `memory-bank/database/lib/regenerate.js` - Markdown regeneration from DB
-- Created `memory-bank/database/lib/workflow.js` - Agent workflow wrapper
-- Created `memory-bank/database/memory_bank.db` - Initialized SQLite database
+#### 21:10:00 IST - T1: Initial git integration
+- Created `src/gitManager.ts` — GitManager class with clone, pull, push, commit, add
+- Created `src/main.ts` — Plugin entry point with settings and commands
+- Modified `esbuild.config.mjs` — Added `path-browserify` alias for `path` module
 
+### 2026-05-28
+
+#### 20:16:00 IST - INIT: Memory bank initialized
+- Created `memory-bank/tasks.md` — Task registry
+- Created `memory-bank/session_cache.md` — Session tracking
+- Created `memory-bank/activeContext.md` — Current context
+- Created `memory-bank/edit_history.md` — Edit history (this file)
+- Created `memory-bank/implementation-details/` — Knowledge layer directory

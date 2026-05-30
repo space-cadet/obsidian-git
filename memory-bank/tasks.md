@@ -1,27 +1,30 @@
-# Memory Bank - Sage Workspace
+# Memory Bank — Obsidian Git Sync Plugin
 
-*Created: 2026-05-30 15:48:12 IST*
-*Last Updated: 2026-05-30 15:48:12 IST*
+*Created: 2026-05-28 20:16:00 IST*
+*Last Updated: 2026-05-30 21:35:00 IST*
 
 ## Overview
 
-This is the Memory Bank for the Sage (灵剑) OpenClaw workspace.
+Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile without proxy servers. Uses Obsidian's `requestUrl` native API for HTTP operations.
 
 ## Active Tasks
 
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
-| T1 | Initialized DB workflow for obsidian-git project | 🔄 | MEDIUM | 2026-05-30 | - | [Details](tasks/T1.md) |
+| T3 | Mobile Compatibility | 🔄 | HIGH | 2026-05-30 | T1, T2 | [Details](tasks/T3.md) |
 
-## Task Relationships
+## Completed Tasks
 
-```
-T1: Initialized DB workflow for obsidian-git project
-```
+| ID | Title | Status | Priority | Started | Completed | Dependencies | Details |
+|----|-------|--------|----------|---------|-----------|--------------|---------|
+| T1 | Core Git Integration | ✅ | HIGH | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T1.md) |
+| T2 | Plugin Commands & UI | ✅ | HIGH | 2026-05-28 | 2026-05-30 | T1 | [Details](tasks/T2.md) |
+| T4 | Auto-sync & Background | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | T1, T2 | [Details](tasks/T4.md) |
+| T5 | Error Handling & Logging | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T5.md) |
 
 ## Status Summary
 
 - **Active**: 1
-- **Completed**: 0
+- **Completed**: 4
 - **Paused**: 0
-- **Total**: 1
+- **Total**: 5

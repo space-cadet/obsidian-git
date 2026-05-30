@@ -1,37 +1,37 @@
 # Active Context
 
-*Last Updated: 2026-05-30 19:53:13 IST*
+*Last Updated: 2026-05-30 21:35:00 IST*
 
-## Current Focus
+## Current Tasks
 
-Initial memory bank setup for the obsidian-git project. No active development task yet.
+### T3: Mobile Compatibility — IN PROGRESS
+- Verifying bundle has no Node.js builtins after winston replacement
+- Need to test on actual mobile device
+- Build verification checklist in progress
 
-## System State
+## Completed Tasks (Recent)
 
-- Memory bank initialized from mb-core framework
-- Project structure analyzed: TypeScript Obsidian plugin using isomorphic-git
-- Core files identified: `main.ts`, `gitManager.ts`, `logger.ts`, `proxyServer.js`
+1. **T1: Core Git Integration** — Replaced proxy with `requestUrl`, implemented GitManager
+2. **T2: Plugin Commands & UI** — Added commands, settings, status bar, ribbon icon
+3. **T4: Auto-sync & Background** — Timer-based sync with cleanup
+4. **T5: Error Handling & Logging** — Replaced winston with simple Logger
 
-## Active Decisions
+## Next Steps
 
-1. **Memory bank format**: Using mb-core v6.10+ tiered structure
-2. **Text-first workflow**: Text files remain primary until DB backfill verified
+1. Build plugin and verify no `require("buffer")` in bundle
+2. Test on mobile device (iOS/Android)
+3. Fix any remaining mobile issues
+4. Add documentation for users (README, setup guide)
 
-## Cross-References
+## System Status
 
-- `projectbrief.md` — Core requirements and project scope
-- `progress.md` — Status tracking and next priorities
-- `tasks/T1.md` — Initial task placeholder
+- **Plugin**: Core features complete, mobile testing pending
+- **Build**: Ready for production build
+- **Memory Bank**: Expanded with separate tasks and implementation docs
+- **Branch**: `simple-git`
 
-## Current Considerations
+## Decisions Pending
 
-- Plugin uses isomorphic-git which requires a CORS proxy for mobile
-- Proxy server runs on localhost:3001
-- LightningFS provides in-browser filesystem abstraction
-- No test suite currently present
-
-## Next Actions
-
-- [ ] Define initial development task for the plugin
-- [ ] Review existing code for known issues or missing features
-- [ ] Consider adding tests or CI pipeline
+- Whether to add `isDesktopOnly: true` fallback if mobile tests fail
+- Whether to add SSH key authentication (currently only Basic Auth)
+- Whether to add conflict resolution UI for merge conflicts
