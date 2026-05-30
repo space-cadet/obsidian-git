@@ -1,39 +1,112 @@
 import * as git from 'isomorphic-git';
-import * as http from 'isomorphic-git/http/web';
+import { requestUrl, RequestUrlResponse } from 'obsidian';
 import { log } from './logger';
 
+/**
+ * Git HTTP client using Obsidian's requestUrl API.
+ *
+ * requestUrl runs at the native level (Capacitor bridge), bypassing CORS
+ * restrictions entirely. This works on both desktop and mobile without
+ * requiring any proxy server.
+ */
 class GitHttpClient {
   private credentials: GitCredentials;
-  private static readonly PROXY_URL = 'http://localhost:3001/proxy?url=';
 
   constructor(credentials: GitCredentials) {
     this.credentials = credentials;
   }
 
   async request(config: any) {
-    const proxiedUrl = GitHttpClient.PROXY_URL + encodeURIComponent(config.url);
-    log.debug('GitHttpClient', `Proxying request to: ${config.url}`);
-    
-    const headers = {
+    log.debug('GitHttpClient', `Requesting: ${config.method || 'GET'} ${config.url}`);
+
+    // Build headers with Basic Auth
+    const headers: Record<string, string> = {
       ...config.headers,
-      'X-Requested-With': 'obsidian-git-sync',
-      'X-Git-Username': this.credentials.username,
-      'X-Git-Password': this.credentials.password
     };
 
+    if (this.credentials.username && this.credentials.password) {
+      const auth = btoa(`${this.credentials.username}:${this.credentials.password}`);
+      headers['Authorization'] = `Basic ${auth}`;
+    }
+
+    // Collect body if it's an async iterable (isomorphic-git sends Uint8Array chunks)
+    let body: string | ArrayBuffer | undefined;
+    if (config.body) {
+      body = await this.collectBody(config.body);
+    }
+
     try {
-      log.debug('GitHttpClient', `Sending ${config.method || 'GET'} request`);
-      const response = await http.request({
-        ...config,
-        url: proxiedUrl,
-        headers
+      const response: RequestUrlResponse = await requestUrl({
+        url: config.url,
+        method: config.method || 'GET',
+        headers,
+        body,
+        throw: false, // Don't throw on 4xx/5xx — let isomorphic-git handle Git errors
       });
-      log.debug('GitHttpClient', `Response status: ${response.statusCode}`);
-      return response;
-    } catch (error) {
+
+      log.debug('GitHttpClient', `Response status: ${response.status}`);
+
+      // Convert Obsidian response to isomorphic-git expected format
+      return {
+        url: config.url,
+        method: config.method || 'GET',
+        statusCode: response.status,
+        statusMessage: this.getStatusMessage(response.status),
+        body: this.toAsyncIterator(response.arrayBuffer),
+        headers: response.headers,
+      };
+    } catch (error: any) {
       log.error('GitHttpClient', `Request failed: ${error.message}`, error);
       throw error;
     }
+  }
+
+  /**
+   * Collect an async iterable of Uint8Arrays into a single ArrayBuffer
+   */
+  private async collectBody(body: AsyncIterable<Uint8Array>): Promise<ArrayBuffer> {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of body) {
+      chunks.push(chunk);
+    }
+
+    let totalLength = 0;
+    for (const chunk of chunks) {
+      totalLength += chunk.byteLength;
+    }
+
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return result.buffer;
+  }
+
+  /**
+   * Convert an ArrayBuffer into an async iterator of Uint8Arrays
+   * (isomorphic-git expects body as an async iterable)
+   */
+  private toAsyncIterator(arrayBuffer: ArrayBuffer): AsyncIterable<Uint8Array> {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        yield new Uint8Array(arrayBuffer);
+      },
+    };
+  }
+
+  private getStatusMessage(status: number): string {
+    const messages: Record<number, string> = {
+      200: 'OK',
+      201: 'Created',
+      204: 'No Content',
+      401: 'Unauthorized',
+      403: 'Forbidden',
+      404: 'Not Found',
+    };
+    return messages[status] || 'Unknown';
   }
 }
 import * as fs from '@isomorphic-git/lightning-fs';
@@ -118,7 +191,6 @@ export class GitManager {
             log.debug('GitManager', `Validating remote repository URL: ${repoUrl}`);
             
             await git.listServerRefs({
-                fs: this.fs,
                 http: new GitHttpClient(this.credentials),
                 url: repoUrl,
                 prefix: `refs/heads/${branchName}`,
@@ -312,12 +384,12 @@ export class GitManager {
                 git.log({
                     fs: this.fs,
                     dir: this.dir,
-                    ref: `${currentBranch}..origin/${currentBranch}`
+                    ref: `origin/${currentBranch}..${currentBranch}`
                 }).then(commits => commits.length).catch(() => 0),
                 git.log({
                     fs: this.fs,
                     dir: this.dir,
-                    ref: `origin/${currentBranch}..${currentBranch}`
+                    ref: `${currentBranch}..origin/${currentBranch}`
                 }).then(commits => commits.length).catch(() => 0)
             ]);
             

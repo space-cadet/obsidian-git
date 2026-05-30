@@ -34,1399 +34,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// node_modules/.pnpm/just-once@1.1.0/node_modules/just-once/index.js
-var require_just_once = __commonJS({
-  "node_modules/.pnpm/just-once@1.1.0/node_modules/just-once/index.js"(exports, module2) {
-    module2.exports = once;
-    function once(fn) {
-      var called, value;
-      if (typeof fn !== "function") {
-        throw new Error("expected a function but got " + fn);
-      }
-      return function wrap() {
-        if (called) {
-          return value;
-        }
-        called = true;
-        value = fn.apply(this, arguments);
-        return value;
-      };
-    }
-  }
-});
-
-// node_modules/.pnpm/fast-text-encoding@1.0.6/node_modules/fast-text-encoding/text.min.js
-var require_text_min = __commonJS({
-  "node_modules/.pnpm/fast-text-encoding@1.0.6/node_modules/fast-text-encoding/text.min.js"(exports) {
-    (function(scope) {
-      "use strict";
-      function B(r, e) {
-        var f;
-        return r instanceof Buffer ? f = r : f = Buffer.from(r.buffer, r.byteOffset, r.byteLength), f.toString(e);
-      }
-      var w = function(r) {
-        return Buffer.from(r);
-      };
-      function h(r) {
-        for (var e = 0, f = Math.min(256 * 256, r.length + 1), n = new Uint16Array(f), i = [], o = 0; ; ) {
-          var t = e < r.length;
-          if (!t || o >= f - 1) {
-            var s = n.subarray(0, o), m = s;
-            if (i.push(String.fromCharCode.apply(null, m)), !t)
-              return i.join("");
-            r = r.subarray(e), e = 0, o = 0;
-          }
-          var a = r[e++];
-          if ((a & 128) === 0)
-            n[o++] = a;
-          else if ((a & 224) === 192) {
-            var d = r[e++] & 63;
-            n[o++] = (a & 31) << 6 | d;
-          } else if ((a & 240) === 224) {
-            var d = r[e++] & 63, l = r[e++] & 63;
-            n[o++] = (a & 31) << 12 | d << 6 | l;
-          } else if ((a & 248) === 240) {
-            var d = r[e++] & 63, l = r[e++] & 63, R = r[e++] & 63, c = (a & 7) << 18 | d << 12 | l << 6 | R;
-            c > 65535 && (c -= 65536, n[o++] = c >>> 10 & 1023 | 55296, c = 56320 | c & 1023), n[o++] = c;
-          }
-        }
-      }
-      function F(r) {
-        for (var e = 0, f = r.length, n = 0, i = Math.max(32, f + (f >>> 1) + 7), o = new Uint8Array(i >>> 3 << 3); e < f; ) {
-          var t = r.charCodeAt(e++);
-          if (t >= 55296 && t <= 56319) {
-            if (e < f) {
-              var s = r.charCodeAt(e);
-              (s & 64512) === 56320 && (++e, t = ((t & 1023) << 10) + (s & 1023) + 65536);
-            }
-            if (t >= 55296 && t <= 56319)
-              continue;
-          }
-          if (n + 4 > o.length) {
-            i += 8, i *= 1 + e / r.length * 2, i = i >>> 3 << 3;
-            var m = new Uint8Array(i);
-            m.set(o), o = m;
-          }
-          if ((t & 4294967168) === 0) {
-            o[n++] = t;
-            continue;
-          } else if ((t & 4294965248) === 0)
-            o[n++] = t >>> 6 & 31 | 192;
-          else if ((t & 4294901760) === 0)
-            o[n++] = t >>> 12 & 15 | 224, o[n++] = t >>> 6 & 63 | 128;
-          else if ((t & 4292870144) === 0)
-            o[n++] = t >>> 18 & 7 | 240, o[n++] = t >>> 12 & 63 | 128, o[n++] = t >>> 6 & 63 | 128;
-          else
-            continue;
-          o[n++] = t & 63 | 128;
-        }
-        return o.slice ? o.slice(0, n) : o.subarray(0, n);
-      }
-      var u = "Failed to ", p = function(r, e, f) {
-        if (r)
-          throw new Error("".concat(u).concat(e, ": the '").concat(f, "' option is unsupported."));
-      };
-      var x = typeof Buffer == "function" && Buffer.from;
-      var A = x ? w : F;
-      function v() {
-        this.encoding = "utf-8";
-      }
-      v.prototype.encode = function(r, e) {
-        return p(e && e.stream, "encode", "stream"), A(r);
-      };
-      function U(r) {
-        var e;
-        try {
-          var f = new Blob([r], { type: "text/plain;charset=UTF-8" });
-          e = URL.createObjectURL(f);
-          var n = new XMLHttpRequest();
-          return n.open("GET", e, false), n.send(), n.responseText;
-        } finally {
-          e && URL.revokeObjectURL(e);
-        }
-      }
-      var O = !x && typeof Blob == "function" && typeof URL == "function" && typeof URL.createObjectURL == "function", S = ["utf-8", "utf8", "unicode-1-1-utf-8"], T = h;
-      x ? T = B : O && (T = function(r) {
-        try {
-          return U(r);
-        } catch (e) {
-          return h(r);
-        }
-      });
-      var y = "construct 'TextDecoder'", E = "".concat(u, " ").concat(y, ": the ");
-      function g(r, e) {
-        p(e && e.fatal, y, "fatal"), r = r || "utf-8";
-        var f;
-        if (x ? f = Buffer.isEncoding(r) : f = S.indexOf(r.toLowerCase()) !== -1, !f)
-          throw new RangeError("".concat(E, " encoding label provided ('").concat(r, "') is invalid."));
-        this.encoding = r, this.fatal = false, this.ignoreBOM = false;
-      }
-      g.prototype.decode = function(r, e) {
-        p(e && e.stream, "decode", "stream");
-        var f;
-        return r instanceof Uint8Array ? f = r : r.buffer instanceof ArrayBuffer ? f = new Uint8Array(r.buffer) : f = new Uint8Array(r), T(f, this.encoding);
-      };
-      scope.TextEncoder = scope.TextEncoder || v;
-      scope.TextDecoder = scope.TextDecoder || g;
-    })(typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : exports);
-  }
-});
-
-// node_modules/.pnpm/isomorphic-textencoder@1.0.1/node_modules/isomorphic-textencoder/browser.js
-var require_browser = __commonJS({
-  "node_modules/.pnpm/isomorphic-textencoder@1.0.1/node_modules/isomorphic-textencoder/browser.js"(exports, module2) {
-    require_text_min();
-    module2.exports = {
-      encode: (string) => new TextEncoder().encode(string),
-      decode: (buffer) => new TextDecoder().decode(buffer)
-    };
-  }
-});
-
-// node_modules/.pnpm/just-debounce-it@1.1.0/node_modules/just-debounce-it/index.js
-var require_just_debounce_it = __commonJS({
-  "node_modules/.pnpm/just-debounce-it@1.1.0/node_modules/just-debounce-it/index.js"(exports, module2) {
-    module2.exports = debounce;
-    function debounce(fn, wait, callFirst) {
-      var timeout;
-      return function() {
-        if (!wait) {
-          return fn.apply(this, arguments);
-        }
-        var context = this;
-        var args = arguments;
-        var callNow = callFirst && !timeout;
-        clearTimeout(timeout);
-        timeout = setTimeout(function() {
-          timeout = null;
-          if (!callNow) {
-            return fn.apply(context, args);
-          }
-        }, wait);
-        if (callNow) {
-          return fn.apply(this, arguments);
-        }
-      };
-    }
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/path.js
-var require_path = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/path.js"(exports, module2) {
-    function normalizePath2(path) {
-      if (path.length === 0) {
-        return ".";
-      }
-      let parts = splitPath(path);
-      parts = parts.reduce(reducer, []);
-      return joinPath(...parts);
-    }
-    function resolvePath(...paths) {
-      let result = "";
-      for (let path of paths) {
-        if (path.startsWith("/")) {
-          result = path;
-        } else {
-          result = normalizePath2(joinPath(result, path));
-        }
-      }
-      return result;
-    }
-    function joinPath(...parts) {
-      if (parts.length === 0)
-        return "";
-      let path = parts.join("/");
-      path = path.replace(/\/{2,}/g, "/");
-      return path;
-    }
-    function splitPath(path) {
-      if (path.length === 0)
-        return [];
-      if (path === "/")
-        return ["/"];
-      let parts = path.split("/");
-      if (parts[parts.length - 1] === "") {
-        parts.pop();
-      }
-      if (path[0] === "/") {
-        parts[0] = "/";
-      } else {
-        if (parts[0] !== ".") {
-          parts.unshift(".");
-        }
-      }
-      return parts;
-    }
-    function dirname2(path) {
-      const last = path.lastIndexOf("/");
-      if (last === -1)
-        throw new Error(`Cannot get dirname of "${path}"`);
-      if (last === 0)
-        return "/";
-      return path.slice(0, last);
-    }
-    function basename2(path) {
-      if (path === "/")
-        throw new Error(`Cannot get basename of "${path}"`);
-      const last = path.lastIndexOf("/");
-      if (last === -1)
-        return path;
-      return path.slice(last + 1);
-    }
-    function reducer(ancestors, current) {
-      if (ancestors.length === 0) {
-        ancestors.push(current);
-        return ancestors;
-      }
-      if (current === ".")
-        return ancestors;
-      if (current === "..") {
-        if (ancestors.length === 1) {
-          if (ancestors[0] === "/") {
-            throw new Error("Unable to normalize path - traverses above root directory");
-          }
-          if (ancestors[0] === ".") {
-            ancestors.push(current);
-            return ancestors;
-          }
-        }
-        if (ancestors[ancestors.length - 1] === "..") {
-          ancestors.push("..");
-          return ancestors;
-        } else {
-          ancestors.pop();
-          return ancestors;
-        }
-      }
-      ancestors.push(current);
-      return ancestors;
-    }
-    module2.exports = {
-      join: joinPath,
-      normalize: normalizePath2,
-      split: splitPath,
-      basename: basename2,
-      dirname: dirname2,
-      resolve: resolvePath
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/errors.js
-var require_errors = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/errors.js"(exports, module2) {
-    function Err(name) {
-      return class extends Error {
-        constructor(...args) {
-          super(...args);
-          this.code = name;
-          if (this.message) {
-            this.message = name + ": " + this.message;
-          } else {
-            this.message = name;
-          }
-        }
-      };
-    }
-    var EEXIST = Err("EEXIST");
-    var ENOENT = Err("ENOENT");
-    var ENOTDIR = Err("ENOTDIR");
-    var ENOTEMPTY = Err("ENOTEMPTY");
-    var ETIMEDOUT = Err("ETIMEDOUT");
-    module2.exports = { EEXIST, ENOENT, ENOTDIR, ENOTEMPTY, ETIMEDOUT };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/CacheFS.js
-var require_CacheFS = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/CacheFS.js"(exports, module2) {
-    var path = require_path();
-    var { EEXIST, ENOENT, ENOTDIR, ENOTEMPTY } = require_errors();
-    var STAT = 0;
-    module2.exports = class CacheFS {
-      constructor() {
-      }
-      _makeRoot(root = /* @__PURE__ */ new Map()) {
-        root.set(STAT, { mode: 511, type: "dir", size: 0, ino: 0, mtimeMs: Date.now() });
-        return root;
-      }
-      activate(superblock = null) {
-        if (superblock === null) {
-          this._root = /* @__PURE__ */ new Map([["/", this._makeRoot()]]);
-        } else if (typeof superblock === "string") {
-          this._root = /* @__PURE__ */ new Map([["/", this._makeRoot(this.parse(superblock))]]);
-        } else {
-          this._root = superblock;
-        }
-      }
-      get activated() {
-        return !!this._root;
-      }
-      deactivate() {
-        this._root = void 0;
-      }
-      size() {
-        return this._countInodes(this._root.get("/")) - 1;
-      }
-      _countInodes(map) {
-        let count = 1;
-        for (let [key, val] of map) {
-          if (key === STAT)
-            continue;
-          count += this._countInodes(val);
-        }
-        return count;
-      }
-      autoinc() {
-        let val = this._maxInode(this._root.get("/")) + 1;
-        return val;
-      }
-      _maxInode(map) {
-        let max = map.get(STAT).ino;
-        for (let [key, val] of map) {
-          if (key === STAT)
-            continue;
-          max = Math.max(max, this._maxInode(val));
-        }
-        return max;
-      }
-      print(root = this._root.get("/")) {
-        let str = "";
-        const printTree = (root2, indent2) => {
-          for (let [file, node] of root2) {
-            if (file === 0)
-              continue;
-            let stat = node.get(STAT);
-            let mode = stat.mode.toString(8);
-            str += `${"	".repeat(indent2)}${file}	${mode}`;
-            if (stat.type === "file") {
-              str += `	${stat.size}	${stat.mtimeMs}
-`;
-            } else {
-              str += `
-`;
-              printTree(node, indent2 + 1);
-            }
-          }
-        };
-        printTree(root, 0);
-        return str;
-      }
-      parse(print) {
-        let autoinc = 0;
-        function mk(stat) {
-          const ino = ++autoinc;
-          const type = stat.length === 1 ? "dir" : "file";
-          let [mode, size, mtimeMs] = stat;
-          mode = parseInt(mode, 8);
-          size = size ? parseInt(size) : 0;
-          mtimeMs = mtimeMs ? parseInt(mtimeMs) : Date.now();
-          return /* @__PURE__ */ new Map([[STAT, { mode, type, size, mtimeMs, ino }]]);
-        }
-        let lines = print.trim().split("\n");
-        let _root = this._makeRoot();
-        let stack = [
-          { indent: -1, node: _root },
-          { indent: 0, node: null }
-        ];
-        for (let line of lines) {
-          let prefix = line.match(/^\t*/)[0];
-          let indent2 = prefix.length;
-          line = line.slice(indent2);
-          let [filename, ...stat] = line.split("	");
-          let node = mk(stat);
-          if (indent2 <= stack[stack.length - 1].indent) {
-            while (indent2 <= stack[stack.length - 1].indent) {
-              stack.pop();
-            }
-          }
-          stack.push({ indent: indent2, node });
-          let cd = stack[stack.length - 2].node;
-          cd.set(filename, node);
-        }
-        return _root;
-      }
-      _lookup(filepath, follow = true) {
-        let dir = this._root;
-        let partialPath = "/";
-        let parts = path.split(filepath);
-        for (let i = 0; i < parts.length; ++i) {
-          let part = parts[i];
-          dir = dir.get(part);
-          if (!dir)
-            throw new ENOENT(filepath);
-          if (follow || i < parts.length - 1) {
-            const stat = dir.get(STAT);
-            if (stat.type === "symlink") {
-              let target = path.resolve(partialPath, stat.target);
-              dir = this._lookup(target);
-            }
-            if (!partialPath) {
-              partialPath = part;
-            } else {
-              partialPath = path.join(partialPath, part);
-            }
-          }
-        }
-        return dir;
-      }
-      mkdir(filepath, { mode }) {
-        if (filepath === "/")
-          throw new EEXIST();
-        let dir = this._lookup(path.dirname(filepath));
-        let basename2 = path.basename(filepath);
-        if (dir.has(basename2)) {
-          throw new EEXIST();
-        }
-        let entry = /* @__PURE__ */ new Map();
-        let stat = {
-          mode,
-          type: "dir",
-          size: 0,
-          mtimeMs: Date.now(),
-          ino: this.autoinc()
-        };
-        entry.set(STAT, stat);
-        dir.set(basename2, entry);
-      }
-      rmdir(filepath) {
-        let dir = this._lookup(filepath);
-        if (dir.get(STAT).type !== "dir")
-          throw new ENOTDIR();
-        if (dir.size > 1)
-          throw new ENOTEMPTY();
-        let parent = this._lookup(path.dirname(filepath));
-        let basename2 = path.basename(filepath);
-        parent.delete(basename2);
-      }
-      readdir(filepath) {
-        let dir = this._lookup(filepath);
-        if (dir.get(STAT).type !== "dir")
-          throw new ENOTDIR();
-        return [...dir.keys()].filter((key) => typeof key === "string");
-      }
-      writeStat(filepath, size, { mode }) {
-        let ino;
-        try {
-          let oldStat = this.stat(filepath);
-          if (mode == null) {
-            mode = oldStat.mode;
-          }
-          ino = oldStat.ino;
-        } catch (err) {
-        }
-        if (mode == null) {
-          mode = 438;
-        }
-        if (ino == null) {
-          ino = this.autoinc();
-        }
-        let dir = this._lookup(path.dirname(filepath));
-        let basename2 = path.basename(filepath);
-        let stat = {
-          mode,
-          type: "file",
-          size,
-          mtimeMs: Date.now(),
-          ino
-        };
-        let entry = /* @__PURE__ */ new Map();
-        entry.set(STAT, stat);
-        dir.set(basename2, entry);
-        return stat;
-      }
-      unlink(filepath) {
-        let parent = this._lookup(path.dirname(filepath));
-        let basename2 = path.basename(filepath);
-        parent.delete(basename2);
-      }
-      rename(oldFilepath, newFilepath) {
-        let basename2 = path.basename(newFilepath);
-        let entry = this._lookup(oldFilepath);
-        let destDir = this._lookup(path.dirname(newFilepath));
-        destDir.set(basename2, entry);
-        this.unlink(oldFilepath);
-      }
-      stat(filepath) {
-        return this._lookup(filepath).get(STAT);
-      }
-      lstat(filepath) {
-        return this._lookup(filepath, false).get(STAT);
-      }
-      readlink(filepath) {
-        return this._lookup(filepath, false).get(STAT).target;
-      }
-      symlink(target, filepath) {
-        let ino, mode;
-        try {
-          let oldStat = this.stat(filepath);
-          if (mode === null) {
-            mode = oldStat.mode;
-          }
-          ino = oldStat.ino;
-        } catch (err) {
-        }
-        if (mode == null) {
-          mode = 40960;
-        }
-        if (ino == null) {
-          ino = this.autoinc();
-        }
-        let dir = this._lookup(path.dirname(filepath));
-        let basename2 = path.basename(filepath);
-        let stat = {
-          mode,
-          type: "symlink",
-          target,
-          size: 0,
-          mtimeMs: Date.now(),
-          ino
-        };
-        let entry = /* @__PURE__ */ new Map();
-        entry.set(STAT, stat);
-        dir.set(basename2, entry);
-        return stat;
-      }
-      _du(dir) {
-        let size = 0;
-        for (const [name, entry] of dir.entries()) {
-          if (name === STAT) {
-            size += entry.size;
-          } else {
-            size += this._du(entry);
-          }
-        }
-        return size;
-      }
-      du(filepath) {
-        let dir = this._lookup(filepath);
-        return this._du(dir);
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+idb-keyval@3.3.2/node_modules/@isomorphic-git/idb-keyval/dist/idb-keyval-cjs.js
-var require_idb_keyval_cjs = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+idb-keyval@3.3.2/node_modules/@isomorphic-git/idb-keyval/dist/idb-keyval-cjs.js"(exports) {
-    "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    var Store = class {
-      constructor(dbName = "keyval-store", storeName = "keyval") {
-        this.storeName = storeName;
-        this._dbName = dbName;
-        this._storeName = storeName;
-        this._init();
-      }
-      _init() {
-        if (this._dbp) {
-          return;
-        }
-        this._dbp = new Promise((resolve, reject) => {
-          const openreq = indexedDB.open(this._dbName);
-          openreq.onerror = () => reject(openreq.error);
-          openreq.onsuccess = () => resolve(openreq.result);
-          openreq.onupgradeneeded = () => {
-            openreq.result.createObjectStore(this._storeName);
-          };
-        });
-      }
-      _withIDBStore(type, callback) {
-        this._init();
-        return this._dbp.then((db) => new Promise((resolve, reject) => {
-          const transaction = db.transaction(this.storeName, type);
-          transaction.oncomplete = () => resolve();
-          transaction.onabort = transaction.onerror = () => reject(transaction.error);
-          callback(transaction.objectStore(this.storeName));
-        }));
-      }
-      _close() {
-        this._init();
-        return this._dbp.then((db) => {
-          db.close();
-          this._dbp = void 0;
-        });
-      }
-    };
-    var store;
-    function getDefaultStore() {
-      if (!store)
-        store = new Store();
-      return store;
-    }
-    function get(key, store2 = getDefaultStore()) {
-      let req;
-      return store2._withIDBStore("readwrite", (store3) => {
-        req = store3.get(key);
-      }).then(() => req.result);
-    }
-    function set(key, value, store2 = getDefaultStore()) {
-      return store2._withIDBStore("readwrite", (store3) => {
-        store3.put(value, key);
-      });
-    }
-    function update(key, updater, store2 = getDefaultStore()) {
-      return store2._withIDBStore("readwrite", (store3) => {
-        const req = store3.get(key);
-        req.onsuccess = () => {
-          store3.put(updater(req.result), key);
-        };
-      });
-    }
-    function del(key, store2 = getDefaultStore()) {
-      return store2._withIDBStore("readwrite", (store3) => {
-        store3.delete(key);
-      });
-    }
-    function clear(store2 = getDefaultStore()) {
-      return store2._withIDBStore("readwrite", (store3) => {
-        store3.clear();
-      });
-    }
-    function keys(store2 = getDefaultStore()) {
-      const keys2 = [];
-      return store2._withIDBStore("readwrite", (store3) => {
-        (store3.openKeyCursor || store3.openCursor).call(store3).onsuccess = function() {
-          if (!this.result)
-            return;
-          keys2.push(this.result.key);
-          this.result.continue();
-        };
-      }).then(() => keys2);
-    }
-    function close(store2 = getDefaultStore()) {
-      return store2._close();
-    }
-    exports.Store = Store;
-    exports.get = get;
-    exports.set = set;
-    exports.update = update;
-    exports.del = del;
-    exports.clear = clear;
-    exports.keys = keys;
-    exports.close = close;
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/IdbBackend.js
-var require_IdbBackend = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/IdbBackend.js"(exports, module2) {
-    var idb = require_idb_keyval_cjs();
-    module2.exports = class IdbBackend {
-      constructor(dbname, storename) {
-        this._database = dbname;
-        this._storename = storename;
-        this._store = new idb.Store(this._database, this._storename);
-      }
-      saveSuperblock(superblock) {
-        return idb.set("!root", superblock, this._store);
-      }
-      loadSuperblock() {
-        return idb.get("!root", this._store);
-      }
-      readFile(inode) {
-        return idb.get(inode, this._store);
-      }
-      writeFile(inode, data) {
-        return idb.set(inode, data, this._store);
-      }
-      unlink(inode) {
-        return idb.del(inode, this._store);
-      }
-      wipe() {
-        return idb.clear(this._store);
-      }
-      close() {
-        return idb.close(this._store);
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/HttpBackend.js
-var require_HttpBackend = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/HttpBackend.js"(exports, module2) {
-    module2.exports = class HttpBackend {
-      constructor(url) {
-        this._url = url;
-      }
-      loadSuperblock() {
-        return fetch(this._url + "/.superblock.txt").then((res) => res.ok ? res.text() : null);
-      }
-      async readFile(filepath) {
-        const res = await fetch(this._url + filepath);
-        if (res.status === 200) {
-          return res.arrayBuffer();
-        } else {
-          throw new Error("ENOENT");
-        }
-      }
-      async sizeFile(filepath) {
-        const res = await fetch(this._url + filepath, { method: "HEAD" });
-        if (res.status === 200) {
-          return res.headers.get("content-length");
-        } else {
-          throw new Error("ENOENT");
-        }
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex.js
-var require_Mutex = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex.js"(exports, module2) {
-    var idb = require_idb_keyval_cjs();
-    var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    module2.exports = class Mutex {
-      constructor(dbname, storename) {
-        this._id = Math.random();
-        this._database = dbname;
-        this._storename = storename;
-        this._store = new idb.Store(this._database, this._storename);
-        this._lock = null;
-      }
-      async has({ margin = 2e3 } = {}) {
-        if (this._lock && this._lock.holder === this._id) {
-          const now = Date.now();
-          if (this._lock.expires > now + margin) {
-            return true;
-          } else {
-            return await this.renew();
-          }
-        } else {
-          return false;
-        }
-      }
-      // Returns true if successful
-      async renew({ ttl = 5e3 } = {}) {
-        let success;
-        await idb.update("lock", (current) => {
-          const now = Date.now();
-          const expires = now + ttl;
-          success = current && current.holder === this._id;
-          this._lock = success ? { holder: this._id, expires } : current;
-          return this._lock;
-        }, this._store);
-        return success;
-      }
-      // Returns true if successful
-      async acquire({ ttl = 5e3 } = {}) {
-        let success;
-        let expired;
-        let doubleLock;
-        await idb.update("lock", (current) => {
-          const now = Date.now();
-          const expires = now + ttl;
-          expired = current && current.expires < now;
-          success = current === void 0 || expired;
-          doubleLock = current && current.holder === this._id;
-          this._lock = success ? { holder: this._id, expires } : current;
-          return this._lock;
-        }, this._store);
-        if (doubleLock) {
-          throw new Error("Mutex double-locked");
-        }
-        return success;
-      }
-      // check at 10Hz, give up after 10 minutes
-      async wait({ interval = 100, limit = 6e3, ttl } = {}) {
-        while (limit--) {
-          if (await this.acquire({ ttl }))
-            return true;
-          await sleep(interval);
-        }
-        throw new Error("Mutex timeout");
-      }
-      // Returns true if successful
-      async release({ force = false } = {}) {
-        let success;
-        let doubleFree;
-        let someoneElseHasIt;
-        await idb.update("lock", (current) => {
-          success = force || current && current.holder === this._id;
-          doubleFree = current === void 0;
-          someoneElseHasIt = current && current.holder !== this._id;
-          this._lock = success ? void 0 : current;
-          return this._lock;
-        }, this._store);
-        await idb.close(this._store);
-        if (!success && !force) {
-          if (doubleFree)
-            throw new Error("Mutex double-freed");
-          if (someoneElseHasIt)
-            throw new Error("Mutex lost ownership");
-        }
-        return success;
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex2.js
-var require_Mutex2 = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex2.js"(exports, module2) {
-    module2.exports = class Mutex {
-      constructor(name) {
-        this._id = Math.random();
-        this._database = name;
-        this._has = false;
-        this._release = null;
-      }
-      async has() {
-        return this._has;
-      }
-      // Returns true if successful
-      async acquire() {
-        return new Promise((resolve) => {
-          navigator.locks.request(this._database + "_lock", { ifAvailable: true }, (lock2) => {
-            this._has = !!lock2;
-            resolve(!!lock2);
-            return new Promise((resolve2) => {
-              this._release = resolve2;
-            });
-          });
-        });
-      }
-      // Returns true if successful, gives up after 10 minutes
-      async wait({ timeout = 6e5 } = {}) {
-        return new Promise((resolve, reject) => {
-          const controller = new AbortController();
-          setTimeout(() => {
-            controller.abort();
-            reject(new Error("Mutex timeout"));
-          }, timeout);
-          navigator.locks.request(this._database + "_lock", { signal: controller.signal }, (lock2) => {
-            this._has = !!lock2;
-            resolve(!!lock2);
-            return new Promise((resolve2) => {
-              this._release = resolve2;
-            });
-          });
-        });
-      }
-      // Returns true if successful
-      async release({ force = false } = {}) {
-        this._has = false;
-        if (this._release) {
-          this._release();
-        } else if (force) {
-          navigator.locks.request(this._database + "_lock", { steal: true }, (lock2) => true);
-        }
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/DefaultBackend.js
-var require_DefaultBackend = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/DefaultBackend.js"(exports, module2) {
-    var { encode, decode } = require_browser();
-    var debounce = require_just_debounce_it();
-    var CacheFS = require_CacheFS();
-    var { ENOENT, ENOTEMPTY, ETIMEDOUT } = require_errors();
-    var IdbBackend = require_IdbBackend();
-    var HttpBackend = require_HttpBackend();
-    var Mutex = require_Mutex();
-    var Mutex2 = require_Mutex2();
-    var path = require_path();
-    module2.exports = class DefaultBackend {
-      constructor() {
-        this.saveSuperblock = debounce(() => {
-          this.flush();
-        }, 500);
-      }
-      async init(name, {
-        wipe,
-        url,
-        urlauto,
-        fileDbName = name,
-        db = null,
-        fileStoreName = name + "_files",
-        lockDbName = name + "_lock",
-        lockStoreName = name + "_lock"
-      } = {}) {
-        this._name = name;
-        this._idb = db || new IdbBackend(fileDbName, fileStoreName);
-        this._mutex = navigator.locks ? new Mutex2(name) : new Mutex(lockDbName, lockStoreName);
-        this._cache = new CacheFS(name);
-        this._opts = { wipe, url };
-        this._needsWipe = !!wipe;
-        if (url) {
-          this._http = new HttpBackend(url);
-          this._urlauto = !!urlauto;
-        }
-      }
-      async activate() {
-        if (this._cache.activated)
-          return;
-        if (this._needsWipe) {
-          this._needsWipe = false;
-          await this._idb.wipe();
-          await this._mutex.release({ force: true });
-        }
-        if (!await this._mutex.has())
-          await this._mutex.wait();
-        const root = await this._idb.loadSuperblock();
-        if (root) {
-          this._cache.activate(root);
-        } else if (this._http) {
-          const text = await this._http.loadSuperblock();
-          this._cache.activate(text);
-          await this._saveSuperblock();
-        } else {
-          this._cache.activate();
-        }
-        if (await this._mutex.has()) {
-          return;
-        } else {
-          throw new ETIMEDOUT();
-        }
-      }
-      async deactivate() {
-        if (await this._mutex.has()) {
-          await this._saveSuperblock();
-        }
-        this._cache.deactivate();
-        try {
-          await this._mutex.release();
-        } catch (e) {
-          console.log(e);
-        }
-        await this._idb.close();
-      }
-      async _saveSuperblock() {
-        if (this._cache.activated) {
-          this._lastSavedAt = Date.now();
-          await this._idb.saveSuperblock(this._cache._root);
-        }
-      }
-      _writeStat(filepath, size, opts) {
-        let dirparts = path.split(path.dirname(filepath));
-        let dir = dirparts.shift();
-        for (let dirpart of dirparts) {
-          dir = path.join(dir, dirpart);
-          try {
-            this._cache.mkdir(dir, { mode: 511 });
-          } catch (e) {
-          }
-        }
-        return this._cache.writeStat(filepath, size, opts);
-      }
-      async readFile(filepath, opts) {
-        const { encoding } = opts;
-        if (encoding && encoding !== "utf8")
-          throw new Error('Only "utf8" encoding is supported in readFile');
-        let data = null, stat = null;
-        try {
-          stat = this._cache.stat(filepath);
-          data = await this._idb.readFile(stat.ino);
-        } catch (e) {
-          if (!this._urlauto)
-            throw e;
-        }
-        if (!data && this._http) {
-          let lstat = this._cache.lstat(filepath);
-          while (lstat.type === "symlink") {
-            filepath = path.resolve(path.dirname(filepath), lstat.target);
-            lstat = this._cache.lstat(filepath);
-          }
-          data = await this._http.readFile(filepath);
-        }
-        if (data) {
-          if (!stat || stat.size != data.byteLength) {
-            stat = await this._writeStat(filepath, data.byteLength, { mode: stat ? stat.mode : 438 });
-            this.saveSuperblock();
-          }
-          if (encoding === "utf8") {
-            data = decode(data);
-          } else {
-            data.toString = () => decode(data);
-          }
-        }
-        if (!stat)
-          throw new ENOENT(filepath);
-        return data;
-      }
-      async writeFile(filepath, data, opts) {
-        const { mode, encoding = "utf8" } = opts;
-        if (typeof data === "string") {
-          if (encoding !== "utf8") {
-            throw new Error('Only "utf8" encoding is supported in writeFile');
-          }
-          data = encode(data);
-        }
-        const stat = await this._cache.writeStat(filepath, data.byteLength, { mode });
-        await this._idb.writeFile(stat.ino, data);
-      }
-      async unlink(filepath, opts) {
-        const stat = this._cache.lstat(filepath);
-        this._cache.unlink(filepath);
-        if (stat.type !== "symlink") {
-          await this._idb.unlink(stat.ino);
-        }
-      }
-      readdir(filepath, opts) {
-        return this._cache.readdir(filepath);
-      }
-      mkdir(filepath, opts) {
-        const { mode = 511 } = opts;
-        this._cache.mkdir(filepath, { mode });
-      }
-      rmdir(filepath, opts) {
-        if (filepath === "/") {
-          throw new ENOTEMPTY();
-        }
-        this._cache.rmdir(filepath);
-      }
-      rename(oldFilepath, newFilepath) {
-        this._cache.rename(oldFilepath, newFilepath);
-      }
-      stat(filepath, opts) {
-        return this._cache.stat(filepath);
-      }
-      lstat(filepath, opts) {
-        return this._cache.lstat(filepath);
-      }
-      readlink(filepath, opts) {
-        return this._cache.readlink(filepath);
-      }
-      symlink(target, filepath) {
-        this._cache.symlink(target, filepath);
-      }
-      async backFile(filepath, opts) {
-        let size = await this._http.sizeFile(filepath);
-        await this._writeStat(filepath, size, opts);
-      }
-      du(filepath) {
-        return this._cache.du(filepath);
-      }
-      flush() {
-        return this._saveSuperblock();
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Stat.js
-var require_Stat = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Stat.js"(exports, module2) {
-    module2.exports = class Stat {
-      constructor(stats) {
-        this.type = stats.type;
-        this.mode = stats.mode;
-        this.size = stats.size;
-        this.ino = stats.ino;
-        this.mtimeMs = stats.mtimeMs;
-        this.ctimeMs = stats.ctimeMs || stats.mtimeMs;
-        this.uid = 1;
-        this.gid = 1;
-        this.dev = 1;
-      }
-      isFile() {
-        return this.type === "file";
-      }
-      isDirectory() {
-        return this.type === "dir";
-      }
-      isSymbolicLink() {
-        return this.type === "symlink";
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/PromisifiedFS.js
-var require_PromisifiedFS = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/PromisifiedFS.js"(exports, module2) {
-    var DefaultBackend = require_DefaultBackend();
-    var Stat = require_Stat();
-    var path = require_path();
-    function cleanParamsFilepathOpts(filepath, opts, ...rest) {
-      filepath = path.normalize(filepath);
-      if (typeof opts === "undefined" || typeof opts === "function") {
-        opts = {};
-      }
-      if (typeof opts === "string") {
-        opts = {
-          encoding: opts
-        };
-      }
-      return [filepath, opts, ...rest];
-    }
-    function cleanParamsFilepathDataOpts(filepath, data, opts, ...rest) {
-      filepath = path.normalize(filepath);
-      if (typeof opts === "undefined" || typeof opts === "function") {
-        opts = {};
-      }
-      if (typeof opts === "string") {
-        opts = {
-          encoding: opts
-        };
-      }
-      return [filepath, data, opts, ...rest];
-    }
-    function cleanParamsFilepathFilepath(oldFilepath, newFilepath, ...rest) {
-      return [path.normalize(oldFilepath), path.normalize(newFilepath), ...rest];
-    }
-    module2.exports = class PromisifiedFS {
-      constructor(name, options = {}) {
-        this.init = this.init.bind(this);
-        this.readFile = this._wrap(this.readFile, cleanParamsFilepathOpts, false);
-        this.writeFile = this._wrap(this.writeFile, cleanParamsFilepathDataOpts, true);
-        this.unlink = this._wrap(this.unlink, cleanParamsFilepathOpts, true);
-        this.readdir = this._wrap(this.readdir, cleanParamsFilepathOpts, false);
-        this.mkdir = this._wrap(this.mkdir, cleanParamsFilepathOpts, true);
-        this.rmdir = this._wrap(this.rmdir, cleanParamsFilepathOpts, true);
-        this.rename = this._wrap(this.rename, cleanParamsFilepathFilepath, true);
-        this.stat = this._wrap(this.stat, cleanParamsFilepathOpts, false);
-        this.lstat = this._wrap(this.lstat, cleanParamsFilepathOpts, false);
-        this.readlink = this._wrap(this.readlink, cleanParamsFilepathOpts, false);
-        this.symlink = this._wrap(this.symlink, cleanParamsFilepathFilepath, true);
-        this.backFile = this._wrap(this.backFile, cleanParamsFilepathOpts, true);
-        this.du = this._wrap(this.du, cleanParamsFilepathOpts, false);
-        this._deactivationPromise = null;
-        this._deactivationTimeout = null;
-        this._activationPromise = null;
-        this._operations = /* @__PURE__ */ new Set();
-        if (name) {
-          this.init(name, options);
-        }
-      }
-      async init(...args) {
-        if (this._initPromiseResolve)
-          await this._initPromise;
-        this._initPromise = this._init(...args);
-        return this._initPromise;
-      }
-      async _init(name, options = {}) {
-        await this._gracefulShutdown();
-        if (this._activationPromise)
-          await this._deactivate();
-        if (this._backend && this._backend.destroy) {
-          await this._backend.destroy();
-        }
-        this._backend = options.backend || new DefaultBackend();
-        if (this._backend.init) {
-          await this._backend.init(name, options);
-        }
-        if (this._initPromiseResolve) {
-          this._initPromiseResolve();
-          this._initPromiseResolve = null;
-        }
-        if (!options.defer) {
-          this.stat("/");
-        }
-      }
-      async _gracefulShutdown() {
-        if (this._operations.size > 0) {
-          this._isShuttingDown = true;
-          await new Promise((resolve) => this._gracefulShutdownResolve = resolve);
-          this._isShuttingDown = false;
-          this._gracefulShutdownResolve = null;
-        }
-      }
-      _wrap(fn, paramCleaner, mutating) {
-        return async (...args) => {
-          args = paramCleaner(...args);
-          let op = {
-            name: fn.name,
-            args
-          };
-          this._operations.add(op);
-          try {
-            await this._activate();
-            return await fn.apply(this, args);
-          } finally {
-            this._operations.delete(op);
-            if (mutating)
-              this._backend.saveSuperblock();
-            if (this._operations.size === 0) {
-              if (!this._deactivationTimeout)
-                clearTimeout(this._deactivationTimeout);
-              this._deactivationTimeout = setTimeout(this._deactivate.bind(this), 500);
-            }
-          }
-        };
-      }
-      async _activate() {
-        if (!this._initPromise)
-          console.warn(new Error(`Attempted to use LightningFS ${this._name} before it was initialized.`));
-        await this._initPromise;
-        if (this._deactivationTimeout) {
-          clearTimeout(this._deactivationTimeout);
-          this._deactivationTimeout = null;
-        }
-        if (this._deactivationPromise)
-          await this._deactivationPromise;
-        this._deactivationPromise = null;
-        if (!this._activationPromise) {
-          this._activationPromise = this._backend.activate ? this._backend.activate() : Promise.resolve();
-        }
-        await this._activationPromise;
-      }
-      async _deactivate() {
-        if (this._activationPromise)
-          await this._activationPromise;
-        if (!this._deactivationPromise) {
-          this._deactivationPromise = this._backend.deactivate ? this._backend.deactivate() : Promise.resolve();
-        }
-        this._activationPromise = null;
-        if (this._gracefulShutdownResolve)
-          this._gracefulShutdownResolve();
-        return this._deactivationPromise;
-      }
-      async readFile(filepath, opts) {
-        return this._backend.readFile(filepath, opts);
-      }
-      async writeFile(filepath, data, opts) {
-        await this._backend.writeFile(filepath, data, opts);
-        return null;
-      }
-      async unlink(filepath, opts) {
-        await this._backend.unlink(filepath, opts);
-        return null;
-      }
-      async readdir(filepath, opts) {
-        return this._backend.readdir(filepath, opts);
-      }
-      async mkdir(filepath, opts) {
-        await this._backend.mkdir(filepath, opts);
-        return null;
-      }
-      async rmdir(filepath, opts) {
-        await this._backend.rmdir(filepath, opts);
-        return null;
-      }
-      async rename(oldFilepath, newFilepath) {
-        await this._backend.rename(oldFilepath, newFilepath);
-        return null;
-      }
-      async stat(filepath, opts) {
-        const data = await this._backend.stat(filepath, opts);
-        return new Stat(data);
-      }
-      async lstat(filepath, opts) {
-        const data = await this._backend.lstat(filepath, opts);
-        return new Stat(data);
-      }
-      async readlink(filepath, opts) {
-        return this._backend.readlink(filepath, opts);
-      }
-      async symlink(target, filepath) {
-        await this._backend.symlink(target, filepath);
-        return null;
-      }
-      async backFile(filepath, opts) {
-        await this._backend.backFile(filepath, opts);
-        return null;
-      }
-      async du(filepath) {
-        return this._backend.du(filepath);
-      }
-      async flush() {
-        return this._backend.flush();
-      }
-    };
-  }
-});
-
-// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/index.js
-var require_src = __commonJS({
-  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/index.js"(exports, module2) {
-    var once = require_just_once();
-    var PromisifiedFS = require_PromisifiedFS();
-    function wrapCallback(opts, cb) {
-      if (typeof opts === "function") {
-        cb = opts;
-      }
-      cb = once(cb);
-      const resolve = (...args) => cb(null, ...args);
-      return [resolve, cb];
-    }
-    module2.exports = class FS {
-      constructor(...args) {
-        this.promises = new PromisifiedFS(...args);
-        this.init = this.init.bind(this);
-        this.readFile = this.readFile.bind(this);
-        this.writeFile = this.writeFile.bind(this);
-        this.unlink = this.unlink.bind(this);
-        this.readdir = this.readdir.bind(this);
-        this.mkdir = this.mkdir.bind(this);
-        this.rmdir = this.rmdir.bind(this);
-        this.rename = this.rename.bind(this);
-        this.stat = this.stat.bind(this);
-        this.lstat = this.lstat.bind(this);
-        this.readlink = this.readlink.bind(this);
-        this.symlink = this.symlink.bind(this);
-        this.backFile = this.backFile.bind(this);
-        this.du = this.du.bind(this);
-        this.flush = this.flush.bind(this);
-      }
-      init(name, options) {
-        return this.promises.init(name, options);
-      }
-      readFile(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.readFile(filepath, opts).then(resolve).catch(reject);
-      }
-      writeFile(filepath, data, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.writeFile(filepath, data, opts).then(resolve).catch(reject);
-      }
-      unlink(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.unlink(filepath, opts).then(resolve).catch(reject);
-      }
-      readdir(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.readdir(filepath, opts).then(resolve).catch(reject);
-      }
-      mkdir(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.mkdir(filepath, opts).then(resolve).catch(reject);
-      }
-      rmdir(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.rmdir(filepath, opts).then(resolve).catch(reject);
-      }
-      rename(oldFilepath, newFilepath, cb) {
-        const [resolve, reject] = wrapCallback(cb);
-        this.promises.rename(oldFilepath, newFilepath).then(resolve).catch(reject);
-      }
-      stat(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.stat(filepath).then(resolve).catch(reject);
-      }
-      lstat(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.lstat(filepath).then(resolve).catch(reject);
-      }
-      readlink(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.readlink(filepath).then(resolve).catch(reject);
-      }
-      symlink(target, filepath, cb) {
-        const [resolve, reject] = wrapCallback(cb);
-        this.promises.symlink(target, filepath).then(resolve).catch(reject);
-      }
-      backFile(filepath, opts, cb) {
-        const [resolve, reject] = wrapCallback(opts, cb);
-        this.promises.backFile(filepath, opts).then(resolve).catch(reject);
-      }
-      du(filepath, cb) {
-        const [resolve, reject] = wrapCallback(cb);
-        this.promises.du(filepath).then(resolve).catch(reject);
-      }
-      flush(cb) {
-        const [resolve, reject] = wrapCallback(cb);
-        this.promises.flush().then(resolve).catch(reject);
-      }
-    };
-  }
-});
-
 // node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js
 var require_lib = __commonJS({
   "node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js"(exports, module2) {
@@ -6819,7 +5426,7 @@ var require_ignore = __commonJS({
         // Zero, one or several directories
         // should not use '*', or it will be replaced by the next replacer
         // Check if it is not the last `'/**'`
-        (_, index2, str) => index2 + 6 < str.length ? "(?:\\/[^\\/]+)*" : "\\/.+"
+        (_, index, str) => index + 6 < str.length ? "(?:\\/[^\\/]+)*" : "\\/.+"
       ],
       // normal intermediate wildcards
       [
@@ -7119,7 +5726,7 @@ var require_onp = __commonJS({
     module2.exports = function(a_, b_) {
       var a = a_, b = b_, m = a.length, n = b.length, reverse = false, ed = null, offset = m + 1, path = [], pathposi = [], ses = [], lcs = "", SES_DELETE = -1, SES_COMMON = 0, SES_ADD = 1;
       var tmp1, tmp2;
-      var init = function() {
+      var init2 = function() {
         if (m >= n) {
           tmp1 = a;
           tmp2 = m;
@@ -7194,7 +5801,7 @@ var require_onp = __commonJS({
           }
         }
       };
-      init();
+      init2();
       return {
         SES_DELETE: -1,
         SES_COMMON: 0,
@@ -7447,14 +6054,1406 @@ var require_diff3 = __commonJS({
   }
 });
 
+// node_modules/.pnpm/just-once@1.1.0/node_modules/just-once/index.js
+var require_just_once = __commonJS({
+  "node_modules/.pnpm/just-once@1.1.0/node_modules/just-once/index.js"(exports, module2) {
+    module2.exports = once;
+    function once(fn) {
+      var called, value;
+      if (typeof fn !== "function") {
+        throw new Error("expected a function but got " + fn);
+      }
+      return function wrap() {
+        if (called) {
+          return value;
+        }
+        called = true;
+        value = fn.apply(this, arguments);
+        return value;
+      };
+    }
+  }
+});
+
+// node_modules/.pnpm/fast-text-encoding@1.0.6/node_modules/fast-text-encoding/text.min.js
+var require_text_min = __commonJS({
+  "node_modules/.pnpm/fast-text-encoding@1.0.6/node_modules/fast-text-encoding/text.min.js"(exports) {
+    (function(scope) {
+      "use strict";
+      function B(r, e) {
+        var f;
+        return r instanceof Buffer ? f = r : f = Buffer.from(r.buffer, r.byteOffset, r.byteLength), f.toString(e);
+      }
+      var w = function(r) {
+        return Buffer.from(r);
+      };
+      function h(r) {
+        for (var e = 0, f = Math.min(256 * 256, r.length + 1), n = new Uint16Array(f), i = [], o = 0; ; ) {
+          var t = e < r.length;
+          if (!t || o >= f - 1) {
+            var s = n.subarray(0, o), m = s;
+            if (i.push(String.fromCharCode.apply(null, m)), !t)
+              return i.join("");
+            r = r.subarray(e), e = 0, o = 0;
+          }
+          var a = r[e++];
+          if ((a & 128) === 0)
+            n[o++] = a;
+          else if ((a & 224) === 192) {
+            var d = r[e++] & 63;
+            n[o++] = (a & 31) << 6 | d;
+          } else if ((a & 240) === 224) {
+            var d = r[e++] & 63, l = r[e++] & 63;
+            n[o++] = (a & 31) << 12 | d << 6 | l;
+          } else if ((a & 248) === 240) {
+            var d = r[e++] & 63, l = r[e++] & 63, R = r[e++] & 63, c = (a & 7) << 18 | d << 12 | l << 6 | R;
+            c > 65535 && (c -= 65536, n[o++] = c >>> 10 & 1023 | 55296, c = 56320 | c & 1023), n[o++] = c;
+          }
+        }
+      }
+      function F(r) {
+        for (var e = 0, f = r.length, n = 0, i = Math.max(32, f + (f >>> 1) + 7), o = new Uint8Array(i >>> 3 << 3); e < f; ) {
+          var t = r.charCodeAt(e++);
+          if (t >= 55296 && t <= 56319) {
+            if (e < f) {
+              var s = r.charCodeAt(e);
+              (s & 64512) === 56320 && (++e, t = ((t & 1023) << 10) + (s & 1023) + 65536);
+            }
+            if (t >= 55296 && t <= 56319)
+              continue;
+          }
+          if (n + 4 > o.length) {
+            i += 8, i *= 1 + e / r.length * 2, i = i >>> 3 << 3;
+            var m = new Uint8Array(i);
+            m.set(o), o = m;
+          }
+          if ((t & 4294967168) === 0) {
+            o[n++] = t;
+            continue;
+          } else if ((t & 4294965248) === 0)
+            o[n++] = t >>> 6 & 31 | 192;
+          else if ((t & 4294901760) === 0)
+            o[n++] = t >>> 12 & 15 | 224, o[n++] = t >>> 6 & 63 | 128;
+          else if ((t & 4292870144) === 0)
+            o[n++] = t >>> 18 & 7 | 240, o[n++] = t >>> 12 & 63 | 128, o[n++] = t >>> 6 & 63 | 128;
+          else
+            continue;
+          o[n++] = t & 63 | 128;
+        }
+        return o.slice ? o.slice(0, n) : o.subarray(0, n);
+      }
+      var u = "Failed to ", p = function(r, e, f) {
+        if (r)
+          throw new Error("".concat(u).concat(e, ": the '").concat(f, "' option is unsupported."));
+      };
+      var x = typeof Buffer == "function" && Buffer.from;
+      var A = x ? w : F;
+      function v() {
+        this.encoding = "utf-8";
+      }
+      v.prototype.encode = function(r, e) {
+        return p(e && e.stream, "encode", "stream"), A(r);
+      };
+      function U(r) {
+        var e;
+        try {
+          var f = new Blob([r], { type: "text/plain;charset=UTF-8" });
+          e = URL.createObjectURL(f);
+          var n = new XMLHttpRequest();
+          return n.open("GET", e, false), n.send(), n.responseText;
+        } finally {
+          e && URL.revokeObjectURL(e);
+        }
+      }
+      var O = !x && typeof Blob == "function" && typeof URL == "function" && typeof URL.createObjectURL == "function", S = ["utf-8", "utf8", "unicode-1-1-utf-8"], T = h;
+      x ? T = B : O && (T = function(r) {
+        try {
+          return U(r);
+        } catch (e) {
+          return h(r);
+        }
+      });
+      var y = "construct 'TextDecoder'", E = "".concat(u, " ").concat(y, ": the ");
+      function g(r, e) {
+        p(e && e.fatal, y, "fatal"), r = r || "utf-8";
+        var f;
+        if (x ? f = Buffer.isEncoding(r) : f = S.indexOf(r.toLowerCase()) !== -1, !f)
+          throw new RangeError("".concat(E, " encoding label provided ('").concat(r, "') is invalid."));
+        this.encoding = r, this.fatal = false, this.ignoreBOM = false;
+      }
+      g.prototype.decode = function(r, e) {
+        p(e && e.stream, "decode", "stream");
+        var f;
+        return r instanceof Uint8Array ? f = r : r.buffer instanceof ArrayBuffer ? f = new Uint8Array(r.buffer) : f = new Uint8Array(r), T(f, this.encoding);
+      };
+      scope.TextEncoder = scope.TextEncoder || v;
+      scope.TextDecoder = scope.TextDecoder || g;
+    })(typeof window !== "undefined" ? window : typeof global !== "undefined" ? global : exports);
+  }
+});
+
+// node_modules/.pnpm/isomorphic-textencoder@1.0.1/node_modules/isomorphic-textencoder/browser.js
+var require_browser = __commonJS({
+  "node_modules/.pnpm/isomorphic-textencoder@1.0.1/node_modules/isomorphic-textencoder/browser.js"(exports, module2) {
+    require_text_min();
+    module2.exports = {
+      encode: (string) => new TextEncoder().encode(string),
+      decode: (buffer) => new TextDecoder().decode(buffer)
+    };
+  }
+});
+
+// node_modules/.pnpm/just-debounce-it@1.1.0/node_modules/just-debounce-it/index.js
+var require_just_debounce_it = __commonJS({
+  "node_modules/.pnpm/just-debounce-it@1.1.0/node_modules/just-debounce-it/index.js"(exports, module2) {
+    module2.exports = debounce;
+    function debounce(fn, wait, callFirst) {
+      var timeout;
+      return function() {
+        if (!wait) {
+          return fn.apply(this, arguments);
+        }
+        var context = this;
+        var args = arguments;
+        var callNow = callFirst && !timeout;
+        clearTimeout(timeout);
+        timeout = setTimeout(function() {
+          timeout = null;
+          if (!callNow) {
+            return fn.apply(context, args);
+          }
+        }, wait);
+        if (callNow) {
+          return fn.apply(this, arguments);
+        }
+      };
+    }
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/path.js
+var require_path = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/path.js"(exports, module2) {
+    function normalizePath2(path) {
+      if (path.length === 0) {
+        return ".";
+      }
+      let parts = splitPath(path);
+      parts = parts.reduce(reducer, []);
+      return joinPath(...parts);
+    }
+    function resolvePath(...paths) {
+      let result = "";
+      for (let path of paths) {
+        if (path.startsWith("/")) {
+          result = path;
+        } else {
+          result = normalizePath2(joinPath(result, path));
+        }
+      }
+      return result;
+    }
+    function joinPath(...parts) {
+      if (parts.length === 0)
+        return "";
+      let path = parts.join("/");
+      path = path.replace(/\/{2,}/g, "/");
+      return path;
+    }
+    function splitPath(path) {
+      if (path.length === 0)
+        return [];
+      if (path === "/")
+        return ["/"];
+      let parts = path.split("/");
+      if (parts[parts.length - 1] === "") {
+        parts.pop();
+      }
+      if (path[0] === "/") {
+        parts[0] = "/";
+      } else {
+        if (parts[0] !== ".") {
+          parts.unshift(".");
+        }
+      }
+      return parts;
+    }
+    function dirname2(path) {
+      const last = path.lastIndexOf("/");
+      if (last === -1)
+        throw new Error(`Cannot get dirname of "${path}"`);
+      if (last === 0)
+        return "/";
+      return path.slice(0, last);
+    }
+    function basename2(path) {
+      if (path === "/")
+        throw new Error(`Cannot get basename of "${path}"`);
+      const last = path.lastIndexOf("/");
+      if (last === -1)
+        return path;
+      return path.slice(last + 1);
+    }
+    function reducer(ancestors, current) {
+      if (ancestors.length === 0) {
+        ancestors.push(current);
+        return ancestors;
+      }
+      if (current === ".")
+        return ancestors;
+      if (current === "..") {
+        if (ancestors.length === 1) {
+          if (ancestors[0] === "/") {
+            throw new Error("Unable to normalize path - traverses above root directory");
+          }
+          if (ancestors[0] === ".") {
+            ancestors.push(current);
+            return ancestors;
+          }
+        }
+        if (ancestors[ancestors.length - 1] === "..") {
+          ancestors.push("..");
+          return ancestors;
+        } else {
+          ancestors.pop();
+          return ancestors;
+        }
+      }
+      ancestors.push(current);
+      return ancestors;
+    }
+    module2.exports = {
+      join: joinPath,
+      normalize: normalizePath2,
+      split: splitPath,
+      basename: basename2,
+      dirname: dirname2,
+      resolve: resolvePath
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/errors.js
+var require_errors = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/errors.js"(exports, module2) {
+    function Err(name) {
+      return class extends Error {
+        constructor(...args) {
+          super(...args);
+          this.code = name;
+          if (this.message) {
+            this.message = name + ": " + this.message;
+          } else {
+            this.message = name;
+          }
+        }
+      };
+    }
+    var EEXIST = Err("EEXIST");
+    var ENOENT = Err("ENOENT");
+    var ENOTDIR = Err("ENOTDIR");
+    var ENOTEMPTY = Err("ENOTEMPTY");
+    var ETIMEDOUT = Err("ETIMEDOUT");
+    module2.exports = { EEXIST, ENOENT, ENOTDIR, ENOTEMPTY, ETIMEDOUT };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/CacheFS.js
+var require_CacheFS = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/CacheFS.js"(exports, module2) {
+    var path = require_path();
+    var { EEXIST, ENOENT, ENOTDIR, ENOTEMPTY } = require_errors();
+    var STAT = 0;
+    module2.exports = class CacheFS {
+      constructor() {
+      }
+      _makeRoot(root = /* @__PURE__ */ new Map()) {
+        root.set(STAT, { mode: 511, type: "dir", size: 0, ino: 0, mtimeMs: Date.now() });
+        return root;
+      }
+      activate(superblock = null) {
+        if (superblock === null) {
+          this._root = /* @__PURE__ */ new Map([["/", this._makeRoot()]]);
+        } else if (typeof superblock === "string") {
+          this._root = /* @__PURE__ */ new Map([["/", this._makeRoot(this.parse(superblock))]]);
+        } else {
+          this._root = superblock;
+        }
+      }
+      get activated() {
+        return !!this._root;
+      }
+      deactivate() {
+        this._root = void 0;
+      }
+      size() {
+        return this._countInodes(this._root.get("/")) - 1;
+      }
+      _countInodes(map) {
+        let count = 1;
+        for (let [key, val] of map) {
+          if (key === STAT)
+            continue;
+          count += this._countInodes(val);
+        }
+        return count;
+      }
+      autoinc() {
+        let val = this._maxInode(this._root.get("/")) + 1;
+        return val;
+      }
+      _maxInode(map) {
+        let max = map.get(STAT).ino;
+        for (let [key, val] of map) {
+          if (key === STAT)
+            continue;
+          max = Math.max(max, this._maxInode(val));
+        }
+        return max;
+      }
+      print(root = this._root.get("/")) {
+        let str = "";
+        const printTree = (root2, indent2) => {
+          for (let [file, node] of root2) {
+            if (file === 0)
+              continue;
+            let stat = node.get(STAT);
+            let mode = stat.mode.toString(8);
+            str += `${"	".repeat(indent2)}${file}	${mode}`;
+            if (stat.type === "file") {
+              str += `	${stat.size}	${stat.mtimeMs}
+`;
+            } else {
+              str += `
+`;
+              printTree(node, indent2 + 1);
+            }
+          }
+        };
+        printTree(root, 0);
+        return str;
+      }
+      parse(print) {
+        let autoinc = 0;
+        function mk(stat) {
+          const ino = ++autoinc;
+          const type = stat.length === 1 ? "dir" : "file";
+          let [mode, size, mtimeMs] = stat;
+          mode = parseInt(mode, 8);
+          size = size ? parseInt(size) : 0;
+          mtimeMs = mtimeMs ? parseInt(mtimeMs) : Date.now();
+          return /* @__PURE__ */ new Map([[STAT, { mode, type, size, mtimeMs, ino }]]);
+        }
+        let lines = print.trim().split("\n");
+        let _root = this._makeRoot();
+        let stack = [
+          { indent: -1, node: _root },
+          { indent: 0, node: null }
+        ];
+        for (let line of lines) {
+          let prefix = line.match(/^\t*/)[0];
+          let indent2 = prefix.length;
+          line = line.slice(indent2);
+          let [filename, ...stat] = line.split("	");
+          let node = mk(stat);
+          if (indent2 <= stack[stack.length - 1].indent) {
+            while (indent2 <= stack[stack.length - 1].indent) {
+              stack.pop();
+            }
+          }
+          stack.push({ indent: indent2, node });
+          let cd = stack[stack.length - 2].node;
+          cd.set(filename, node);
+        }
+        return _root;
+      }
+      _lookup(filepath, follow = true) {
+        let dir = this._root;
+        let partialPath = "/";
+        let parts = path.split(filepath);
+        for (let i = 0; i < parts.length; ++i) {
+          let part = parts[i];
+          dir = dir.get(part);
+          if (!dir)
+            throw new ENOENT(filepath);
+          if (follow || i < parts.length - 1) {
+            const stat = dir.get(STAT);
+            if (stat.type === "symlink") {
+              let target = path.resolve(partialPath, stat.target);
+              dir = this._lookup(target);
+            }
+            if (!partialPath) {
+              partialPath = part;
+            } else {
+              partialPath = path.join(partialPath, part);
+            }
+          }
+        }
+        return dir;
+      }
+      mkdir(filepath, { mode }) {
+        if (filepath === "/")
+          throw new EEXIST();
+        let dir = this._lookup(path.dirname(filepath));
+        let basename2 = path.basename(filepath);
+        if (dir.has(basename2)) {
+          throw new EEXIST();
+        }
+        let entry = /* @__PURE__ */ new Map();
+        let stat = {
+          mode,
+          type: "dir",
+          size: 0,
+          mtimeMs: Date.now(),
+          ino: this.autoinc()
+        };
+        entry.set(STAT, stat);
+        dir.set(basename2, entry);
+      }
+      rmdir(filepath) {
+        let dir = this._lookup(filepath);
+        if (dir.get(STAT).type !== "dir")
+          throw new ENOTDIR();
+        if (dir.size > 1)
+          throw new ENOTEMPTY();
+        let parent = this._lookup(path.dirname(filepath));
+        let basename2 = path.basename(filepath);
+        parent.delete(basename2);
+      }
+      readdir(filepath) {
+        let dir = this._lookup(filepath);
+        if (dir.get(STAT).type !== "dir")
+          throw new ENOTDIR();
+        return [...dir.keys()].filter((key) => typeof key === "string");
+      }
+      writeStat(filepath, size, { mode }) {
+        let ino;
+        try {
+          let oldStat = this.stat(filepath);
+          if (mode == null) {
+            mode = oldStat.mode;
+          }
+          ino = oldStat.ino;
+        } catch (err) {
+        }
+        if (mode == null) {
+          mode = 438;
+        }
+        if (ino == null) {
+          ino = this.autoinc();
+        }
+        let dir = this._lookup(path.dirname(filepath));
+        let basename2 = path.basename(filepath);
+        let stat = {
+          mode,
+          type: "file",
+          size,
+          mtimeMs: Date.now(),
+          ino
+        };
+        let entry = /* @__PURE__ */ new Map();
+        entry.set(STAT, stat);
+        dir.set(basename2, entry);
+        return stat;
+      }
+      unlink(filepath) {
+        let parent = this._lookup(path.dirname(filepath));
+        let basename2 = path.basename(filepath);
+        parent.delete(basename2);
+      }
+      rename(oldFilepath, newFilepath) {
+        let basename2 = path.basename(newFilepath);
+        let entry = this._lookup(oldFilepath);
+        let destDir = this._lookup(path.dirname(newFilepath));
+        destDir.set(basename2, entry);
+        this.unlink(oldFilepath);
+      }
+      stat(filepath) {
+        return this._lookup(filepath).get(STAT);
+      }
+      lstat(filepath) {
+        return this._lookup(filepath, false).get(STAT);
+      }
+      readlink(filepath) {
+        return this._lookup(filepath, false).get(STAT).target;
+      }
+      symlink(target, filepath) {
+        let ino, mode;
+        try {
+          let oldStat = this.stat(filepath);
+          if (mode === null) {
+            mode = oldStat.mode;
+          }
+          ino = oldStat.ino;
+        } catch (err) {
+        }
+        if (mode == null) {
+          mode = 40960;
+        }
+        if (ino == null) {
+          ino = this.autoinc();
+        }
+        let dir = this._lookup(path.dirname(filepath));
+        let basename2 = path.basename(filepath);
+        let stat = {
+          mode,
+          type: "symlink",
+          target,
+          size: 0,
+          mtimeMs: Date.now(),
+          ino
+        };
+        let entry = /* @__PURE__ */ new Map();
+        entry.set(STAT, stat);
+        dir.set(basename2, entry);
+        return stat;
+      }
+      _du(dir) {
+        let size = 0;
+        for (const [name, entry] of dir.entries()) {
+          if (name === STAT) {
+            size += entry.size;
+          } else {
+            size += this._du(entry);
+          }
+        }
+        return size;
+      }
+      du(filepath) {
+        let dir = this._lookup(filepath);
+        return this._du(dir);
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+idb-keyval@3.3.2/node_modules/@isomorphic-git/idb-keyval/dist/idb-keyval-cjs.js
+var require_idb_keyval_cjs = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+idb-keyval@3.3.2/node_modules/@isomorphic-git/idb-keyval/dist/idb-keyval-cjs.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    var Store = class {
+      constructor(dbName = "keyval-store", storeName = "keyval") {
+        this.storeName = storeName;
+        this._dbName = dbName;
+        this._storeName = storeName;
+        this._init();
+      }
+      _init() {
+        if (this._dbp) {
+          return;
+        }
+        this._dbp = new Promise((resolve, reject) => {
+          const openreq = indexedDB.open(this._dbName);
+          openreq.onerror = () => reject(openreq.error);
+          openreq.onsuccess = () => resolve(openreq.result);
+          openreq.onupgradeneeded = () => {
+            openreq.result.createObjectStore(this._storeName);
+          };
+        });
+      }
+      _withIDBStore(type, callback) {
+        this._init();
+        return this._dbp.then((db) => new Promise((resolve, reject) => {
+          const transaction = db.transaction(this.storeName, type);
+          transaction.oncomplete = () => resolve();
+          transaction.onabort = transaction.onerror = () => reject(transaction.error);
+          callback(transaction.objectStore(this.storeName));
+        }));
+      }
+      _close() {
+        this._init();
+        return this._dbp.then((db) => {
+          db.close();
+          this._dbp = void 0;
+        });
+      }
+    };
+    var store;
+    function getDefaultStore() {
+      if (!store)
+        store = new Store();
+      return store;
+    }
+    function get(key, store2 = getDefaultStore()) {
+      let req;
+      return store2._withIDBStore("readwrite", (store3) => {
+        req = store3.get(key);
+      }).then(() => req.result);
+    }
+    function set(key, value, store2 = getDefaultStore()) {
+      return store2._withIDBStore("readwrite", (store3) => {
+        store3.put(value, key);
+      });
+    }
+    function update(key, updater, store2 = getDefaultStore()) {
+      return store2._withIDBStore("readwrite", (store3) => {
+        const req = store3.get(key);
+        req.onsuccess = () => {
+          store3.put(updater(req.result), key);
+        };
+      });
+    }
+    function del(key, store2 = getDefaultStore()) {
+      return store2._withIDBStore("readwrite", (store3) => {
+        store3.delete(key);
+      });
+    }
+    function clear(store2 = getDefaultStore()) {
+      return store2._withIDBStore("readwrite", (store3) => {
+        store3.clear();
+      });
+    }
+    function keys(store2 = getDefaultStore()) {
+      const keys2 = [];
+      return store2._withIDBStore("readwrite", (store3) => {
+        (store3.openKeyCursor || store3.openCursor).call(store3).onsuccess = function() {
+          if (!this.result)
+            return;
+          keys2.push(this.result.key);
+          this.result.continue();
+        };
+      }).then(() => keys2);
+    }
+    function close(store2 = getDefaultStore()) {
+      return store2._close();
+    }
+    exports.Store = Store;
+    exports.get = get;
+    exports.set = set;
+    exports.update = update;
+    exports.del = del;
+    exports.clear = clear;
+    exports.keys = keys;
+    exports.close = close;
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/IdbBackend.js
+var require_IdbBackend = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/IdbBackend.js"(exports, module2) {
+    var idb = require_idb_keyval_cjs();
+    module2.exports = class IdbBackend {
+      constructor(dbname, storename) {
+        this._database = dbname;
+        this._storename = storename;
+        this._store = new idb.Store(this._database, this._storename);
+      }
+      saveSuperblock(superblock) {
+        return idb.set("!root", superblock, this._store);
+      }
+      loadSuperblock() {
+        return idb.get("!root", this._store);
+      }
+      readFile(inode) {
+        return idb.get(inode, this._store);
+      }
+      writeFile(inode, data) {
+        return idb.set(inode, data, this._store);
+      }
+      unlink(inode) {
+        return idb.del(inode, this._store);
+      }
+      wipe() {
+        return idb.clear(this._store);
+      }
+      close() {
+        return idb.close(this._store);
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/HttpBackend.js
+var require_HttpBackend = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/HttpBackend.js"(exports, module2) {
+    module2.exports = class HttpBackend {
+      constructor(url) {
+        this._url = url;
+      }
+      loadSuperblock() {
+        return fetch(this._url + "/.superblock.txt").then((res) => res.ok ? res.text() : null);
+      }
+      async readFile(filepath) {
+        const res = await fetch(this._url + filepath);
+        if (res.status === 200) {
+          return res.arrayBuffer();
+        } else {
+          throw new Error("ENOENT");
+        }
+      }
+      async sizeFile(filepath) {
+        const res = await fetch(this._url + filepath, { method: "HEAD" });
+        if (res.status === 200) {
+          return res.headers.get("content-length");
+        } else {
+          throw new Error("ENOENT");
+        }
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex.js
+var require_Mutex = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex.js"(exports, module2) {
+    var idb = require_idb_keyval_cjs();
+    var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    module2.exports = class Mutex {
+      constructor(dbname, storename) {
+        this._id = Math.random();
+        this._database = dbname;
+        this._storename = storename;
+        this._store = new idb.Store(this._database, this._storename);
+        this._lock = null;
+      }
+      async has({ margin = 2e3 } = {}) {
+        if (this._lock && this._lock.holder === this._id) {
+          const now = Date.now();
+          if (this._lock.expires > now + margin) {
+            return true;
+          } else {
+            return await this.renew();
+          }
+        } else {
+          return false;
+        }
+      }
+      // Returns true if successful
+      async renew({ ttl = 5e3 } = {}) {
+        let success;
+        await idb.update("lock", (current) => {
+          const now = Date.now();
+          const expires = now + ttl;
+          success = current && current.holder === this._id;
+          this._lock = success ? { holder: this._id, expires } : current;
+          return this._lock;
+        }, this._store);
+        return success;
+      }
+      // Returns true if successful
+      async acquire({ ttl = 5e3 } = {}) {
+        let success;
+        let expired;
+        let doubleLock;
+        await idb.update("lock", (current) => {
+          const now = Date.now();
+          const expires = now + ttl;
+          expired = current && current.expires < now;
+          success = current === void 0 || expired;
+          doubleLock = current && current.holder === this._id;
+          this._lock = success ? { holder: this._id, expires } : current;
+          return this._lock;
+        }, this._store);
+        if (doubleLock) {
+          throw new Error("Mutex double-locked");
+        }
+        return success;
+      }
+      // check at 10Hz, give up after 10 minutes
+      async wait({ interval = 100, limit = 6e3, ttl } = {}) {
+        while (limit--) {
+          if (await this.acquire({ ttl }))
+            return true;
+          await sleep(interval);
+        }
+        throw new Error("Mutex timeout");
+      }
+      // Returns true if successful
+      async release({ force = false } = {}) {
+        let success;
+        let doubleFree;
+        let someoneElseHasIt;
+        await idb.update("lock", (current) => {
+          success = force || current && current.holder === this._id;
+          doubleFree = current === void 0;
+          someoneElseHasIt = current && current.holder !== this._id;
+          this._lock = success ? void 0 : current;
+          return this._lock;
+        }, this._store);
+        await idb.close(this._store);
+        if (!success && !force) {
+          if (doubleFree)
+            throw new Error("Mutex double-freed");
+          if (someoneElseHasIt)
+            throw new Error("Mutex lost ownership");
+        }
+        return success;
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex2.js
+var require_Mutex2 = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Mutex2.js"(exports, module2) {
+    module2.exports = class Mutex {
+      constructor(name) {
+        this._id = Math.random();
+        this._database = name;
+        this._has = false;
+        this._release = null;
+      }
+      async has() {
+        return this._has;
+      }
+      // Returns true if successful
+      async acquire() {
+        return new Promise((resolve) => {
+          navigator.locks.request(this._database + "_lock", { ifAvailable: true }, (lock2) => {
+            this._has = !!lock2;
+            resolve(!!lock2);
+            return new Promise((resolve2) => {
+              this._release = resolve2;
+            });
+          });
+        });
+      }
+      // Returns true if successful, gives up after 10 minutes
+      async wait({ timeout = 6e5 } = {}) {
+        return new Promise((resolve, reject) => {
+          const controller = new AbortController();
+          setTimeout(() => {
+            controller.abort();
+            reject(new Error("Mutex timeout"));
+          }, timeout);
+          navigator.locks.request(this._database + "_lock", { signal: controller.signal }, (lock2) => {
+            this._has = !!lock2;
+            resolve(!!lock2);
+            return new Promise((resolve2) => {
+              this._release = resolve2;
+            });
+          });
+        });
+      }
+      // Returns true if successful
+      async release({ force = false } = {}) {
+        this._has = false;
+        if (this._release) {
+          this._release();
+        } else if (force) {
+          navigator.locks.request(this._database + "_lock", { steal: true }, (lock2) => true);
+        }
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/DefaultBackend.js
+var require_DefaultBackend = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/DefaultBackend.js"(exports, module2) {
+    var { encode, decode } = require_browser();
+    var debounce = require_just_debounce_it();
+    var CacheFS = require_CacheFS();
+    var { ENOENT, ENOTEMPTY, ETIMEDOUT } = require_errors();
+    var IdbBackend = require_IdbBackend();
+    var HttpBackend = require_HttpBackend();
+    var Mutex = require_Mutex();
+    var Mutex2 = require_Mutex2();
+    var path = require_path();
+    module2.exports = class DefaultBackend {
+      constructor() {
+        this.saveSuperblock = debounce(() => {
+          this.flush();
+        }, 500);
+      }
+      async init(name, {
+        wipe,
+        url,
+        urlauto,
+        fileDbName = name,
+        db = null,
+        fileStoreName = name + "_files",
+        lockDbName = name + "_lock",
+        lockStoreName = name + "_lock"
+      } = {}) {
+        this._name = name;
+        this._idb = db || new IdbBackend(fileDbName, fileStoreName);
+        this._mutex = navigator.locks ? new Mutex2(name) : new Mutex(lockDbName, lockStoreName);
+        this._cache = new CacheFS(name);
+        this._opts = { wipe, url };
+        this._needsWipe = !!wipe;
+        if (url) {
+          this._http = new HttpBackend(url);
+          this._urlauto = !!urlauto;
+        }
+      }
+      async activate() {
+        if (this._cache.activated)
+          return;
+        if (this._needsWipe) {
+          this._needsWipe = false;
+          await this._idb.wipe();
+          await this._mutex.release({ force: true });
+        }
+        if (!await this._mutex.has())
+          await this._mutex.wait();
+        const root = await this._idb.loadSuperblock();
+        if (root) {
+          this._cache.activate(root);
+        } else if (this._http) {
+          const text = await this._http.loadSuperblock();
+          this._cache.activate(text);
+          await this._saveSuperblock();
+        } else {
+          this._cache.activate();
+        }
+        if (await this._mutex.has()) {
+          return;
+        } else {
+          throw new ETIMEDOUT();
+        }
+      }
+      async deactivate() {
+        if (await this._mutex.has()) {
+          await this._saveSuperblock();
+        }
+        this._cache.deactivate();
+        try {
+          await this._mutex.release();
+        } catch (e) {
+          console.log(e);
+        }
+        await this._idb.close();
+      }
+      async _saveSuperblock() {
+        if (this._cache.activated) {
+          this._lastSavedAt = Date.now();
+          await this._idb.saveSuperblock(this._cache._root);
+        }
+      }
+      _writeStat(filepath, size, opts) {
+        let dirparts = path.split(path.dirname(filepath));
+        let dir = dirparts.shift();
+        for (let dirpart of dirparts) {
+          dir = path.join(dir, dirpart);
+          try {
+            this._cache.mkdir(dir, { mode: 511 });
+          } catch (e) {
+          }
+        }
+        return this._cache.writeStat(filepath, size, opts);
+      }
+      async readFile(filepath, opts) {
+        const { encoding } = opts;
+        if (encoding && encoding !== "utf8")
+          throw new Error('Only "utf8" encoding is supported in readFile');
+        let data = null, stat = null;
+        try {
+          stat = this._cache.stat(filepath);
+          data = await this._idb.readFile(stat.ino);
+        } catch (e) {
+          if (!this._urlauto)
+            throw e;
+        }
+        if (!data && this._http) {
+          let lstat = this._cache.lstat(filepath);
+          while (lstat.type === "symlink") {
+            filepath = path.resolve(path.dirname(filepath), lstat.target);
+            lstat = this._cache.lstat(filepath);
+          }
+          data = await this._http.readFile(filepath);
+        }
+        if (data) {
+          if (!stat || stat.size != data.byteLength) {
+            stat = await this._writeStat(filepath, data.byteLength, { mode: stat ? stat.mode : 438 });
+            this.saveSuperblock();
+          }
+          if (encoding === "utf8") {
+            data = decode(data);
+          } else {
+            data.toString = () => decode(data);
+          }
+        }
+        if (!stat)
+          throw new ENOENT(filepath);
+        return data;
+      }
+      async writeFile(filepath, data, opts) {
+        const { mode, encoding = "utf8" } = opts;
+        if (typeof data === "string") {
+          if (encoding !== "utf8") {
+            throw new Error('Only "utf8" encoding is supported in writeFile');
+          }
+          data = encode(data);
+        }
+        const stat = await this._cache.writeStat(filepath, data.byteLength, { mode });
+        await this._idb.writeFile(stat.ino, data);
+      }
+      async unlink(filepath, opts) {
+        const stat = this._cache.lstat(filepath);
+        this._cache.unlink(filepath);
+        if (stat.type !== "symlink") {
+          await this._idb.unlink(stat.ino);
+        }
+      }
+      readdir(filepath, opts) {
+        return this._cache.readdir(filepath);
+      }
+      mkdir(filepath, opts) {
+        const { mode = 511 } = opts;
+        this._cache.mkdir(filepath, { mode });
+      }
+      rmdir(filepath, opts) {
+        if (filepath === "/") {
+          throw new ENOTEMPTY();
+        }
+        this._cache.rmdir(filepath);
+      }
+      rename(oldFilepath, newFilepath) {
+        this._cache.rename(oldFilepath, newFilepath);
+      }
+      stat(filepath, opts) {
+        return this._cache.stat(filepath);
+      }
+      lstat(filepath, opts) {
+        return this._cache.lstat(filepath);
+      }
+      readlink(filepath, opts) {
+        return this._cache.readlink(filepath);
+      }
+      symlink(target, filepath) {
+        this._cache.symlink(target, filepath);
+      }
+      async backFile(filepath, opts) {
+        let size = await this._http.sizeFile(filepath);
+        await this._writeStat(filepath, size, opts);
+      }
+      du(filepath) {
+        return this._cache.du(filepath);
+      }
+      flush() {
+        return this._saveSuperblock();
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Stat.js
+var require_Stat = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/Stat.js"(exports, module2) {
+    module2.exports = class Stat {
+      constructor(stats) {
+        this.type = stats.type;
+        this.mode = stats.mode;
+        this.size = stats.size;
+        this.ino = stats.ino;
+        this.mtimeMs = stats.mtimeMs;
+        this.ctimeMs = stats.ctimeMs || stats.mtimeMs;
+        this.uid = 1;
+        this.gid = 1;
+        this.dev = 1;
+      }
+      isFile() {
+        return this.type === "file";
+      }
+      isDirectory() {
+        return this.type === "dir";
+      }
+      isSymbolicLink() {
+        return this.type === "symlink";
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/PromisifiedFS.js
+var require_PromisifiedFS = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/PromisifiedFS.js"(exports, module2) {
+    var DefaultBackend = require_DefaultBackend();
+    var Stat = require_Stat();
+    var path = require_path();
+    function cleanParamsFilepathOpts(filepath, opts, ...rest) {
+      filepath = path.normalize(filepath);
+      if (typeof opts === "undefined" || typeof opts === "function") {
+        opts = {};
+      }
+      if (typeof opts === "string") {
+        opts = {
+          encoding: opts
+        };
+      }
+      return [filepath, opts, ...rest];
+    }
+    function cleanParamsFilepathDataOpts(filepath, data, opts, ...rest) {
+      filepath = path.normalize(filepath);
+      if (typeof opts === "undefined" || typeof opts === "function") {
+        opts = {};
+      }
+      if (typeof opts === "string") {
+        opts = {
+          encoding: opts
+        };
+      }
+      return [filepath, data, opts, ...rest];
+    }
+    function cleanParamsFilepathFilepath(oldFilepath, newFilepath, ...rest) {
+      return [path.normalize(oldFilepath), path.normalize(newFilepath), ...rest];
+    }
+    module2.exports = class PromisifiedFS {
+      constructor(name, options = {}) {
+        this.init = this.init.bind(this);
+        this.readFile = this._wrap(this.readFile, cleanParamsFilepathOpts, false);
+        this.writeFile = this._wrap(this.writeFile, cleanParamsFilepathDataOpts, true);
+        this.unlink = this._wrap(this.unlink, cleanParamsFilepathOpts, true);
+        this.readdir = this._wrap(this.readdir, cleanParamsFilepathOpts, false);
+        this.mkdir = this._wrap(this.mkdir, cleanParamsFilepathOpts, true);
+        this.rmdir = this._wrap(this.rmdir, cleanParamsFilepathOpts, true);
+        this.rename = this._wrap(this.rename, cleanParamsFilepathFilepath, true);
+        this.stat = this._wrap(this.stat, cleanParamsFilepathOpts, false);
+        this.lstat = this._wrap(this.lstat, cleanParamsFilepathOpts, false);
+        this.readlink = this._wrap(this.readlink, cleanParamsFilepathOpts, false);
+        this.symlink = this._wrap(this.symlink, cleanParamsFilepathFilepath, true);
+        this.backFile = this._wrap(this.backFile, cleanParamsFilepathOpts, true);
+        this.du = this._wrap(this.du, cleanParamsFilepathOpts, false);
+        this._deactivationPromise = null;
+        this._deactivationTimeout = null;
+        this._activationPromise = null;
+        this._operations = /* @__PURE__ */ new Set();
+        if (name) {
+          this.init(name, options);
+        }
+      }
+      async init(...args) {
+        if (this._initPromiseResolve)
+          await this._initPromise;
+        this._initPromise = this._init(...args);
+        return this._initPromise;
+      }
+      async _init(name, options = {}) {
+        await this._gracefulShutdown();
+        if (this._activationPromise)
+          await this._deactivate();
+        if (this._backend && this._backend.destroy) {
+          await this._backend.destroy();
+        }
+        this._backend = options.backend || new DefaultBackend();
+        if (this._backend.init) {
+          await this._backend.init(name, options);
+        }
+        if (this._initPromiseResolve) {
+          this._initPromiseResolve();
+          this._initPromiseResolve = null;
+        }
+        if (!options.defer) {
+          this.stat("/");
+        }
+      }
+      async _gracefulShutdown() {
+        if (this._operations.size > 0) {
+          this._isShuttingDown = true;
+          await new Promise((resolve) => this._gracefulShutdownResolve = resolve);
+          this._isShuttingDown = false;
+          this._gracefulShutdownResolve = null;
+        }
+      }
+      _wrap(fn, paramCleaner, mutating) {
+        return async (...args) => {
+          args = paramCleaner(...args);
+          let op = {
+            name: fn.name,
+            args
+          };
+          this._operations.add(op);
+          try {
+            await this._activate();
+            return await fn.apply(this, args);
+          } finally {
+            this._operations.delete(op);
+            if (mutating)
+              this._backend.saveSuperblock();
+            if (this._operations.size === 0) {
+              if (!this._deactivationTimeout)
+                clearTimeout(this._deactivationTimeout);
+              this._deactivationTimeout = setTimeout(this._deactivate.bind(this), 500);
+            }
+          }
+        };
+      }
+      async _activate() {
+        if (!this._initPromise)
+          console.warn(new Error(`Attempted to use LightningFS ${this._name} before it was initialized.`));
+        await this._initPromise;
+        if (this._deactivationTimeout) {
+          clearTimeout(this._deactivationTimeout);
+          this._deactivationTimeout = null;
+        }
+        if (this._deactivationPromise)
+          await this._deactivationPromise;
+        this._deactivationPromise = null;
+        if (!this._activationPromise) {
+          this._activationPromise = this._backend.activate ? this._backend.activate() : Promise.resolve();
+        }
+        await this._activationPromise;
+      }
+      async _deactivate() {
+        if (this._activationPromise)
+          await this._activationPromise;
+        if (!this._deactivationPromise) {
+          this._deactivationPromise = this._backend.deactivate ? this._backend.deactivate() : Promise.resolve();
+        }
+        this._activationPromise = null;
+        if (this._gracefulShutdownResolve)
+          this._gracefulShutdownResolve();
+        return this._deactivationPromise;
+      }
+      async readFile(filepath, opts) {
+        return this._backend.readFile(filepath, opts);
+      }
+      async writeFile(filepath, data, opts) {
+        await this._backend.writeFile(filepath, data, opts);
+        return null;
+      }
+      async unlink(filepath, opts) {
+        await this._backend.unlink(filepath, opts);
+        return null;
+      }
+      async readdir(filepath, opts) {
+        return this._backend.readdir(filepath, opts);
+      }
+      async mkdir(filepath, opts) {
+        await this._backend.mkdir(filepath, opts);
+        return null;
+      }
+      async rmdir(filepath, opts) {
+        await this._backend.rmdir(filepath, opts);
+        return null;
+      }
+      async rename(oldFilepath, newFilepath) {
+        await this._backend.rename(oldFilepath, newFilepath);
+        return null;
+      }
+      async stat(filepath, opts) {
+        const data = await this._backend.stat(filepath, opts);
+        return new Stat(data);
+      }
+      async lstat(filepath, opts) {
+        const data = await this._backend.lstat(filepath, opts);
+        return new Stat(data);
+      }
+      async readlink(filepath, opts) {
+        return this._backend.readlink(filepath, opts);
+      }
+      async symlink(target, filepath) {
+        await this._backend.symlink(target, filepath);
+        return null;
+      }
+      async backFile(filepath, opts) {
+        await this._backend.backFile(filepath, opts);
+        return null;
+      }
+      async du(filepath) {
+        return this._backend.du(filepath);
+      }
+      async flush() {
+        return this._backend.flush();
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/index.js
+var require_src = __commonJS({
+  "node_modules/.pnpm/@isomorphic-git+lightning-fs@4.6.0/node_modules/@isomorphic-git/lightning-fs/src/index.js"(exports, module2) {
+    var once = require_just_once();
+    var PromisifiedFS = require_PromisifiedFS();
+    function wrapCallback(opts, cb) {
+      if (typeof opts === "function") {
+        cb = opts;
+      }
+      cb = once(cb);
+      const resolve = (...args) => cb(null, ...args);
+      return [resolve, cb];
+    }
+    module2.exports = class FS {
+      constructor(...args) {
+        this.promises = new PromisifiedFS(...args);
+        this.init = this.init.bind(this);
+        this.readFile = this.readFile.bind(this);
+        this.writeFile = this.writeFile.bind(this);
+        this.unlink = this.unlink.bind(this);
+        this.readdir = this.readdir.bind(this);
+        this.mkdir = this.mkdir.bind(this);
+        this.rmdir = this.rmdir.bind(this);
+        this.rename = this.rename.bind(this);
+        this.stat = this.stat.bind(this);
+        this.lstat = this.lstat.bind(this);
+        this.readlink = this.readlink.bind(this);
+        this.symlink = this.symlink.bind(this);
+        this.backFile = this.backFile.bind(this);
+        this.du = this.du.bind(this);
+        this.flush = this.flush.bind(this);
+      }
+      init(name, options) {
+        return this.promises.init(name, options);
+      }
+      readFile(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.readFile(filepath, opts).then(resolve).catch(reject);
+      }
+      writeFile(filepath, data, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.writeFile(filepath, data, opts).then(resolve).catch(reject);
+      }
+      unlink(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.unlink(filepath, opts).then(resolve).catch(reject);
+      }
+      readdir(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.readdir(filepath, opts).then(resolve).catch(reject);
+      }
+      mkdir(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.mkdir(filepath, opts).then(resolve).catch(reject);
+      }
+      rmdir(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.rmdir(filepath, opts).then(resolve).catch(reject);
+      }
+      rename(oldFilepath, newFilepath, cb) {
+        const [resolve, reject] = wrapCallback(cb);
+        this.promises.rename(oldFilepath, newFilepath).then(resolve).catch(reject);
+      }
+      stat(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.stat(filepath).then(resolve).catch(reject);
+      }
+      lstat(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.lstat(filepath).then(resolve).catch(reject);
+      }
+      readlink(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.readlink(filepath).then(resolve).catch(reject);
+      }
+      symlink(target, filepath, cb) {
+        const [resolve, reject] = wrapCallback(cb);
+        this.promises.symlink(target, filepath).then(resolve).catch(reject);
+      }
+      backFile(filepath, opts, cb) {
+        const [resolve, reject] = wrapCallback(opts, cb);
+        this.promises.backFile(filepath, opts).then(resolve).catch(reject);
+      }
+      du(filepath, cb) {
+        const [resolve, reject] = wrapCallback(cb);
+        this.promises.du(filepath).then(resolve).catch(reject);
+      }
+      flush(cb) {
+        const [resolve, reject] = wrapCallback(cb);
+        this.promises.flush().then(resolve).catch(reject);
+      }
+    };
+  }
+});
+
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
   default: () => GitSyncPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian3 = require("obsidian");
-var import_lightning_fs = __toESM(require_src());
+var import_obsidian4 = require("obsidian");
 
 // node_modules/.pnpm/isomorphic-git@1.29.0/node_modules/isomorphic-git/index.js
 var import_async_lock = __toESM(require_async_lock(), 1);
@@ -7739,7 +7738,7 @@ var GitIndex = class _GitIndex {
     if (buffer.length === 0) {
       throw new InternalError("Index file is empty (.git/index)");
     }
-    const index2 = new _GitIndex();
+    const index = new _GitIndex();
     const reader = new BufferCursor(buffer);
     const magic = reader.toString("utf8", 4);
     if (magic !== "DIRC") {
@@ -7795,10 +7794,10 @@ var GitIndex = class _GitIndex {
         }
       }
       entry.stages = [];
-      index2._addEntry(entry);
+      index._addEntry(entry);
       i++;
     }
-    return index2;
+    return index;
   }
   get unmergedPaths() {
     return [...this._unmergedPaths];
@@ -7950,8 +7949,8 @@ function createCache() {
 async function updateCachedIndexFile(fs, filepath, cache) {
   const stat = await fs.lstat(filepath);
   const rawIndexFile = await fs.read(filepath);
-  const index2 = await GitIndex.from(rawIndexFile);
-  cache.map.set(filepath, index2);
+  const index = await GitIndex.from(rawIndexFile);
+  cache.map.set(filepath, index);
   cache.stats.set(filepath, stat);
 }
 async function isIndexStale(fs, filepath, cache) {
@@ -7987,16 +7986,16 @@ var GitIndexManager = class {
       if (await isIndexStale(fs, filepath, cache[IndexCache])) {
         await updateCachedIndexFile(fs, filepath, cache[IndexCache]);
       }
-      const index2 = cache[IndexCache].map.get(filepath);
-      unmergedPaths = index2.unmergedPaths;
+      const index = cache[IndexCache].map.get(filepath);
+      unmergedPaths = index.unmergedPaths;
       if (unmergedPaths.length && !allowUnmerged)
         throw new UnmergedPathsError(unmergedPaths);
-      result = await closure(index2);
-      if (index2._dirty) {
-        const buffer = await index2.toObject();
+      result = await closure(index);
+      if (index._dirty) {
+        const buffer = await index.toObject();
         await fs.write(filepath, buffer);
         cache[IndexCache].stats.set(filepath, await fs.lstat(filepath));
-        index2._dirty = false;
+        index._dirty = false;
       }
     });
     return result;
@@ -8077,8 +8076,8 @@ var GitWalkerIndex = class {
   constructor({ fs, gitdir, cache }) {
     this.treePromise = GitIndexManager.acquire(
       { fs, gitdir, cache },
-      async function(index2) {
-        return flatFileListToDirectoryStructure(index2.entries);
+      async function(index) {
+        return flatFileListToDirectoryStructure(index.entries);
       }
     );
     const walker = this;
@@ -8466,8 +8465,8 @@ var normalizePath = (path) => {
   };
 };
 var findLastIndex = (array, callback) => {
-  return array.reduce((lastIndex, item, index2) => {
-    return callback(item) ? index2 : lastIndex;
+  return array.reduce((lastIndex, item, index) => {
+    return callback(item) ? index : lastIndex;
   }, -1);
 };
 var GitConfig = class _GitConfig {
@@ -10626,8 +10625,8 @@ var GitWalkerFs = class {
     if (entry._oid === false) {
       const { fs, gitdir, cache } = this;
       let oid;
-      await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-        const stage = index2.entriesMap.get(entry._fullpath);
+      await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index) {
+        const stage = index.entriesMap.get(entry._fullpath);
         const stats = await entry.stat();
         const config = await GitConfigManager.get({ fs, gitdir });
         const filemode = await config.get("core.filemode");
@@ -10641,7 +10640,7 @@ var GitWalkerFs = class {
               GitObject.wrap({ type: "blob", object: await entry.content() })
             );
             if (stage && oid === stage.oid && (!filemode || stats.mode === stage.mode) && compareStats(stats, stage, filemode, trustino)) {
-              index2.insert({
+              index.insert({
                 filepath: entry._fullpath,
                 stats,
                 oid
@@ -11179,13 +11178,13 @@ async function add({
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
     const fs = new FileSystem(_fs);
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async (index2) => {
+    await GitIndexManager.acquire({ fs, gitdir, cache }, async (index) => {
       return addToIndex({
         dir,
         gitdir,
         fs,
         filepath,
-        index: index2,
+        index,
         force,
         parallel
       });
@@ -11200,7 +11199,7 @@ async function addToIndex({
   gitdir,
   fs,
   filepath,
-  index: index2,
+  index,
   force,
   parallel
 }) {
@@ -11228,7 +11227,7 @@ async function addToIndex({
             gitdir,
             fs,
             filepath: [(0, import_path_browserify.join)(currentFilepath, child)],
-            index: index2,
+            index,
             force,
             parallel
           })
@@ -11241,7 +11240,7 @@ async function addToIndex({
             gitdir,
             fs,
             filepath: [(0, import_path_browserify.join)(currentFilepath, child)],
-            index: index2,
+            index,
             force,
             parallel
           });
@@ -11254,7 +11253,7 @@ async function addToIndex({
       if (object === null)
         throw new NotFoundError(currentFilepath);
       const oid = await _writeObject({ fs, gitdir, type: "blob", object });
-      index2.insert({ filepath: currentFilepath, stats, oid });
+      index.insert({ filepath: currentFilepath, stats, oid });
     }
   });
   const settledPromises = await Promise.allSettled(promises);
@@ -11420,8 +11419,8 @@ async function _commit({
     throw new MissingNameError("committer");
   return GitIndexManager.acquire(
     { fs, gitdir, cache, allowUnmerged: false },
-    async function(index2) {
-      const inodes = flatFileListToDirectoryStructure(index2.entries);
+    async function(index) {
+      const inodes = flatFileListToDirectoryStructure(index.entries);
       const inode = inodes.get(".");
       if (!tree) {
         tree = await constructTree({ fs, gitdir, inode, dryRun });
@@ -11682,7 +11681,7 @@ async function _checkout({
     }
     let count = 0;
     const total = ops.length;
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
+    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index) {
       await Promise.all(
         ops.filter(
           ([method]) => method === "delete" || method === "delete-index"
@@ -11691,7 +11690,7 @@ async function _checkout({
           if (method === "delete") {
             await fs.rm(filepath);
           }
-          index2.delete({ filepath: fullpath });
+          index.delete({ filepath: fullpath });
           if (onProgress) {
             await onProgress({
               phase: "Updating workdir",
@@ -11702,13 +11701,13 @@ async function _checkout({
         })
       );
     });
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
+    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index) {
       for (const [method, fullpath] of ops) {
         if (method === "rmdir" || method === "rmdir-index") {
           const filepath = `${dir}/${fullpath}`;
           try {
             if (method === "rmdir-index") {
-              index2.delete({ filepath: fullpath });
+              index.delete({ filepath: fullpath });
             }
             await fs.rmdir(filepath);
             if (onProgress) {
@@ -11743,7 +11742,7 @@ async function _checkout({
         }
       })
     );
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
+    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index) {
       await Promise.all(
         ops.filter(
           ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
@@ -11774,7 +11773,7 @@ async function _checkout({
             if (method === "mkdir-index") {
               stats.mode = 57344;
             }
-            index2.insert({
+            index.insert({
               filepath: fullpath,
               stats,
               oid: oid2
@@ -13342,13 +13341,13 @@ async function currentBranch({
 async function _findMergeBase({ fs, cache, gitdir, oids }) {
   const visits = {};
   const passes = oids.length;
-  let heads = oids.map((oid, index2) => ({ index: index2, oid }));
+  let heads = oids.map((oid, index) => ({ index, oid }));
   while (heads.length) {
     const result = /* @__PURE__ */ new Set();
-    for (const { oid, index: index2 } of heads) {
+    for (const { oid, index } of heads) {
       if (!visits[oid])
         visits[oid] = /* @__PURE__ */ new Set();
-      visits[oid].add(index2);
+      visits[oid].add(index);
       if (visits[oid].size === passes) {
         result.add(oid);
       }
@@ -13357,14 +13356,14 @@ async function _findMergeBase({ fs, cache, gitdir, oids }) {
       return [...result];
     }
     const newheads = /* @__PURE__ */ new Map();
-    for (const { oid, index: index2 } of heads) {
+    for (const { oid, index } of heads) {
       try {
         const { object } = await _readObject({ fs, cache, gitdir, oid });
         const commit2 = GitCommit.from(object);
         const { parent } = commit2.parseHeaders();
         for (const oid2 of parent) {
-          if (!visits[oid2] || !visits[oid2].has(index2)) {
-            newheads.set(oid2 + ":" + index2, { oid: oid2, index: index2 });
+          if (!visits[oid2] || !visits[oid2].has(index)) {
+            newheads.set(oid2 + ":" + index, { oid: oid2, index });
           }
         }
       } catch (err) {
@@ -13411,7 +13410,7 @@ async function mergeTree({
   cache,
   dir,
   gitdir = (0, import_path_browserify.join)(dir, ".git"),
-  index: index2,
+  index,
   ourOid,
   baseOid,
   theirOid,
@@ -13485,13 +13484,13 @@ async function mergeTree({
                   const baseOid2 = await base.oid();
                   const ourOid2 = await ours.oid();
                   const theirOid2 = await theirs.oid();
-                  index2.delete({ filepath });
-                  index2.insert({ filepath, oid: baseOid2, stage: 1 });
-                  index2.insert({ filepath, oid: ourOid2, stage: 2 });
-                  index2.insert({ filepath, oid: theirOid2, stage: 3 });
+                  index.delete({ filepath });
+                  index.insert({ filepath, oid: baseOid2, stage: 1 });
+                  index.insert({ filepath, oid: ourOid2, stage: 2 });
+                  index.insert({ filepath, oid: theirOid2, stage: 3 });
                 }
               } else if (!abortOnConflict) {
-                index2.insert({ filepath, oid: r.mergeResult.oid, stage: 0 });
+                index.insert({ filepath, oid: r.mergeResult.oid, stage: 0 });
               }
               return r.mergeResult;
             });
@@ -13502,9 +13501,9 @@ async function mergeTree({
             if (!abortOnConflict) {
               const baseOid2 = await base.oid();
               const theirOid2 = await theirs.oid();
-              index2.delete({ filepath });
-              index2.insert({ filepath, oid: baseOid2, stage: 1 });
-              index2.insert({ filepath, oid: theirOid2, stage: 3 });
+              index.delete({ filepath });
+              index.insert({ filepath, oid: baseOid2, stage: 1 });
+              index.insert({ filepath, oid: theirOid2, stage: 3 });
             }
             return {
               mode: await theirs.mode(),
@@ -13519,9 +13518,9 @@ async function mergeTree({
             if (!abortOnConflict) {
               const baseOid2 = await base.oid();
               const ourOid2 = await ours.oid();
-              index2.delete({ filepath });
-              index2.insert({ filepath, oid: baseOid2, stage: 1 });
-              index2.insert({ filepath, oid: ourOid2, stage: 2 });
+              index.delete({ filepath });
+              index.insert({ filepath, oid: baseOid2, stage: 1 });
+              index.insert({ filepath, oid: ourOid2, stage: 2 });
             }
             return {
               mode: await ours.mode(),
@@ -13712,13 +13711,13 @@ async function _merge({
     }
     const tree = await GitIndexManager.acquire(
       { fs, gitdir, cache, allowUnmerged: false },
-      async (index2) => {
+      async (index) => {
         return mergeTree({
           fs,
           cache,
           dir,
           gitdir,
-          index: index2,
+          index,
           ourOid,
           theirOid,
           baseOid,
@@ -13865,6 +13864,58 @@ async function findRoot({ fs, filepath }) {
     throw err;
   }
 }
+function formatInfoRefs(remote, prefix, symrefs, peelTags) {
+  const refs = [];
+  for (const [key, value] of remote.refs) {
+    if (prefix && !key.startsWith(prefix))
+      continue;
+    if (key.endsWith("^{}")) {
+      if (peelTags) {
+        const _key = key.replace("^{}", "");
+        const last = refs[refs.length - 1];
+        const r = last.ref === _key ? last : refs.find((x) => x.ref === _key);
+        if (r === void 0) {
+          throw new Error("I did not expect this to happen");
+        }
+        r.peeled = value;
+      }
+      continue;
+    }
+    const ref = { ref: key, oid: value };
+    if (symrefs) {
+      if (remote.symrefs.has(key)) {
+        ref.target = remote.symrefs.get(key);
+      }
+    }
+    refs.push(ref);
+  }
+  return refs;
+}
+async function init({
+  fs,
+  bare = false,
+  dir,
+  gitdir = bare ? dir : (0, import_path_browserify.join)(dir, ".git"),
+  defaultBranch = "master"
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    if (!bare) {
+      assertParameter("dir", dir);
+    }
+    return await _init({
+      fs: new FileSystem(fs),
+      bare,
+      dir,
+      gitdir,
+      defaultBranch
+    });
+  } catch (err) {
+    err.caller = "git.init";
+    throw err;
+  }
+}
 async function _isDescendent({
   fs,
   cache,
@@ -13914,6 +13965,95 @@ async function _isDescendent({
     }
   }
   return false;
+}
+async function parseListRefsResponse(stream) {
+  const read = GitPktLine.streamReader(stream);
+  const refs = [];
+  let line;
+  while (true) {
+    line = await read();
+    if (line === true)
+      break;
+    if (line === null)
+      continue;
+    line = line.toString("utf8").replace(/\n$/, "");
+    const [oid, ref, ...attrs] = line.split(" ");
+    const r = { ref, oid };
+    for (const attr of attrs) {
+      const [name, value] = attr.split(":");
+      if (name === "symref-target") {
+        r.target = value;
+      } else if (name === "peeled") {
+        r.peeled = value;
+      }
+    }
+    refs.push(r);
+  }
+  return refs;
+}
+async function writeListRefsRequest({ prefix, symrefs, peelTags }) {
+  const packstream = [];
+  packstream.push(GitPktLine.encode("command=ls-refs\n"));
+  packstream.push(GitPktLine.encode(`agent=${pkg.agent}
+`));
+  if (peelTags || symrefs || prefix) {
+    packstream.push(GitPktLine.delim());
+  }
+  if (peelTags)
+    packstream.push(GitPktLine.encode("peel"));
+  if (symrefs)
+    packstream.push(GitPktLine.encode("symrefs"));
+  if (prefix)
+    packstream.push(GitPktLine.encode(`ref-prefix ${prefix}`));
+  packstream.push(GitPktLine.flush());
+  return packstream;
+}
+async function listServerRefs({
+  http,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  corsProxy,
+  url,
+  headers = {},
+  forPush = false,
+  protocolVersion = 2,
+  prefix,
+  symrefs,
+  peelTags
+}) {
+  try {
+    assertParameter("http", http);
+    assertParameter("url", url);
+    const remote = await GitRemoteHTTP.discover({
+      http,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      headers,
+      protocolVersion
+    });
+    if (remote.protocolVersion === 1) {
+      return formatInfoRefs(remote, prefix, symrefs, peelTags);
+    }
+    const body = await writeListRefsRequest({ prefix, symrefs, peelTags });
+    const res = await GitRemoteHTTP.connect({
+      http,
+      auth: remote.auth,
+      headers,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      body
+    });
+    return parseListRefsResponse(res.body);
+  } catch (err) {
+    err.caller = "git.listServerRefs";
+    throw err;
+  }
 }
 function compareAge(a, b) {
   return a.committer.timestamp - b.committer.timestamp;
@@ -14733,110 +14873,11 @@ async function statusMatrix({
   }
 }
 
-// node_modules/.pnpm/isomorphic-git@1.29.0/node_modules/isomorphic-git/http/web/index.js
-var web_exports = {};
-__export(web_exports, {
-  default: () => web_default,
-  request: () => request
-});
-function fromValue2(value) {
-  let queue = [value];
-  return {
-    next() {
-      return Promise.resolve({ done: queue.length === 0, value: queue.pop() });
-    },
-    return() {
-      queue = [];
-      return {};
-    },
-    [Symbol.asyncIterator]() {
-      return this;
-    }
-  };
-}
-function getIterator2(iterable) {
-  if (iterable[Symbol.asyncIterator]) {
-    return iterable[Symbol.asyncIterator]();
-  }
-  if (iterable[Symbol.iterator]) {
-    return iterable[Symbol.iterator]();
-  }
-  if (iterable.next) {
-    return iterable;
-  }
-  return fromValue2(iterable);
-}
-async function forAwait2(iterable, cb) {
-  const iter = getIterator2(iterable);
-  while (true) {
-    const { value, done } = await iter.next();
-    if (value)
-      await cb(value);
-    if (done)
-      break;
-  }
-  if (iter.return)
-    iter.return();
-}
-async function collect2(iterable) {
-  let size = 0;
-  const buffers = [];
-  await forAwait2(iterable, (value) => {
-    buffers.push(value);
-    size += value.byteLength;
-  });
-  const result = new Uint8Array(size);
-  let nextIndex = 0;
-  for (const buffer of buffers) {
-    result.set(buffer, nextIndex);
-    nextIndex += buffer.byteLength;
-  }
-  return result;
-}
-function fromStream(stream) {
-  if (stream[Symbol.asyncIterator])
-    return stream;
-  const reader = stream.getReader();
-  return {
-    next() {
-      return reader.read();
-    },
-    return() {
-      reader.releaseLock();
-      return {};
-    },
-    [Symbol.asyncIterator]() {
-      return this;
-    }
-  };
-}
-async function request({
-  onProgress,
-  url,
-  method = "GET",
-  headers = {},
-  body
-}) {
-  if (body) {
-    body = await collect2(body);
-  }
-  const res = await fetch(url, { method, headers, body });
-  const iter = res.body && res.body.getReader ? fromStream(res.body) : [new Uint8Array(await res.arrayBuffer())];
-  headers = {};
-  for (const [key, value] of res.headers.entries()) {
-    headers[key] = value;
-  }
-  return {
-    url: res.url,
-    method: res.method,
-    statusCode: res.status,
-    statusMessage: res.statusText,
-    body: iter,
-    headers
-  };
-}
-var index = { request };
-var web_default = index;
+// src/main.ts
+var import_lightning_fs = __toESM(require_src());
+
+// src/gitManager.ts
+var import_obsidian2 = require("obsidian");
 
 // src/logger.ts
 var import_obsidian = require("obsidian");
@@ -14911,37 +14952,90 @@ var Logger = class _Logger {
 var log2 = Logger.getInstance();
 
 // src/gitManager.ts
-var import_obsidian2 = require("obsidian");
-var _GitHttpClient = class _GitHttpClient {
+var import_obsidian3 = require("obsidian");
+var GitHttpClient = class {
   constructor(credentials) {
     this.credentials = credentials;
   }
   async request(config) {
-    const proxiedUrl = _GitHttpClient.PROXY_URL + encodeURIComponent(config.url);
-    log2.debug("GitHttpClient", `Proxying request to: ${config.url}`);
+    log2.debug("GitHttpClient", `Requesting: ${config.method || "GET"} ${config.url}`);
     const headers = {
-      ...config.headers,
-      "X-Requested-With": "obsidian-git-sync",
-      "X-Git-Username": this.credentials.username,
-      "X-Git-Password": this.credentials.password
+      ...config.headers
     };
+    if (this.credentials.username && this.credentials.password) {
+      const auth = btoa(`${this.credentials.username}:${this.credentials.password}`);
+      headers["Authorization"] = `Basic ${auth}`;
+    }
+    let body;
+    if (config.body) {
+      body = await this.collectBody(config.body);
+    }
     try {
-      log2.debug("GitHttpClient", `Sending ${config.method || "GET"} request`);
-      const response = await request({
-        ...config,
-        url: proxiedUrl,
-        headers
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: config.url,
+        method: config.method || "GET",
+        headers,
+        body,
+        throw: false
+        // Don't throw on 4xx/5xx — let isomorphic-git handle Git errors
       });
-      log2.debug("GitHttpClient", `Response status: ${response.statusCode}`);
-      return response;
+      log2.debug("GitHttpClient", `Response status: ${response.status}`);
+      return {
+        url: config.url,
+        method: config.method || "GET",
+        statusCode: response.status,
+        statusMessage: this.getStatusMessage(response.status),
+        body: this.toAsyncIterator(response.arrayBuffer),
+        headers: response.headers
+      };
     } catch (error) {
       log2.error("GitHttpClient", `Request failed: ${error.message}`, error);
       throw error;
     }
   }
+  /**
+   * Collect an async iterable of Uint8Arrays into a single ArrayBuffer
+   */
+  async collectBody(body) {
+    const chunks = [];
+    for await (const chunk of body) {
+      chunks.push(chunk);
+    }
+    let totalLength = 0;
+    for (const chunk of chunks) {
+      totalLength += chunk.byteLength;
+    }
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return result.buffer;
+  }
+  /**
+   * Convert an ArrayBuffer into an async iterator of Uint8Arrays
+   * (isomorphic-git expects body as an async iterable)
+   */
+  toAsyncIterator(arrayBuffer) {
+    return {
+      [Symbol.asyncIterator]: async function* () {
+        yield new Uint8Array(arrayBuffer);
+      }
+    };
+  }
+  getStatusMessage(status) {
+    const messages = {
+      200: "OK",
+      201: "Created",
+      204: "No Content",
+      401: "Unauthorized",
+      403: "Forbidden",
+      404: "Not Found"
+    };
+    return messages[status] || "Unknown";
+  }
 };
-_GitHttpClient.PROXY_URL = "http://localhost:3001/proxy?url=";
-var GitHttpClient = _GitHttpClient;
 var GitManager = class {
   constructor(fs, dir, credentials, statusBarItem) {
     this.statusBarItem = null;
@@ -14993,8 +15087,19 @@ var GitManager = class {
         log2.info("GitManager", `Repository successfully cloned to ${this.dir}`);
         return true;
       }
-      this.updateStatus("Repository already exists");
-      log2.info("GitManager", `Repository already exists at ${this.dir}`);
+      this.updateStatus("Validating repository...");
+      log2.debug("GitManager", `Validating remote repository URL: ${repoUrl}`);
+      await listServerRefs({
+        http: new GitHttpClient(this.credentials),
+        url: repoUrl,
+        prefix: `refs/heads/${branchName}`,
+        onAuth: () => ({
+          username: this.credentials.username,
+          password: this.credentials.password
+        })
+      });
+      this.updateStatus("Repository validated");
+      log2.info("GitManager", `Repository exists and remote URL is valid`);
       return true;
     } catch (error) {
       log2.error("GitManager", "Failed to initialize repository", error);
@@ -15003,13 +15108,16 @@ var GitManager = class {
     }
   }
   /**
-   * Check if the current directory is a git repository
+   * Check if the current directory is a local git repository
+   * Note: This only checks for local repository structure, not remote connectivity
    */
   async isRepository() {
     try {
       await findRoot({ fs: this.fs, filepath: this.dir });
+      log2.debug("GitManager", `Local Git repository found at ${this.dir}`);
       return true;
     } catch (error) {
+      log2.debug("GitManager", `No local Git repository found at ${this.dir}`);
       return false;
     }
   }
@@ -15021,10 +15129,11 @@ var GitManager = class {
       this.updateStatus("Pulling changes...");
       await pull({
         fs: this.fs,
-        http: web_exports,
+        http: new GitHttpClient(this.credentials),
         dir: this.dir,
         ref: branchName,
         singleBranch: true,
+        fastForwardOnly: true,
         onAuth: () => ({
           username: this.credentials.username,
           password: this.credentials.password
@@ -15147,12 +15256,12 @@ var GitManager = class {
         log({
           fs: this.fs,
           dir: this.dir,
-          ref: `${currentBranch2}..origin/${currentBranch2}`
+          ref: `origin/${currentBranch2}..${currentBranch2}`
         }).then((commits) => commits.length).catch(() => 0),
         log({
           fs: this.fs,
           dir: this.dir,
-          ref: `origin/${currentBranch2}..${currentBranch2}`
+          ref: `${currentBranch2}..origin/${currentBranch2}`
         }).then((commits) => commits.length).catch(() => 0)
       ]);
       log2.info("GitManager", `Repository status: branch=${currentBranch2}, ahead=${ahead}, behind=${behind}`);
@@ -15184,10 +15293,10 @@ var GitManager = class {
         await this.commit(commitMessage);
         await this.push(branchName);
         log2.info("GitManager", `Sync completed successfully with ${changedFiles.length} files updated`);
-        new import_obsidian2.Notice(`Git sync completed: ${changedFiles.length} files updated`);
+        new import_obsidian3.Notice(`Git sync completed: ${changedFiles.length} files updated`);
       } else {
         log2.info("GitManager", "Sync completed: No changes to commit");
-        new import_obsidian2.Notice("Git sync completed: No changes to commit");
+        new import_obsidian3.Notice("Git sync completed: No changes to commit");
       }
       this.updateStatus("Ready");
     } catch (error) {
@@ -15211,7 +15320,7 @@ var DEFAULT_SETTINGS = {
   autoSyncInterval: 0,
   autoCommitMessage: "Vault backup: {{date}}"
 };
-var GitSyncPlugin = class extends import_obsidian3.Plugin {
+var GitSyncPlugin = class extends import_obsidian4.Plugin {
   constructor() {
     super(...arguments);
     this.intervalId = null;
@@ -15228,15 +15337,207 @@ var GitSyncPlugin = class extends import_obsidian3.Plugin {
       log2.info("GitSyncPlugin", "Manual sync triggered from ribbon");
       try {
         await this.syncVault();
-        new import_obsidian3.Notice("Git sync completed successfully");
+        new import_obsidian4.Notice("Git sync completed successfully");
       } catch (error) {
         log2.error("GitSyncPlugin", "Manual sync failed", error);
-        new import_obsidian3.Notice(`Git sync failed: ${error.message}`);
+        new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
       }
     });
     this.statusBarItem = this.addStatusBarItem();
     this.statusBarItem.setText("Git: Ready");
     this.addSettingTab(new GitSyncSettingTab(this.app, this));
+    this.addCommand({
+      id: "git-sync-now",
+      name: "Sync now",
+      callback: async () => {
+        log2.info("GitSyncPlugin", "Manual sync triggered from command palette");
+        try {
+          await this.syncVault();
+          new import_obsidian4.Notice("Git sync completed successfully");
+        } catch (error) {
+          log2.error("GitSyncPlugin", "Manual sync failed", error);
+          new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
+        }
+      }
+    });
+    this.addCommand({
+      id: "git-sync-pull",
+      name: "Pull from remote",
+      callback: async () => {
+        log2.info("GitSyncPlugin", "Pull triggered from command palette");
+        try {
+          if (!this.gitManager) {
+            const vaultPath = this.app.vault.getRoot().path;
+            const credentials = {
+              username: this.settings.username,
+              password: this.settings.password,
+              author: {
+                name: this.settings.author.name || "Obsidian Git Sync User",
+                email: this.settings.author.email || "user@example.com"
+              }
+            };
+            if (this.statusBarItem) {
+              this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
+            } else {
+              throw new Error("Status bar item not initialized");
+            }
+          }
+          await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+          await this.gitManager.pull(this.settings.branchName);
+          new import_obsidian4.Notice("Git pull completed successfully");
+        } catch (error) {
+          log2.error("GitSyncPlugin", "Pull failed", error);
+          new import_obsidian4.Notice(`Git pull failed: ${error.message}`);
+        }
+      }
+    });
+    this.addCommand({
+      id: "git-sync-push",
+      name: "Push to remote",
+      callback: async () => {
+        log2.info("GitSyncPlugin", "Push triggered from command palette");
+        try {
+          if (!this.gitManager) {
+            const vaultPath = this.app.vault.getRoot().path;
+            const credentials = {
+              username: this.settings.username,
+              password: this.settings.password,
+              author: {
+                name: this.settings.author.name || "Obsidian Git Sync User",
+                email: this.settings.author.email || "user@example.com"
+              }
+            };
+            if (this.statusBarItem) {
+              this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
+            } else {
+              throw new Error("Status bar item not initialized");
+            }
+          }
+          await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+          await this.gitManager.push(this.settings.branchName);
+          new import_obsidian4.Notice("Git push completed successfully");
+        } catch (error) {
+          log2.error("GitSyncPlugin", "Push failed", error);
+          new import_obsidian4.Notice(`Git push failed: ${error.message}`);
+        }
+      }
+    });
+    this.addCommand({
+      id: "git-sync-status",
+      name: "Show repository status",
+      callback: async () => {
+        log2.info("GitSyncPlugin", "Status check triggered from command palette");
+        try {
+          if (!this.gitManager) {
+            const vaultPath = this.app.vault.getRoot().path;
+            const credentials = {
+              username: this.settings.username,
+              password: this.settings.password,
+              author: {
+                name: this.settings.author.name || "Obsidian Git Sync User",
+                email: this.settings.author.email || "user@example.com"
+              }
+            };
+            if (this.statusBarItem) {
+              this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
+            } else {
+              throw new Error("Status bar item not initialized");
+            }
+          }
+          await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+          const status = await this.gitManager.getStatus();
+          new import_obsidian4.Notice(`Git status: ${status.branch} \u2014 ${status.ahead} ahead, ${status.behind} behind`);
+        } catch (error) {
+          log2.error("GitSyncPlugin", "Status check failed", error);
+          new import_obsidian4.Notice(`Git status failed: ${error.message}`);
+        }
+      }
+    });
+    this.addCommand({
+      id: "git-sync-test-compatibility",
+      name: "Test isomorphic-git compatibility",
+      callback: async () => {
+        const results = [];
+        const testFsName = "git-test-" + Date.now();
+        const testFs = new import_lightning_fs.default(testFsName);
+        const pfs = testFs.promises;
+        const testDir = "/git-compat-test";
+        try {
+          try {
+            await pfs.mkdir(testDir);
+            results.push("\u2705 LightningFS (mobile fs)");
+          } catch (e) {
+            results.push("\u274C LightningFS: " + e.message);
+          }
+          try {
+            await init({ fs: pfs, dir: testDir, defaultBranch: "main" });
+            results.push("\u2705 git.init");
+          } catch (e) {
+            results.push("\u274C git.init: " + e.message);
+          }
+          try {
+            const root = await findRoot({ fs: pfs, filepath: testDir });
+            results.push(root === testDir ? "\u2705 git.findRoot" : "\u26A0\uFE0F git.findRoot (unexpected root)");
+          } catch (e) {
+            results.push("\u274C git.findRoot: " + e.message);
+          }
+          try {
+            await pfs.writeFile(testDir + "/test.md", "# Hello");
+            await add({ fs: pfs, dir: testDir, filepath: "test.md" });
+            const sha = await commit({
+              fs: pfs,
+              dir: testDir,
+              message: "Test commit",
+              author: { name: "Test", email: "test@example.com" }
+            });
+            results.push("\u2705 git.add + git.commit (" + sha.slice(0, 7) + ")");
+          } catch (e) {
+            results.push("\u274C git.add/commit: " + e.message);
+          }
+          try {
+            const commits = await log({ fs: pfs, dir: testDir });
+            results.push("\u2705 git.log (" + commits.length + " commits)");
+          } catch (e) {
+            results.push("\u274C git.log: " + e.message);
+          }
+          try {
+            const branch = await currentBranch({ fs: pfs, dir: testDir, fullname: false });
+            results.push(branch === "main" ? "\u2705 git.currentBranch (main)" : "\u26A0\uFE0F git.currentBranch (" + branch + ")");
+          } catch (e) {
+            results.push("\u274C git.currentBranch: " + e.message);
+          }
+          try {
+            results.push("\u2705 HTTP client (requestUrl native bridge)");
+          } catch (e) {
+            results.push("\u274C HTTP client: " + e.message);
+          }
+          const passed = results.filter((r) => r.startsWith("\u2705")).length;
+          const failed = results.filter((r) => r.startsWith("\u274C")).length;
+          new import_obsidian4.Notice(`Git compat: ${passed}/${results.length} passed${failed > 0 ? ", " + failed + " failed" : ""}`);
+          class TestResultsModal extends import_obsidian4.Modal {
+            constructor(app, results2) {
+              super(app);
+              this.results = results2;
+            }
+            onOpen() {
+              const { contentEl } = this;
+              contentEl.createEl("h2", { text: "isomorphic-git Compatibility Test" });
+              const list = contentEl.createEl("ul");
+              for (const r of this.results) {
+                list.createEl("li", { text: r });
+              }
+              contentEl.createEl("p", {
+                text: passed === this.results.length ? "All tests passed \u2014 isomorphic-git is fully compatible." : "Some tests failed \u2014 check the results above."
+              });
+            }
+          }
+          new TestResultsModal(this.app, results).open();
+        } catch (e) {
+          log2.error("GitSyncPlugin", "Compatibility test failed", e);
+          new import_obsidian4.Notice("Compatibility test error: " + e.message);
+        }
+      }
+    });
     this.setupAutoSync();
   }
   onunload() {
@@ -15314,7 +15615,7 @@ var GitSyncPlugin = class extends import_obsidian3.Plugin {
     }
   }
 };
-var GitSyncSettingTab = class extends import_obsidian3.PluginSettingTab {
+var GitSyncSettingTab = class extends import_obsidian4.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -15323,46 +15624,46 @@ var GitSyncSettingTab = class extends import_obsidian3.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "Git Sync Settings" });
-    new import_obsidian3.Setting(containerEl).setName("Repository URL").setDesc("The URL of your Git repository").addText((text) => text.setPlaceholder("https://github.com/username/repo.git").setValue(this.plugin.settings.repoUrl).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Repository URL").setDesc("The URL of your Git repository").addText((text) => text.setPlaceholder("https://github.com/username/repo.git").setValue(this.plugin.settings.repoUrl).onChange(async (value) => {
       this.plugin.settings.repoUrl = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Branch").setDesc("The branch to sync with").addText((text) => text.setPlaceholder("main").setValue(this.plugin.settings.branchName).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Branch").setDesc("The branch to sync with").addText((text) => text.setPlaceholder("main").setValue(this.plugin.settings.branchName).onChange(async (value) => {
       this.plugin.settings.branchName = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Username").setDesc("Your Git username").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Username").setDesc("Your Git username").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Password/Token").setDesc("Your Git password or personal access token").addText((text) => text.setPlaceholder("password or token").setValue(this.plugin.settings.password).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Password/Token").setDesc("Your Git password or personal access token").addText((text) => text.setPlaceholder("password or token").setValue(this.plugin.settings.password).onChange(async (value) => {
       text.inputEl.type = "password";
       this.plugin.settings.password = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Author Name").setDesc("Your name for Git commits").addText((text) => text.setPlaceholder("Your Name").setValue(this.plugin.settings.author.name).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Author Name").setDesc("Your name for Git commits").addText((text) => text.setPlaceholder("Your Name").setValue(this.plugin.settings.author.name).onChange(async (value) => {
       this.plugin.settings.author.name = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Author Email").setDesc("Your email for Git commits").addText((text) => text.setPlaceholder("your.email@example.com").setValue(this.plugin.settings.author.email).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Author Email").setDesc("Your email for Git commits").addText((text) => text.setPlaceholder("your.email@example.com").setValue(this.plugin.settings.author.email).onChange(async (value) => {
       this.plugin.settings.author.email = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Auto Sync Interval").setDesc("How often to automatically sync (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.autoSyncInterval)).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Auto Sync Interval").setDesc("How often to automatically sync (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.autoSyncInterval)).onChange(async (value) => {
       const numValue = Number(value);
       if (!isNaN(numValue) && numValue >= 0) {
         this.plugin.settings.autoSyncInterval = numValue;
         await this.plugin.saveSettings();
       }
     }));
-    new import_obsidian3.Setting(containerEl).setName("Auto Commit Message").setDesc("Message for automatic commits. Use {{date}} for current date/time").addText((text) => text.setPlaceholder("Vault backup: {{date}}").setValue(this.plugin.settings.autoCommitMessage).onChange(async (value) => {
+    new import_obsidian4.Setting(containerEl).setName("Auto Commit Message").setDesc("Message for automatic commits. Use {{date}} for current date/time").addText((text) => text.setPlaceholder("Vault backup: {{date}}").setValue(this.plugin.settings.autoCommitMessage).onChange(async (value) => {
       this.plugin.settings.autoCommitMessage = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian3.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
+    new import_obsidian4.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
       try {
         if (!this.plugin.settings.repoUrl) {
-          new import_obsidian3.Notice("Please enter a repository URL first");
+          new import_obsidian4.Notice("Please enter a repository URL first");
           return;
         }
         if (!this.plugin.gitManager) {
@@ -15381,22 +15682,22 @@ var GitSyncSettingTab = class extends import_obsidian3.PluginSettingTab {
             throw new Error("Status bar item not initialized");
           }
         }
-        new import_obsidian3.Notice("Testing connection...");
+        new import_obsidian4.Notice("Testing connection...");
         await this.plugin.gitManager.initializeRepo(
           this.plugin.settings.repoUrl,
           this.plugin.settings.branchName
         );
-        new import_obsidian3.Notice("Connection successful!");
+        new import_obsidian4.Notice("Connection successful!");
       } catch (error) {
-        new import_obsidian3.Notice(`Connection test failed: ${error.message}`);
+        new import_obsidian4.Notice(`Connection test failed: ${error.message}`);
       }
     }));
-    new import_obsidian3.Setting(containerEl).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
+    new import_obsidian4.Setting(containerEl).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
       try {
         await this.plugin.syncVault();
-        new import_obsidian3.Notice("Git sync completed successfully");
+        new import_obsidian4.Notice("Git sync completed successfully");
       } catch (error) {
-        new import_obsidian3.Notice(`Git sync failed: ${error.message}`);
+        new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
       }
     }));
   }
