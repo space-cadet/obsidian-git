@@ -97,23 +97,11 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Pull triggered from command palette');
 				try {
+					await this.ensureGitManager();
 					if (!this.gitManager) {
-						const vaultPath = this.app.vault.getRoot().path;
-						const credentials: GitCredentials = {
-							username: this.settings.username,
-							password: this.settings.password,
-							author: {
-								name: this.settings.author.name || 'Obsidian Git Sync User',
-								email: this.settings.author.email || 'user@example.com'
-							}
-						};
-						if (this.statusBarItem) {
-							this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
-						} else {
-							throw new Error('Status bar item not initialized');
-						}
+						new Notice('No git repository found');
+						return;
 					}
-					await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
 					await this.gitManager.pull(this.settings.branchName);
 					new Notice('Git pull completed successfully');
 				} catch (error: any) {
@@ -129,23 +117,11 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Push triggered from command palette');
 				try {
+					await this.ensureGitManager();
 					if (!this.gitManager) {
-						const vaultPath = this.app.vault.getRoot().path;
-						const credentials: GitCredentials = {
-							username: this.settings.username,
-							password: this.settings.password,
-							author: {
-								name: this.settings.author.name || 'Obsidian Git Sync User',
-								email: this.settings.author.email || 'user@example.com'
-							}
-						};
-						if (this.statusBarItem) {
-							this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
-						} else {
-							throw new Error('Status bar item not initialized');
-						}
+						new Notice('No git repository found');
+						return;
 					}
-					await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
 					await this.gitManager.push(this.settings.branchName);
 					new Notice('Git push completed successfully');
 				} catch (error: any) {
@@ -161,23 +137,11 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Status check triggered from command palette');
 				try {
+					await this.ensureGitManager();
 					if (!this.gitManager) {
-						const vaultPath = this.app.vault.getRoot().path;
-						const credentials: GitCredentials = {
-							username: this.settings.username,
-							password: this.settings.password,
-							author: {
-								name: this.settings.author.name || 'Obsidian Git Sync User',
-								email: this.settings.author.email || 'user@example.com'
-							}
-						};
-						if (this.statusBarItem) {
-							this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
-						} else {
-							throw new Error('Status bar item not initialized');
-						}
+						new Notice('No git repository found');
+						return;
 					}
-					await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
 					const status = await this.gitManager.getStatus();
 					new Notice(`Git status: ${status.branch} — ${status.ahead} ahead, ${status.behind} behind`);
 				} catch (error: any) {
@@ -261,11 +225,13 @@ export default class GitSyncPlugin extends Plugin {
 	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
 		if (this.gitManager) return this.gitManager;
 
-		const vaultPath = this.app.vault.getRoot().path;
+		// Use empty string as the "directory" since DataAdapter resolves relative to vault root
+		const vaultPath = '';
 		
-		// Check REAL filesystem (not LightningFS) for .git
-		const hasRealRepo = await this.detectRealGitRepo();
-		if (!hasRealRepo) {
+		// Check if git repo exists via isomorphic-git itself
+		const hasRepo = await this.detectRealGitRepo();
+		if (!hasRepo) {
+			log.warn('GitSyncPlugin', 'No .git repo found in vault');
 			return null;
 		}
 
@@ -292,7 +258,11 @@ export default class GitSyncPlugin extends Plugin {
 		if (this.settings.repoUrl) {
 			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
 		} else {
-			await this.gitManager.initLocal();
+			// Just verify the repo is valid
+			const isRepo = await this.gitManager.isRepository();
+			if (!isRepo) {
+				log.warn('GitSyncPlugin', 'GitManager could not verify repo');
+			}
 		}
 		
 		return this.gitManager;
@@ -303,27 +273,47 @@ export default class GitSyncPlugin extends Plugin {
 	 */
 	async detectRealGitRepo(): Promise<boolean> {
 		try {
-			// Check for .git/HEAD in the real vault filesystem
-			const headFile = this.app.vault.getAbstractFileByPath('.git/HEAD');
-			if (headFile) return true;
-			
-			// Fallback: try adapter.stat for .git directory
+			// Method 1: Try to read .git/HEAD via the adapter (desktop + mobile)
 			const adapter = this.app.vault.adapter;
-			if ('stat' in adapter) {
-				const stat = await (adapter as any).stat('.git');
-				if (stat && stat.type === 'folder') return true;
+			try {
+				await adapter.read('.git/HEAD');
+				log.debug('GitSyncPlugin', 'detectRealGitRepo: .git/HEAD readable');
+				return true;
+			} catch (e) {
+				log.debug('GitSyncPlugin', 'detectRealGitRepo: .git/HEAD not readable', e);
+			}
+			
+			// Method 2: Try adapter.stat for .git directory
+			try {
+				const stat = await adapter.stat('.git');
+				if (stat && stat.type === 'folder') {
+					log.debug('GitSyncPlugin', 'detectRealGitRepo: .git dir found via stat');
+					return true;
+				}
+			} catch (e) {
+				log.debug('GitSyncPlugin', 'detectRealGitRepo: .git stat failed', e);
+			}
+			
+			// Method 3: Try isomorphic-git findRoot with our fs adapter
+			try {
+				const git = await import('isomorphic-git');
+				const root = await git.findRoot({ fs: this.fs, filepath: '.' });
+				if (root) {
+					log.debug('GitSyncPlugin', 'detectRealGitRepo: findRoot found repo at', root);
+					return true;
+				}
+			} catch (e) {
+				log.debug('GitSyncPlugin', 'detectRealGitRepo: findRoot failed', e);
 			}
 			
 			return false;
-		} catch {
+		} catch (e) {
+			log.warn('GitSyncPlugin', 'detectRealGitRepo error', e);
 			return false;
 		}
 	}
 
 	async syncVault() {
-		// Get the vault path
-		const vaultPath = this.app.vault.getRoot().path;
-		
 		// Format commit message with date
 		const commitMessage = this.settings.autoCommitMessage.replace(
 			'{{date}}', 
@@ -331,31 +321,20 @@ export default class GitSyncPlugin extends Plugin {
 		);
 	
 		// Initialize GitManager if not already done
+		await this.ensureGitManager();
 		if (!this.gitManager) {
-			const credentials: GitCredentials = {
-				username: this.settings.username,
-				password: this.settings.password,
-				author: {
-					name: this.settings.author.name || 'Obsidian Git Sync User', // Ensure a valid default name
-					email: this.settings.author.email || 'user@example.com' // Ensure a valid default email
-				}
-			};
-			if (this.statusBarItem) {
-				this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
-			} else {
-				throw new Error('Status bar item not initialized');
-			}
-		} else {
-			// Update credentials in case they've changed in settings
-			this.gitManager.updateCredentials({
-				username: this.settings.username,
-				password: this.settings.password,
-				author: {
-					name: this.settings.author.name || 'Obsidian Git Sync User',
-					email: this.settings.author.email || 'user@example.com'
-				}
-			});
+			throw new Error('No git repository found in vault');
 		}
+		
+		// Update credentials in case they've changed in settings
+		this.gitManager.updateCredentials({
+			username: this.settings.username,
+			password: this.settings.password,
+			author: {
+				name: this.settings.author.name || 'Obsidian Git Sync User',
+				email: this.settings.author.email || 'user@example.com'
+			}
+		});
 	
 		// Perform the sync operation
 		try {
@@ -492,29 +471,18 @@ class GitSyncSettingTab extends PluginSettingTab {
 							return;
 						}
 
+						await this.plugin.ensureGitManager();
 						if (!this.plugin.gitManager) {
-							const vaultPath = this.plugin.app.vault.getRoot().path;
-							const credentials: GitCredentials = {
-								username: this.plugin.settings.username,
-								password: this.plugin.settings.password,
-								author: {
-									name: this.plugin.settings.author.name,
-									email: this.plugin.settings.author.email
-								}
-							};
-							if (this.plugin.statusBarItem) {
-								this.plugin.gitManager = new GitManager(this.plugin.fs, vaultPath, credentials, this.plugin.statusBarItem);
-							} else {
-								throw new Error('Status bar item not initialized');
-							}
+							new Notice('No git repository configured');
+							return;
 						}
 
-						new Notice('Testing connection...');
-						await this.plugin.gitManager.initializeRepo(
-							this.plugin.settings.repoUrl,
-							this.plugin.settings.branchName
-						);
-						new Notice('Connection successful!');
+							new Notice('Testing connection...');
+							await this.plugin.gitManager!.initializeRepo(
+								this.plugin.settings.repoUrl,
+								this.plugin.settings.branchName
+							);
+							new Notice('Connection successful!');
 					} catch (error) {
 						new Notice(`Connection test failed: ${error.message}`);
 					}

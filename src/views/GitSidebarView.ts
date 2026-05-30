@@ -181,6 +181,11 @@ export class GitSidebarView extends ItemView {
     // ─── Main refresh ───
 
     async refresh(): Promise<void> {
+        // Try to auto-init gitManager if not already done
+        if (!this.plugin.gitManager) {
+            await this.plugin.ensureGitManager();
+        }
+        
         // Update initialization state
         const initialized = !!this.plugin.gitManager;
         if (initialized) {

@@ -32,3 +32,4 @@ Thumbs.db
 .pnpm-store/
 
 data.json*.zip
+*.zip
