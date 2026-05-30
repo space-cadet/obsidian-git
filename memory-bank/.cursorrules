@@ -1,0 +1,60 @@
+# .cursorrules — Obsidian Git Plugin
+
+## Project Context
+
+This is the **obsidian-git** plugin — a Git synchronization plugin for Obsidian that works on both desktop and mobile. The current implementation uses `simple-git` (Node.js wrapper around git CLI) which fails on mobile. The active task (T1) is porting to `isomorphic-git` (pure JavaScript git implementation).
+
+## Memory Bank Location
+`/Users/deepak/code/obsidian-git/memory-bank/`
+
+## Operational Rules
+
+### File Organization
+- All Memory Bank files in `/Users/deepak/code/obsidian-git/memory-bank/`
+- Use Markdown format for all documentation
+- Include "Last Updated" timestamp at end of each file in IST timezone
+- Cross-reference related information using relative links
+- Include task ID references for traceability
+
+### Tiered Knowledge Structure
+**Bootstrap** (Session Start): tasks.md, activeContext.md
+**Critical** (Task-Focused): session_cache.md, edit_history.md, errorLog.md
+**Essential** (Context): projectbrief.md, .cursorrules
+
+### Update Workflow (Text-First)
+1. Determine system time and timezone (IST standard)
+2. Update individual task file with progress and timestamp
+3. Update tasks.md master registry with status changes
+4. Update session file (create if new, update if existing)
+5. Update session_cache.md with current metadata
+6. Update other relevant files (activeContext.md, errorLog.md)
+7. Update edit_history.md (prepend new entries with timestamp and task ID)
+
+### Update Patterns
+- Prepend entries to edit_history.md (newest first)
+- Include timestamps for all updates (IST timezone)
+- Make differential updates to minimize token usage
+- Verify cross-references after major updates
+
+### Documentation Style
+- Use clear, concise language
+- Prefer structured lists and tables
+- Include relative links for cross-references
+- Include task ID references (T1, T2, etc.)
+- Include timestamps with IST timezone
+
+## Project-Specific Conventions
+
+### Git Operations
+- Use `isomorphic-git` for all git operations (not `simple-git`)
+- Use Obsidian `Vault` API instead of Node `fs`/`path`
+- Use `normalizePath()` from Obsidian for cross-platform paths
+- Mobile auth: prefer token-based over SSH on mobile
+
+### Code Style
+- TypeScript with strict types
+- Obsidian plugin API patterns
+- ESBuild for bundling
+- Minimal dependencies (isomorphic-git is ~500KB)
+
+*Last Updated: 2026-05-30 16:50:00 IST*
