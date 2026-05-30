@@ -17445,10 +17445,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("git-sidebar-container");
-    this.headerContainer = container.createDiv("git-sidebar-header");
-    this.renderHeader();
     this.tabsContainer = container.createDiv("git-sidebar-tabs");
     this.renderTabs();
+    this.headerContainer = container.createDiv("git-sidebar-header");
     this.contentContainer = container.createDiv("git-sidebar-content");
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
@@ -17465,34 +17464,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       this.refreshInterval = null;
     }
   }
-  renderHeader() {
-    this.headerContainer.empty();
-    const branchRow = this.headerContainer.createDiv("git-header-branch");
-    branchRow.createSpan({ text: "\u25CF", cls: "git-branch-dot" });
-    const branchName = this.headerContainer.createDiv("git-branch-name");
-    branchName.setText("Loading...");
-    const statusRow = this.headerContainer.createDiv("git-header-status");
-    statusRow.createSpan({ text: "\u2B06 0 \u2B07 0", cls: "git-ahead-behind" });
-  }
-  updateHeader(branch, ahead, behind) {
-    const branchName = this.headerContainer.querySelector(".git-branch-name");
-    if (branchName)
-      branchName.setText(branch);
-    const statusRow = this.headerContainer.querySelector(".git-header-status");
-    if (statusRow) {
-      statusRow.empty();
-      if (this.isLocalOnly) {
-        statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
-      } else if (ahead > 0 || behind > 0) {
-        statusRow.createSpan({
-          text: `\u2B06 ${ahead} \u2B07 ${behind}`,
-          cls: "git-ahead-behind" + (ahead > 0 ? " git-ahead" : "") + (behind > 0 ? " git-behind" : "")
-        });
-      } else {
-        statusRow.createSpan({ text: "Up to date", cls: "git-up-to-date" });
-      }
-    }
-  }
+  // ─── Tabs ───
   renderTabs() {
     this.tabsContainer.empty();
     const tabs = [
@@ -17505,13 +17477,37 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         text: tab.label,
         cls: "git-tab-btn" + (tab.id === this.activeTab ? " git-tab-active" : "")
       });
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", async () => {
         this.activeTab = tab.id;
         this.renderTabs();
-        this.refresh();
+        await this.refresh();
       });
     }
   }
+  // ─── Header ───
+  renderHeader(branch, ahead, behind, initialized) {
+    this.headerContainer.empty();
+    const branchRow = this.headerContainer.createDiv("git-header-branch");
+    branchRow.createSpan({ text: "\u25CF", cls: "git-branch-dot" });
+    branchRow.createSpan({
+      text: initialized ? branch : "Not initialized",
+      cls: "git-branch-name" + (initialized ? "" : " git-branch-uninit")
+    });
+    const statusRow = this.headerContainer.createDiv("git-header-status");
+    if (!initialized) {
+      statusRow.createSpan({ text: "Git repo detected \u2014 initialize to sync", cls: "git-header-hint" });
+    } else if (this.isLocalOnly) {
+      statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
+    } else if (ahead > 0 || behind > 0) {
+      statusRow.createSpan({
+        text: `\u2B06 ${ahead} \u2B07 ${behind}`,
+        cls: "git-ahead-behind" + (ahead > 0 ? " git-ahead" : "") + (behind > 0 ? " git-behind" : "")
+      });
+    } else {
+      statusRow.createSpan({ text: "Up to date", cls: "git-up-to-date" });
+    }
+  }
+  // ─── Footer ───
   renderFooter(container) {
     container.empty();
     new import_obsidian4.ButtonComponent(container).setButtonText("Stage All").setTooltip("Stage all changes").setClass("git-btn-secondary").onClick(async () => {
@@ -17527,78 +17523,61 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         new import_obsidian4.Notice("Stage failed: " + e.message);
       }
     });
-    if (!this.isLocalOnly) {
-      new import_obsidian4.ButtonComponent(container).setButtonText("Sync").setTooltip("Pull, commit, push").setClass("git-btn-primary").onClick(async () => {
-        try {
+    new import_obsidian4.ButtonComponent(container).setButtonText(this.isLocalOnly ? "Commit" : "Sync").setTooltip(this.isLocalOnly ? "Commit changes" : "Pull, commit, push").setClass("git-btn-primary").onClick(async () => {
+      try {
+        if (this.isLocalOnly || !this.plugin.settings.repoUrl) {
+          if (!this.plugin.gitManager) {
+            new import_obsidian4.Notice("Git not initialized");
+            return;
+          }
+          await this.plugin.gitManager.commit("Update from Obsidian");
+          new import_obsidian4.Notice("Changes committed");
+        } else {
           await this.plugin.syncVault();
-          await this.refresh();
-        } catch (e) {
-          new import_obsidian4.Notice("Sync failed: " + e.message);
+          new import_obsidian4.Notice("Sync complete");
         }
-      });
-    }
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice((this.isLocalOnly ? "Commit" : "Sync") + " failed: " + e.message);
+      }
+    });
     new import_obsidian4.ButtonComponent(container).setButtonText("Refresh").setTooltip("Refresh git status").setClass("git-btn-ghost").onClick(async () => {
       await this.refresh();
     });
   }
+  // ─── Main refresh ───
   async refresh() {
-    if (!this.plugin.gitManager) {
-      const hasRealRepo = await this.plugin.detectRealGitRepo();
-      if (hasRealRepo) {
-        this.contentContainer.empty();
-        const wrapper = this.contentContainer.createDiv("git-empty-state-container");
-        wrapper.createEl("p", {
-          text: "Git repo detected in vault.",
-          cls: "git-empty-state git-empty-state-title"
-        });
-        wrapper.createEl("p", {
-          text: this.plugin.settings.repoUrl ? "Click Sync to initialize plugin storage from remote." : "Configure a remote URL in settings to sync, or use Stage All to track changes locally.",
-          cls: "git-empty-state"
-        });
-        const btnRow = wrapper.createDiv("git-empty-state-actions");
-        new import_obsidian4.ButtonComponent(btnRow).setButtonText("Initialize").setClass("git-btn-primary").onClick(async () => {
-          try {
-            await this.plugin.ensureGitManager(false);
-            new import_obsidian4.Notice("Git storage initialized");
-            await this.refresh();
-          } catch (e) {
-            new import_obsidian4.Notice("Initialize failed: " + e.message);
-          }
-        });
-        if (this.plugin.settings.repoUrl) {
-          new import_obsidian4.ButtonComponent(btnRow).setButtonText("Clone Remote").setClass("git-btn-secondary").onClick(async () => {
-            try {
-              await this.plugin.syncVault();
-              new import_obsidian4.Notice("Remote repo cloned");
-              await this.refresh();
-            } catch (e) {
-              new import_obsidian4.Notice("Clone failed: " + e.message);
-            }
-          });
-        }
-        this.updateHeader("local", 0, 0);
-      } else {
-        this.contentContainer.empty();
-        this.contentContainer.createEl("div", {
-          cls: "git-empty-state-container",
-          text: ""
-        }).createEl("p", {
-          text: "No git repository found in vault.",
-          cls: "git-empty-state"
-        });
-        this.updateHeader("No repo", 0, 0);
+    const initialized = !!this.plugin.gitManager;
+    if (initialized) {
+      this.hasRemote = !!this.plugin.settings.repoUrl;
+      this.isLocalOnly = !this.hasRemote;
+    }
+    let branch = "unknown";
+    let ahead = 0;
+    let behind = 0;
+    if (initialized) {
+      try {
+        branch = await this.plugin.gitManager.getCurrentBranch();
+        const status = await this.plugin.gitManager.getStatus();
+        ahead = status.ahead;
+        behind = status.behind;
+      } catch (e) {
+        log2.warn("GitSidebar", "Failed to get branch/status", e);
       }
+    } else {
+      const hasReal = await this.plugin.detectRealGitRepo();
+      if (hasReal) {
+        branch = "local";
+      } else {
+        branch = "No repo";
+      }
+    }
+    this.renderHeader(branch, ahead, behind, initialized);
+    this.contentContainer.empty();
+    if (!initialized) {
+      this.renderUninitializedContent();
       return;
     }
-    try {
-      const branch = await this.plugin.gitManager.getCurrentBranch();
-      const { ahead, behind } = await this.plugin.gitManager.getStatus();
-      this.updateHeader(branch, ahead, behind);
-    } catch (e) {
-      log2.warn("GitSidebar", "Failed to get branch/status", e);
-      this.updateHeader("unknown", 0, 0);
-    }
-    this.contentContainer.empty();
     switch (this.activeTab) {
       case "status":
         await this.renderStatusTab();
@@ -17611,12 +17590,46 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         break;
     }
   }
+  renderUninitializedContent() {
+    const wrapper = this.contentContainer.createDiv("git-uninit-container");
+    const hasReal = this.plugin.detectRealGitRepo();
+    wrapper.createEl("p", {
+      text: "A git repository exists in this vault.",
+      cls: "git-uninit-title"
+    });
+    wrapper.createEl("p", {
+      text: this.plugin.settings.repoUrl ? "Initialize to sync with the configured remote, or clone to start from the remote." : "Initialize to track changes locally. Add a remote URL in settings to push/pull.",
+      cls: "git-uninit-desc"
+    });
+    const btnRow = wrapper.createDiv("git-uninit-actions");
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Initialize Local").setTooltip("Create local git tracking").setClass("git-btn-primary").onClick(async () => {
+      try {
+        await this.plugin.ensureGitManager(false);
+        new import_obsidian4.Notice("Git storage initialized");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Initialize failed: " + e.message);
+      }
+    });
+    if (this.plugin.settings.repoUrl) {
+      new import_obsidian4.ButtonComponent(btnRow).setButtonText("Clone Remote").setTooltip("Clone from configured remote URL").setClass("git-btn-secondary").onClick(async () => {
+        try {
+          await this.plugin.syncVault();
+          new import_obsidian4.Notice("Remote cloned");
+          await this.refresh();
+        } catch (e) {
+          new import_obsidian4.Notice("Clone failed: " + e.message);
+        }
+      });
+    }
+  }
+  // ─── Tab renders ───
   async renderStatusTab() {
     const listContainer = this.contentContainer.createDiv("git-status-list");
     try {
       const files = await this.plugin.gitManager.getDetailedStatus();
       if (files.length === 0) {
-        listContainer.createEl("p", { text: "No changes", cls: "git-empty-state" });
+        listContainer.createEl("p", { text: "No changes \u2014 working tree clean", cls: "git-empty-state" });
         return;
       }
       const statusIcons = {
@@ -17728,6 +17741,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     }
   }
+  // ─── Helpers ───
   truncateMessage(msg, maxLen = 40) {
     const clean = msg.split("\n")[0];
     return clean.length > maxLen ? clean.slice(0, maxLen) + "\u2026" : clean;
