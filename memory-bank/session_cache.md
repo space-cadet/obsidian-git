@@ -1,81 +1,94 @@
 # Session Cache
 
 *Created: 2026-05-30 16:05:00 IST*
-*Last Updated: 2026-05-30 17:45:00 IST*
+*Last Updated: 2026-05-30 18:35:00 IST*
+*Status: ENDED*
 
 ## Current Session
 **Started**: 2026-05-30 16:04 IST
+**Ended**: 2026-05-30 18:35 IST
 **Focus Task**: T1 — Port GitManager to isomorphic-git
-**Session File**: `sessions/2026-05-30-afternoon.md`
-**Current Phase**: Phase 1.5 (Design & Planning) — ✅ Complete
+**Session File**: `sessions/2026-05-30-afternoon.md`, `sessions/2026-05-30-evening.md`
+**Current Phase**: Phase 2.5 (Spike Validation) — Session wrapped, mobile test pending
 
 ## Overview
 - Active Tasks: 1
 - Paused Tasks: 0
-- Last Session: First session
-- Current Period: afternoon → evening
+- Last Session: 2026-05-30 evening
+- Current Period: evening
 - Last Task Focus: T1
 
 ## Session History (Last 5)
-1. `sessions/2026-05-30-afternoon.md` — Project reorganization + memory bank setup + design planning
+1. `sessions/2026-05-30-evening.md` — Spike validation, buffer fix, session wrap-up
+2. `sessions/2026-05-30-afternoon.md` — Project reorganization + memory bank setup + design planning
 
 ## Task Registry
 - T0: Initial plugin scaffold — ✅ COMPLETE
-- T1: Port GitManager to isomorphic-git — 🔄 IN PROGRESS (Phase 1.5 done)
+- T1: Port GitManager to isomorphic-git — 🔄 IN PROGRESS (Spike validated, buffer fixed, awaiting mobile test)
 
 ## Active Tasks
 
 ### T1: Port GitManager to isomorphic-git
-**Status:** 🔄 IN PROGRESS — Phase 1.5 Complete
+**Status:** 🔄 IN PROGRESS — Spike Complete, Buffer Fixed, Awaiting Mobile Test
 **Priority:** HIGH
 **Started:** 2026-05-30
-**Last Active:** 2026-05-30 17:45:00 IST
+**Last Active:** 2026-05-30 18:35:00 IST
 **Dependencies:** None
 
-#### Context
-The obsidian-git plugin currently uses `simple-git` which wraps the system `git` CLI binary. This approach works on desktop but fails completely on mobile (iOS/Android) where no `git` binary exists, Node `fs`/`path` modules are unavailable, and shell execution is blocked.
+#### Spike Results
+- **Branch**: `isomorphic-git-spike` (pushed to origin)
+- **Build**: ✅ Passes, ~551KB bundle (with buffer bundled), no Node built-ins
+- **Desktop Test**: ✅ init → create file → add → commit → log → statusMatrix all succeed
+- **Mobile Test v1**: ❌ Failed — `buffer` not bundled (esbuild externalized it)
+- **Mobile Test v2**: ⏳ Awaiting result — buffer bundled inline via esbuild config fix
 
-The solution is to port to `isomorphic-git` — a pure JavaScript implementation of Git that runs in any JS environment including mobile browsers/WebViews.
+#### Critical Fix: Buffer Bundling
+- **Issue**: esbuild's `builtin-modules` listed `buffer` as Node.js built-in → excluded from bundle
+- **Impact**: `import('buffer')` failed on mobile (no Node.js environment)
+- **Fix**: `esbuild.config.mjs` → `builtins.filter(b => b !== "buffer")`
+- **Result**: `buffer` bundled inline (203 references), zero runtime imports
 
 #### Phase Status
 | Phase | Status | Deliverable |
 |-------|--------|-------------|
 | 1: Foundation & Research | ✅ Complete | Code analyzed, deps identified, mb initialized |
 | 1.5: Design & Planning | ✅ Complete | techContext, systemPatterns, implementation plan |
-| 2: Branch & Deps | ⏳ Pending | `isomorphic-git` branch, package.json updated |
-| 3: Vault FS Adapter | ⏳ Pending | `VaultFsAdapter.ts` with tests |
-| 4: GitManager Rewrite | ⏳ Pending | Complete rewrite, same public API |
-| 5: HTTP Client & Auth | ⏳ Pending | Token auth, mobile storage, settings UI |
-| 6: Integration & Testing | ⏳ Pending | Desktop + mobile validation |
+| 2: Branch & Deps | ✅ Complete | `isomorphic-git-spike` branch, deps installed, build passes |
+| 2.5: Spike | ✅ Complete | Minimal test plugin validates core architecture |
+| 2.5b: Buffer Fix | ✅ Complete | esbuild config fixed, v2 sent to user |
+| 3: Vault FS Adapter | ⏳ Pending | Extract adapter, test binary handling |
+| 4: GitManager Rewrite | ⏳ Pending | Full rewrite with all operations |
+| 5: HTTP Client & Auth | ⏳ Pending | `requestUrl` + token auth |
+| 6: Integration & Testing | ⏳ Pending | Desktop + mobile validation (awaiting v2 result) |
 | 7: Cleanup & Docs | ⏳ Pending | Remove simple-git, update README, merge |
 
 #### Critical Files
+- `src/main.ts` — Minimal test plugin (spike, throwaway)
+- `spike-results.md` — Spike test results and mobile test instructions
 - `src/gitManager.ts` — Complete rewrite needed (currently simple-git based)
-- `src/adapters/VaultFsAdapter.ts` — New file, bridges Vault API to isomorphic-git
-- `package.json` — Remove simple-git, add isomorphic-git + buffer
-- `esbuild.config.mjs` — May need browser polyfills
+- `src/adapters/VaultFsAdapter.ts` — To be extracted from spike
+- `package.json` — has isomorphic-git + buffer added
+- `esbuild.config.mjs` — **CRITICAL FIX**: buffer now bundled inline
 - `implementation-details/isomorphic-git-port-plan.md` — Detailed plan
 - `memory-bank/techContext.md` — Tech decisions
 - `memory-bank/systemPatterns.md` — Architecture patterns
 
-#### Working State
-- Current branch: `simple-git` (stable, desktop-only)
-- Target branch: `isomorphic-git` (to be created)
-- Git permissions: Fixed (`.git/index` now group-writable)
-- Memory bank: Initialized and pushed to remote
-
 ## Next Session Action Items
-1. Create `isomorphic-git` branch
-2. Swap dependencies (remove simple-git, add isomorphic-git + buffer)
-3. Begin `VaultFsAdapter.ts` implementation
+1. **Awaiting user**: Test v2 plugin on mobile, report pass/fail
+2. **If pass**: Create `isomorphic-git` production branch, extract VaultFsAdapter, implement HTTP client
+3. **If fail**: Debug specific failure from error message, iterate
+4. **Commit**: esbuild config fix is currently uncommitted on `isomorphic-git-spike`
 
 ## Notes
-- Design phase produced comprehensive documentation:
-  - `techContext.md`: Technology stack comparison, mobile constraints, auth strategy
-  - `systemPatterns.md`: Adapter pattern, auth pattern, error handling, mobile-specific patterns
-  - `implementation-details/isomorphic-git-port-plan.md`: 7-phase detailed plan with code examples, risk assessment, timeline
-- Estimated remaining work: 10-14 hours across Phases 2-7
-- No blockers — ready to begin implementation
+- Spike proved core architecture is sound on desktop
+- Buffer bundling was the critical mobile blocker — now fixed
+- v2 plugin (`obsidian-isogit-fixed-v2.zip`) sent to user
+- If mobile test passes, the foundation is solid and we can proceed to production implementation
+- If it fails, we need the exact error to debug further
+- Context usage was ~60% at session end
 
 ## Session Files
-- `sessions/2026-05-30-afternoon.md` — This session's detailed record
+- `sessions/2026-05-30-afternoon.md` — Afternoon session detailed record
+- `sessions/2026-05-30-evening.md` — Evening session wrap-up
+
+*Session Ended: 2026-05-30 18:35:00 IST*

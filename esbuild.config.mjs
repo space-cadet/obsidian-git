@@ -32,7 +32,7 @@ const context = await esbuild.context({
       "@lezer/highlight",
       "@lezer/lr",
       "node:events",
-      ...builtins],
+      ...builtins.filter(b => b !== "buffer")],
   format: "cjs",
   target: "es2018",
   logLevel: "info",
