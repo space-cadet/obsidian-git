@@ -9,6 +9,9 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
@@ -303,34 +306,34 @@ var require_inherits_browser = __commonJS({
 var require_safe_buffer = __commonJS({
   "node_modules/safe-buffer/index.js"(exports, module2) {
     var buffer = require("buffer");
-    var Buffer3 = buffer.Buffer;
+    var Buffer2 = buffer.Buffer;
     function copyProps(src, dst) {
       for (var key in src) {
         dst[key] = src[key];
       }
     }
-    if (Buffer3.from && Buffer3.alloc && Buffer3.allocUnsafe && Buffer3.allocUnsafeSlow) {
+    if (Buffer2.from && Buffer2.alloc && Buffer2.allocUnsafe && Buffer2.allocUnsafeSlow) {
       module2.exports = buffer;
     } else {
       copyProps(buffer, exports);
       exports.Buffer = SafeBuffer;
     }
     function SafeBuffer(arg, encodingOrOffset, length) {
-      return Buffer3(arg, encodingOrOffset, length);
+      return Buffer2(arg, encodingOrOffset, length);
     }
-    SafeBuffer.prototype = Object.create(Buffer3.prototype);
-    copyProps(Buffer3, SafeBuffer);
+    SafeBuffer.prototype = Object.create(Buffer2.prototype);
+    copyProps(Buffer2, SafeBuffer);
     SafeBuffer.from = function(arg, encodingOrOffset, length) {
       if (typeof arg === "number") {
         throw new TypeError("Argument must not be a number");
       }
-      return Buffer3(arg, encodingOrOffset, length);
+      return Buffer2(arg, encodingOrOffset, length);
     };
     SafeBuffer.alloc = function(size, fill, encoding) {
       if (typeof size !== "number") {
         throw new TypeError("Argument must be a number");
       }
-      var buf = Buffer3(size);
+      var buf = Buffer2(size);
       if (fill !== void 0) {
         if (typeof encoding === "string") {
           buf.fill(fill, encoding);
@@ -346,7 +349,7 @@ var require_safe_buffer = __commonJS({
       if (typeof size !== "number") {
         throw new TypeError("Argument must be a number");
       }
-      return Buffer3(size);
+      return Buffer2(size);
     };
     SafeBuffer.allocUnsafeSlow = function(size) {
       if (typeof size !== "number") {
@@ -1686,11 +1689,11 @@ var require_which_typed_array = __commonJS({
         return false;
       }
       if (!hasToStringTag) {
-        var tag = $slice($toString(value), 8, -1);
-        if ($indexOf(typedArrays, tag) > -1) {
-          return tag;
+        var tag2 = $slice($toString(value), 8, -1);
+        if ($indexOf(typedArrays, tag2) > -1) {
+          return tag2;
         }
-        if (tag !== "Object") {
+        if (tag2 !== "Object") {
           return false;
         }
         return trySlices(value);
@@ -1735,7 +1738,7 @@ var require_typed_array_buffer = __commonJS({
 var require_to_buffer = __commonJS({
   "node_modules/to-buffer/index.js"(exports, module2) {
     "use strict";
-    var Buffer3 = require_safe_buffer().Buffer;
+    var Buffer2 = require_safe_buffer().Buffer;
     var isArray = require_isarray();
     var typedArrayBuffer = require_typed_array_buffer();
     var isView = ArrayBuffer.isView || function isView2(obj) {
@@ -1748,35 +1751,35 @@ var require_to_buffer = __commonJS({
     };
     var useUint8Array = typeof Uint8Array !== "undefined";
     var useArrayBuffer = typeof ArrayBuffer !== "undefined" && typeof Uint8Array !== "undefined";
-    var useFromArrayBuffer = useArrayBuffer && (Buffer3.prototype instanceof Uint8Array || Buffer3.TYPED_ARRAY_SUPPORT);
+    var useFromArrayBuffer = useArrayBuffer && (Buffer2.prototype instanceof Uint8Array || Buffer2.TYPED_ARRAY_SUPPORT);
     module2.exports = function toBuffer(data, encoding) {
-      if (Buffer3.isBuffer(data)) {
+      if (Buffer2.isBuffer(data)) {
         if (data.constructor && !("isBuffer" in data)) {
-          return Buffer3.from(data);
+          return Buffer2.from(data);
         }
         return data;
       }
       if (typeof data === "string") {
-        return Buffer3.from(data, encoding);
+        return Buffer2.from(data, encoding);
       }
       if (useArrayBuffer && isView(data)) {
         if (data.byteLength === 0) {
-          return Buffer3.alloc(0);
+          return Buffer2.alloc(0);
         }
         if (useFromArrayBuffer) {
-          var res = Buffer3.from(data.buffer, data.byteOffset, data.byteLength);
+          var res = Buffer2.from(data.buffer, data.byteOffset, data.byteLength);
           if (res.byteLength === data.byteLength) {
             return res;
           }
         }
         var uint8 = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
-        var result = Buffer3.from(uint8);
+        var result = Buffer2.from(uint8);
         if (result.length === data.byteLength) {
           return result;
         }
       }
       if (useUint8Array && data instanceof Uint8Array) {
-        return Buffer3.from(data);
+        return Buffer2.from(data);
       }
       var isArr = isArray(data);
       if (isArr) {
@@ -1787,8 +1790,8 @@ var require_to_buffer = __commonJS({
           }
         }
       }
-      if (isArr || Buffer3.isBuffer(data) && data.constructor && typeof data.constructor.isBuffer === "function" && data.constructor.isBuffer(data)) {
-        return Buffer3.from(data);
+      if (isArr || Buffer2.isBuffer(data) && data.constructor && typeof data.constructor.isBuffer === "function" && data.constructor.isBuffer(data)) {
+        return Buffer2.from(data);
       }
       throw new TypeError('The "data" argument must be a string, an Array, a Buffer, a Uint8Array, or a DataView.');
     };
@@ -1799,10 +1802,10 @@ var require_to_buffer = __commonJS({
 var require_hash = __commonJS({
   "node_modules/sha.js/hash.js"(exports, module2) {
     "use strict";
-    var Buffer3 = require_safe_buffer().Buffer;
+    var Buffer2 = require_safe_buffer().Buffer;
     var toBuffer = require_to_buffer();
     function Hash2(blockSize, finalSize) {
-      this._block = Buffer3.alloc(blockSize);
+      this._block = Buffer2.alloc(blockSize);
       this._finalSize = finalSize;
       this._blockSize = blockSize;
       this._len = 0;
@@ -1862,7 +1865,7 @@ var require_sha1 = __commonJS({
     "use strict";
     var inherits = require_inherits_browser();
     var Hash2 = require_hash();
-    var Buffer3 = require_safe_buffer().Buffer;
+    var Buffer2 = require_safe_buffer().Buffer;
     var K = [
       1518500249,
       1859775393,
@@ -1931,7 +1934,7 @@ var require_sha1 = __commonJS({
       this._e = e + this._e | 0;
     };
     Sha1.prototype._hash = function() {
-      var H = Buffer3.allocUnsafe(20);
+      var H = Buffer2.allocUnsafe(20);
       H.writeInt32BE(this._a | 0, 0);
       H.writeInt32BE(this._b | 0, 4);
       H.writeInt32BE(this._c | 0, 8);
@@ -3818,16 +3821,16 @@ var require_deflate = __commonJS({
       return s.pending !== 0 ? Z_OK : Z_STREAM_END;
     }
     function deflateEnd(strm) {
-      var status;
+      var status2;
       if (!strm || !strm.state) {
         return Z_STREAM_ERROR;
       }
-      status = strm.state.status;
-      if (status !== INIT_STATE && status !== EXTRA_STATE && status !== NAME_STATE && status !== COMMENT_STATE && status !== HCRC_STATE && status !== BUSY_STATE && status !== FINISH_STATE) {
+      status2 = strm.state.status;
+      if (status2 !== INIT_STATE && status2 !== EXTRA_STATE && status2 !== NAME_STATE && status2 !== COMMENT_STATE && status2 !== HCRC_STATE && status2 !== BUSY_STATE && status2 !== FINISH_STATE) {
         return err(strm, Z_STREAM_ERROR);
       }
       strm.state = null;
-      return status === BUSY_STATE ? err(strm, Z_DATA_ERROR) : Z_OK;
+      return status2 === BUSY_STATE ? err(strm, Z_DATA_ERROR) : Z_OK;
     }
     function deflateSetDictionary(strm, dictionary) {
       var dictLength = dictionary.length;
@@ -4112,7 +4115,7 @@ var require_deflate2 = __commonJS({
       this.chunks = [];
       this.strm = new ZStream();
       this.strm.avail_out = 0;
-      var status = zlib_deflate.deflateInit2(
+      var status2 = zlib_deflate.deflateInit2(
         this.strm,
         opt.level,
         opt.method,
@@ -4120,8 +4123,8 @@ var require_deflate2 = __commonJS({
         opt.memLevel,
         opt.strategy
       );
-      if (status !== Z_OK) {
-        throw new Error(msg[status]);
+      if (status2 !== Z_OK) {
+        throw new Error(msg[status2]);
       }
       if (opt.header) {
         zlib_deflate.deflateSetHeader(this.strm, opt.header);
@@ -4135,9 +4138,9 @@ var require_deflate2 = __commonJS({
         } else {
           dict = opt.dictionary;
         }
-        status = zlib_deflate.deflateSetDictionary(this.strm, dict);
-        if (status !== Z_OK) {
-          throw new Error(msg[status]);
+        status2 = zlib_deflate.deflateSetDictionary(this.strm, dict);
+        if (status2 !== Z_OK) {
+          throw new Error(msg[status2]);
         }
         this._dict_set = true;
       }
@@ -4145,7 +4148,7 @@ var require_deflate2 = __commonJS({
     Deflate.prototype.push = function(data, mode) {
       var strm = this.strm;
       var chunkSize = this.options.chunkSize;
-      var status, _mode;
+      var status2, _mode;
       if (this.ended) {
         return false;
       }
@@ -4165,9 +4168,9 @@ var require_deflate2 = __commonJS({
           strm.next_out = 0;
           strm.avail_out = chunkSize;
         }
-        status = zlib_deflate.deflate(strm, _mode);
-        if (status !== Z_STREAM_END && status !== Z_OK) {
-          this.onEnd(status);
+        status2 = zlib_deflate.deflate(strm, _mode);
+        if (status2 !== Z_STREAM_END && status2 !== Z_OK) {
+          this.onEnd(status2);
           this.ended = true;
           return false;
         }
@@ -4178,12 +4181,12 @@ var require_deflate2 = __commonJS({
             this.onData(utils.shrinkBuf(strm.output, strm.next_out));
           }
         }
-      } while ((strm.avail_in > 0 || strm.avail_out === 0) && status !== Z_STREAM_END);
+      } while ((strm.avail_in > 0 || strm.avail_out === 0) && status2 !== Z_STREAM_END);
       if (_mode === Z_FINISH) {
-        status = zlib_deflate.deflateEnd(this.strm);
-        this.onEnd(status);
+        status2 = zlib_deflate.deflateEnd(this.strm);
+        this.onEnd(status2);
         this.ended = true;
-        return status === Z_OK;
+        return status2 === Z_OK;
       }
       if (_mode === Z_SYNC_FLUSH) {
         this.onEnd(Z_OK);
@@ -4195,8 +4198,8 @@ var require_deflate2 = __commonJS({
     Deflate.prototype.onData = function(chunk) {
       this.chunks.push(chunk);
     };
-    Deflate.prototype.onEnd = function(status) {
-      if (status === Z_OK) {
+    Deflate.prototype.onEnd = function(status2) {
+      if (status2 === Z_OK) {
         if (this.options.to === "string") {
           this.result = this.chunks.join("");
         } else {
@@ -4204,7 +4207,7 @@ var require_deflate2 = __commonJS({
         }
       }
       this.chunks = [];
-      this.err = status;
+      this.err = status2;
       this.msg = this.strm.msg;
     };
     function deflate2(input, options) {
@@ -6101,12 +6104,12 @@ var require_inflate2 = __commonJS({
       this.chunks = [];
       this.strm = new ZStream();
       this.strm.avail_out = 0;
-      var status = zlib_inflate.inflateInit2(
+      var status2 = zlib_inflate.inflateInit2(
         this.strm,
         opt.windowBits
       );
-      if (status !== c.Z_OK) {
-        throw new Error(msg[status]);
+      if (status2 !== c.Z_OK) {
+        throw new Error(msg[status2]);
       }
       this.header = new GZheader();
       zlib_inflate.inflateGetHeader(this.strm, this.header);
@@ -6117,9 +6120,9 @@ var require_inflate2 = __commonJS({
           opt.dictionary = new Uint8Array(opt.dictionary);
         }
         if (opt.raw) {
-          status = zlib_inflate.inflateSetDictionary(this.strm, opt.dictionary);
-          if (status !== c.Z_OK) {
-            throw new Error(msg[status]);
+          status2 = zlib_inflate.inflateSetDictionary(this.strm, opt.dictionary);
+          if (status2 !== c.Z_OK) {
+            throw new Error(msg[status2]);
           }
         }
       }
@@ -6128,7 +6131,7 @@ var require_inflate2 = __commonJS({
       var strm = this.strm;
       var chunkSize = this.options.chunkSize;
       var dictionary = this.options.dictionary;
-      var status, _mode;
+      var status2, _mode;
       var next_out_utf8, tail, utf8str;
       var allowBufError = false;
       if (this.ended) {
@@ -6150,21 +6153,21 @@ var require_inflate2 = __commonJS({
           strm.next_out = 0;
           strm.avail_out = chunkSize;
         }
-        status = zlib_inflate.inflate(strm, c.Z_NO_FLUSH);
-        if (status === c.Z_NEED_DICT && dictionary) {
-          status = zlib_inflate.inflateSetDictionary(this.strm, dictionary);
+        status2 = zlib_inflate.inflate(strm, c.Z_NO_FLUSH);
+        if (status2 === c.Z_NEED_DICT && dictionary) {
+          status2 = zlib_inflate.inflateSetDictionary(this.strm, dictionary);
         }
-        if (status === c.Z_BUF_ERROR && allowBufError === true) {
-          status = c.Z_OK;
+        if (status2 === c.Z_BUF_ERROR && allowBufError === true) {
+          status2 = c.Z_OK;
           allowBufError = false;
         }
-        if (status !== c.Z_STREAM_END && status !== c.Z_OK) {
-          this.onEnd(status);
+        if (status2 !== c.Z_STREAM_END && status2 !== c.Z_OK) {
+          this.onEnd(status2);
           this.ended = true;
           return false;
         }
         if (strm.next_out) {
-          if (strm.avail_out === 0 || status === c.Z_STREAM_END || strm.avail_in === 0 && (_mode === c.Z_FINISH || _mode === c.Z_SYNC_FLUSH)) {
+          if (strm.avail_out === 0 || status2 === c.Z_STREAM_END || strm.avail_in === 0 && (_mode === c.Z_FINISH || _mode === c.Z_SYNC_FLUSH)) {
             if (this.options.to === "string") {
               next_out_utf8 = strings.utf8border(strm.output, strm.next_out);
               tail = strm.next_out - next_out_utf8;
@@ -6183,15 +6186,15 @@ var require_inflate2 = __commonJS({
         if (strm.avail_in === 0 && strm.avail_out === 0) {
           allowBufError = true;
         }
-      } while ((strm.avail_in > 0 || strm.avail_out === 0) && status !== c.Z_STREAM_END);
-      if (status === c.Z_STREAM_END) {
+      } while ((strm.avail_in > 0 || strm.avail_out === 0) && status2 !== c.Z_STREAM_END);
+      if (status2 === c.Z_STREAM_END) {
         _mode = c.Z_FINISH;
       }
       if (_mode === c.Z_FINISH) {
-        status = zlib_inflate.inflateEnd(this.strm);
-        this.onEnd(status);
+        status2 = zlib_inflate.inflateEnd(this.strm);
+        this.onEnd(status2);
         this.ended = true;
-        return status === c.Z_OK;
+        return status2 === c.Z_OK;
       }
       if (_mode === c.Z_SYNC_FLUSH) {
         this.onEnd(c.Z_OK);
@@ -6203,8 +6206,8 @@ var require_inflate2 = __commonJS({
     Inflate.prototype.onData = function(chunk) {
       this.chunks.push(chunk);
     };
-    Inflate.prototype.onEnd = function(status) {
-      if (status === c.Z_OK) {
+    Inflate.prototype.onEnd = function(status2) {
+      if (status2 === c.Z_OK) {
         if (this.options.to === "string") {
           this.result = this.chunks.join("");
         } else {
@@ -6212,7 +6215,7 @@ var require_inflate2 = __commonJS({
         }
       }
       this.chunks = [];
-      this.err = status;
+      this.err = status2;
       this.msg = this.strm.msg;
     };
     function inflate2(input, options) {
@@ -6440,7 +6443,7 @@ var require_ignore = __commonJS({
         // Zero, one or several directories
         // should not use '*', or it will be replaced by the next replacer
         // Check if it is not the last `'/**'`
-        (_, index, str) => index + 6 < str.length ? "(?:\\/[^\\/]+)*" : "\\/.+"
+        (_, index2, str) => index2 + 6 < str.length ? "(?:\\/[^\\/]+)*" : "\\/.+"
       ],
       // normal intermediate wildcards
       [
@@ -7068,155 +7071,82 @@ var require_diff3 = __commonJS({
   }
 });
 
-// src/main.ts
-var main_exports = {};
-__export(main_exports, {
-  default: () => IsomorphicGitTestPlugin
-});
-module.exports = __toCommonJS(main_exports);
-var import_obsidian = require("obsidian");
-
 // node_modules/isomorphic-git/index.js
-var import_async_lock = __toESM(require_async_lock(), 1);
-var import_sha1 = __toESM(require_sha1(), 1);
-var import_crc_32 = __toESM(require_crc32(), 1);
-var import_pako = __toESM(require_pako(), 1);
-var import_pify = __toESM(require_pify(), 1);
-var import_ignore = __toESM(require_ignore(), 1);
-var import_clean_git_ref = __toESM(require_lib2(), 1);
-var import_diff3 = __toESM(require_diff3(), 1);
-var BaseError = class _BaseError extends Error {
-  constructor(message) {
-    super(message);
-    this.caller = "";
-  }
-  toJSON() {
-    return {
-      code: this.code,
-      data: this.data,
-      caller: this.caller,
-      message: this.message,
-      stack: this.stack
-    };
-  }
-  fromJSON(json) {
-    const e = new _BaseError(json.message);
-    e.code = json.code;
-    e.data = json.data;
-    e.caller = json.caller;
-    e.stack = json.stack;
-    return e;
-  }
-  get isIsomorphicGitError() {
-    return true;
-  }
-};
-var UnmergedPathsError = class _UnmergedPathsError extends BaseError {
-  /**
-   * @param {Array<string>} filepaths
-   */
-  constructor(filepaths) {
-    super(
-      `Modifying the index is not possible because you have unmerged files: ${filepaths.toString}. Fix them up in the work tree, and then use 'git add/rm as appropriate to mark resolution and make a commit.`
-    );
-    this.code = this.name = _UnmergedPathsError.code;
-    this.data = { filepaths };
-  }
-};
-UnmergedPathsError.code = "UnmergedPathsError";
-var InternalError = class _InternalError extends BaseError {
-  /**
-   * @param {string} message
-   */
-  constructor(message) {
-    super(
-      `An internal error caused this command to fail.
-
-If you're using an application that depends on isomorphic-git, please report this error to that application's developers.
-
-If you're a developer and you believe this is a bug in isomorphic-git, please file an issue at https://github.com/isomorphic-git/isomorphic-git/issues with a minimal reproduction, version and environment details, and this error message: ${message}`
-    );
-    this.code = this.name = _InternalError.code;
-    this.data = { message };
-  }
-};
-InternalError.code = "InternalError";
-var UnsafeFilepathError = class _UnsafeFilepathError extends BaseError {
-  /**
-   * @param {string} filepath
-   */
-  constructor(filepath) {
-    super(`The filepath "${filepath}" contains unsafe character sequences`);
-    this.code = this.name = _UnsafeFilepathError.code;
-    this.data = { filepath };
-  }
-};
-UnsafeFilepathError.code = "UnsafeFilepathError";
-var BufferCursor = class {
-  constructor(buffer) {
-    this.buffer = buffer;
-    this._start = 0;
-  }
-  eof() {
-    return this._start >= this.buffer.length;
-  }
-  tell() {
-    return this._start;
-  }
-  seek(n) {
-    this._start = n;
-  }
-  slice(n) {
-    const r = this.buffer.slice(this._start, this._start + n);
-    this._start += n;
-    return r;
-  }
-  toString(enc, length) {
-    const r = this.buffer.toString(enc, this._start, this._start + length);
-    this._start += length;
-    return r;
-  }
-  write(value, length, enc) {
-    const r = this.buffer.write(value, this._start, length, enc);
-    this._start += length;
-    return r;
-  }
-  copy(source, start, end) {
-    const r = source.copy(this.buffer, this._start, start, end);
-    this._start += r;
-    return r;
-  }
-  readUInt8() {
-    const r = this.buffer.readUInt8(this._start);
-    this._start += 1;
-    return r;
-  }
-  writeUInt8(value) {
-    const r = this.buffer.writeUInt8(value, this._start);
-    this._start += 1;
-    return r;
-  }
-  readUInt16BE() {
-    const r = this.buffer.readUInt16BE(this._start);
-    this._start += 2;
-    return r;
-  }
-  writeUInt16BE(value) {
-    const r = this.buffer.writeUInt16BE(value, this._start);
-    this._start += 2;
-    return r;
-  }
-  readUInt32BE() {
-    const r = this.buffer.readUInt32BE(this._start);
-    this._start += 4;
-    return r;
-  }
-  writeUInt32BE(value) {
-    const r = this.buffer.writeUInt32BE(value, this._start);
-    this._start += 4;
-    return r;
-  }
-};
+var isomorphic_git_exports = {};
+__export(isomorphic_git_exports, {
+  Errors: () => Errors,
+  STAGE: () => STAGE,
+  TREE: () => TREE,
+  WORKDIR: () => WORKDIR,
+  abortMerge: () => abortMerge,
+  add: () => add,
+  addNote: () => addNote,
+  addRemote: () => addRemote,
+  annotatedTag: () => annotatedTag,
+  branch: () => branch,
+  checkout: () => checkout,
+  cherryPick: () => cherryPick,
+  clone: () => clone,
+  commit: () => commit,
+  currentBranch: () => currentBranch,
+  default: () => isomorphic_git_default,
+  deleteBranch: () => deleteBranch,
+  deleteRef: () => deleteRef,
+  deleteRemote: () => deleteRemote,
+  deleteTag: () => deleteTag,
+  expandOid: () => expandOid,
+  expandRef: () => expandRef,
+  fastForward: () => fastForward,
+  fetch: () => fetch,
+  findMergeBase: () => findMergeBase,
+  findRoot: () => findRoot,
+  getConfig: () => getConfig,
+  getConfigAll: () => getConfigAll,
+  getRemoteInfo: () => getRemoteInfo,
+  getRemoteInfo2: () => getRemoteInfo2,
+  hashBlob: () => hashBlob,
+  indexPack: () => indexPack,
+  init: () => init,
+  isDescendent: () => isDescendent,
+  isIgnored: () => isIgnored,
+  listBranches: () => listBranches,
+  listFiles: () => listFiles,
+  listNotes: () => listNotes,
+  listRefs: () => listRefs,
+  listRemotes: () => listRemotes,
+  listServerRefs: () => listServerRefs,
+  listTags: () => listTags,
+  log: () => log,
+  merge: () => merge,
+  packObjects: () => packObjects,
+  pull: () => pull,
+  push: () => push,
+  readBlob: () => readBlob,
+  readCommit: () => readCommit,
+  readNote: () => readNote,
+  readObject: () => readObject,
+  readTag: () => readTag,
+  readTree: () => readTree,
+  remove: () => remove,
+  removeNote: () => removeNote,
+  renameBranch: () => renameBranch,
+  resetIndex: () => resetIndex,
+  resolveRef: () => resolveRef,
+  setConfig: () => setConfig,
+  stash: () => stash,
+  status: () => status,
+  statusMatrix: () => statusMatrix,
+  tag: () => tag,
+  updateIndex: () => updateIndex$1,
+  version: () => version,
+  walk: () => walk,
+  writeBlob: () => writeBlob,
+  writeCommit: () => writeCommit,
+  writeObject: () => writeObject,
+  writeRef: () => writeRef,
+  writeTag: () => writeTag,
+  writeTree: () => writeTree
+});
 function compareStrings(a, b) {
   return -(a < b) || +(a > b);
 }
@@ -7238,7 +7168,6 @@ function normalizeMode(mode) {
     permissions = 0;
   return (type << 12) + permissions;
 }
-var MAX_UINT32 = 2 ** 32;
 function SecondsNanoseconds(givenSeconds, givenNanoseconds, milliseconds, date) {
   if (givenSeconds !== void 0 && givenNanoseconds !== void 0) {
     return [givenSeconds, givenNanoseconds];
@@ -7287,7 +7216,6 @@ function toHex(buffer) {
   }
   return hex;
 }
-var supportsSubtleSHA1 = null;
 async function shasum(buffer) {
   if (supportsSubtleSHA1 === null) {
     supportsSubtleSHA1 = await testSubtleSHA1();
@@ -7323,246 +7251,12 @@ function renderCacheEntryFlags(entry) {
   flags.nameLength = Math.min(Buffer.from(entry.path).length, 4095);
   return (flags.assumeValid ? 32768 : 0) + (flags.extended ? 16384 : 0) + ((flags.stage & 3) << 12) + (flags.nameLength & 4095);
 }
-var GitIndex = class _GitIndex {
-  /*::
-   _entries: Map<string, CacheEntry>
-   _dirty: boolean // Used to determine if index needs to be saved to filesystem
-   */
-  constructor(entries, unmergedPaths) {
-    this._dirty = false;
-    this._unmergedPaths = unmergedPaths || /* @__PURE__ */ new Set();
-    this._entries = entries || /* @__PURE__ */ new Map();
-  }
-  _addEntry(entry) {
-    if (entry.flags.stage === 0) {
-      entry.stages = [entry];
-      this._entries.set(entry.path, entry);
-      this._unmergedPaths.delete(entry.path);
-    } else {
-      let existingEntry = this._entries.get(entry.path);
-      if (!existingEntry) {
-        this._entries.set(entry.path, entry);
-        existingEntry = entry;
-      }
-      existingEntry.stages[entry.flags.stage] = entry;
-      this._unmergedPaths.add(entry.path);
-    }
-  }
-  static async from(buffer) {
-    if (Buffer.isBuffer(buffer)) {
-      return _GitIndex.fromBuffer(buffer);
-    } else if (buffer === null) {
-      return new _GitIndex(null);
-    } else {
-      throw new InternalError("invalid type passed to GitIndex.from");
-    }
-  }
-  static async fromBuffer(buffer) {
-    if (buffer.length === 0) {
-      throw new InternalError("Index file is empty (.git/index)");
-    }
-    const index = new _GitIndex();
-    const reader = new BufferCursor(buffer);
-    const magic = reader.toString("utf8", 4);
-    if (magic !== "DIRC") {
-      throw new InternalError(`Invalid dircache magic file number: ${magic}`);
-    }
-    const shaComputed = await shasum(buffer.slice(0, -20));
-    const shaClaimed = buffer.slice(-20).toString("hex");
-    if (shaClaimed !== shaComputed) {
-      throw new InternalError(
-        `Invalid checksum in GitIndex buffer: expected ${shaClaimed} but saw ${shaComputed}`
-      );
-    }
-    const version = reader.readUInt32BE();
-    if (version !== 2) {
-      throw new InternalError(`Unsupported dircache version: ${version}`);
-    }
-    const numEntries = reader.readUInt32BE();
-    let i = 0;
-    while (!reader.eof() && i < numEntries) {
-      const entry = {};
-      entry.ctimeSeconds = reader.readUInt32BE();
-      entry.ctimeNanoseconds = reader.readUInt32BE();
-      entry.mtimeSeconds = reader.readUInt32BE();
-      entry.mtimeNanoseconds = reader.readUInt32BE();
-      entry.dev = reader.readUInt32BE();
-      entry.ino = reader.readUInt32BE();
-      entry.mode = reader.readUInt32BE();
-      entry.uid = reader.readUInt32BE();
-      entry.gid = reader.readUInt32BE();
-      entry.size = reader.readUInt32BE();
-      entry.oid = reader.slice(20).toString("hex");
-      const flags = reader.readUInt16BE();
-      entry.flags = parseCacheEntryFlags(flags);
-      const pathlength = buffer.indexOf(0, reader.tell() + 1) - reader.tell();
-      if (pathlength < 1) {
-        throw new InternalError(`Got a path length of: ${pathlength}`);
-      }
-      entry.path = reader.toString("utf8", pathlength);
-      if (entry.path.includes("..\\") || entry.path.includes("../")) {
-        throw new UnsafeFilepathError(entry.path);
-      }
-      let padding = 8 - (reader.tell() - 12) % 8;
-      if (padding === 0)
-        padding = 8;
-      while (padding--) {
-        const tmp = reader.readUInt8();
-        if (tmp !== 0) {
-          throw new InternalError(
-            `Expected 1-8 null characters but got '${tmp}' after ${entry.path}`
-          );
-        } else if (reader.eof()) {
-          throw new InternalError("Unexpected end of file");
-        }
-      }
-      entry.stages = [];
-      index._addEntry(entry);
-      i++;
-    }
-    return index;
-  }
-  get unmergedPaths() {
-    return [...this._unmergedPaths];
-  }
-  get entries() {
-    return [...this._entries.values()].sort(comparePath);
-  }
-  get entriesMap() {
-    return this._entries;
-  }
-  get entriesFlat() {
-    return [...this.entries].flatMap((entry) => {
-      return entry.stages.length > 1 ? entry.stages.filter((x) => x) : entry;
-    });
-  }
-  *[Symbol.iterator]() {
-    for (const entry of this.entries) {
-      yield entry;
-    }
-  }
-  insert({ filepath, stats, oid, stage = 0 }) {
-    if (!stats) {
-      stats = {
-        ctimeSeconds: 0,
-        ctimeNanoseconds: 0,
-        mtimeSeconds: 0,
-        mtimeNanoseconds: 0,
-        dev: 0,
-        ino: 0,
-        mode: 0,
-        uid: 0,
-        gid: 0,
-        size: 0
-      };
-    }
-    stats = normalizeStats(stats);
-    const bfilepath = Buffer.from(filepath);
-    const entry = {
-      ctimeSeconds: stats.ctimeSeconds,
-      ctimeNanoseconds: stats.ctimeNanoseconds,
-      mtimeSeconds: stats.mtimeSeconds,
-      mtimeNanoseconds: stats.mtimeNanoseconds,
-      dev: stats.dev,
-      ino: stats.ino,
-      // We provide a fallback value for `mode` here because not all fs
-      // implementations assign it, but we use it in GitTree.
-      // '100644' is for a "regular non-executable file"
-      mode: stats.mode || 33188,
-      uid: stats.uid,
-      gid: stats.gid,
-      size: stats.size,
-      path: filepath,
-      oid,
-      flags: {
-        assumeValid: false,
-        extended: false,
-        stage,
-        nameLength: bfilepath.length < 4095 ? bfilepath.length : 4095
-      },
-      stages: []
-    };
-    this._addEntry(entry);
-    this._dirty = true;
-  }
-  delete({ filepath }) {
-    if (this._entries.has(filepath)) {
-      this._entries.delete(filepath);
-    } else {
-      for (const key of this._entries.keys()) {
-        if (key.startsWith(filepath + "/")) {
-          this._entries.delete(key);
-        }
-      }
-    }
-    if (this._unmergedPaths.has(filepath)) {
-      this._unmergedPaths.delete(filepath);
-    }
-    this._dirty = true;
-  }
-  clear() {
-    this._entries.clear();
-    this._dirty = true;
-  }
-  has({ filepath }) {
-    return this._entries.has(filepath);
-  }
-  render() {
-    return this.entries.map((entry) => `${entry.mode.toString(8)} ${entry.oid}    ${entry.path}`).join("\n");
-  }
-  static async _entryToBuffer(entry) {
-    const bpath = Buffer.from(entry.path);
-    const length = Math.ceil((62 + bpath.length + 1) / 8) * 8;
-    const written = Buffer.alloc(length);
-    const writer = new BufferCursor(written);
-    const stat = normalizeStats(entry);
-    writer.writeUInt32BE(stat.ctimeSeconds);
-    writer.writeUInt32BE(stat.ctimeNanoseconds);
-    writer.writeUInt32BE(stat.mtimeSeconds);
-    writer.writeUInt32BE(stat.mtimeNanoseconds);
-    writer.writeUInt32BE(stat.dev);
-    writer.writeUInt32BE(stat.ino);
-    writer.writeUInt32BE(stat.mode);
-    writer.writeUInt32BE(stat.uid);
-    writer.writeUInt32BE(stat.gid);
-    writer.writeUInt32BE(stat.size);
-    writer.write(entry.oid, 20, "hex");
-    writer.writeUInt16BE(renderCacheEntryFlags(entry));
-    writer.write(entry.path, bpath.length, "utf8");
-    return written;
-  }
-  async toObject() {
-    const header = Buffer.alloc(12);
-    const writer = new BufferCursor(header);
-    writer.write("DIRC", 4, "utf8");
-    writer.writeUInt32BE(2);
-    writer.writeUInt32BE(this.entriesFlat.length);
-    let entryBuffers = [];
-    for (const entry of this.entries) {
-      entryBuffers.push(_GitIndex._entryToBuffer(entry));
-      if (entry.stages.length > 1) {
-        for (const stage of entry.stages) {
-          if (stage && stage !== entry) {
-            entryBuffers.push(_GitIndex._entryToBuffer(stage));
-          }
-        }
-      }
-    }
-    entryBuffers = await Promise.all(entryBuffers);
-    const body = Buffer.concat(entryBuffers);
-    const main = Buffer.concat([header, body]);
-    const sum = await shasum(main);
-    return Buffer.concat([main, Buffer.from(sum, "hex")]);
-  }
-};
 function compareStats(entry, stats, filemode = true, trustino = true) {
   const e = normalizeStats(entry);
   const s = normalizeStats(stats);
   const staleness = filemode && e.mode !== s.mode || e.mtimeSeconds !== s.mtimeSeconds || e.ctimeSeconds !== s.ctimeSeconds || e.uid !== s.uid || e.gid !== s.gid || trustino && e.ino !== s.ino || e.size !== s.size;
   return staleness;
 }
-var lock = null;
-var IndexCache = Symbol("IndexCache");
 function createCache() {
   return {
     map: /* @__PURE__ */ new Map(),
@@ -7574,8 +7268,8 @@ async function updateCachedIndexFile(fs, filepath, cache) {
     fs.lstat(filepath),
     fs.read(filepath)
   ]);
-  const index = await GitIndex.from(rawIndexFile);
-  cache.map.set(filepath, index);
+  const index2 = await GitIndex.from(rawIndexFile);
+  cache.map.set(filepath, index2);
   cache.stats.set(filepath, stat);
 }
 async function isIndexStale(fs, filepath, cache) {
@@ -7589,48 +7283,6 @@ async function isIndexStale(fs, filepath, cache) {
     return false;
   return compareStats(savedStats, currStats);
 }
-var GitIndexManager = class {
-  /**
-   * Manages access to the Git index file, ensuring thread-safe operations and caching.
-   *
-   * @param {object} opts - Options for acquiring the Git index.
-   * @param {FSClient} opts.fs - A file system implementation.
-   * @param {string} opts.gitdir - The path to the `.git` directory.
-   * @param {object} opts.cache - A shared cache object for storing index data.
-   * @param {boolean} [opts.allowUnmerged=true] - Whether to allow unmerged paths in the index.
-   * @param {function(GitIndex): any} closure - A function to execute with the Git index.
-   * @returns {Promise<any>} The result of the closure function.
-   * @throws {UnmergedPathsError} If unmerged paths exist and `allowUnmerged` is `false`.
-   */
-  static async acquire({ fs, gitdir, cache, allowUnmerged = true }, closure) {
-    if (!cache[IndexCache]) {
-      cache[IndexCache] = createCache();
-    }
-    const filepath = `${gitdir}/index`;
-    if (lock === null)
-      lock = new import_async_lock.default({ maxPending: Infinity });
-    let result;
-    let unmergedPaths = [];
-    await lock.acquire(filepath, async () => {
-      const theIndexCache = cache[IndexCache];
-      if (await isIndexStale(fs, filepath, theIndexCache)) {
-        await updateCachedIndexFile(fs, filepath, theIndexCache);
-      }
-      const index = theIndexCache.map.get(filepath);
-      unmergedPaths = index.unmergedPaths;
-      if (unmergedPaths.length && !allowUnmerged)
-        throw new UnmergedPathsError(unmergedPaths);
-      result = await closure(index);
-      if (index._dirty) {
-        const buffer = await index.toObject();
-        await fs.write(filepath, buffer);
-        theIndexCache.stats.set(filepath, await fs.lstat(filepath));
-        index._dirty = false;
-      }
-    });
-    return result;
-  }
-};
 function basename(path) {
   const last = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
   if (last > -1) {
@@ -7702,99 +7354,6 @@ function mode2type(mode) {
   }
   throw new InternalError(`Unexpected GitTree entry mode: ${mode.toString(8)}`);
 }
-var GitWalkerIndex = class {
-  constructor({ fs, gitdir, cache }) {
-    this.treePromise = GitIndexManager.acquire(
-      { fs, gitdir, cache },
-      async function(index) {
-        return flatFileListToDirectoryStructure(index.entries);
-      }
-    );
-    const walker = this;
-    this.ConstructEntry = class StageEntry {
-      constructor(fullpath) {
-        this._fullpath = fullpath;
-        this._type = false;
-        this._mode = false;
-        this._stat = false;
-        this._oid = false;
-      }
-      async type() {
-        return walker.type(this);
-      }
-      async mode() {
-        return walker.mode(this);
-      }
-      async stat() {
-        return walker.stat(this);
-      }
-      async content() {
-        return walker.content(this);
-      }
-      async oid() {
-        return walker.oid(this);
-      }
-    };
-  }
-  async readdir(entry) {
-    const filepath = entry._fullpath;
-    const tree = await this.treePromise;
-    const inode = tree.get(filepath);
-    if (!inode)
-      return null;
-    if (inode.type === "blob")
-      return null;
-    if (inode.type !== "tree") {
-      throw new Error(`ENOTDIR: not a directory, scandir '${filepath}'`);
-    }
-    const names = inode.children.map((inode2) => inode2.fullpath);
-    names.sort(compareStrings);
-    return names;
-  }
-  async type(entry) {
-    if (entry._type === false) {
-      await entry.stat();
-    }
-    return entry._type;
-  }
-  async mode(entry) {
-    if (entry._mode === false) {
-      await entry.stat();
-    }
-    return entry._mode;
-  }
-  async stat(entry) {
-    if (entry._stat === false) {
-      const tree = await this.treePromise;
-      const inode = tree.get(entry._fullpath);
-      if (!inode) {
-        throw new Error(
-          `ENOENT: no such file or directory, lstat '${entry._fullpath}'`
-        );
-      }
-      const stats = inode.type === "tree" ? {} : normalizeStats(inode.metadata);
-      entry._type = inode.type === "tree" ? "tree" : mode2type(stats.mode);
-      entry._mode = stats.mode;
-      if (inode.type === "tree") {
-        entry._stat = void 0;
-      } else {
-        entry._stat = stats;
-      }
-    }
-    return entry._stat;
-  }
-  async content(_entry) {
-  }
-  async oid(entry) {
-    if (entry._oid === false) {
-      const tree = await this.treePromise;
-      const inode = tree.get(entry._fullpath);
-      entry._oid = inode.metadata.oid;
-    }
-    return entry._oid;
-  }
-};
-var GitWalkSymbol = Symbol("GitWalkSymbol");
 function STAGE() {
   const o = /* @__PURE__ */ Object.create(null);
   Object.defineProperty(o, GitWalkSymbol, {
@@ -7805,182 +7364,6 @@ function STAGE() {
   Object.freeze(o);
   return o;
 }
-var NotFoundError = class _NotFoundError extends BaseError {
-  /**
-   * @param {string} what
-   */
-  constructor(what) {
-    super(`Could not find ${what}.`);
-    this.code = this.name = _NotFoundError.code;
-    this.data = { what };
-  }
-};
-NotFoundError.code = "NotFoundError";
-var ObjectTypeError = class _ObjectTypeError extends BaseError {
-  /**
-   * @param {string} oid
-   * @param {'blob'|'commit'|'tag'|'tree'} actual
-   * @param {'blob'|'commit'|'tag'|'tree'} expected
-   * @param {string} [filepath]
-   */
-  constructor(oid, actual, expected, filepath) {
-    super(
-      `Object ${oid} ${filepath ? `at ${filepath}` : ""}was anticipated to be a ${expected} but it is a ${actual}.`
-    );
-    this.code = this.name = _ObjectTypeError.code;
-    this.data = { oid, actual, expected, filepath };
-  }
-};
-ObjectTypeError.code = "ObjectTypeError";
-var InvalidOidError = class _InvalidOidError extends BaseError {
-  /**
-   * @param {string} value
-   */
-  constructor(value) {
-    super(`Expected a 40-char hex object id but saw "${value}".`);
-    this.code = this.name = _InvalidOidError.code;
-    this.data = { value };
-  }
-};
-InvalidOidError.code = "InvalidOidError";
-var NoRefspecError = class _NoRefspecError extends BaseError {
-  /**
-   * @param {string} remote
-   */
-  constructor(remote) {
-    super(`Could not find a fetch refspec for remote "${remote}". Make sure the config file has an entry like the following:
-[remote "${remote}"]
-	fetch = +refs/heads/*:refs/remotes/origin/*
-`);
-    this.code = this.name = _NoRefspecError.code;
-    this.data = { remote };
-  }
-};
-NoRefspecError.code = "NoRefspecError";
-var GitPackedRefs = class _GitPackedRefs {
-  constructor(text) {
-    this.refs = /* @__PURE__ */ new Map();
-    this.parsedConfig = [];
-    if (text) {
-      let key = null;
-      this.parsedConfig = text.trim().split("\n").map((line) => {
-        if (/^\s*#/.test(line)) {
-          return { line, comment: true };
-        }
-        const i = line.indexOf(" ");
-        if (line.startsWith("^")) {
-          const value = line.slice(1);
-          this.refs.set(key + "^{}", value);
-          return { line, ref: key, peeled: value };
-        } else {
-          const value = line.slice(0, i);
-          key = line.slice(i + 1);
-          this.refs.set(key, value);
-          return { line, ref: key, oid: value };
-        }
-      });
-    }
-    return this;
-  }
-  static from(text) {
-    return new _GitPackedRefs(text);
-  }
-  delete(ref) {
-    this.parsedConfig = this.parsedConfig.filter((entry) => entry.ref !== ref);
-    this.refs.delete(ref);
-  }
-  toString() {
-    return this.parsedConfig.map(({ line }) => line).join("\n") + "\n";
-  }
-};
-var GitRefSpec = class _GitRefSpec {
-  constructor({ remotePath, localPath, force, matchPrefix }) {
-    Object.assign(this, {
-      remotePath,
-      localPath,
-      force,
-      matchPrefix
-    });
-  }
-  static from(refspec) {
-    const [forceMatch, remotePath, remoteGlobMatch, localPath, localGlobMatch] = refspec.match(/^(\+?)(.*?)(\*?):(.*?)(\*?)$/).slice(1);
-    const force = forceMatch === "+";
-    const remoteIsGlob = remoteGlobMatch === "*";
-    const localIsGlob = localGlobMatch === "*";
-    if (remoteIsGlob !== localIsGlob) {
-      throw new InternalError("Invalid refspec");
-    }
-    return new _GitRefSpec({
-      remotePath,
-      localPath,
-      force,
-      matchPrefix: remoteIsGlob
-    });
-  }
-  translate(remoteBranch) {
-    if (this.matchPrefix) {
-      if (remoteBranch.startsWith(this.remotePath)) {
-        return this.localPath + remoteBranch.replace(this.remotePath, "");
-      }
-    } else {
-      if (remoteBranch === this.remotePath)
-        return this.localPath;
-    }
-    return null;
-  }
-  reverseTranslate(localBranch) {
-    if (this.matchPrefix) {
-      if (localBranch.startsWith(this.localPath)) {
-        return this.remotePath + localBranch.replace(this.localPath, "");
-      }
-    } else {
-      if (localBranch === this.localPath)
-        return this.remotePath;
-    }
-    return null;
-  }
-};
-var GitRefSpecSet = class _GitRefSpecSet {
-  constructor(rules = []) {
-    this.rules = rules;
-  }
-  static from(refspecs) {
-    const rules = [];
-    for (const refspec of refspecs) {
-      rules.push(GitRefSpec.from(refspec));
-    }
-    return new _GitRefSpecSet(rules);
-  }
-  add(refspec) {
-    const rule = GitRefSpec.from(refspec);
-    this.rules.push(rule);
-  }
-  translate(remoteRefs) {
-    const result = [];
-    for (const rule of this.rules) {
-      for (const remoteRef of remoteRefs) {
-        const localRef = rule.translate(remoteRef);
-        if (localRef) {
-          result.push([remoteRef, localRef]);
-        }
-      }
-    }
-    return result;
-  }
-  translateOne(remoteRef) {
-    let result = null;
-    for (const rule of this.rules) {
-      const localRef = rule.translate(remoteRef);
-      if (localRef) {
-        result = localRef;
-      }
-    }
-    return result;
-  }
-  localNamespaces() {
-    return this.rules.filter((rule) => rule.matchPrefix).map((rule) => rule.localPath.replace(/\/$/, ""));
-  }
-};
 function compareRefNames(a, b) {
   const _a = a.replace(/\^\{\}$/, "");
   const _b = b.replace(/\^\{\}$/, "");
@@ -8080,687 +7463,11 @@ function join(...args) {
     return ".";
   return normalize(joined);
 }
-var num = (val) => {
-  if (typeof val === "number") {
-    return val;
-  }
-  val = val.toLowerCase();
-  let n = parseInt(val);
-  if (val.endsWith("k"))
-    n *= 1024;
-  if (val.endsWith("m"))
-    n *= 1024 * 1024;
-  if (val.endsWith("g"))
-    n *= 1024 * 1024 * 1024;
-  return n;
-};
-var bool = (val) => {
-  if (typeof val === "boolean") {
-    return val;
-  }
-  val = val.trim().toLowerCase();
-  if (val === "true" || val === "yes" || val === "on")
-    return true;
-  if (val === "false" || val === "no" || val === "off")
-    return false;
-  throw Error(
-    `Expected 'true', 'false', 'yes', 'no', 'on', or 'off', but got ${val}`
-  );
-};
-var schema = {
-  core: {
-    filemode: bool,
-    bare: bool,
-    logallrefupdates: bool,
-    symlinks: bool,
-    ignorecase: bool,
-    bigFileThreshold: num
-  }
-};
-var SECTION_LINE_REGEX = /^\[([A-Za-z0-9-.]+)(?: "(.*)")?\]$/;
-var SECTION_REGEX = /^[A-Za-z0-9-.]+$/;
-var VARIABLE_LINE_REGEX = /^([A-Za-z][A-Za-z-]*)(?: *= *(.*))?$/;
-var VARIABLE_NAME_REGEX = /^[A-Za-z][A-Za-z-]*$/;
-var VARIABLE_VALUE_COMMENT_REGEX = /^(.*?)( *[#;].*)$/;
-var extractSectionLine = (line) => {
-  const matches = SECTION_LINE_REGEX.exec(line);
-  if (matches != null) {
-    const [section, subsection] = matches.slice(1);
-    return [section, subsection];
-  }
-  return null;
-};
-var extractVariableLine = (line) => {
-  const matches = VARIABLE_LINE_REGEX.exec(line);
-  if (matches != null) {
-    const [name, rawValue = "true"] = matches.slice(1);
-    const valueWithoutComments = removeComments(rawValue);
-    const valueWithoutQuotes = removeQuotes(valueWithoutComments);
-    return [name, valueWithoutQuotes];
-  }
-  return null;
-};
-var removeComments = (rawValue) => {
-  const commentMatches = VARIABLE_VALUE_COMMENT_REGEX.exec(rawValue);
-  if (commentMatches == null) {
-    return rawValue;
-  }
-  const [valueWithoutComment, comment] = commentMatches.slice(1);
-  if (hasOddNumberOfQuotes(valueWithoutComment) && hasOddNumberOfQuotes(comment)) {
-    return `${valueWithoutComment}${comment}`;
-  }
-  return valueWithoutComment;
-};
-var hasOddNumberOfQuotes = (text) => {
-  const numberOfQuotes = (text.match(/(?:^|[^\\])"/g) || []).length;
-  return numberOfQuotes % 2 !== 0;
-};
-var removeQuotes = (text) => {
-  return text.split("").reduce((newText, c, idx, text2) => {
-    const isQuote = c === '"' && text2[idx - 1] !== "\\";
-    const isEscapeForQuote = c === "\\" && text2[idx + 1] === '"';
-    if (isQuote || isEscapeForQuote) {
-      return newText;
-    }
-    return newText + c;
-  }, "");
-};
-var lower = (text) => {
-  return text != null ? text.toLowerCase() : null;
-};
-var getPath = (section, subsection, name) => {
-  return [lower(section), subsection, lower(name)].filter((a) => a != null).join(".");
-};
-var normalizePath = (path) => {
-  const pathSegments = path.split(".");
-  const section = pathSegments.shift();
-  const name = pathSegments.pop();
-  const subsection = pathSegments.length ? pathSegments.join(".") : void 0;
-  return {
-    section,
-    subsection,
-    name,
-    path: getPath(section, subsection, name),
-    sectionPath: getPath(section, subsection, null),
-    isSection: !!section
-  };
-};
-var findLastIndex = (array, callback) => {
-  return array.reduce((lastIndex, item, index) => {
-    return callback(item) ? index : lastIndex;
-  }, -1);
-};
-var GitConfig = class _GitConfig {
-  constructor(text) {
-    let section = null;
-    let subsection = null;
-    this.parsedConfig = text ? text.split("\n").map((line) => {
-      let name = null;
-      let value = null;
-      const trimmedLine = line.trim();
-      const extractedSection = extractSectionLine(trimmedLine);
-      const isSection = extractedSection != null;
-      if (isSection) {
-        ;
-        [section, subsection] = extractedSection;
-      } else {
-        const extractedVariable = extractVariableLine(trimmedLine);
-        const isVariable = extractedVariable != null;
-        if (isVariable) {
-          ;
-          [name, value] = extractedVariable;
-        }
-      }
-      const path = getPath(section, subsection, name);
-      return { line, isSection, section, subsection, name, value, path };
-    }) : [];
-  }
-  static from(text) {
-    return new _GitConfig(text);
-  }
-  async get(path, getall = false) {
-    const normalizedPath = normalizePath(path).path;
-    const allValues = this.parsedConfig.filter((config) => config.path === normalizedPath).map(({ section, name, value }) => {
-      const fn = schema[section] && schema[section][name];
-      return fn ? fn(value) : value;
-    });
-    return getall ? allValues : allValues.pop();
-  }
-  async getall(path) {
-    return this.get(path, true);
-  }
-  async getSubsections(section) {
-    return this.parsedConfig.filter((config) => config.isSection && config.section === section).map((config) => config.subsection);
-  }
-  async deleteSection(section, subsection) {
-    this.parsedConfig = this.parsedConfig.filter(
-      (config) => !(config.section === section && config.subsection === subsection)
-    );
-  }
-  async append(path, value) {
-    return this.set(path, value, true);
-  }
-  async set(path, value, append = false) {
-    const {
-      section,
-      subsection,
-      name,
-      path: normalizedPath,
-      sectionPath,
-      isSection
-    } = normalizePath(path);
-    const configIndex = findLastIndex(
-      this.parsedConfig,
-      (config) => config.path === normalizedPath
-    );
-    if (value == null) {
-      if (configIndex !== -1) {
-        this.parsedConfig.splice(configIndex, 1);
-      }
-    } else {
-      if (configIndex !== -1) {
-        const config = this.parsedConfig[configIndex];
-        const modifiedConfig = Object.assign({}, config, {
-          name,
-          value,
-          modified: true
-        });
-        if (append) {
-          this.parsedConfig.splice(configIndex + 1, 0, modifiedConfig);
-        } else {
-          this.parsedConfig[configIndex] = modifiedConfig;
-        }
-      } else {
-        const sectionIndex = this.parsedConfig.findIndex(
-          (config) => config.path === sectionPath
-        );
-        const newConfig = {
-          section,
-          subsection,
-          name,
-          value,
-          modified: true,
-          path: normalizedPath
-        };
-        if (SECTION_REGEX.test(section) && VARIABLE_NAME_REGEX.test(name)) {
-          if (sectionIndex >= 0) {
-            this.parsedConfig.splice(sectionIndex + 1, 0, newConfig);
-          } else {
-            const newSection = {
-              isSection,
-              section,
-              subsection,
-              modified: true,
-              path: sectionPath
-            };
-            this.parsedConfig.push(newSection, newConfig);
-          }
-        }
-      }
-    }
-  }
-  toString() {
-    return this.parsedConfig.map(({ line, section, subsection, name, value, modified = false }) => {
-      if (!modified) {
-        return line;
-      }
-      if (name != null && value != null) {
-        if (typeof value === "string" && /[#;]/.test(value)) {
-          return `	${name} = "${value}"`;
-        }
-        return `	${name} = ${value}`;
-      }
-      if (subsection != null) {
-        return `[${section} "${subsection}"]`;
-      }
-      return `[${section}]`;
-    }).join("\n");
-  }
-};
-var GitConfigManager = class {
-  /**
-   * Reads the Git configuration file from the specified `.git` directory.
-   *
-   * @param {object} opts - Options for reading the Git configuration.
-   * @param {FSClient} opts.fs - A file system implementation.
-   * @param {string} opts.gitdir - The path to the `.git` directory.
-   * @returns {Promise<GitConfig>} A `GitConfig` object representing the parsed configuration.
-   */
-  static async get({ fs, gitdir }) {
-    const text = await fs.read(`${gitdir}/config`, { encoding: "utf8" });
-    return GitConfig.from(text);
-  }
-  /**
-   * Saves the provided Git configuration to the specified `.git` directory.
-   *
-   * @param {object} opts - Options for saving the Git configuration.
-   * @param {FSClient} opts.fs - A file system implementation.
-   * @param {string} opts.gitdir - The path to the `.git` directory.
-   * @param {GitConfig} opts.config - The `GitConfig` object to save.
-   * @returns {Promise<void>} Resolves when the configuration has been successfully saved.
-   */
-  static async save({ fs, gitdir, config }) {
-    await fs.write(`${gitdir}/config`, config.toString(), {
-      encoding: "utf8"
-    });
-  }
-};
-var refpaths = (ref) => [
-  `${ref}`,
-  `refs/${ref}`,
-  `refs/tags/${ref}`,
-  `refs/heads/${ref}`,
-  `refs/remotes/${ref}`,
-  `refs/remotes/${ref}/HEAD`
-];
-var GIT_FILES = ["config", "description", "index", "shallow", "commondir"];
-var lock$1;
 async function acquireLock(ref, callback) {
   if (lock$1 === void 0)
     lock$1 = new import_async_lock.default();
   return lock$1.acquire(ref, callback);
 }
-var GitRefManager = class _GitRefManager {
-  /**
-   * Updates remote refs based on the provided refspecs and options.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.remote - The name of the remote.
-   * @param {Map<string, string>} args.refs - A map of refs to their object IDs.
-   * @param {Map<string, string>} args.symrefs - A map of symbolic refs.
-   * @param {boolean} args.tags - Whether to fetch tags.
-   * @param {string[]} [args.refspecs = undefined] - The refspecs to use.
-   * @param {boolean} [args.prune = false] - Whether to prune stale refs.
-   * @param {boolean} [args.pruneTags = false] - Whether to prune tags.
-   * @returns {Promise<Object>} - An object containing pruned refs.
-   */
-  static async updateRemoteRefs({
-    fs,
-    gitdir,
-    remote,
-    refs,
-    symrefs,
-    tags,
-    refspecs = void 0,
-    prune = false,
-    pruneTags = false
-  }) {
-    for (const value of refs.values()) {
-      if (!value.match(/[0-9a-f]{40}/)) {
-        throw new InvalidOidError(value);
-      }
-    }
-    const config = await GitConfigManager.get({ fs, gitdir });
-    if (!refspecs) {
-      refspecs = await config.getall(`remote.${remote}.fetch`);
-      if (refspecs.length === 0) {
-        throw new NoRefspecError(remote);
-      }
-      refspecs.unshift(`+HEAD:refs/remotes/${remote}/HEAD`);
-    }
-    const refspec = GitRefSpecSet.from(refspecs);
-    const actualRefsToWrite = /* @__PURE__ */ new Map();
-    if (pruneTags) {
-      const tags2 = await _GitRefManager.listRefs({
-        fs,
-        gitdir,
-        filepath: "refs/tags"
-      });
-      await _GitRefManager.deleteRefs({
-        fs,
-        gitdir,
-        refs: tags2.map((tag) => `refs/tags/${tag}`)
-      });
-    }
-    if (tags) {
-      for (const serverRef of refs.keys()) {
-        if (serverRef.startsWith("refs/tags") && !serverRef.endsWith("^{}")) {
-          if (!await _GitRefManager.exists({ fs, gitdir, ref: serverRef })) {
-            const oid = refs.get(serverRef);
-            actualRefsToWrite.set(serverRef, oid);
-          }
-        }
-      }
-    }
-    const refTranslations = refspec.translate([...refs.keys()]);
-    for (const [serverRef, translatedRef] of refTranslations) {
-      const value = refs.get(serverRef);
-      actualRefsToWrite.set(translatedRef, value);
-    }
-    const symrefTranslations = refspec.translate([...symrefs.keys()]);
-    for (const [serverRef, translatedRef] of symrefTranslations) {
-      const value = symrefs.get(serverRef);
-      const symtarget = refspec.translateOne(value);
-      if (symtarget) {
-        actualRefsToWrite.set(translatedRef, `ref: ${symtarget}`);
-      }
-    }
-    const pruned = [];
-    if (prune) {
-      for (const filepath of refspec.localNamespaces()) {
-        const refs2 = (await _GitRefManager.listRefs({
-          fs,
-          gitdir,
-          filepath
-        })).map((file) => `${filepath}/${file}`);
-        for (const ref of refs2) {
-          if (!actualRefsToWrite.has(ref)) {
-            pruned.push(ref);
-          }
-        }
-      }
-      if (pruned.length > 0) {
-        await _GitRefManager.deleteRefs({ fs, gitdir, refs: pruned });
-      }
-    }
-    for (const [key, value] of actualRefsToWrite) {
-      await acquireLock(
-        key,
-        async () => fs.write(join(gitdir, key), `${value.trim()}
-`, "utf8")
-      );
-    }
-    return { pruned };
-  }
-  /**
-   * Writes a ref to the file system.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to write.
-   * @param {string} args.value - The object ID to write.
-   * @returns {Promise<void>}
-   */
-  // TODO: make this less crude?
-  static async writeRef({ fs, gitdir, ref, value }) {
-    if (!value.match(/[0-9a-f]{40}/)) {
-      throw new InvalidOidError(value);
-    }
-    await acquireLock(
-      ref,
-      async () => fs.write(join(gitdir, ref), `${value.trim()}
-`, "utf8")
-    );
-  }
-  /**
-   * Writes a symbolic ref to the file system.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to write.
-   * @param {string} args.value - The target ref.
-   * @returns {Promise<void>}
-   */
-  static async writeSymbolicRef({ fs, gitdir, ref, value }) {
-    await acquireLock(
-      ref,
-      async () => fs.write(join(gitdir, ref), `ref: ${value.trim()}
-`, "utf8")
-    );
-  }
-  /**
-   * Deletes a single ref.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to delete.
-   * @returns {Promise<void>}
-   */
-  static async deleteRef({ fs, gitdir, ref }) {
-    return _GitRefManager.deleteRefs({ fs, gitdir, refs: [ref] });
-  }
-  /**
-   * Deletes multiple refs.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string[]} args.refs - The refs to delete.
-   * @returns {Promise<void>}
-   */
-  static async deleteRefs({ fs, gitdir, refs }) {
-    await Promise.all(refs.map((ref) => fs.rm(join(gitdir, ref))));
-    let text = await acquireLock(
-      "packed-refs",
-      async () => fs.read(`${gitdir}/packed-refs`, { encoding: "utf8" })
-    );
-    const packed = GitPackedRefs.from(text);
-    const beforeSize = packed.refs.size;
-    for (const ref of refs) {
-      if (packed.refs.has(ref)) {
-        packed.delete(ref);
-      }
-    }
-    if (packed.refs.size < beforeSize) {
-      text = packed.toString();
-      await acquireLock(
-        "packed-refs",
-        async () => fs.write(`${gitdir}/packed-refs`, text, { encoding: "utf8" })
-      );
-    }
-  }
-  /**
-   * Resolves a ref to its object ID.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to resolve.
-   * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
-   * @returns {Promise<string>} - The resolved object ID.
-   */
-  static async resolve({ fs, gitdir, ref, depth = void 0 }) {
-    if (depth !== void 0) {
-      depth--;
-      if (depth === -1) {
-        return ref;
-      }
-    }
-    if (ref.startsWith("ref: ")) {
-      ref = ref.slice("ref: ".length);
-      return _GitRefManager.resolve({ fs, gitdir, ref, depth });
-    }
-    if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
-      return ref;
-    }
-    const packedMap = await _GitRefManager.packedRefs({ fs, gitdir });
-    const allpaths = refpaths(ref).filter((p) => !GIT_FILES.includes(p));
-    for (const ref2 of allpaths) {
-      const sha = await acquireLock(
-        ref2,
-        async () => await fs.read(`${gitdir}/${ref2}`, { encoding: "utf8" }) || packedMap.get(ref2)
-      );
-      if (sha) {
-        return _GitRefManager.resolve({ fs, gitdir, ref: sha.trim(), depth });
-      }
-    }
-    throw new NotFoundError(ref);
-  }
-  /**
-   * Checks if a ref exists.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to check.
-   * @returns {Promise<boolean>} - True if the ref exists, false otherwise.
-   */
-  static async exists({ fs, gitdir, ref }) {
-    try {
-      await _GitRefManager.expand({ fs, gitdir, ref });
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-  /**
-   * Expands a ref to its full name.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.ref - The ref to expand.
-   * @returns {Promise<string>} - The full ref name.
-   */
-  static async expand({ fs, gitdir, ref }) {
-    if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
-      return ref;
-    }
-    const packedMap = await _GitRefManager.packedRefs({ fs, gitdir });
-    const allpaths = refpaths(ref);
-    for (const ref2 of allpaths) {
-      const refExists = await acquireLock(
-        ref2,
-        async () => fs.exists(`${gitdir}/${ref2}`)
-      );
-      if (refExists)
-        return ref2;
-      if (packedMap.has(ref2))
-        return ref2;
-    }
-    throw new NotFoundError(ref);
-  }
-  /**
-   * Expands a ref against a provided map.
-   *
-   * @param {Object} args
-   * @param {string} args.ref - The ref to expand.
-   * @param {Map<string, string>} args.map - The map of refs.
-   * @returns {Promise<string>} - The expanded ref.
-   */
-  static async expandAgainstMap({ ref, map }) {
-    const allpaths = refpaths(ref);
-    for (const ref2 of allpaths) {
-      if (await map.has(ref2))
-        return ref2;
-    }
-    throw new NotFoundError(ref);
-  }
-  /**
-   * Resolves a ref against a provided map.
-   *
-   * @param {Object} args
-   * @param {string} args.ref - The ref to resolve.
-   * @param {string} [args.fullref = args.ref] - The full ref name.
-   * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
-   * @param {Map<string, string>} args.map - The map of refs.
-   * @returns {Object} - An object containing the full ref and its object ID.
-   */
-  static resolveAgainstMap({ ref, fullref = ref, depth = void 0, map }) {
-    if (depth !== void 0) {
-      depth--;
-      if (depth === -1) {
-        return { fullref, oid: ref };
-      }
-    }
-    if (ref.startsWith("ref: ")) {
-      ref = ref.slice("ref: ".length);
-      return _GitRefManager.resolveAgainstMap({ ref, fullref, depth, map });
-    }
-    if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
-      return { fullref, oid: ref };
-    }
-    const allpaths = refpaths(ref);
-    for (const ref2 of allpaths) {
-      const sha = map.get(ref2);
-      if (sha) {
-        return _GitRefManager.resolveAgainstMap({
-          ref: sha.trim(),
-          fullref: ref2,
-          depth,
-          map
-        });
-      }
-    }
-    throw new NotFoundError(ref);
-  }
-  /**
-   * Reads the packed refs file and returns a map of refs.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @returns {Promise<Map<string, string>>} - A map of packed refs.
-   */
-  static async packedRefs({ fs, gitdir }) {
-    const text = await acquireLock(
-      "packed-refs",
-      async () => fs.read(`${gitdir}/packed-refs`, { encoding: "utf8" })
-    );
-    const packed = GitPackedRefs.from(text);
-    return packed.refs;
-  }
-  /**
-   * Lists all refs matching a given filepath prefix.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.filepath - The filepath prefix to match.
-   * @returns {Promise<string[]>} - A sorted list of refs.
-   */
-  static async listRefs({ fs, gitdir, filepath }) {
-    const packedMap = _GitRefManager.packedRefs({ fs, gitdir });
-    let files = null;
-    try {
-      files = await fs.readdirDeep(`${gitdir}/${filepath}`);
-      files = files.map((x) => x.replace(`${gitdir}/${filepath}/`, ""));
-    } catch (err) {
-      files = [];
-    }
-    for (let key of (await packedMap).keys()) {
-      if (key.startsWith(filepath)) {
-        key = key.replace(filepath + "/", "");
-        if (!files.includes(key)) {
-          files.push(key);
-        }
-      }
-    }
-    files.sort(compareRefNames);
-    return files;
-  }
-  /**
-   * Lists all branches, optionally filtered by remote.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} [args.remote] - The remote to filter branches by.
-   * @returns {Promise<string[]>} - A list of branch names.
-   */
-  static async listBranches({ fs, gitdir, remote }) {
-    if (remote) {
-      return _GitRefManager.listRefs({
-        fs,
-        gitdir,
-        filepath: `refs/remotes/${remote}`
-      });
-    } else {
-      return _GitRefManager.listRefs({ fs, gitdir, filepath: `refs/heads` });
-    }
-  }
-  /**
-   * Lists all tags.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @returns {Promise<string[]>} - A list of tag names.
-   */
-  static async listTags({ fs, gitdir }) {
-    const tags = await _GitRefManager.listRefs({
-      fs,
-      gitdir,
-      filepath: `refs/tags`
-    });
-    return tags.filter((x) => !x.endsWith("^{}"));
-  }
-};
 function compareTreeEntryPath(a, b) {
   return compareStrings(appendSlashIfDir(a), appendSlashIfDir(b));
 }
@@ -8838,93 +7545,6 @@ function nudgeIntoShape(entry) {
   }
   return entry;
 }
-var GitTree = class _GitTree {
-  constructor(entries) {
-    if (Buffer.isBuffer(entries)) {
-      this._entries = parseBuffer(entries);
-    } else if (Array.isArray(entries)) {
-      this._entries = entries.map(nudgeIntoShape);
-    } else {
-      throw new InternalError("invalid type passed to GitTree constructor");
-    }
-    this._entries.sort(comparePath);
-  }
-  static from(tree) {
-    return new _GitTree(tree);
-  }
-  render() {
-    return this._entries.map((entry) => `${entry.mode} ${entry.type} ${entry.oid}    ${entry.path}`).join("\n");
-  }
-  toObject() {
-    const entries = [...this._entries];
-    entries.sort(compareTreeEntryPath);
-    return Buffer.concat(
-      entries.map((entry) => {
-        const mode = Buffer.from(entry.mode.replace(/^0/, ""));
-        const space = Buffer.from(" ");
-        const path = Buffer.from(entry.path, "utf8");
-        const nullchar = Buffer.from([0]);
-        const oid = Buffer.from(entry.oid, "hex");
-        return Buffer.concat([mode, space, path, nullchar, oid]);
-      })
-    );
-  }
-  /**
-   * @returns {TreeEntry[]}
-   */
-  entries() {
-    return this._entries;
-  }
-  *[Symbol.iterator]() {
-    for (const entry of this._entries) {
-      yield entry;
-    }
-  }
-};
-var GitObject = class {
-  /**
-   * Wraps a raw object with a Git header.
-   *
-   * @param {Object} params - The parameters for wrapping.
-   * @param {string} params.type - The type of the Git object (e.g., 'blob', 'tree', 'commit').
-   * @param {Uint8Array} params.object - The raw object data to wrap.
-   * @returns {Uint8Array} The wrapped Git object as a single buffer.
-   */
-  static wrap({ type, object }) {
-    const header = `${type} ${object.length}\0`;
-    const headerLen = header.length;
-    const totalLength = headerLen + object.length;
-    const wrappedObject = new Uint8Array(totalLength);
-    for (let i = 0; i < headerLen; i++) {
-      wrappedObject[i] = header.charCodeAt(i);
-    }
-    wrappedObject.set(object, headerLen);
-    return wrappedObject;
-  }
-  /**
-   * Unwraps a Git object buffer into its type and raw object data.
-   *
-   * @param {Buffer|Uint8Array} buffer - The buffer containing the wrapped Git object.
-   * @returns {{ type: string, object: Buffer }} An object containing the type and the raw object data.
-   * @throws {InternalError} If the length specified in the header does not match the actual object length.
-   */
-  static unwrap(buffer) {
-    const s = buffer.indexOf(32);
-    const i = buffer.indexOf(0);
-    const type = buffer.slice(0, s).toString("utf8");
-    const length = buffer.slice(s + 1, i).toString("utf8");
-    const actualLength = buffer.length - (i + 1);
-    if (parseInt(length) !== actualLength) {
-      throw new InternalError(
-        `Length mismatch: expected ${length} bytes but got ${actualLength} instead.`
-      );
-    }
-    return {
-      type,
-      object: Buffer.from(buffer.slice(i + 1))
-    };
-  }
-};
 async function readObjectLoose({ fs, gitdir, oid }) {
   const source = `objects/${oid.slice(0, 2)}/${oid.slice(2)}`;
   const file = await fs.read(`${gitdir}/${source}`);
@@ -9027,125 +7647,6 @@ function getIterator(iterable) {
   }
   return fromValue(iterable);
 }
-var StreamReader = class {
-  constructor(stream) {
-    if (typeof Buffer === "undefined") {
-      throw new Error("Missing Buffer dependency");
-    }
-    this.stream = getIterator(stream);
-    this.buffer = null;
-    this.cursor = 0;
-    this.undoCursor = 0;
-    this.started = false;
-    this._ended = false;
-    this._discardedBytes = 0;
-  }
-  eof() {
-    return this._ended && this.cursor === this.buffer.length;
-  }
-  tell() {
-    return this._discardedBytes + this.cursor;
-  }
-  async byte() {
-    if (this.eof())
-      return;
-    if (!this.started)
-      await this._init();
-    if (this.cursor === this.buffer.length) {
-      await this._loadnext();
-      if (this._ended)
-        return;
-    }
-    this._moveCursor(1);
-    return this.buffer[this.undoCursor];
-  }
-  async chunk() {
-    if (this.eof())
-      return;
-    if (!this.started)
-      await this._init();
-    if (this.cursor === this.buffer.length) {
-      await this._loadnext();
-      if (this._ended)
-        return;
-    }
-    this._moveCursor(this.buffer.length);
-    return this.buffer.slice(this.undoCursor, this.cursor);
-  }
-  async read(n) {
-    if (this.eof())
-      return;
-    if (!this.started)
-      await this._init();
-    if (this.cursor + n > this.buffer.length) {
-      this._trim();
-      await this._accumulate(n);
-    }
-    this._moveCursor(n);
-    return this.buffer.slice(this.undoCursor, this.cursor);
-  }
-  async skip(n) {
-    if (this.eof())
-      return;
-    if (!this.started)
-      await this._init();
-    if (this.cursor + n > this.buffer.length) {
-      this._trim();
-      await this._accumulate(n);
-    }
-    this._moveCursor(n);
-  }
-  async undo() {
-    this.cursor = this.undoCursor;
-  }
-  async _next() {
-    this.started = true;
-    let { done, value } = await this.stream.next();
-    if (done) {
-      this._ended = true;
-      if (!value)
-        return Buffer.alloc(0);
-    }
-    if (value) {
-      value = Buffer.from(value);
-    }
-    return value;
-  }
-  _trim() {
-    this.buffer = this.buffer.slice(this.undoCursor);
-    this.cursor -= this.undoCursor;
-    this._discardedBytes += this.undoCursor;
-    this.undoCursor = 0;
-  }
-  _moveCursor(n) {
-    this.undoCursor = this.cursor;
-    this.cursor += n;
-    if (this.cursor > this.buffer.length) {
-      this.cursor = this.buffer.length;
-    }
-  }
-  async _accumulate(n) {
-    if (this._ended)
-      return;
-    const buffers = [this.buffer];
-    while (this.cursor + n > lengthBuffers(buffers)) {
-      const nextbuffer = await this._next();
-      if (this._ended)
-        break;
-      buffers.push(nextbuffer);
-    }
-    this.buffer = Buffer.concat(buffers);
-  }
-  async _loadnext() {
-    this._discardedBytes += this.buffer.length;
-    this.undoCursor = 0;
-    this.cursor = 0;
-    this.buffer = await this._next();
-  }
-  async _init() {
-    this.buffer = await this._next();
-  }
-};
 function lengthBuffers(buffers) {
   return buffers.reduce((acc, buffer) => acc + buffer.length, 0);
 }
@@ -9156,10 +7657,10 @@ async function listpack(stream, onData) {
   if (PACK !== "PACK") {
     throw new InternalError(`Invalid PACK header '${PACK}'`);
   }
-  let version = await reader.read(4);
-  version = version.readUInt32BE(0);
-  if (version !== 2) {
-    throw new InternalError(`Invalid packfile version: ${version}`);
+  let version2 = await reader.read(4);
+  version2 = version2.readUInt32BE(0);
+  if (version2 !== 2) {
+    throw new InternalError(`Invalid packfile version: ${version2}`);
   }
   let numObjects = await reader.read(4);
   numObjects = numObjects.readUInt32BE(0);
@@ -9231,7 +7732,6 @@ async function parseHeader(reader) {
   }
   return { type, length, ofs, reference };
 }
-var supportsDecompressionStream = false;
 async function inflate(buffer) {
   if (supportsDecompressionStream === null) {
     supportsDecompressionStream = testDecompressionStream();
@@ -9275,268 +7775,6 @@ function otherVarIntDecode(reader, startWith) {
   } while (byte & 128);
   return result;
 }
-var GitPackIndex = class _GitPackIndex {
-  constructor(stuff) {
-    Object.assign(this, stuff);
-    this.offsetCache = {};
-  }
-  static async fromIdx({ idx, getExternalRefDelta }) {
-    const reader = new BufferCursor(idx);
-    const magic = reader.slice(4).toString("hex");
-    if (magic !== "ff744f63") {
-      return;
-    }
-    const version = reader.readUInt32BE();
-    if (version !== 2) {
-      throw new InternalError(
-        `Unable to read version ${version} packfile IDX. (Only version 2 supported)`
-      );
-    }
-    if (idx.byteLength > 2048 * 1024 * 1024) {
-      throw new InternalError(
-        `To keep implementation simple, I haven't implemented the layer 5 feature needed to support packfiles > 2GB in size.`
-      );
-    }
-    reader.seek(reader.tell() + 4 * 255);
-    const size = reader.readUInt32BE();
-    const hashes = [];
-    for (let i = 0; i < size; i++) {
-      const hash = reader.slice(20).toString("hex");
-      hashes[i] = hash;
-    }
-    reader.seek(reader.tell() + 4 * size);
-    const offsets = /* @__PURE__ */ new Map();
-    for (let i = 0; i < size; i++) {
-      offsets.set(hashes[i], reader.readUInt32BE());
-    }
-    const packfileSha = reader.slice(20).toString("hex");
-    return new _GitPackIndex({
-      hashes,
-      crcs: {},
-      offsets,
-      packfileSha,
-      getExternalRefDelta
-    });
-  }
-  static async fromPack({ pack, getExternalRefDelta, onProgress }) {
-    const listpackTypes = {
-      1: "commit",
-      2: "tree",
-      3: "blob",
-      4: "tag",
-      6: "ofs-delta",
-      7: "ref-delta"
-    };
-    const offsetToObject = {};
-    const packfileSha = pack.slice(-20).toString("hex");
-    const hashes = [];
-    const crcs = {};
-    const offsets = /* @__PURE__ */ new Map();
-    let totalObjectCount = null;
-    let lastPercent = null;
-    await listpack([pack], async ({ data, type, reference, offset, num: num2 }) => {
-      if (totalObjectCount === null)
-        totalObjectCount = num2;
-      const percent = Math.floor(
-        (totalObjectCount - num2) * 100 / totalObjectCount
-      );
-      if (percent !== lastPercent) {
-        if (onProgress) {
-          await onProgress({
-            phase: "Receiving objects",
-            loaded: totalObjectCount - num2,
-            total: totalObjectCount
-          });
-        }
-      }
-      lastPercent = percent;
-      type = listpackTypes[type];
-      if (["commit", "tree", "blob", "tag"].includes(type)) {
-        offsetToObject[offset] = {
-          type,
-          offset
-        };
-      } else if (type === "ofs-delta") {
-        offsetToObject[offset] = {
-          type,
-          offset
-        };
-      } else if (type === "ref-delta") {
-        offsetToObject[offset] = {
-          type,
-          offset
-        };
-      }
-    });
-    const offsetArray = Object.keys(offsetToObject).map(Number);
-    for (const [i, start] of offsetArray.entries()) {
-      const end = i + 1 === offsetArray.length ? pack.byteLength - 20 : offsetArray[i + 1];
-      const o = offsetToObject[start];
-      const crc = import_crc_32.default.buf(pack.slice(start, end)) >>> 0;
-      o.end = end;
-      o.crc = crc;
-    }
-    const p = new _GitPackIndex({
-      pack: Promise.resolve(pack),
-      packfileSha,
-      crcs,
-      hashes,
-      offsets,
-      getExternalRefDelta
-    });
-    lastPercent = null;
-    let count = 0;
-    const objectsByDepth = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    for (let offset in offsetToObject) {
-      offset = Number(offset);
-      const percent = Math.floor(count * 100 / totalObjectCount);
-      if (percent !== lastPercent) {
-        if (onProgress) {
-          await onProgress({
-            phase: "Resolving deltas",
-            loaded: count,
-            total: totalObjectCount
-          });
-        }
-      }
-      count++;
-      lastPercent = percent;
-      const o = offsetToObject[offset];
-      if (o.oid)
-        continue;
-      try {
-        p.readDepth = 0;
-        p.externalReadDepth = 0;
-        const { type, object } = await p.readSlice({ start: offset });
-        objectsByDepth[p.readDepth] += 1;
-        const oid = await shasum(GitObject.wrap({ type, object }));
-        o.oid = oid;
-        hashes.push(oid);
-        offsets.set(oid, offset);
-        crcs[oid] = o.crc;
-      } catch (err) {
-        continue;
-      }
-    }
-    hashes.sort();
-    return p;
-  }
-  async toBuffer() {
-    const buffers = [];
-    const write = (str, encoding) => {
-      buffers.push(Buffer.from(str, encoding));
-    };
-    write("ff744f63", "hex");
-    write("00000002", "hex");
-    const fanoutBuffer = new BufferCursor(Buffer.alloc(256 * 4));
-    for (let i = 0; i < 256; i++) {
-      let count = 0;
-      for (const hash of this.hashes) {
-        if (parseInt(hash.slice(0, 2), 16) <= i)
-          count++;
-      }
-      fanoutBuffer.writeUInt32BE(count);
-    }
-    buffers.push(fanoutBuffer.buffer);
-    for (const hash of this.hashes) {
-      write(hash, "hex");
-    }
-    const crcsBuffer = new BufferCursor(Buffer.alloc(this.hashes.length * 4));
-    for (const hash of this.hashes) {
-      crcsBuffer.writeUInt32BE(this.crcs[hash]);
-    }
-    buffers.push(crcsBuffer.buffer);
-    const offsetsBuffer = new BufferCursor(Buffer.alloc(this.hashes.length * 4));
-    for (const hash of this.hashes) {
-      offsetsBuffer.writeUInt32BE(this.offsets.get(hash));
-    }
-    buffers.push(offsetsBuffer.buffer);
-    write(this.packfileSha, "hex");
-    const totalBuffer = Buffer.concat(buffers);
-    const sha = await shasum(totalBuffer);
-    const shaBuffer = Buffer.alloc(20);
-    shaBuffer.write(sha, "hex");
-    return Buffer.concat([totalBuffer, shaBuffer]);
-  }
-  async load({ pack }) {
-    this.pack = pack;
-  }
-  async unload() {
-    this.pack = null;
-  }
-  async read({ oid }) {
-    if (!this.offsets.get(oid)) {
-      if (this.getExternalRefDelta) {
-        this.externalReadDepth++;
-        return this.getExternalRefDelta(oid);
-      } else {
-        throw new InternalError(`Could not read object ${oid} from packfile`);
-      }
-    }
-    const start = this.offsets.get(oid);
-    return this.readSlice({ start });
-  }
-  async readSlice({ start }) {
-    if (this.offsetCache[start]) {
-      return Object.assign({}, this.offsetCache[start]);
-    }
-    this.readDepth++;
-    const types = {
-      16: "commit",
-      32: "tree",
-      48: "blob",
-      64: "tag",
-      96: "ofs_delta",
-      112: "ref_delta"
-    };
-    const pack = await this.pack;
-    if (!pack) {
-      throw new InternalError(
-        "Could not read packfile data. The packfile may be missing, corrupted, or too large to read into memory."
-      );
-    }
-    const raw = pack.slice(start);
-    const reader = new BufferCursor(raw);
-    const byte = reader.readUInt8();
-    const btype = byte & 112;
-    let type = types[btype];
-    if (type === void 0) {
-      throw new InternalError("Unrecognized type: 0b" + btype.toString(2));
-    }
-    const lastFour = byte & 15;
-    let length = lastFour;
-    const multibyte = byte & 128;
-    if (multibyte) {
-      length = otherVarIntDecode(reader, lastFour);
-    }
-    let base = null;
-    let object = null;
-    if (type === "ofs_delta") {
-      const offset = decodeVarInt(reader);
-      const baseOffset = start - offset;
-      ({ object: base, type } = await this.readSlice({ start: baseOffset }));
-    }
-    if (type === "ref_delta") {
-      const oid = reader.slice(20).toString("hex");
-      ({ object: base, type } = await this.read({ oid }));
-    }
-    const buffer = raw.slice(reader.tell());
-    object = Buffer.from(await inflate(buffer));
-    if (object.byteLength !== length) {
-      throw new InternalError(
-        `Packfile told us object would have length ${length} but it had length ${object.byteLength}`
-      );
-    }
-    if (base) {
-      object = Buffer.from(applyDelta(object, base));
-    }
-    if (this.readDepth > 3) {
-      this.offsetCache[start] = { type, object };
-    }
-    return { type, format: "content", object };
-  }
-};
-var PackfileCache = Symbol("PackfileCache");
 async function loadPackIndex({
   fs,
   filename,
@@ -9686,360 +7924,6 @@ async function _readObject({
   }
   throw new InternalError(`invalid requested format "${format}"`);
 }
-var AlreadyExistsError = class _AlreadyExistsError extends BaseError {
-  /**
-   * @param {'note'|'remote'|'tag'|'branch'} noun
-   * @param {string} where
-   * @param {boolean} canForce
-   */
-  constructor(noun, where, canForce = true) {
-    super(
-      `Failed to create ${noun} at ${where} because it already exists.${canForce ? ` (Hint: use 'force: true' parameter to overwrite existing ${noun}.)` : ""}`
-    );
-    this.code = this.name = _AlreadyExistsError.code;
-    this.data = { noun, where, canForce };
-  }
-};
-AlreadyExistsError.code = "AlreadyExistsError";
-var AmbiguousError = class _AmbiguousError extends BaseError {
-  /**
-   * @param {'oids'|'refs'} nouns
-   * @param {string} short
-   * @param {string[]} matches
-   */
-  constructor(nouns, short, matches) {
-    super(
-      `Found multiple ${nouns} matching "${short}" (${matches.join(
-        ", "
-      )}). Use a longer abbreviation length to disambiguate them.`
-    );
-    this.code = this.name = _AmbiguousError.code;
-    this.data = { nouns, short, matches };
-  }
-};
-AmbiguousError.code = "AmbiguousError";
-var CheckoutConflictError = class _CheckoutConflictError extends BaseError {
-  /**
-   * @param {string[]} filepaths
-   */
-  constructor(filepaths) {
-    super(
-      `Your local changes to the following files would be overwritten by checkout: ${filepaths.join(
-        ", "
-      )}`
-    );
-    this.code = this.name = _CheckoutConflictError.code;
-    this.data = { filepaths };
-  }
-};
-CheckoutConflictError.code = "CheckoutConflictError";
-var CherryPickMergeCommitError = class _CherryPickMergeCommitError extends BaseError {
-  /**
-   * @param {string} oid
-   * @param {number} parentCount
-   */
-  constructor(oid, parentCount) {
-    super(
-      `Cannot cherry-pick merge commit ${oid}. Merge commits have ${parentCount} parents and require specifying which parent to use as the base.`
-    );
-    this.code = this.name = _CherryPickMergeCommitError.code;
-    this.data = { oid, parentCount };
-  }
-};
-CherryPickMergeCommitError.code = "CherryPickMergeCommitError";
-var CherryPickRootCommitError = class _CherryPickRootCommitError extends BaseError {
-  /**
-   * @param {string} oid
-   */
-  constructor(oid) {
-    super(
-      `Cannot cherry-pick root commit ${oid}. Root commits have no parents.`
-    );
-    this.code = this.name = _CherryPickRootCommitError.code;
-    this.data = { oid };
-  }
-};
-CherryPickRootCommitError.code = "CherryPickRootCommitError";
-var CommitNotFetchedError = class _CommitNotFetchedError extends BaseError {
-  /**
-   * @param {string} ref
-   * @param {string} oid
-   */
-  constructor(ref, oid) {
-    super(
-      `Failed to checkout "${ref}" because commit ${oid} is not available locally. Do a git fetch to make the branch available locally.`
-    );
-    this.code = this.name = _CommitNotFetchedError.code;
-    this.data = { ref, oid };
-  }
-};
-CommitNotFetchedError.code = "CommitNotFetchedError";
-var EmptyServerResponseError = class _EmptyServerResponseError extends BaseError {
-  constructor() {
-    super(`Empty response from git server.`);
-    this.code = this.name = _EmptyServerResponseError.code;
-    this.data = {};
-  }
-};
-EmptyServerResponseError.code = "EmptyServerResponseError";
-var FastForwardError = class _FastForwardError extends BaseError {
-  constructor() {
-    super(`A simple fast-forward merge was not possible.`);
-    this.code = this.name = _FastForwardError.code;
-    this.data = {};
-  }
-};
-FastForwardError.code = "FastForwardError";
-var GitPushError = class _GitPushError extends BaseError {
-  /**
-   * @param {string} prettyDetails
-   * @param {PushResult} result
-   */
-  constructor(prettyDetails, result) {
-    super(`One or more branches were not updated: ${prettyDetails}`);
-    this.code = this.name = _GitPushError.code;
-    this.data = { prettyDetails, result };
-  }
-};
-GitPushError.code = "GitPushError";
-var HttpError = class _HttpError extends BaseError {
-  /**
-   * @param {number} statusCode
-   * @param {string} statusMessage
-   * @param {string} response
-   */
-  constructor(statusCode, statusMessage, response) {
-    super(`HTTP Error: ${statusCode} ${statusMessage}`);
-    this.code = this.name = _HttpError.code;
-    this.data = { statusCode, statusMessage, response };
-  }
-};
-HttpError.code = "HttpError";
-var InvalidFilepathError = class _InvalidFilepathError extends BaseError {
-  /**
-   * @param {'leading-slash'|'trailing-slash'|'directory'} [reason]
-   */
-  constructor(reason) {
-    let message = "invalid filepath";
-    if (reason === "leading-slash" || reason === "trailing-slash") {
-      message = `"filepath" parameter should not include leading or trailing directory separators because these can cause problems on some platforms.`;
-    } else if (reason === "directory") {
-      message = `"filepath" should not be a directory.`;
-    }
-    super(message);
-    this.code = this.name = _InvalidFilepathError.code;
-    this.data = { reason };
-  }
-};
-InvalidFilepathError.code = "InvalidFilepathError";
-var InvalidRefNameError = class _InvalidRefNameError extends BaseError {
-  /**
-   * @param {string} ref
-   * @param {string} suggestion
-   * @param {boolean} canForce
-   */
-  constructor(ref, suggestion) {
-    super(
-      `"${ref}" would be an invalid git reference. (Hint: a valid alternative would be "${suggestion}".)`
-    );
-    this.code = this.name = _InvalidRefNameError.code;
-    this.data = { ref, suggestion };
-  }
-};
-InvalidRefNameError.code = "InvalidRefNameError";
-var MaxDepthError = class _MaxDepthError extends BaseError {
-  /**
-   * @param {number} depth
-   */
-  constructor(depth) {
-    super(`Maximum search depth of ${depth} exceeded.`);
-    this.code = this.name = _MaxDepthError.code;
-    this.data = { depth };
-  }
-};
-MaxDepthError.code = "MaxDepthError";
-var MergeNotSupportedError = class _MergeNotSupportedError extends BaseError {
-  constructor() {
-    super(`Merges with conflicts are not supported yet.`);
-    this.code = this.name = _MergeNotSupportedError.code;
-    this.data = {};
-  }
-};
-MergeNotSupportedError.code = "MergeNotSupportedError";
-var MergeConflictError = class _MergeConflictError extends BaseError {
-  /**
-   * @param {Array<string>} filepaths
-   * @param {Array<string>} bothModified
-   * @param {Array<string>} deleteByUs
-   * @param {Array<string>} deleteByTheirs
-   */
-  constructor(filepaths, bothModified, deleteByUs, deleteByTheirs) {
-    super(
-      `Automatic merge failed with one or more merge conflicts in the following files: ${filepaths.toString()}. Fix conflicts then commit the result.`
-    );
-    this.code = this.name = _MergeConflictError.code;
-    this.data = { filepaths, bothModified, deleteByUs, deleteByTheirs };
-  }
-};
-MergeConflictError.code = "MergeConflictError";
-var MissingNameError = class _MissingNameError extends BaseError {
-  /**
-   * @param {'author'|'committer'|'tagger'} role
-   */
-  constructor(role) {
-    super(
-      `No name was provided for ${role} in the argument or in the .git/config file.`
-    );
-    this.code = this.name = _MissingNameError.code;
-    this.data = { role };
-  }
-};
-MissingNameError.code = "MissingNameError";
-var MissingParameterError = class _MissingParameterError extends BaseError {
-  /**
-   * @param {string} parameter
-   */
-  constructor(parameter) {
-    super(
-      `The function requires a "${parameter}" parameter but none was provided.`
-    );
-    this.code = this.name = _MissingParameterError.code;
-    this.data = { parameter };
-  }
-};
-MissingParameterError.code = "MissingParameterError";
-var MultipleGitError = class _MultipleGitError extends BaseError {
-  /**
-   * @param {Error[]} errors
-   * @param {string} message
-   */
-  constructor(errors) {
-    super(
-      `There are multiple errors that were thrown by the method. Please refer to the "errors" property to see more`
-    );
-    this.code = this.name = _MultipleGitError.code;
-    this.data = { errors };
-    this.errors = errors;
-  }
-};
-MultipleGitError.code = "MultipleGitError";
-var ParseError = class _ParseError extends BaseError {
-  /**
-   * @param {string} expected
-   * @param {string} actual
-   */
-  constructor(expected, actual) {
-    super(`Expected "${expected}" but received "${actual}".`);
-    this.code = this.name = _ParseError.code;
-    this.data = { expected, actual };
-  }
-};
-ParseError.code = "ParseError";
-var PushRejectedError = class _PushRejectedError extends BaseError {
-  /**
-   * @param {'not-fast-forward'|'tag-exists'} reason
-   */
-  constructor(reason) {
-    let message = "";
-    if (reason === "not-fast-forward") {
-      message = " because it was not a simple fast-forward";
-    } else if (reason === "tag-exists") {
-      message = " because tag already exists";
-    }
-    super(`Push rejected${message}. Use "force: true" to override.`);
-    this.code = this.name = _PushRejectedError.code;
-    this.data = { reason };
-  }
-};
-PushRejectedError.code = "PushRejectedError";
-var RemoteCapabilityError = class _RemoteCapabilityError extends BaseError {
-  /**
-   * @param {'shallow'|'deepen-since'|'deepen-not'|'deepen-relative'} capability
-   * @param {'depth'|'since'|'exclude'|'relative'} parameter
-   */
-  constructor(capability, parameter) {
-    super(
-      `Remote does not support the "${capability}" so the "${parameter}" parameter cannot be used.`
-    );
-    this.code = this.name = _RemoteCapabilityError.code;
-    this.data = { capability, parameter };
-  }
-};
-RemoteCapabilityError.code = "RemoteCapabilityError";
-var SmartHttpError = class _SmartHttpError extends BaseError {
-  /**
-   * @param {string} preview
-   * @param {string} response
-   */
-  constructor(preview, response) {
-    super(
-      `Remote did not reply using the "smart" HTTP protocol. Expected "001e# service=git-upload-pack" but received: ${preview}`
-    );
-    this.code = this.name = _SmartHttpError.code;
-    this.data = { preview, response };
-  }
-};
-SmartHttpError.code = "SmartHttpError";
-var UnknownTransportError = class _UnknownTransportError extends BaseError {
-  /**
-   * @param {string} url
-   * @param {string} transport
-   * @param {string} [suggestion]
-   */
-  constructor(url, transport, suggestion) {
-    super(
-      `Git remote "${url}" uses an unrecognized transport protocol: "${transport}"`
-    );
-    this.code = this.name = _UnknownTransportError.code;
-    this.data = { url, transport, suggestion };
-  }
-};
-UnknownTransportError.code = "UnknownTransportError";
-var UrlParseError = class _UrlParseError extends BaseError {
-  /**
-   * @param {string} url
-   */
-  constructor(url) {
-    super(`Cannot parse remote URL: "${url}"`);
-    this.code = this.name = _UrlParseError.code;
-    this.data = { url };
-  }
-};
-UrlParseError.code = "UrlParseError";
-var UserCanceledError = class _UserCanceledError extends BaseError {
-  constructor() {
-    super(`The operation was canceled.`);
-    this.code = this.name = _UserCanceledError.code;
-    this.data = {};
-  }
-};
-UserCanceledError.code = "UserCanceledError";
-var IndexResetError = class _IndexResetError extends BaseError {
-  /**
-   * @param {Array<string>} filepaths
-   */
-  constructor(filepath) {
-    super(
-      `Could not merge index: Entry for '${filepath}' is not up to date. Either reset the index entry to HEAD, or stage your unstaged changes.`
-    );
-    this.code = this.name = _IndexResetError.code;
-    this.data = { filepath };
-  }
-};
-IndexResetError.code = "IndexResetError";
-var NoCommitError = class _NoCommitError extends BaseError {
-  /**
-   * @param {string} ref
-   */
-  constructor(ref) {
-    super(
-      `"${ref}" does not point to any commit. You're maybe working on a repository with no commits yet. `
-    );
-    this.code = this.name = _NoCommitError.code;
-    this.data = { ref };
-  }
-};
-NoCommitError.code = "NoCommitError";
 function formatAuthor({ name, email, timestamp, timezoneOffset }) {
   timezoneOffset = formatTimezoneOffset(timezoneOffset);
   return `${name} <${email}> ${timestamp} ${timezoneOffset}`;
@@ -10088,246 +7972,12 @@ function parseTimezoneOffset(offset) {
 function negateExceptForZero$1(n) {
   return n === 0 ? n : -n;
 }
-var GitAnnotatedTag = class _GitAnnotatedTag {
-  constructor(tag) {
-    if (typeof tag === "string") {
-      this._tag = tag;
-    } else if (Buffer.isBuffer(tag)) {
-      this._tag = tag.toString("utf8");
-    } else if (typeof tag === "object") {
-      this._tag = _GitAnnotatedTag.render(tag);
-    } else {
-      throw new InternalError(
-        "invalid type passed to GitAnnotatedTag constructor"
-      );
-    }
-  }
-  static from(tag) {
-    return new _GitAnnotatedTag(tag);
-  }
-  static render(obj) {
-    return `object ${obj.object}
-type ${obj.type}
-tag ${obj.tag}
-tagger ${formatAuthor(obj.tagger)}
-
-${obj.message}
-${obj.gpgsig ? obj.gpgsig : ""}`;
-  }
-  justHeaders() {
-    return this._tag.slice(0, this._tag.indexOf("\n\n"));
-  }
-  message() {
-    const tag = this.withoutSignature();
-    return tag.slice(tag.indexOf("\n\n") + 2);
-  }
-  parse() {
-    return Object.assign(this.headers(), {
-      message: this.message(),
-      gpgsig: this.gpgsig()
-    });
-  }
-  render() {
-    return this._tag;
-  }
-  headers() {
-    const headers = this.justHeaders().split("\n");
-    const hs = [];
-    for (const h of headers) {
-      if (h[0] === " ") {
-        hs[hs.length - 1] += "\n" + h.slice(1);
-      } else {
-        hs.push(h);
-      }
-    }
-    const obj = {};
-    for (const h of hs) {
-      const key = h.slice(0, h.indexOf(" "));
-      const value = h.slice(h.indexOf(" ") + 1);
-      if (Array.isArray(obj[key])) {
-        obj[key].push(value);
-      } else {
-        obj[key] = value;
-      }
-    }
-    if (obj.tagger) {
-      obj.tagger = parseAuthor(obj.tagger);
-    }
-    if (obj.committer) {
-      obj.committer = parseAuthor(obj.committer);
-    }
-    return obj;
-  }
-  withoutSignature() {
-    const tag = normalizeNewlines(this._tag);
-    if (tag.indexOf("\n-----BEGIN PGP SIGNATURE-----") === -1)
-      return tag;
-    return tag.slice(0, tag.lastIndexOf("\n-----BEGIN PGP SIGNATURE-----"));
-  }
-  gpgsig() {
-    if (this._tag.indexOf("\n-----BEGIN PGP SIGNATURE-----") === -1)
-      return;
-    const signature = this._tag.slice(
-      this._tag.indexOf("-----BEGIN PGP SIGNATURE-----"),
-      this._tag.indexOf("-----END PGP SIGNATURE-----") + "-----END PGP SIGNATURE-----".length
-    );
-    return normalizeNewlines(signature);
-  }
-  payload() {
-    return this.withoutSignature() + "\n";
-  }
-  toObject() {
-    return Buffer.from(this._tag, "utf8");
-  }
-  static async sign(tag, sign, secretKey) {
-    const payload = tag.payload();
-    let { signature } = await sign({ payload, secretKey });
-    signature = normalizeNewlines(signature);
-    const signedTag = payload + signature;
-    return _GitAnnotatedTag.from(signedTag);
-  }
-};
 function indent(str) {
   return str.trim().split("\n").map((x) => " " + x).join("\n") + "\n";
 }
 function outdent(str) {
   return str.split("\n").map((x) => x.replace(/^ /, "")).join("\n");
 }
-var GitCommit = class _GitCommit {
-  constructor(commit2) {
-    if (typeof commit2 === "string") {
-      this._commit = commit2;
-    } else if (Buffer.isBuffer(commit2)) {
-      this._commit = commit2.toString("utf8");
-    } else if (typeof commit2 === "object") {
-      this._commit = _GitCommit.render(commit2);
-    } else {
-      throw new InternalError("invalid type passed to GitCommit constructor");
-    }
-  }
-  static fromPayloadSignature({ payload, signature }) {
-    const headers = _GitCommit.justHeaders(payload);
-    const message = _GitCommit.justMessage(payload);
-    const commit2 = normalizeNewlines(
-      headers + "\ngpgsig" + indent(signature) + "\n" + message
-    );
-    return new _GitCommit(commit2);
-  }
-  static from(commit2) {
-    return new _GitCommit(commit2);
-  }
-  toObject() {
-    return Buffer.from(this._commit, "utf8");
-  }
-  // Todo: allow setting the headers and message
-  headers() {
-    return this.parseHeaders();
-  }
-  // Todo: allow setting the headers and message
-  message() {
-    return _GitCommit.justMessage(this._commit);
-  }
-  parse() {
-    return Object.assign({ message: this.message() }, this.headers());
-  }
-  static justMessage(commit2) {
-    return normalizeNewlines(commit2.slice(commit2.indexOf("\n\n") + 2));
-  }
-  static justHeaders(commit2) {
-    return commit2.slice(0, commit2.indexOf("\n\n"));
-  }
-  parseHeaders() {
-    const headers = _GitCommit.justHeaders(this._commit).split("\n");
-    const hs = [];
-    for (const h of headers) {
-      if (h[0] === " ") {
-        hs[hs.length - 1] += "\n" + h.slice(1);
-      } else {
-        hs.push(h);
-      }
-    }
-    const obj = {
-      parent: []
-    };
-    for (const h of hs) {
-      const key = h.slice(0, h.indexOf(" "));
-      const value = h.slice(h.indexOf(" ") + 1);
-      if (Array.isArray(obj[key])) {
-        obj[key].push(value);
-      } else {
-        obj[key] = value;
-      }
-    }
-    if (obj.author) {
-      obj.author = parseAuthor(obj.author);
-    }
-    if (obj.committer) {
-      obj.committer = parseAuthor(obj.committer);
-    }
-    return obj;
-  }
-  static renderHeaders(obj) {
-    let headers = "";
-    if (obj.tree) {
-      headers += `tree ${obj.tree}
-`;
-    } else {
-      headers += `tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904
-`;
-    }
-    if (obj.parent) {
-      if (obj.parent.length === void 0) {
-        throw new InternalError(`commit 'parent' property should be an array`);
-      }
-      for (const p of obj.parent) {
-        headers += `parent ${p}
-`;
-      }
-    }
-    const author = obj.author;
-    headers += `author ${formatAuthor(author)}
-`;
-    const committer = obj.committer || obj.author;
-    headers += `committer ${formatAuthor(committer)}
-`;
-    if (obj.gpgsig) {
-      headers += "gpgsig" + indent(obj.gpgsig);
-    }
-    return headers;
-  }
-  static render(obj) {
-    return _GitCommit.renderHeaders(obj) + "\n" + normalizeNewlines(obj.message);
-  }
-  render() {
-    return this._commit;
-  }
-  withoutSignature() {
-    const commit2 = normalizeNewlines(this._commit);
-    if (commit2.indexOf("\ngpgsig") === -1)
-      return commit2;
-    const headers = commit2.slice(0, commit2.indexOf("\ngpgsig"));
-    const message = commit2.slice(
-      commit2.indexOf("-----END PGP SIGNATURE-----\n") + "-----END PGP SIGNATURE-----\n".length
-    );
-    return normalizeNewlines(headers + "\n" + message);
-  }
-  isolateSignature() {
-    const signature = this._commit.slice(
-      this._commit.indexOf("-----BEGIN PGP SIGNATURE-----"),
-      this._commit.indexOf("-----END PGP SIGNATURE-----") + "-----END PGP SIGNATURE-----".length
-    );
-    return outdent(signature);
-  }
-  static async sign(commit2, sign, secretKey) {
-    const payload = commit2.withoutSignature();
-    const message = _GitCommit.justMessage(commit2._commit);
-    let { signature } = await sign({ payload, secretKey });
-    signature = normalizeNewlines(signature);
-    const headers = _GitCommit.justHeaders(commit2._commit);
-    const signedCommit = headers + "\ngpgsig" + indent(signature) + "\n" + message;
-    return _GitCommit.from(signedCommit);
-  }
-};
 async function resolveTree({ fs, cache, gitdir, oid }) {
   if (oid === "4b825dc642cb6eb9a060e54bf8d69288fbee4904") {
     return { tree: GitTree.from([]), oid };
@@ -10346,119 +7996,6 @@ async function resolveTree({ fs, cache, gitdir, oid }) {
   }
   return { tree: GitTree.from(object), oid };
 }
-var GitWalkerRepo = class {
-  constructor({ fs, gitdir, ref, cache }) {
-    this.fs = fs;
-    this.cache = cache;
-    this.gitdir = gitdir;
-    this.mapPromise = (async () => {
-      const map = /* @__PURE__ */ new Map();
-      let oid;
-      try {
-        oid = await GitRefManager.resolve({ fs, gitdir, ref });
-      } catch (e) {
-        if (e instanceof NotFoundError) {
-          oid = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
-        }
-      }
-      const tree = await resolveTree({ fs, cache: this.cache, gitdir, oid });
-      tree.type = "tree";
-      tree.mode = "40000";
-      map.set(".", tree);
-      return map;
-    })();
-    const walker = this;
-    this.ConstructEntry = class TreeEntry {
-      constructor(fullpath) {
-        this._fullpath = fullpath;
-        this._type = false;
-        this._mode = false;
-        this._stat = false;
-        this._content = false;
-        this._oid = false;
-      }
-      async type() {
-        return walker.type(this);
-      }
-      async mode() {
-        return walker.mode(this);
-      }
-      async stat() {
-        return walker.stat(this);
-      }
-      async content() {
-        return walker.content(this);
-      }
-      async oid() {
-        return walker.oid(this);
-      }
-    };
-  }
-  async readdir(entry) {
-    const filepath = entry._fullpath;
-    const { fs, cache, gitdir } = this;
-    const map = await this.mapPromise;
-    const obj = map.get(filepath);
-    if (!obj)
-      throw new Error(`No obj for ${filepath}`);
-    const oid = obj.oid;
-    if (!oid)
-      throw new Error(`No oid for obj ${JSON.stringify(obj)}`);
-    if (obj.type !== "tree") {
-      return null;
-    }
-    const { type, object } = await _readObject({ fs, cache, gitdir, oid });
-    if (type !== obj.type) {
-      throw new ObjectTypeError(oid, type, obj.type);
-    }
-    const tree = GitTree.from(object);
-    for (const entry2 of tree) {
-      map.set(join(filepath, entry2.path), entry2);
-    }
-    return tree.entries().map((entry2) => join(filepath, entry2.path));
-  }
-  async type(entry) {
-    if (entry._type === false) {
-      const map = await this.mapPromise;
-      const { type } = map.get(entry._fullpath);
-      entry._type = type;
-    }
-    return entry._type;
-  }
-  async mode(entry) {
-    if (entry._mode === false) {
-      const map = await this.mapPromise;
-      const { mode } = map.get(entry._fullpath);
-      entry._mode = normalizeMode(parseInt(mode, 8));
-    }
-    return entry._mode;
-  }
-  async stat(_entry) {
-  }
-  async content(entry) {
-    if (entry._content === false) {
-      const map = await this.mapPromise;
-      const { fs, cache, gitdir } = this;
-      const obj = map.get(entry._fullpath);
-      const oid = obj.oid;
-      const { type, object } = await _readObject({ fs, cache, gitdir, oid });
-      if (type !== "blob") {
-        entry._content = void 0;
-      } else {
-        entry._content = new Uint8Array(object);
-      }
-    }
-    return entry._content;
-  }
-  async oid(entry) {
-    if (entry._oid === false) {
-      const map = await this.mapPromise;
-      const obj = map.get(entry._fullpath);
-      entry._oid = obj.oid;
-    }
-    return entry._oid;
-  }
-};
 function TREE({ ref = "HEAD" } = {}) {
   const o = /* @__PURE__ */ Object.create(null);
   Object.defineProperty(o, GitWalkSymbol, {
@@ -10469,153 +8006,6 @@ function TREE({ ref = "HEAD" } = {}) {
   Object.freeze(o);
   return o;
 }
-var GitWalkerFs = class {
-  constructor({ fs, dir, gitdir, cache, refresh = true }) {
-    this.fs = fs;
-    this.cache = cache;
-    this.dir = dir;
-    this.gitdir = gitdir;
-    this.refresh = refresh;
-    this.config = null;
-    const walker = this;
-    this.ConstructEntry = class WorkdirEntry {
-      constructor(fullpath) {
-        this._fullpath = fullpath;
-        this._type = false;
-        this._mode = false;
-        this._stat = false;
-        this._content = false;
-        this._oid = false;
-      }
-      async type() {
-        return walker.type(this);
-      }
-      async mode() {
-        return walker.mode(this);
-      }
-      async stat() {
-        return walker.stat(this);
-      }
-      async content() {
-        return walker.content(this);
-      }
-      async oid() {
-        return walker.oid(this);
-      }
-    };
-  }
-  async readdir(entry) {
-    const filepath = entry._fullpath;
-    const { fs, dir } = this;
-    const names = await fs.readdir(join(dir, filepath));
-    if (names === null)
-      return null;
-    return names.map((name) => join(filepath, name));
-  }
-  async type(entry) {
-    if (entry._type === false) {
-      await entry.stat();
-    }
-    return entry._type;
-  }
-  async mode(entry) {
-    if (entry._mode === false) {
-      await entry.stat();
-    }
-    return entry._mode;
-  }
-  async stat(entry) {
-    if (entry._stat === false) {
-      const { fs, dir } = this;
-      let stat = await fs.lstat(`${dir}/${entry._fullpath}`);
-      if (!stat) {
-        throw new Error(
-          `ENOENT: no such file or directory, lstat '${entry._fullpath}'`
-        );
-      }
-      let type = stat.isDirectory() ? "tree" : "blob";
-      if (type === "blob" && !stat.isFile() && !stat.isSymbolicLink()) {
-        type = "special";
-      }
-      entry._type = type;
-      stat = normalizeStats(stat);
-      entry._mode = stat.mode;
-      if (stat.size === -1 && entry._actualSize) {
-        stat.size = entry._actualSize;
-      }
-      entry._stat = stat;
-    }
-    return entry._stat;
-  }
-  async content(entry) {
-    if (entry._content === false) {
-      const { fs, dir, gitdir } = this;
-      if (await entry.type() === "tree") {
-        entry._content = void 0;
-      } else {
-        let content;
-        if (await entry.mode() >> 12 === 10) {
-          content = await fs.readlink(`${dir}/${entry._fullpath}`);
-        } else {
-          const config = await this._getGitConfig(fs, gitdir);
-          const autocrlf = await config.get("core.autocrlf");
-          content = await fs.read(`${dir}/${entry._fullpath}`, { autocrlf });
-        }
-        entry._actualSize = content.length;
-        if (entry._stat && entry._stat.size === -1) {
-          entry._stat.size = entry._actualSize;
-        }
-        entry._content = new Uint8Array(content);
-      }
-    }
-    return entry._content;
-  }
-  async oid(entry) {
-    if (entry._oid === false) {
-      const self = this;
-      const { fs, gitdir, cache } = this;
-      let oid;
-      await GitIndexManager.acquire(
-        { fs, gitdir, cache },
-        async function(index) {
-          const stage = index.entriesMap.get(entry._fullpath);
-          const stats = await entry.stat();
-          const config = await self._getGitConfig(fs, gitdir);
-          const filemode = await config.get("core.filemode");
-          const trustino = typeof process !== "undefined" ? !(process.platform === "win32") : true;
-          if (!stage || compareStats(stats, stage, filemode, trustino)) {
-            const content = await entry.content();
-            if (content === void 0) {
-              oid = void 0;
-            } else {
-              oid = await shasum(
-                GitObject.wrap({ type: "blob", object: content })
-              );
-              if (self.refresh && stage && oid === stage.oid && (!filemode || stats.mode === stage.mode) && compareStats(stats, stage, filemode, trustino)) {
-                index.insert({
-                  filepath: entry._fullpath,
-                  stats,
-                  oid
-                });
-              }
-            }
-          } else {
-            oid = stage.oid;
-          }
-        }
-      );
-      entry._oid = oid;
-    }
-    return entry._oid;
-  }
-  async _getGitConfig(fs, gitdir) {
-    if (this.config) {
-      return this.config;
-    }
-    this.config = await GitConfigManager.get({ fs, gitdir });
-    return this.config;
-  }
-};
 function WORKDIR({ refresh = true } = {}) {
   const o = /* @__PURE__ */ Object.create(null);
   Object.defineProperty(o, GitWalkSymbol, {
@@ -10630,24 +8020,6 @@ function arrayRange(start, end) {
   const length = end - start;
   return Array.from({ length }, (_, i) => start + i);
 }
-var flat = typeof Array.prototype.flat === "undefined" ? (entries) => entries.reduce((acc, x) => acc.concat(x), []) : (entries) => entries.flat();
-var RunningMinimum = class {
-  constructor() {
-    this.value = null;
-  }
-  consider(value) {
-    if (value === null || value === void 0)
-      return;
-    if (this.value === null) {
-      this.value = value;
-    } else if (value < this.value) {
-      this.value = value;
-    }
-  }
-  reset() {
-    this.value = null;
-  }
-};
 function* unionOfIterators(sets) {
   const min = new RunningMinimum();
   let minimum;
@@ -10697,7 +8069,7 @@ async function _walk({
     return flatten;
   },
   // The default iterate function walks all children concurrently
-  iterate = (walk, children) => Promise.all([...children].map(walk))
+  iterate = (walk2, children) => Promise.all([...children].map(walk2))
 }) {
   const walkers = trees.map(
     (proxy) => proxy[GitWalkSymbol]({ fs, dir, gitdir, cache })
@@ -10723,17 +8095,17 @@ async function _walk({
       children: unionOfIterators(iterators)
     };
   };
-  const walk = async (root2) => {
+  const walk2 = async (root2) => {
     const { entries, children } = await unionWalkerFromReaddir(root2);
     const fullpath = entries.find((entry) => entry && entry._fullpath)._fullpath;
     const parent = await map(fullpath, entries);
     if (parent !== null) {
-      let walkedChildren = await iterate(walk, children);
+      let walkedChildren = await iterate(walk2, children);
       walkedChildren = walkedChildren.filter((x) => x !== void 0);
       return reduce(parent, walkedChildren);
     }
   };
-  return walk(root);
+  return walk2(root);
 }
 async function rmRecursive(fs, filepath) {
   const entries = await fs.readdir(filepath);
@@ -10773,18 +8145,6 @@ function isPromiseFs(fs) {
   };
   return isPromiseLike(test(fs));
 }
-var commands = [
-  "readFile",
-  "writeFile",
-  "mkdir",
-  "rmdir",
-  "unlink",
-  "stat",
-  "lstat",
-  "readdir",
-  "readlink",
-  "symlink"
-];
 function bindFs(target, fs) {
   if (isPromiseFs(fs)) {
     for (const command of commands) {
@@ -10815,229 +8175,6 @@ function bindFs(target, fs) {
       target._rm = rmRecursive.bind(null, target);
   }
 }
-var FileSystem = class {
-  /**
-   * Creates an instance of FileSystem.
-   *
-   * @param {Object} fs - A file system implementation to wrap.
-   */
-  constructor(fs) {
-    if (typeof fs._original_unwrapped_fs !== "undefined")
-      return fs;
-    const promises = Object.getOwnPropertyDescriptor(fs, "promises");
-    if (promises && promises.enumerable) {
-      bindFs(this, fs.promises);
-    } else {
-      bindFs(this, fs);
-    }
-    this._original_unwrapped_fs = fs;
-  }
-  /**
-   * Return true if a file exists, false if it doesn't exist.
-   * Rethrows errors that aren't related to file existence.
-   *
-   * @param {string} filepath - The path to the file.
-   * @param {Object} [options] - Additional options.
-   * @returns {Promise<boolean>} - `true` if the file exists, `false` otherwise.
-   */
-  async exists(filepath, options = {}) {
-    try {
-      await this._stat(filepath);
-      return true;
-    } catch (err) {
-      if (err.code === "ENOENT" || err.code === "ENOTDIR" || (err.code || "").includes("ENS")) {
-        return false;
-      } else {
-        console.log('Unhandled error in "FileSystem.exists()" function', err);
-        throw err;
-      }
-    }
-  }
-  /**
-   * Return the contents of a file if it exists, otherwise returns null.
-   *
-   * @param {string} filepath - The path to the file.
-   * @param {Object} [options] - Options for reading the file.
-   * @returns {Promise<Buffer|string|null>} - The file contents, or `null` if the file doesn't exist.
-   */
-  async read(filepath, options = {}) {
-    try {
-      let buffer = await this._readFile(filepath, options);
-      if (options.autocrlf === "true") {
-        try {
-          buffer = new TextDecoder("utf8", { fatal: true }).decode(buffer);
-          buffer = buffer.replace(/\r\n/g, "\n");
-          buffer = new TextEncoder().encode(buffer);
-        } catch (error) {
-        }
-      }
-      if (typeof buffer !== "string") {
-        buffer = Buffer.from(buffer);
-      }
-      return buffer;
-    } catch (err) {
-      return null;
-    }
-  }
-  /**
-   * Write a file (creating missing directories if need be) without throwing errors.
-   *
-   * @param {string} filepath - The path to the file.
-   * @param {Buffer|Uint8Array|string} contents - The data to write.
-   * @param {Object|string} [options] - Options for writing the file.
-   * @returns {Promise<void>}
-   */
-  async write(filepath, contents, options = {}) {
-    try {
-      await this._writeFile(filepath, contents, options);
-    } catch (err) {
-      await this.mkdir(dirname(filepath));
-      await this._writeFile(filepath, contents, options);
-    }
-  }
-  /**
-   * Make a directory (or series of nested directories) without throwing an error if it already exists.
-   *
-   * @param {string} filepath - The path to the directory.
-   * @param {boolean} [_selfCall=false] - Internal flag to prevent infinite recursion.
-   * @returns {Promise<void>}
-   */
-  async mkdir(filepath, _selfCall = false) {
-    try {
-      await this._mkdir(filepath);
-    } catch (err) {
-      if (err === null)
-        return;
-      if (err.code === "EEXIST")
-        return;
-      if (_selfCall)
-        throw err;
-      if (err.code === "ENOENT") {
-        const parent = dirname(filepath);
-        if (parent === "." || parent === "/" || parent === filepath)
-          throw err;
-        await this.mkdir(parent);
-        await this.mkdir(filepath, true);
-      }
-    }
-  }
-  /**
-   * Delete a file without throwing an error if it is already deleted.
-   *
-   * @param {string} filepath - The path to the file.
-   * @returns {Promise<void>}
-   */
-  async rm(filepath) {
-    try {
-      await this._unlink(filepath);
-    } catch (err) {
-      if (err.code !== "ENOENT")
-        throw err;
-    }
-  }
-  /**
-   * Delete a directory without throwing an error if it is already deleted.
-   *
-   * @param {string} filepath - The path to the directory.
-   * @param {Object} [opts] - Options for deleting the directory.
-   * @returns {Promise<void>}
-   */
-  async rmdir(filepath, opts) {
-    try {
-      if (opts && opts.recursive) {
-        await this._rm(filepath, opts);
-      } else {
-        await this._rmdir(filepath);
-      }
-    } catch (err) {
-      if (err.code !== "ENOENT")
-        throw err;
-    }
-  }
-  /**
-   * Read a directory without throwing an error is the directory doesn't exist
-   *
-   * @param {string} filepath - The path to the directory.
-   * @returns {Promise<string[]|null>} - An array of file names, or `null` if the path is not a directory.
-   */
-  async readdir(filepath) {
-    try {
-      const names = await this._readdir(filepath);
-      names.sort(compareStrings);
-      return names;
-    } catch (err) {
-      if (err.code === "ENOTDIR")
-        return null;
-      return [];
-    }
-  }
-  /**
-   * Return a flat list of all the files nested inside a directory
-   *
-   * Based on an elegant concurrent recursive solution from SO
-   * https://stackoverflow.com/a/45130990/2168416
-   *
-   * @param {string} dir - The directory to read.
-   * @returns {Promise<string[]>} - A flat list of all files in the directory.
-   */
-  async readdirDeep(dir) {
-    const subdirs = await this._readdir(dir);
-    const files = await Promise.all(
-      subdirs.map(async (subdir) => {
-        const res = dir + "/" + subdir;
-        return (await this._stat(res)).isDirectory() ? this.readdirDeep(res) : res;
-      })
-    );
-    return files.reduce((a, f) => a.concat(f), []);
-  }
-  /**
-   * Return the Stats of a file/symlink if it exists, otherwise returns null.
-   * Rethrows errors that aren't related to file existence.
-   *
-   * @param {string} filename - The path to the file or symlink.
-   * @returns {Promise<Object|null>} - The stats object, or `null` if the file doesn't exist.
-   */
-  async lstat(filename) {
-    try {
-      const stats = await this._lstat(filename);
-      return stats;
-    } catch (err) {
-      if (err.code === "ENOENT" || (err.code || "").includes("ENS")) {
-        return null;
-      }
-      throw err;
-    }
-  }
-  /**
-   * Reads the contents of a symlink if it exists, otherwise returns null.
-   * Rethrows errors that aren't related to file existence.
-   *
-   * @param {string} filename - The path to the symlink.
-   * @param {Object} [opts={ encoding: 'buffer' }] - Options for reading the symlink.
-   * @returns {Promise<Buffer|null>} - The symlink target, or `null` if it doesn't exist.
-   */
-  async readlink(filename, opts = { encoding: "buffer" }) {
-    try {
-      const link = await this._readlink(filename, opts);
-      return Buffer.isBuffer(link) ? link : Buffer.from(link);
-    } catch (err) {
-      if (err.code === "ENOENT" || (err.code || "").includes("ENS")) {
-        return null;
-      }
-      throw err;
-    }
-  }
-  /**
-   * Write the contents of buffer to a symlink.
-   *
-   * @param {string} filename - The path to the symlink.
-   * @param {Buffer} buffer - The symlink target.
-   * @returns {Promise<void>}
-   */
-  async writelink(filename, buffer) {
-    return this._symlink(buffer.toString("utf8"), filename);
-  }
-};
 function assertParameter(name, value) {
   if (value === void 0) {
     throw new MissingParameterError(name);
@@ -11064,65 +8201,97 @@ async function discoverGitdir({ fsp, dotgit }) {
     return dotgit;
   }
 }
-var GitIgnoreManager = class {
-  /**
-   * Determines whether a given file is ignored based on `.gitignore` rules and exclusion files.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} args.dir - The working directory.
-   * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {string} args.filepath - The path of the file to check.
-   * @returns {Promise<boolean>} - `true` if the file is ignored, `false` otherwise.
-   */
-  static async isIgnored({ fs, dir, gitdir = join(dir, ".git"), filepath }) {
-    if (basename(filepath) === ".git")
-      return true;
-    if (filepath === ".")
-      return false;
-    let excludes = "";
-    const excludesFile = join(gitdir, "info", "exclude");
-    if (await fs.exists(excludesFile)) {
-      excludes = await fs.read(excludesFile, "utf8");
-    }
-    const pairs = [
-      {
-        gitignore: join(dir, ".gitignore"),
-        filepath
-      }
-    ];
-    const pieces = filepath.split("/").filter(Boolean);
-    for (let i = 1; i < pieces.length; i++) {
-      const folder = pieces.slice(0, i).join("/");
-      const file = pieces.slice(i).join("/");
-      pairs.push({
-        gitignore: join(dir, folder, ".gitignore"),
-        filepath: file
-      });
-    }
-    let ignoredStatus = false;
-    for (const p of pairs) {
-      let file;
-      try {
-        file = await fs.read(p.gitignore, "utf8");
-      } catch (err) {
-        if (err.code === "NOENT")
-          continue;
-      }
-      const ign = (0, import_ignore.default)().add(excludes);
-      ign.add(file);
-      const parentdir = dirname(p.filepath);
-      if (parentdir !== "." && ign.ignores(parentdir))
-        return true;
-      if (ignoredStatus) {
-        ignoredStatus = !ign.test(p.filepath).unignored;
-      } else {
-        ignoredStatus = ign.test(p.filepath).ignored;
-      }
-    }
-    return ignoredStatus;
+async function modified(entry, base) {
+  if (!entry && !base)
+    return false;
+  if (entry && !base)
+    return true;
+  if (!entry && base)
+    return true;
+  if (await entry.type() === "tree" && await base.type() === "tree") {
+    return false;
   }
-};
+  if (await entry.type() === await base.type() && await entry.mode() === await base.mode() && await entry.oid() === await base.oid()) {
+    return false;
+  }
+  return true;
+}
+async function abortMerge({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  commit: commit2 = "HEAD",
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("dir", dir);
+    assertParameter("gitdir", gitdir);
+    const fs = new FileSystem(_fs);
+    const trees = [TREE({ ref: commit2 }), WORKDIR(), STAGE()];
+    let unmergedPaths = [];
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        unmergedPaths = index2.unmergedPaths;
+      }
+    );
+    const results = await _walk({
+      fs,
+      cache,
+      dir,
+      gitdir: updatedGitdir,
+      trees,
+      map: async function(path, [head, workdir, index2]) {
+        const staged = !await modified(workdir, index2);
+        const unmerged = unmergedPaths.includes(path);
+        const unmodified = !await modified(index2, head);
+        if (staged || unmerged) {
+          return head ? {
+            path,
+            mode: await head.mode(),
+            oid: await head.oid(),
+            type: await head.type(),
+            content: await head.content()
+          } : void 0;
+        }
+        if (unmodified)
+          return false;
+        else
+          throw new IndexResetError(path);
+      }
+    });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        for (const entry of results) {
+          if (entry === false)
+            continue;
+          if (!entry) {
+            await fs.rmdir(`${dir}/${entry.path}`, { recursive: true });
+            index2.delete({ filepath: entry.path });
+            continue;
+          }
+          if (entry.type === "blob") {
+            const content = new TextDecoder().decode(entry.content);
+            await fs.write(`${dir}/${entry.path}`, content, {
+              mode: entry.mode
+            });
+            index2.insert({
+              filepath: entry.path,
+              oid: entry.oid,
+              stage: 0
+            });
+          }
+        }
+      }
+    );
+  } catch (err) {
+    err.caller = "git.abortMerge";
+    throw err;
+  }
+}
 async function writeObjectLoose({ fs, gitdir, object, format, oid }) {
   if (format !== "deflated") {
     throw new InternalError(
@@ -11134,7 +8303,6 @@ async function writeObjectLoose({ fs, gitdir, object, format, oid }) {
   if (!await fs.exists(filepath))
     await fs.write(filepath, object);
 }
-var supportsCompressionStream = null;
 async function deflate(buffer) {
   if (supportsCompressionStream === null) {
     supportsCompressionStream = testCompressionStream();
@@ -11202,7 +8370,7 @@ async function add({
     const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     await GitIndexManager.acquire(
       { fs, gitdir: updatedGitdir, cache },
-      async (index) => {
+      async (index2) => {
         const config = await GitConfigManager.get({ fs, gitdir: updatedGitdir });
         const autocrlf = await config.get("core.autocrlf");
         return addToIndex({
@@ -11210,7 +8378,7 @@ async function add({
           gitdir: updatedGitdir,
           fs,
           filepath,
-          index,
+          index: index2,
           force,
           parallel,
           autocrlf
@@ -11227,7 +8395,7 @@ async function addToIndex({
   gitdir,
   fs,
   filepath,
-  index,
+  index: index2,
   force,
   parallel,
   autocrlf
@@ -11256,7 +8424,7 @@ async function addToIndex({
             gitdir,
             fs,
             filepath: [join(currentFilepath, child)],
-            index,
+            index: index2,
             force,
             parallel,
             autocrlf
@@ -11270,7 +8438,7 @@ async function addToIndex({
             gitdir,
             fs,
             filepath: [join(currentFilepath, child)],
-            index,
+            index: index2,
             force,
             parallel,
             autocrlf
@@ -11282,7 +8450,7 @@ async function addToIndex({
       if (object === null)
         throw new NotFoundError(currentFilepath);
       const oid = await _writeObject({ fs, gitdir, type: "blob", object });
-      index.insert({ filepath: currentFilepath, stats, oid });
+      index2.insert({ filepath: currentFilepath, stats, oid });
     }
   });
   const settledPromises = await Promise.allSettled(promises);
@@ -11451,8 +8619,8 @@ async function _commit({
     throw new MissingNameError("committer");
   return GitIndexManager.acquire(
     { fs, gitdir, cache, allowUnmerged: false },
-    async function(index) {
-      const inodes = flatFileListToDirectoryStructure(index.entries);
+    async function(index2) {
+      const inodes = flatFileListToDirectoryStructure(index2.entries);
       const inode = inodes.get(".");
       if (!tree) {
         tree = await constructTree({ fs, gitdir, inode, dryRun });
@@ -11594,69 +8762,2328 @@ async function _resolveFilepath({
   }
   throw new NotFoundError(`file or directory found at "${oid}:${filepath}"`);
 }
-var worthWalking = (filepath, root) => {
-  if (filepath === "." || root == null || root.length === 0 || root === ".") {
-    return true;
+async function _readTree({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  filepath = void 0
+}) {
+  if (filepath !== void 0) {
+    oid = await resolveFilepath({ fs, cache, gitdir, oid, filepath });
   }
-  if (root.length >= filepath.length) {
-    return root.startsWith(filepath);
+  const { tree, oid: treeOid } = await resolveTree({ fs, cache, gitdir, oid });
+  const result = {
+    oid: treeOid,
+    tree: tree.entries()
+  };
+  return result;
+}
+async function _writeTree({ fs, gitdir, tree }) {
+  const object = GitTree.from(tree).toObject();
+  const oid = await _writeObject({
+    fs,
+    gitdir,
+    type: "tree",
+    object,
+    format: "content"
+  });
+  return oid;
+}
+async function _addNote({
+  fs,
+  cache,
+  onSign,
+  gitdir,
+  ref,
+  oid,
+  note,
+  force,
+  author,
+  committer,
+  signingKey
+}) {
+  let parent;
+  try {
+    parent = await GitRefManager.resolve({ gitdir, fs, ref });
+  } catch (err) {
+    if (!(err instanceof NotFoundError)) {
+      throw err;
+    }
+  }
+  const result = await _readTree({
+    fs,
+    cache,
+    gitdir,
+    oid: parent || "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+  });
+  let tree = result.tree;
+  if (force) {
+    tree = tree.filter((entry) => entry.path !== oid);
   } else {
-    return filepath.startsWith(root);
+    for (const entry of tree) {
+      if (entry.path === oid) {
+        throw new AlreadyExistsError("note", oid);
+      }
+    }
   }
-};
-var lock$3 = null;
-var GitShallowManager = class {
-  /**
-   * Reads the `shallow` file in the Git repository and returns a set of object IDs (OIDs).
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @returns {Promise<Set<string>>} - A set of shallow object IDs.
-   */
-  static async read({ fs, gitdir }) {
-    if (lock$3 === null)
-      lock$3 = new import_async_lock.default();
-    const filepath = join(gitdir, "shallow");
-    const oids = /* @__PURE__ */ new Set();
-    await lock$3.acquire(filepath, async function() {
-      const text = await fs.read(filepath, { encoding: "utf8" });
-      if (text === null)
-        return oids;
-      if (text.trim() === "")
-        return oids;
-      text.trim().split("\n").map((oid) => oids.add(oid));
+  if (typeof note === "string") {
+    note = Buffer.from(note, "utf8");
+  }
+  const noteOid = await _writeObject({
+    fs,
+    gitdir,
+    type: "blob",
+    object: note,
+    format: "content"
+  });
+  tree.push({ mode: "100644", path: oid, oid: noteOid, type: "blob" });
+  const treeOid = await _writeTree({
+    fs,
+    gitdir,
+    tree
+  });
+  const commitOid = await _commit({
+    fs,
+    cache,
+    onSign,
+    gitdir,
+    ref,
+    tree: treeOid,
+    parent: parent && [parent],
+    message: `Note added by 'isomorphic-git addNote'
+`,
+    author,
+    committer,
+    signingKey
+  });
+  return commitOid;
+}
+async function addNote({
+  fs: _fs,
+  onSign,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref = "refs/notes/commits",
+  oid,
+  note,
+  force,
+  author: _author,
+  committer: _committer,
+  signingKey,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    assertParameter("note", note);
+    if (signingKey) {
+      assertParameter("onSign", onSign);
+    }
+    const fs = new FileSystem(_fs);
+    const author = await normalizeAuthorObject({ fs, gitdir, author: _author });
+    if (!author)
+      throw new MissingNameError("author");
+    const committer = await normalizeCommitterObject({
+      fs,
+      gitdir,
+      author,
+      committer: _committer
     });
-    return oids;
+    if (!committer)
+      throw new MissingNameError("committer");
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    return await _addNote({
+      fs,
+      cache,
+      onSign,
+      gitdir: updatedGitdir,
+      ref,
+      oid,
+      note,
+      force,
+      author,
+      committer,
+      signingKey
+    });
+  } catch (err) {
+    err.caller = "git.addNote";
+    throw err;
   }
-  /**
-   * Writes a set of object IDs (OIDs) to the `shallow` file in the Git repository.
-   * If the set is empty, the `shallow` file is removed.
-   *
-   * @param {Object} args
-   * @param {FSClient} args.fs - A file system implementation.
-   * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
-   * @param {Set<string>} args.oids - A set of shallow object IDs to write.
-   * @returns {Promise<void>}
-   */
-  static async write({ fs, gitdir, oids }) {
-    if (lock$3 === null)
-      lock$3 = new import_async_lock.default();
-    const filepath = join(gitdir, "shallow");
-    if (oids.size > 0) {
-      const text = [...oids].join("\n") + "\n";
-      await lock$3.acquire(filepath, async function() {
-        await fs.write(filepath, text, {
-          encoding: "utf8"
-        });
+}
+function isValidRef(name, onelevel) {
+  if (typeof name !== "string")
+    throw new TypeError("Reference name must be a string");
+  return !bad.test(name) && (!!onelevel || name.includes("/"));
+}
+async function _addRemote({ fs, gitdir, remote, url, force }) {
+  if (!isValidRef(remote, true)) {
+    throw new InvalidRefNameError(remote, import_clean_git_ref.default.clean(remote));
+  }
+  const config = await GitConfigManager.get({ fs, gitdir });
+  if (!force) {
+    const remoteNames = await config.getSubsections("remote");
+    if (remoteNames.includes(remote)) {
+      if (url !== await config.get(`remote.${remote}.url`)) {
+        throw new AlreadyExistsError("remote", remote);
+      }
+    }
+  }
+  await config.set(`remote.${remote}.url`, url);
+  await config.set(
+    `remote.${remote}.fetch`,
+    `+refs/heads/*:refs/remotes/${remote}/*`
+  );
+  await GitConfigManager.save({ fs, gitdir, config });
+}
+async function addRemote({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  remote,
+  url,
+  force = false
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("remote", remote);
+    assertParameter("url", url);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _addRemote({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      remote,
+      url,
+      force
+    });
+  } catch (err) {
+    err.caller = "git.addRemote";
+    throw err;
+  }
+}
+async function _annotatedTag({
+  fs,
+  cache,
+  onSign,
+  gitdir,
+  ref,
+  tagger,
+  message = ref,
+  gpgsig,
+  object,
+  signingKey,
+  force = false
+}) {
+  ref = ref.startsWith("refs/tags/") ? ref : `refs/tags/${ref}`;
+  if (!force && await GitRefManager.exists({ fs, gitdir, ref })) {
+    throw new AlreadyExistsError("tag", ref);
+  }
+  const oid = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: object || "HEAD"
+  });
+  const { type } = await _readObject({ fs, cache, gitdir, oid });
+  let tagObject = GitAnnotatedTag.from({
+    object: oid,
+    type,
+    tag: ref.replace("refs/tags/", ""),
+    tagger,
+    message,
+    gpgsig
+  });
+  if (signingKey) {
+    tagObject = await GitAnnotatedTag.sign(tagObject, onSign, signingKey);
+  }
+  const value = await _writeObject({
+    fs,
+    gitdir,
+    type: "tag",
+    object: tagObject.toObject()
+  });
+  await GitRefManager.writeRef({ fs, gitdir, ref, value });
+}
+async function annotatedTag({
+  fs: _fs,
+  onSign,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  tagger: _tagger,
+  message = ref,
+  gpgsig,
+  object,
+  signingKey,
+  force = false,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    if (signingKey) {
+      assertParameter("onSign", onSign);
+    }
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const tagger = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _tagger
+    });
+    if (!tagger)
+      throw new MissingNameError("tagger");
+    return await _annotatedTag({
+      fs,
+      cache,
+      onSign,
+      gitdir: updatedGitdir,
+      ref,
+      tagger,
+      message,
+      gpgsig,
+      object,
+      signingKey,
+      force
+    });
+  } catch (err) {
+    err.caller = "git.annotatedTag";
+    throw err;
+  }
+}
+async function _branch({
+  fs,
+  gitdir,
+  ref,
+  object,
+  checkout: checkout2 = false,
+  force = false
+}) {
+  if (!isValidRef(ref, true)) {
+    throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
+  }
+  const fullref = `refs/heads/${ref}`;
+  if (!force) {
+    const exist = await GitRefManager.exists({ fs, gitdir, ref: fullref });
+    if (exist) {
+      throw new AlreadyExistsError("branch", ref, false);
+    }
+  }
+  let oid;
+  try {
+    oid = await GitRefManager.resolve({ fs, gitdir, ref: object || "HEAD" });
+  } catch (e) {
+  }
+  if (oid) {
+    await GitRefManager.writeRef({ fs, gitdir, ref: fullref, value: oid });
+  }
+  if (checkout2) {
+    await GitRefManager.writeSymbolicRef({
+      fs,
+      gitdir,
+      ref: "HEAD",
+      value: fullref
+    });
+  }
+}
+async function branch({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  object,
+  checkout: checkout2 = false,
+  force = false
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _branch({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref,
+      object,
+      checkout: checkout2,
+      force
+    });
+  } catch (err) {
+    err.caller = "git.branch";
+    throw err;
+  }
+}
+async function _checkout({
+  fs,
+  cache,
+  onProgress,
+  onPostCheckout,
+  dir,
+  gitdir,
+  remote,
+  ref,
+  filepaths,
+  noCheckout,
+  noUpdateHead,
+  dryRun,
+  force,
+  track = true,
+  nonBlocking = false,
+  batchSize = 100
+}) {
+  let oldOid;
+  if (onPostCheckout) {
+    try {
+      oldOid = await GitRefManager.resolve({ fs, gitdir, ref: "HEAD" });
+    } catch (err) {
+      oldOid = "0000000000000000000000000000000000000000";
+    }
+  }
+  let oid;
+  try {
+    oid = await GitRefManager.resolve({ fs, gitdir, ref });
+  } catch (err) {
+    if (ref === "HEAD")
+      throw err;
+    const remoteRef = `${remote}/${ref}`;
+    oid = await GitRefManager.resolve({
+      fs,
+      gitdir,
+      ref: remoteRef
+    });
+    if (track) {
+      const config = await GitConfigManager.get({ fs, gitdir });
+      await config.set(`branch.${ref}.remote`, remote);
+      await config.set(`branch.${ref}.merge`, `refs/heads/${ref}`);
+      await GitConfigManager.save({ fs, gitdir, config });
+    }
+    await GitRefManager.writeRef({
+      fs,
+      gitdir,
+      ref: `refs/heads/${ref}`,
+      value: oid
+    });
+  }
+  if (!noCheckout) {
+    let ops;
+    try {
+      ops = await analyze({
+        fs,
+        cache,
+        onProgress,
+        dir,
+        gitdir,
+        ref,
+        force,
+        filepaths
       });
+    } catch (err) {
+      if (err instanceof NotFoundError && err.data.what === oid) {
+        throw new CommitNotFetchedError(ref, oid);
+      } else {
+        throw err;
+      }
+    }
+    const conflicts = ops.filter(([method]) => method === "conflict").map(([method, fullpath]) => fullpath);
+    if (conflicts.length > 0) {
+      throw new CheckoutConflictError(conflicts);
+    }
+    const errors = ops.filter(([method]) => method === "error").map(([method, fullpath]) => fullpath);
+    if (errors.length > 0) {
+      throw new InternalError(errors.join(", "));
+    }
+    if (dryRun) {
+      if (onPostCheckout) {
+        await onPostCheckout({
+          previousHead: oldOid,
+          newHead: oid,
+          type: filepaths != null && filepaths.length > 0 ? "file" : "branch"
+        });
+      }
+      return;
+    }
+    let count = 0;
+    const total = ops.length;
+    await GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        await Promise.all(
+          ops.filter(
+            ([method]) => method === "delete" || method === "delete-index"
+          ).map(async function([method, fullpath]) {
+            const filepath = `${dir}/${fullpath}`;
+            if (method === "delete") {
+              await fs.rm(filepath);
+            }
+            index2.delete({ filepath: fullpath });
+            if (onProgress) {
+              await onProgress({
+                phase: "Updating workdir",
+                loaded: ++count,
+                total
+              });
+            }
+          })
+        );
+      }
+    );
+    await GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        for (const [method, fullpath] of ops) {
+          if (method === "rmdir" || method === "rmdir-index") {
+            const filepath = `${dir}/${fullpath}`;
+            try {
+              if (method === "rmdir") {
+                await fs.rmdir(filepath);
+              }
+              index2.delete({ filepath: fullpath });
+              if (onProgress) {
+                await onProgress({
+                  phase: "Updating workdir",
+                  loaded: ++count,
+                  total
+                });
+              }
+            } catch (e) {
+              if (e.code === "ENOTEMPTY") {
+                console.log(
+                  `Did not delete ${fullpath} because directory is not empty`
+                );
+              } else {
+                throw e;
+              }
+            }
+          }
+        }
+      }
+    );
+    await Promise.all(
+      ops.filter(([method]) => method === "mkdir" || method === "mkdir-index").map(async function([_, fullpath]) {
+        const filepath = `${dir}/${fullpath}`;
+        await fs.mkdir(filepath);
+        if (onProgress) {
+          await onProgress({
+            phase: "Updating workdir",
+            loaded: ++count,
+            total
+          });
+        }
+      })
+    );
+    if (nonBlocking) {
+      const eligibleOps = ops.filter(
+        ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
+      );
+      const updateWorkingDirResults = await batchAllSettled(
+        "Update Working Dir",
+        eligibleOps.map(
+          ([method, fullpath, oid2, mode, chmod]) => () => updateWorkingDir({ fs, cache, gitdir, dir }, [
+            method,
+            fullpath,
+            oid2,
+            mode,
+            chmod
+          ])
+        ),
+        onProgress,
+        batchSize
+      );
+      await GitIndexManager.acquire(
+        { fs, gitdir, cache, allowUnmerged: true },
+        async function(index2) {
+          await batchAllSettled(
+            "Update Index",
+            updateWorkingDirResults.map(
+              ([fullpath, oid2, stats]) => () => updateIndex({ index: index2, fullpath, oid: oid2, stats })
+            ),
+            onProgress,
+            batchSize
+          );
+        }
+      );
     } else {
-      await lock$3.acquire(filepath, async function() {
-        await fs.rm(filepath);
+      await GitIndexManager.acquire(
+        { fs, gitdir, cache, allowUnmerged: true },
+        async function(index2) {
+          var _a, _b;
+          const settled = await Promise.allSettled(
+            ops.filter(
+              ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
+            ).map(async function([method, fullpath, oid2, mode, chmod]) {
+              const filepath = `${dir}/${fullpath}`;
+              if (method !== "create-index" && method !== "mkdir-index") {
+                const { object } = await _readObject({
+                  fs,
+                  cache,
+                  gitdir,
+                  oid: oid2
+                });
+                if (chmod) {
+                  await fs.rm(filepath);
+                }
+                if (mode === 33188) {
+                  await fs.write(filepath, object);
+                } else if (mode === 33261) {
+                  await fs.write(filepath, object, { mode: 511 });
+                } else if (mode === 40960) {
+                  await fs.writelink(filepath, object);
+                } else {
+                  throw new InternalError(
+                    `Invalid mode 0o${mode.toString(
+                      8
+                    )} detected in blob ${oid2}`
+                  );
+                }
+              }
+              const stats = await fs.lstat(filepath);
+              if (mode === 33261) {
+                stats.mode = 493;
+              }
+              if (method === "mkdir-index") {
+                stats.mode = 57344;
+              }
+              index2.insert({
+                filepath: fullpath,
+                stats,
+                oid: oid2
+              });
+              if (onProgress) {
+                await onProgress({
+                  phase: "Updating workdir",
+                  loaded: ++count,
+                  total
+                });
+              }
+            })
+          );
+          const rejections = [];
+          for (const result of settled) {
+            if (result.status === "rejected") {
+              rejections.push(result.reason);
+              console.error(
+                "[isomorphic-git checkout] task rejected:",
+                (_b = (_a = result.reason) == null ? void 0 : _a.stack) != null ? _b : result.reason
+              );
+            }
+          }
+          if (rejections.length > 0) {
+            throw new MultipleGitError(rejections);
+          }
+        }
+      );
+    }
+    if (onPostCheckout) {
+      await onPostCheckout({
+        previousHead: oldOid,
+        newHead: oid,
+        type: filepaths != null && filepaths.length > 0 ? "file" : "branch"
       });
     }
   }
-};
+  if (!noUpdateHead) {
+    const fullRef = await GitRefManager.expand({ fs, gitdir, ref });
+    if (fullRef.startsWith("refs/heads")) {
+      await GitRefManager.writeSymbolicRef({
+        fs,
+        gitdir,
+        ref: "HEAD",
+        value: fullRef
+      });
+    } else {
+      await GitRefManager.writeRef({ fs, gitdir, ref: "HEAD", value: oid });
+    }
+  }
+}
+async function analyze({
+  fs,
+  cache,
+  onProgress,
+  dir,
+  gitdir,
+  ref,
+  force,
+  filepaths
+}) {
+  let count = 0;
+  return _walk({
+    fs,
+    cache,
+    dir,
+    gitdir,
+    trees: [TREE({ ref }), WORKDIR(), STAGE()],
+    map: async function(fullpath, [commit2, workdir, stage]) {
+      if (fullpath === ".")
+        return;
+      if (filepaths && !filepaths.some((base) => worthWalking(fullpath, base))) {
+        return null;
+      }
+      if (onProgress) {
+        await onProgress({ phase: "Analyzing workdir", loaded: ++count });
+      }
+      const key = [!!stage, !!commit2, !!workdir].map(Number).join("");
+      switch (key) {
+        case "000":
+          return;
+        case "001":
+          if (force && filepaths && filepaths.includes(fullpath)) {
+            return ["delete", fullpath];
+          }
+          return;
+        case "010": {
+          switch (await commit2.type()) {
+            case "tree": {
+              return ["mkdir", fullpath];
+            }
+            case "blob": {
+              return [
+                "create",
+                fullpath,
+                await commit2.oid(),
+                await commit2.mode()
+              ];
+            }
+            case "commit": {
+              return [
+                "mkdir-index",
+                fullpath,
+                await commit2.oid(),
+                await commit2.mode()
+              ];
+            }
+            default: {
+              return [
+                "error",
+                `new entry Unhandled type ${await commit2.type()}`
+              ];
+            }
+          }
+        }
+        case "011": {
+          switch (`${await commit2.type()}-${await workdir.type()}`) {
+            case "tree-tree": {
+              return;
+            }
+            case "tree-blob":
+            case "blob-tree": {
+              return ["conflict", fullpath];
+            }
+            case "blob-blob": {
+              if (await commit2.oid() !== await workdir.oid()) {
+                if (force) {
+                  return [
+                    "update",
+                    fullpath,
+                    await commit2.oid(),
+                    await commit2.mode(),
+                    await commit2.mode() !== await workdir.mode()
+                  ];
+                } else {
+                  return ["conflict", fullpath];
+                }
+              } else {
+                if (await commit2.mode() !== await workdir.mode()) {
+                  if (force) {
+                    return [
+                      "update",
+                      fullpath,
+                      await commit2.oid(),
+                      await commit2.mode(),
+                      true
+                    ];
+                  } else {
+                    return ["conflict", fullpath];
+                  }
+                } else {
+                  return [
+                    "create-index",
+                    fullpath,
+                    await commit2.oid(),
+                    await commit2.mode()
+                  ];
+                }
+              }
+            }
+            case "commit-tree": {
+              return;
+            }
+            case "commit-blob": {
+              return ["conflict", fullpath];
+            }
+            default: {
+              return ["error", `new entry Unhandled type ${commit2.type}`];
+            }
+          }
+        }
+        case "100": {
+          return ["delete-index", fullpath];
+        }
+        case "101": {
+          switch (await stage.type()) {
+            case "tree": {
+              return ["rmdir-index", fullpath];
+            }
+            case "blob": {
+              if (await stage.oid() !== await workdir.oid()) {
+                if (force) {
+                  return ["delete", fullpath];
+                } else {
+                  return ["conflict", fullpath];
+                }
+              } else {
+                return ["delete", fullpath];
+              }
+            }
+            case "commit": {
+              return ["rmdir-index", fullpath];
+            }
+            default: {
+              return [
+                "error",
+                `delete entry Unhandled type ${await stage.type()}`
+              ];
+            }
+          }
+        }
+        case "110":
+        case "111": {
+          switch (`${await stage.type()}-${await commit2.type()}`) {
+            case "tree-tree": {
+              return;
+            }
+            case "blob-blob": {
+              if (await stage.oid() === await commit2.oid() && await stage.mode() === await commit2.mode() && !force) {
+                return;
+              }
+              if (workdir) {
+                if (await workdir.oid() !== await stage.oid() && await workdir.oid() !== await commit2.oid()) {
+                  if (force) {
+                    return [
+                      "update",
+                      fullpath,
+                      await commit2.oid(),
+                      await commit2.mode(),
+                      await commit2.mode() !== await workdir.mode()
+                    ];
+                  } else {
+                    return ["conflict", fullpath];
+                  }
+                }
+              } else if (force) {
+                return [
+                  "update",
+                  fullpath,
+                  await commit2.oid(),
+                  await commit2.mode(),
+                  await commit2.mode() !== await stage.mode()
+                ];
+              }
+              if (await commit2.mode() !== await stage.mode()) {
+                return [
+                  "update",
+                  fullpath,
+                  await commit2.oid(),
+                  await commit2.mode(),
+                  true
+                ];
+              }
+              if (await commit2.oid() !== await stage.oid()) {
+                return [
+                  "update",
+                  fullpath,
+                  await commit2.oid(),
+                  await commit2.mode(),
+                  false
+                ];
+              } else {
+                return;
+              }
+            }
+            case "tree-blob": {
+              return ["update-dir-to-blob", fullpath, await commit2.oid()];
+            }
+            case "blob-tree": {
+              return ["update-blob-to-tree", fullpath];
+            }
+            case "commit-commit": {
+              return [
+                "mkdir-index",
+                fullpath,
+                await commit2.oid(),
+                await commit2.mode()
+              ];
+            }
+            default: {
+              return [
+                "error",
+                `update entry Unhandled type ${await stage.type()}-${await commit2.type()}`
+              ];
+            }
+          }
+        }
+      }
+    },
+    // Modify the default flat mapping
+    reduce: async function(parent, children) {
+      children = flat(children);
+      if (!parent) {
+        return children;
+      } else if (parent && parent[0] === "rmdir") {
+        children.push(parent);
+        return children;
+      } else {
+        children.unshift(parent);
+        return children;
+      }
+    }
+  });
+}
+async function updateIndex({ index: index2, fullpath, stats, oid }) {
+  try {
+    index2.insert({
+      filepath: fullpath,
+      stats,
+      oid
+    });
+  } catch (e) {
+    console.warn(`Error inserting ${fullpath} into index:`, e);
+  }
+}
+async function updateWorkingDir({ fs, cache, gitdir, dir }, [method, fullpath, oid, mode, chmod]) {
+  const filepath = `${dir}/${fullpath}`;
+  if (method !== "create-index" && method !== "mkdir-index") {
+    const { object } = await _readObject({ fs, cache, gitdir, oid });
+    if (chmod) {
+      await fs.rm(filepath);
+    }
+    if (mode === 33188) {
+      await fs.write(filepath, object);
+    } else if (mode === 33261) {
+      await fs.write(filepath, object, { mode: 511 });
+    } else if (mode === 40960) {
+      await fs.writelink(filepath, object);
+    } else {
+      throw new InternalError(
+        `Invalid mode 0o${mode.toString(8)} detected in blob ${oid}`
+      );
+    }
+  }
+  const stats = await fs.lstat(filepath);
+  if (mode === 33261) {
+    stats.mode = 493;
+  }
+  if (method === "mkdir-index") {
+    stats.mode = 57344;
+  }
+  return [fullpath, oid, stats];
+}
+async function batchAllSettled(operationName, tasks, onProgress, batchSize) {
+  const results = [];
+  const rejections = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize).map((task) => task());
+    const batchResults = await Promise.allSettled(batch);
+    batchResults.forEach((result) => {
+      var _a, _b;
+      if (result.status === "fulfilled") {
+        results.push(result.value);
+      } else {
+        rejections.push(result.reason);
+        console.error(
+          `[isomorphic-git ${operationName}] task rejected:`,
+          (_b = (_a = result.reason) == null ? void 0 : _a.stack) != null ? _b : result.reason
+        );
+      }
+    });
+    if (onProgress) {
+      await onProgress({
+        phase: "Updating workdir",
+        loaded: i + batch.length,
+        total: tasks.length
+      });
+    }
+  }
+  if (rejections.length > 0) {
+    throw new MultipleGitError(rejections);
+  }
+  return results;
+}
+async function checkout({
+  fs,
+  onProgress,
+  onPostCheckout,
+  dir,
+  gitdir = join(dir, ".git"),
+  remote = "origin",
+  ref: _ref,
+  filepaths,
+  noCheckout = false,
+  noUpdateHead = _ref === void 0,
+  dryRun = false,
+  force = false,
+  track = true,
+  cache = {},
+  nonBlocking = false,
+  batchSize = 100
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("dir", dir);
+    assertParameter("gitdir", gitdir);
+    const ref = _ref || "HEAD";
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _checkout({
+      fs: fsp,
+      cache,
+      onProgress,
+      onPostCheckout,
+      dir,
+      gitdir: updatedGitdir,
+      remote,
+      ref,
+      filepaths,
+      noCheckout,
+      noUpdateHead,
+      dryRun,
+      force,
+      track,
+      nonBlocking,
+      batchSize
+    });
+  } catch (err) {
+    err.caller = "git.checkout";
+    throw err;
+  }
+}
+function mergeFile({ branches, contents }) {
+  const ourName = branches[1];
+  const theirName = branches[2];
+  const baseContent = contents[0];
+  const ourContent = contents[1];
+  const theirContent = contents[2];
+  const ours = ourContent.match(LINEBREAKS);
+  const base = baseContent.match(LINEBREAKS);
+  const theirs = theirContent.match(LINEBREAKS);
+  const result = (0, import_diff3.default)(ours, base, theirs);
+  const markerSize = 7;
+  let mergedText = "";
+  let cleanMerge = true;
+  for (const item of result) {
+    if (item.ok) {
+      mergedText += item.ok.join("");
+    }
+    if (item.conflict) {
+      cleanMerge = false;
+      mergedText += `${"<".repeat(markerSize)} ${ourName}
+`;
+      mergedText += item.conflict.a.join("");
+      mergedText += `${"=".repeat(markerSize)}
+`;
+      mergedText += item.conflict.b.join("");
+      mergedText += `${">".repeat(markerSize)} ${theirName}
+`;
+    }
+  }
+  return { cleanMerge, mergedText };
+}
+async function mergeTree({
+  fs,
+  cache,
+  dir,
+  gitdir = join(dir, ".git"),
+  index: index2,
+  ourOid,
+  baseOid,
+  theirOid,
+  ourName = "ours",
+  baseName = "base",
+  theirName = "theirs",
+  dryRun = false,
+  abortOnConflict = true,
+  mergeDriver
+}) {
+  const ourTree = TREE({ ref: ourOid });
+  const baseTree = TREE({ ref: baseOid });
+  const theirTree = TREE({ ref: theirOid });
+  const unmergedFiles = [];
+  const bothModified = [];
+  const deleteByUs = [];
+  const deleteByTheirs = [];
+  const results = await _walk({
+    fs,
+    cache,
+    dir,
+    gitdir,
+    trees: [ourTree, baseTree, theirTree],
+    map: async function(filepath, [ours, base, theirs]) {
+      const path = basename(filepath);
+      const ourChange = await modified(ours, base);
+      const theirChange = await modified(theirs, base);
+      switch (`${ourChange}-${theirChange}`) {
+        case "false-false": {
+          return {
+            mode: await base.mode(),
+            path,
+            oid: await base.oid(),
+            type: await base.type()
+          };
+        }
+        case "false-true": {
+          if (!theirs && await ours.type() === "tree") {
+            return {
+              mode: await ours.mode(),
+              path,
+              oid: await ours.oid(),
+              type: await ours.type()
+            };
+          }
+          return theirs ? {
+            mode: await theirs.mode(),
+            path,
+            oid: await theirs.oid(),
+            type: await theirs.type()
+          } : void 0;
+        }
+        case "true-false": {
+          if (!ours && await theirs.type() === "tree") {
+            return {
+              mode: await theirs.mode(),
+              path,
+              oid: await theirs.oid(),
+              type: await theirs.type()
+            };
+          }
+          return ours ? {
+            mode: await ours.mode(),
+            path,
+            oid: await ours.oid(),
+            type: await ours.type()
+          } : void 0;
+        }
+        case "true-true": {
+          if (ours && theirs && await ours.type() === "tree" && await theirs.type() === "tree") {
+            return {
+              mode: await ours.mode(),
+              path,
+              oid: await ours.oid(),
+              type: "tree"
+            };
+          }
+          if (ours && theirs && await ours.type() === "blob" && await theirs.type() === "blob") {
+            return mergeBlobs({
+              fs,
+              gitdir,
+              path,
+              ours,
+              base,
+              theirs,
+              ourName,
+              baseName,
+              theirName,
+              mergeDriver
+            }).then(async (r) => {
+              if (!r.cleanMerge) {
+                unmergedFiles.push(filepath);
+                bothModified.push(filepath);
+                if (!abortOnConflict) {
+                  let baseOid2 = "";
+                  if (base && await base.type() === "blob") {
+                    baseOid2 = await base.oid();
+                  }
+                  const ourOid2 = await ours.oid();
+                  const theirOid2 = await theirs.oid();
+                  index2.delete({ filepath });
+                  if (baseOid2) {
+                    index2.insert({ filepath, oid: baseOid2, stage: 1 });
+                  }
+                  index2.insert({ filepath, oid: ourOid2, stage: 2 });
+                  index2.insert({ filepath, oid: theirOid2, stage: 3 });
+                }
+              } else if (!abortOnConflict) {
+                index2.insert({ filepath, oid: r.mergeResult.oid, stage: 0 });
+              }
+              return r.mergeResult;
+            });
+          }
+          if (base && !ours && theirs && await base.type() === "blob" && await theirs.type() === "blob") {
+            unmergedFiles.push(filepath);
+            deleteByUs.push(filepath);
+            if (!abortOnConflict) {
+              const baseOid2 = await base.oid();
+              const theirOid2 = await theirs.oid();
+              index2.delete({ filepath });
+              index2.insert({ filepath, oid: baseOid2, stage: 1 });
+              index2.insert({ filepath, oid: theirOid2, stage: 3 });
+            }
+            return {
+              mode: await theirs.mode(),
+              oid: await theirs.oid(),
+              type: "blob",
+              path
+            };
+          }
+          if (base && ours && !theirs && await base.type() === "blob" && await ours.type() === "blob") {
+            unmergedFiles.push(filepath);
+            deleteByTheirs.push(filepath);
+            if (!abortOnConflict) {
+              const baseOid2 = await base.oid();
+              const ourOid2 = await ours.oid();
+              index2.delete({ filepath });
+              index2.insert({ filepath, oid: baseOid2, stage: 1 });
+              index2.insert({ filepath, oid: ourOid2, stage: 2 });
+            }
+            return {
+              mode: await ours.mode(),
+              oid: await ours.oid(),
+              type: "blob",
+              path
+            };
+          }
+          if (base && !ours && !theirs && (await base.type() === "blob" || await base.type() === "tree")) {
+            return void 0;
+          }
+          throw new MergeNotSupportedError();
+        }
+      }
+    },
+    /**
+     * @param {TreeEntry} [parent]
+     * @param {Array<TreeEntry>} children
+     */
+    reduce: unmergedFiles.length !== 0 && (!dir || abortOnConflict) ? void 0 : async (parent, children) => {
+      const entries = children.filter(Boolean);
+      if (!parent)
+        return;
+      if (parent && parent.type === "tree" && entries.length === 0 && parent.path !== ".")
+        return;
+      if (entries.length > 0 || parent.path === "." && entries.length === 0) {
+        const tree = new GitTree(entries);
+        const object = tree.toObject();
+        const oid = await _writeObject({
+          fs,
+          gitdir,
+          type: "tree",
+          object,
+          dryRun
+        });
+        parent.oid = oid;
+      }
+      return parent;
+    }
+  });
+  if (unmergedFiles.length !== 0) {
+    if (dir && !abortOnConflict) {
+      await _walk({
+        fs,
+        cache,
+        dir,
+        gitdir,
+        trees: [TREE({ ref: results.oid })],
+        map: async function(filepath, [entry]) {
+          const path = `${dir}/${filepath}`;
+          if (await entry.type() === "blob") {
+            const mode = await entry.mode();
+            const content = new TextDecoder().decode(await entry.content());
+            await fs.write(path, content, { mode });
+          }
+          return true;
+        }
+      });
+    }
+    return new MergeConflictError(
+      unmergedFiles,
+      bothModified,
+      deleteByUs,
+      deleteByTheirs
+    );
+  }
+  return results.oid;
+}
+async function mergeBlobs({
+  fs,
+  gitdir,
+  path,
+  ours,
+  base,
+  theirs,
+  ourName,
+  theirName,
+  baseName,
+  dryRun,
+  mergeDriver = mergeFile
+}) {
+  const type = "blob";
+  let baseMode = "100755";
+  let baseOid = "";
+  let baseContent = "";
+  if (base && await base.type() === "blob") {
+    baseMode = await base.mode();
+    baseOid = await base.oid();
+    baseContent = Buffer.from(await base.content()).toString("utf8");
+  }
+  const mode = baseMode === await ours.mode() ? await theirs.mode() : await ours.mode();
+  if (await ours.oid() === await theirs.oid()) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await ours.oid(), type }
+    };
+  }
+  if (await ours.oid() === baseOid) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await theirs.oid(), type }
+    };
+  }
+  if (await theirs.oid() === baseOid) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await ours.oid(), type }
+    };
+  }
+  const ourContent = Buffer.from(await ours.content()).toString("utf8");
+  const theirContent = Buffer.from(await theirs.content()).toString("utf8");
+  const { mergedText, cleanMerge } = await mergeDriver({
+    branches: [baseName, ourName, theirName],
+    contents: [baseContent, ourContent, theirContent],
+    path
+  });
+  const oid = await _writeObject({
+    fs,
+    gitdir,
+    type: "blob",
+    object: Buffer.from(mergedText, "utf8"),
+    dryRun
+  });
+  return { cleanMerge, mergeResult: { mode, path, oid, type } };
+}
+async function acquireLock$1(ref, callback) {
+  if (lock$2 === void 0)
+    lock$2 = new import_async_lock.default();
+  return lock$2.acquire(ref, callback);
+}
+async function checkAndWriteBlob(fs, gitdir, dir, filepath, oid = null) {
+  const currentFilepath = join(dir, filepath);
+  const stats = await fs.lstat(currentFilepath);
+  if (!stats)
+    throw new NotFoundError(currentFilepath);
+  if (stats.isDirectory())
+    throw new InternalError(
+      `${currentFilepath}: file expected, but found directory`
+    );
+  const objContent = oid ? await readObjectLoose({ fs, gitdir, oid }) : void 0;
+  let retOid = objContent ? oid : void 0;
+  if (!objContent) {
+    await acquireLock$1({ fs, gitdir, currentFilepath }, async () => {
+      const object = stats.isSymbolicLink() ? await fs.readlink(currentFilepath).then(posixifyPathBuffer) : await fs.read(currentFilepath);
+      if (object === null)
+        throw new NotFoundError(currentFilepath);
+      retOid = await _writeObject({ fs, gitdir, type: "blob", object });
+    });
+  }
+  return retOid;
+}
+async function processTreeEntries({ fs, dir, gitdir, entries }) {
+  async function processTreeEntry(entry) {
+    if (entry.type === "tree") {
+      if (!entry.oid) {
+        const children = await Promise.all(entry.children.map(processTreeEntry));
+        entry.oid = await _writeTree({
+          fs,
+          gitdir,
+          tree: children
+        });
+        entry.mode = 16384;
+      }
+    } else if (entry.type === "blob") {
+      entry.oid = await checkAndWriteBlob(
+        fs,
+        gitdir,
+        dir,
+        entry.path,
+        entry.oid
+      );
+      entry.mode = 33188;
+    }
+    entry.path = entry.path.split("/").pop();
+    return entry;
+  }
+  return Promise.all(entries.map(processTreeEntry));
+}
+async function writeTreeChanges({
+  fs,
+  dir,
+  gitdir,
+  treePair
+  // [TREE({ ref: 'HEAD' }), 'STAGE'] would be the equivalent of `git write-tree`
+}) {
+  const isStage = treePair[1] === "stage";
+  const trees = treePair.map((t) => typeof t === "string" ? _TreeMap[t]() : t);
+  const changedEntries = [];
+  const map = async (filepath, [head, stage]) => {
+    if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
+      return;
+    }
+    if (stage) {
+      if (!head || await head.oid() !== await stage.oid() && await stage.oid() !== void 0) {
+        changedEntries.push([head, stage]);
+      }
+      return {
+        mode: await stage.mode(),
+        path: filepath,
+        oid: await stage.oid(),
+        type: await stage.type()
+      };
+    }
+  };
+  const reduce = async (parent, children) => {
+    children = children.filter(Boolean);
+    if (!parent) {
+      return children.length > 0 ? children : void 0;
+    } else {
+      parent.children = children;
+      return parent;
+    }
+  };
+  const iterate = async (walk2, children) => {
+    const filtered = [];
+    for (const child of children) {
+      const [head, stage] = child;
+      if (isStage) {
+        if (stage) {
+          if (await fs.exists(`${dir}/${stage.toString()}`)) {
+            filtered.push(child);
+          } else {
+            changedEntries.push([null, stage]);
+          }
+        }
+      } else if (head) {
+        if (!stage) {
+          changedEntries.push([head, null]);
+        } else {
+          filtered.push(child);
+        }
+      }
+    }
+    return filtered.length ? Promise.all(filtered.map(walk2)) : [];
+  };
+  const entries = await _walk({
+    fs,
+    cache: {},
+    dir,
+    gitdir,
+    trees,
+    map,
+    reduce,
+    iterate
+  });
+  if (changedEntries.length === 0 || entries.length === 0) {
+    return null;
+  }
+  const processedEntries = await processTreeEntries({
+    fs,
+    dir,
+    gitdir,
+    entries
+  });
+  const treeEntries = processedEntries.filter(Boolean).map((entry) => ({
+    mode: entry.mode,
+    path: entry.path,
+    oid: entry.oid,
+    type: entry.type
+  }));
+  return _writeTree({ fs, gitdir, tree: treeEntries });
+}
+async function applyTreeChanges({
+  fs,
+  dir,
+  gitdir,
+  stashCommit,
+  parentCommit,
+  wasStaged
+}) {
+  const dirRemoved = [];
+  const stageUpdated = [];
+  const ops = await _walk({
+    fs,
+    cache: {},
+    dir,
+    gitdir,
+    trees: [TREE({ ref: parentCommit }), TREE({ ref: stashCommit })],
+    map: async (filepath, [parent, stash2]) => {
+      if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
+        return;
+      }
+      const type = stash2 ? await stash2.type() : await parent.type();
+      if (type !== "tree" && type !== "blob") {
+        return;
+      }
+      if (!stash2 && parent) {
+        const method = type === "tree" ? "rmdir" : "rm";
+        if (type === "tree")
+          dirRemoved.push(filepath);
+        if (type === "blob" && wasStaged)
+          stageUpdated.push({ filepath, oid: await parent.oid() });
+        return { method, filepath };
+      }
+      const oid = await stash2.oid();
+      if (!parent || await parent.oid() !== oid) {
+        if (type === "tree") {
+          return { method: "mkdir", filepath };
+        } else {
+          if (wasStaged)
+            stageUpdated.push({
+              filepath,
+              oid,
+              stats: await fs.lstat(join(dir, filepath))
+            });
+          return {
+            method: "write",
+            filepath,
+            oid
+          };
+        }
+      }
+    }
+  });
+  await acquireLock$1({ fs, gitdir, dirRemoved, ops }, async () => {
+    for (const op of ops) {
+      const currentFilepath = join(dir, op.filepath);
+      switch (op.method) {
+        case "rmdir":
+          await fs.rmdir(currentFilepath);
+          break;
+        case "mkdir":
+          await fs.mkdir(currentFilepath);
+          break;
+        case "rm":
+          await fs.rm(currentFilepath);
+          break;
+        case "write":
+          if (!dirRemoved.some(
+            (removedDir) => currentFilepath.startsWith(removedDir)
+          )) {
+            const { object } = await _readObject({
+              fs,
+              cache: {},
+              gitdir,
+              oid: op.oid
+            });
+            if (await fs.exists(currentFilepath)) {
+              await fs.rm(currentFilepath);
+            }
+            await fs.write(currentFilepath, object);
+          }
+          break;
+      }
+    }
+  });
+  await GitIndexManager.acquire({ fs, gitdir, cache: {} }, async (index2) => {
+    stageUpdated.forEach(({ filepath, stats, oid }) => {
+      index2.insert({ filepath, stats, oid });
+    });
+  });
+}
+async function _cherryPick({
+  fs,
+  cache,
+  dir,
+  gitdir,
+  oid,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  committer,
+  mergeDriver
+}) {
+  const { commit: cherryCommit, oid: cherryOid } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid
+  });
+  if (cherryCommit.parent.length > 1) {
+    throw new CherryPickMergeCommitError(cherryOid, cherryCommit.parent.length);
+  }
+  if (cherryCommit.parent.length === 0) {
+    throw new CherryPickRootCommitError(cherryOid);
+  }
+  const currentOid = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: "HEAD"
+  });
+  const { commit: currentCommit } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid: currentOid
+  });
+  const cherryParentOid = cherryCommit.parent[0];
+  const { commit: cherryParent } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid: cherryParentOid
+  });
+  const mergedTreeOid = await GitIndexManager.acquire(
+    { fs, gitdir, cache, allowUnmerged: false },
+    async (index2) => {
+      return mergeTree({
+        fs,
+        cache,
+        dir,
+        gitdir,
+        index: index2,
+        ourOid: currentCommit.tree,
+        baseOid: cherryParent.tree,
+        theirOid: cherryCommit.tree,
+        ourName: "HEAD",
+        baseName: `parent of ${cherryOid.slice(0, 7)}`,
+        theirName: cherryOid.slice(0, 7),
+        dryRun,
+        abortOnConflict,
+        mergeDriver
+      });
+    }
+  );
+  if (mergedTreeOid instanceof MergeConflictError) {
+    throw mergedTreeOid;
+  }
+  const newOid = await _commit({
+    fs,
+    cache,
+    gitdir,
+    message: cherryCommit.message,
+    tree: mergedTreeOid,
+    parent: [currentOid],
+    // Single parent: current HEAD
+    author: cherryCommit.author,
+    // Preserve original author
+    committer,
+    // New committer
+    dryRun,
+    noUpdateBranch
+  });
+  if (dir && !dryRun && !noUpdateBranch) {
+    await applyTreeChanges({
+      fs,
+      dir,
+      gitdir,
+      stashCommit: newOid,
+      parentCommit: currentOid,
+      wasStaged: true
+    });
+  }
+  return newOid;
+}
+async function cherryPick({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  cache = {},
+  committer,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  mergeDriver
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const { commit: cherryCommit } = await _readCommit({
+      fs,
+      cache,
+      gitdir: updatedGitdir,
+      oid
+    });
+    if (cherryCommit.parent && cherryCommit.parent.length > 1) {
+      return await _cherryPick({
+        fs,
+        cache,
+        dir,
+        gitdir: updatedGitdir,
+        oid,
+        dryRun,
+        noUpdateBranch,
+        abortOnConflict,
+        committer: void 0,
+        mergeDriver
+      });
+    }
+    const normalizedCommitter = await normalizeCommitterObject({
+      fs,
+      gitdir: updatedGitdir,
+      committer
+    });
+    if (!normalizedCommitter) {
+      throw new MissingNameError("committer");
+    }
+    return await _cherryPick({
+      fs,
+      cache,
+      dir,
+      gitdir: updatedGitdir,
+      oid,
+      dryRun,
+      noUpdateBranch,
+      abortOnConflict,
+      committer: normalizedCommitter,
+      mergeDriver
+    });
+  } catch (err) {
+    err.caller = "git.cherryPick";
+    throw err;
+  }
+}
+function abbreviateRef(ref) {
+  const match = abbreviateRx.exec(ref);
+  if (match) {
+    if (match[1] === "remotes/" && ref.endsWith("/HEAD")) {
+      return match[2].slice(0, -5);
+    } else {
+      return match[2];
+    }
+  }
+  return ref;
+}
+async function _currentBranch({
+  fs,
+  gitdir,
+  fullname = false,
+  test = false
+}) {
+  const ref = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: "HEAD",
+    depth: 2
+  });
+  if (test) {
+    try {
+      await GitRefManager.resolve({ fs, gitdir, ref });
+    } catch (_) {
+      return;
+    }
+  }
+  if (!ref.startsWith("refs/"))
+    return;
+  return fullname ? ref : abbreviateRef(ref);
+}
+function translateSSHtoHTTP(url) {
+  url = url.replace(/^git@([^:]+):/, "https://$1/");
+  url = url.replace(/^ssh:\/\//, "https://");
+  return url;
+}
+function calculateBasicAuthHeader({ username = "", password = "" }) {
+  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+}
+async function forAwait(iterable, cb) {
+  const iter = getIterator(iterable);
+  while (true) {
+    const { value, done } = await iter.next();
+    if (value)
+      await cb(value);
+    if (done)
+      break;
+  }
+  if (iter.return)
+    iter.return();
+}
+async function collect(iterable) {
+  let size = 0;
+  const buffers = [];
+  await forAwait(iterable, (value) => {
+    buffers.push(value);
+    size += value.byteLength;
+  });
+  const result = new Uint8Array(size);
+  let nextIndex = 0;
+  for (const buffer of buffers) {
+    result.set(buffer, nextIndex);
+    nextIndex += buffer.byteLength;
+  }
+  return result;
+}
+function extractAuthFromUrl(url) {
+  let userpass = url.match(/^https?:\/\/([^/]+)@/);
+  if (userpass == null)
+    return { url, auth: {} };
+  userpass = userpass[1];
+  const [username, password] = userpass.split(":");
+  url = url.replace(`${userpass}@`, "");
+  return { url, auth: { username, password } };
+}
+function padHex(b, n) {
+  const s = n.toString(16);
+  return "0".repeat(b - s.length) + s;
+}
+async function parseCapabilitiesV2(read) {
+  const capabilities2 = {};
+  let line;
+  while (true) {
+    line = await read();
+    if (line === true)
+      break;
+    if (line === null)
+      continue;
+    line = line.toString("utf8").replace(/\n$/, "");
+    const i = line.indexOf("=");
+    if (i > -1) {
+      const key = line.slice(0, i);
+      const value = line.slice(i + 1);
+      capabilities2[key] = value;
+    } else {
+      capabilities2[line] = true;
+    }
+  }
+  return { protocolVersion: 2, capabilities2 };
+}
+async function parseRefsAdResponse(stream, { service }) {
+  const capabilities = /* @__PURE__ */ new Set();
+  const refs = /* @__PURE__ */ new Map();
+  const symrefs = /* @__PURE__ */ new Map();
+  const read = GitPktLine.streamReader(stream);
+  let lineOne = await read();
+  while (lineOne === null)
+    lineOne = await read();
+  if (lineOne === true)
+    throw new EmptyServerResponseError();
+  if (lineOne.includes("version 2")) {
+    return parseCapabilitiesV2(read);
+  }
+  if (lineOne.toString("utf8").replace(/\n$/, "") !== `# service=${service}`) {
+    throw new ParseError(`# service=${service}\\n`, lineOne.toString("utf8"));
+  }
+  let lineTwo = await read();
+  while (lineTwo === null)
+    lineTwo = await read();
+  if (lineTwo === true)
+    return { capabilities, refs, symrefs };
+  lineTwo = lineTwo.toString("utf8");
+  if (lineTwo.includes("version 2")) {
+    return parseCapabilitiesV2(read);
+  }
+  const [firstRef, capabilitiesLine] = splitAndAssert(lineTwo, "\0", "\\x00");
+  capabilitiesLine.split(" ").map((x) => capabilities.add(x));
+  if (firstRef !== "0000000000000000000000000000000000000000 capabilities^{}") {
+    const [ref, name] = splitAndAssert(firstRef, " ", " ");
+    refs.set(name, ref);
+    while (true) {
+      const line = await read();
+      if (line === true)
+        break;
+      if (line !== null) {
+        const [ref2, name2] = splitAndAssert(line.toString("utf8"), " ", " ");
+        refs.set(name2, ref2);
+      }
+    }
+  }
+  for (const cap of capabilities) {
+    if (cap.startsWith("symref=")) {
+      const m = cap.match(/symref=([^:]+):(.*)/);
+      if (m.length === 3) {
+        symrefs.set(m[1], m[2]);
+      }
+    }
+  }
+  return { protocolVersion: 1, capabilities, refs, symrefs };
+}
+function splitAndAssert(line, sep, expected) {
+  const split = line.trim().split(sep);
+  if (split.length !== 2) {
+    throw new ParseError(
+      `Two strings separated by '${expected}'`,
+      line.toString("utf8")
+    );
+  }
+  return split;
+}
+function parseRemoteUrl({ url }) {
+  if (url.startsWith("git@")) {
+    return {
+      transport: "ssh",
+      address: url
+    };
+  }
+  const matches = url.match(/(\w+)(:\/\/|::)(.*)/);
+  if (matches === null)
+    return;
+  if (matches[2] === "://") {
+    return {
+      transport: matches[1],
+      address: matches[0]
+    };
+  }
+  if (matches[2] === "::") {
+    return {
+      transport: matches[1],
+      address: matches[3]
+    };
+  }
+}
+async function hasObjectLoose({ fs, gitdir, oid }) {
+  const source = `objects/${oid.slice(0, 2)}/${oid.slice(2)}`;
+  return fs.exists(`${gitdir}/${source}`);
+}
+async function hasObjectPacked({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  getExternalRefDelta
+}) {
+  let list = await fs.readdir(join(gitdir, "objects/pack"));
+  list = list.filter((x) => x.endsWith(".idx"));
+  for (const filename of list) {
+    const indexFile = `${gitdir}/objects/pack/${filename}`;
+    const p = await readPackIndex({
+      fs,
+      cache,
+      filename: indexFile,
+      getExternalRefDelta
+    });
+    if (p.error)
+      throw new InternalError(p.error);
+    if (p.offsets.has(oid)) {
+      return true;
+    }
+  }
+  return false;
+}
+async function hasObject({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  format = "content"
+}) {
+  const getExternalRefDelta = (oid2) => _readObject({ fs, cache, gitdir, oid: oid2 });
+  let result = await hasObjectLoose({ fs, gitdir, oid });
+  if (!result) {
+    result = await hasObjectPacked({
+      fs,
+      cache,
+      gitdir,
+      oid,
+      getExternalRefDelta
+    });
+  }
+  return result;
+}
+function emptyPackfile(pack) {
+  const pheader = "5041434b";
+  const version2 = "00000002";
+  const obCount = "00000000";
+  const header = pheader + version2 + obCount;
+  return pack.slice(0, 12).toString("hex") === header;
+}
+function filterCapabilities(server, client) {
+  const serverNames = server.map((cap) => cap.split("=", 1)[0]);
+  return client.filter((cap) => {
+    const name = cap.split("=", 1)[0];
+    return serverNames.includes(name);
+  });
+}
+function findSplit(str) {
+  const r = str.indexOf("\r");
+  const n = str.indexOf("\n");
+  if (r === -1 && n === -1)
+    return -1;
+  if (r === -1)
+    return n + 1;
+  if (n === -1)
+    return r + 1;
+  if (n === r + 1)
+    return n + 1;
+  return Math.min(r, n) + 1;
+}
+function splitLines(input) {
+  const output = new FIFO();
+  let tmp = "";
+  (async () => {
+    await forAwait(input, (chunk) => {
+      chunk = chunk.toString("utf8");
+      tmp += chunk;
+      while (true) {
+        const i = findSplit(tmp);
+        if (i === -1)
+          break;
+        output.write(tmp.slice(0, i));
+        tmp = tmp.slice(i);
+      }
+    });
+    if (tmp.length > 0) {
+      output.write(tmp);
+    }
+    output.end();
+  })();
+  return output;
+}
+async function parseUploadPackResponse(stream) {
+  const { packetlines, packfile, progress } = GitSideBand.demux(stream);
+  const shallows = [];
+  const unshallows = [];
+  const acks = [];
+  let nak = false;
+  let done = false;
+  return new Promise((resolve, reject) => {
+    forAwait(packetlines, (data) => {
+      const line = data.toString("utf8").trim();
+      if (line.startsWith("shallow")) {
+        const oid = line.slice(-41).trim();
+        if (oid.length !== 40) {
+          reject(new InvalidOidError(oid));
+        }
+        shallows.push(oid);
+      } else if (line.startsWith("unshallow")) {
+        const oid = line.slice(-41).trim();
+        if (oid.length !== 40) {
+          reject(new InvalidOidError(oid));
+        }
+        unshallows.push(oid);
+      } else if (line.startsWith("ACK")) {
+        const [, oid, status2] = line.split(" ");
+        acks.push({ oid, status: status2 });
+        if (!status2)
+          done = true;
+      } else if (line.startsWith("NAK")) {
+        nak = true;
+        done = true;
+      } else {
+        done = true;
+        nak = true;
+      }
+      if (done) {
+        stream.error ? reject(stream.error) : resolve({ shallows, unshallows, acks, nak, packfile, progress });
+      }
+    }).finally(() => {
+      if (!done) {
+        stream.error ? reject(stream.error) : resolve({ shallows, unshallows, acks, nak, packfile, progress });
+      }
+    });
+  });
+}
+function writeUploadPackRequest({
+  capabilities = [],
+  wants = [],
+  haves = [],
+  shallows = [],
+  depth = null,
+  since = null,
+  exclude = []
+}) {
+  const packstream = [];
+  wants = [...new Set(wants)];
+  let firstLineCapabilities = ` ${capabilities.join(" ")}`;
+  for (const oid of wants) {
+    packstream.push(GitPktLine.encode(`want ${oid}${firstLineCapabilities}
+`));
+    firstLineCapabilities = "";
+  }
+  for (const oid of shallows) {
+    packstream.push(GitPktLine.encode(`shallow ${oid}
+`));
+  }
+  if (depth !== null) {
+    packstream.push(GitPktLine.encode(`deepen ${depth}
+`));
+  }
+  if (since !== null) {
+    packstream.push(
+      GitPktLine.encode(`deepen-since ${Math.floor(since.valueOf() / 1e3)}
+`)
+    );
+  }
+  for (const oid of exclude) {
+    packstream.push(GitPktLine.encode(`deepen-not ${oid}
+`));
+  }
+  packstream.push(GitPktLine.flush());
+  for (const oid of haves) {
+    packstream.push(GitPktLine.encode(`have ${oid}
+`));
+  }
+  packstream.push(GitPktLine.encode(`done
+`));
+  return packstream;
+}
+async function _fetch({
+  fs,
+  cache,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  gitdir,
+  ref: _ref,
+  remoteRef: _remoteRef,
+  remote: _remote,
+  url: _url,
+  corsProxy,
+  depth = null,
+  since = null,
+  exclude = [],
+  relative = false,
+  tags = false,
+  singleBranch = false,
+  headers = {},
+  prune = false,
+  pruneTags = false
+}) {
+  const ref = _ref || await _currentBranch({ fs, gitdir, test: true });
+  const config = await GitConfigManager.get({ fs, gitdir });
+  const remote = _remote || ref && await config.get(`branch.${ref}.remote`) || "origin";
+  const url = _url || await config.get(`remote.${remote}.url`);
+  if (typeof url === "undefined") {
+    throw new MissingParameterError("remote OR url");
+  }
+  const remoteRef = _remoteRef || ref && await config.get(`branch.${ref}.merge`) || _ref || "HEAD";
+  if (corsProxy === void 0) {
+    corsProxy = await config.get("http.corsProxy");
+  }
+  const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
+  const remoteHTTP = await GitRemoteHTTP2.discover({
+    http,
+    onAuth,
+    onAuthSuccess,
+    onAuthFailure,
+    corsProxy,
+    service: "git-upload-pack",
+    url,
+    headers,
+    protocolVersion: 1
+  });
+  const auth = remoteHTTP.auth;
+  const remoteRefs = remoteHTTP.refs;
+  if (remoteRefs.size === 0) {
+    return {
+      defaultBranch: null,
+      fetchHead: null,
+      fetchHeadDescription: null
+    };
+  }
+  if (depth !== null && !remoteHTTP.capabilities.has("shallow")) {
+    throw new RemoteCapabilityError("shallow", "depth");
+  }
+  if (since !== null && !remoteHTTP.capabilities.has("deepen-since")) {
+    throw new RemoteCapabilityError("deepen-since", "since");
+  }
+  if (exclude.length > 0 && !remoteHTTP.capabilities.has("deepen-not")) {
+    throw new RemoteCapabilityError("deepen-not", "exclude");
+  }
+  if (relative === true && !remoteHTTP.capabilities.has("deepen-relative")) {
+    throw new RemoteCapabilityError("deepen-relative", "relative");
+  }
+  const { oid, fullref } = GitRefManager.resolveAgainstMap({
+    ref: remoteRef,
+    map: remoteRefs
+  });
+  for (const remoteRef2 of remoteRefs.keys()) {
+    if (remoteRef2 === fullref || remoteRef2 === "HEAD" || remoteRef2.startsWith("refs/heads/") || tags && remoteRef2.startsWith("refs/tags/")) {
+      continue;
+    }
+    remoteRefs.delete(remoteRef2);
+  }
+  const capabilities = filterCapabilities(
+    [...remoteHTTP.capabilities],
+    [
+      "multi_ack_detailed",
+      "no-done",
+      "side-band-64k",
+      // Note: I removed 'thin-pack' option since our code doesn't "fatten" packfiles,
+      // which is necessary for compatibility with git. It was the cause of mysterious
+      // 'fatal: pack has [x] unresolved deltas' errors that plagued us for some time.
+      // isomorphic-git is perfectly happy with thin packfiles in .git/objects/pack but
+      // canonical git it turns out is NOT.
+      "ofs-delta",
+      `agent=${pkg.agent}`
+    ]
+  );
+  if (relative)
+    capabilities.push("deepen-relative");
+  const wants = singleBranch ? [oid] : remoteRefs.values();
+  const haveRefs = singleBranch ? [ref] : await GitRefManager.listRefs({
+    fs,
+    gitdir,
+    filepath: `refs`
+  });
+  let haves = [];
+  for (let ref2 of haveRefs) {
+    try {
+      ref2 = await GitRefManager.expand({ fs, gitdir, ref: ref2 });
+      const oid2 = await GitRefManager.resolve({ fs, gitdir, ref: ref2 });
+      if (await hasObject({ fs, cache, gitdir, oid: oid2 })) {
+        haves.push(oid2);
+      }
+    } catch (err) {
+    }
+  }
+  haves = [...new Set(haves)];
+  const oids = await GitShallowManager.read({ fs, gitdir });
+  const shallows = remoteHTTP.capabilities.has("shallow") ? [...oids] : [];
+  const packstream = writeUploadPackRequest({
+    capabilities,
+    wants,
+    haves,
+    shallows,
+    depth,
+    since,
+    exclude
+  });
+  const packbuffer = Buffer.from(await collect(packstream));
+  const raw = await GitRemoteHTTP2.connect({
+    http,
+    onProgress,
+    corsProxy,
+    service: "git-upload-pack",
+    url,
+    auth,
+    body: [packbuffer],
+    headers
+  });
+  const response = await parseUploadPackResponse(raw.body);
+  if (raw.headers) {
+    response.headers = raw.headers;
+  }
+  for (const oid2 of response.shallows) {
+    if (!oids.has(oid2)) {
+      try {
+        const { object } = await _readObject({ fs, cache, gitdir, oid: oid2 });
+        const commit2 = new GitCommit(object);
+        const hasParents = await Promise.all(
+          commit2.headers().parent.map((oid3) => hasObject({ fs, cache, gitdir, oid: oid3 }))
+        );
+        const haveAllParents = hasParents.length === 0 || hasParents.every((has) => has);
+        if (!haveAllParents) {
+          oids.add(oid2);
+        }
+      } catch (err) {
+        oids.add(oid2);
+      }
+    }
+  }
+  for (const oid2 of response.unshallows) {
+    oids.delete(oid2);
+  }
+  await GitShallowManager.write({ fs, gitdir, oids });
+  if (singleBranch) {
+    const refs = /* @__PURE__ */ new Map([[fullref, oid]]);
+    const symrefs = /* @__PURE__ */ new Map();
+    let bail = 10;
+    let key = fullref;
+    while (bail--) {
+      const value = remoteHTTP.symrefs.get(key);
+      if (value === void 0)
+        break;
+      symrefs.set(key, value);
+      key = value;
+    }
+    const realRef = remoteRefs.get(key);
+    if (realRef) {
+      refs.set(key, realRef);
+    }
+    const { pruned } = await GitRefManager.updateRemoteRefs({
+      fs,
+      gitdir,
+      remote,
+      refs,
+      symrefs,
+      tags,
+      prune
+    });
+    if (prune) {
+      response.pruned = pruned;
+    }
+  } else {
+    const { pruned } = await GitRefManager.updateRemoteRefs({
+      fs,
+      gitdir,
+      remote,
+      refs: remoteRefs,
+      symrefs: remoteHTTP.symrefs,
+      tags,
+      prune,
+      pruneTags
+    });
+    if (prune) {
+      response.pruned = pruned;
+    }
+  }
+  response.HEAD = remoteHTTP.symrefs.get("HEAD");
+  if (response.HEAD === void 0) {
+    const { oid: oid2 } = GitRefManager.resolveAgainstMap({
+      ref: "HEAD",
+      map: remoteRefs
+    });
+    for (const [key, value] of remoteRefs.entries()) {
+      if (key !== "HEAD" && value === oid2) {
+        response.HEAD = key;
+        break;
+      }
+    }
+  }
+  const noun = fullref.startsWith("refs/tags") ? "tag" : "branch";
+  response.FETCH_HEAD = {
+    oid,
+    description: `${noun} '${abbreviateRef(fullref)}' of ${url}`
+  };
+  if (onProgress || onMessage) {
+    const lines = splitLines(response.progress);
+    forAwait(lines, async (line) => {
+      if (onMessage)
+        await onMessage(line);
+      if (onProgress) {
+        const matches = line.match(/([^:]*).*\((\d+?)\/(\d+?)\)/);
+        if (matches) {
+          await onProgress({
+            phase: matches[1].trim(),
+            loaded: parseInt(matches[2], 10),
+            total: parseInt(matches[3], 10)
+          });
+        }
+      }
+    });
+  }
+  const packfile = Buffer.from(await collect(response.packfile));
+  if (raw.body.error)
+    throw raw.body.error;
+  const packfileSha = packfile.slice(-20).toString("hex");
+  const res = {
+    defaultBranch: response.HEAD,
+    fetchHead: response.FETCH_HEAD.oid,
+    fetchHeadDescription: response.FETCH_HEAD.description
+  };
+  if (response.headers) {
+    res.headers = response.headers;
+  }
+  if (prune) {
+    res.pruned = response.pruned;
+  }
+  if (packfileSha !== "" && !emptyPackfile(packfile)) {
+    res.packfile = `objects/pack/pack-${packfileSha}.pack`;
+    const fullpath = join(gitdir, res.packfile);
+    await fs.write(fullpath, packfile);
+    const getExternalRefDelta = (oid2) => _readObject({ fs, cache, gitdir, oid: oid2 });
+    const idx = await GitPackIndex.fromPack({
+      pack: packfile,
+      getExternalRefDelta,
+      onProgress
+    });
+    await fs.write(fullpath.replace(/\.pack$/, ".idx"), await idx.toBuffer());
+  }
+  return res;
+}
 async function _init({
   fs,
   bare = false,
@@ -11688,6 +11115,153 @@ async function _init({
   );
   await fs.write(gitdir + "/HEAD", `ref: refs/heads/${defaultBranch}
 `);
+}
+async function _clone({
+  fs,
+  cache,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  onPostCheckout,
+  dir,
+  gitdir,
+  url,
+  corsProxy,
+  ref,
+  remote,
+  depth,
+  since,
+  exclude,
+  relative,
+  singleBranch,
+  noCheckout,
+  noTags,
+  headers,
+  nonBlocking,
+  batchSize = 100
+}) {
+  try {
+    await _init({ fs, gitdir });
+    await _addRemote({ fs, gitdir, remote, url, force: false });
+    if (corsProxy) {
+      const config = await GitConfigManager.get({ fs, gitdir });
+      await config.set(`http.corsProxy`, corsProxy);
+      await GitConfigManager.save({ fs, gitdir, config });
+    }
+    const { defaultBranch, fetchHead } = await _fetch({
+      fs,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      gitdir,
+      ref,
+      remote,
+      corsProxy,
+      depth,
+      since,
+      exclude,
+      relative,
+      singleBranch,
+      headers,
+      tags: !noTags
+    });
+    if (fetchHead === null)
+      return;
+    ref = ref || defaultBranch;
+    ref = ref.replace("refs/heads/", "");
+    await _checkout({
+      fs,
+      cache,
+      onProgress,
+      onPostCheckout,
+      dir,
+      gitdir,
+      ref,
+      remote,
+      noCheckout,
+      nonBlocking,
+      batchSize
+    });
+  } catch (err) {
+    await fs.rmdir(gitdir, { recursive: true, maxRetries: 10 }).catch(() => void 0);
+    throw err;
+  }
+}
+async function clone({
+  fs,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  onPostCheckout,
+  dir,
+  gitdir = join(dir, ".git"),
+  url,
+  corsProxy = void 0,
+  ref = void 0,
+  remote = "origin",
+  depth = void 0,
+  since = void 0,
+  exclude = [],
+  relative = false,
+  singleBranch = false,
+  noCheckout = false,
+  noTags = false,
+  headers = {},
+  cache = {},
+  nonBlocking = false,
+  batchSize = 100
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("http", http);
+    assertParameter("gitdir", gitdir);
+    if (!noCheckout) {
+      assertParameter("dir", dir);
+    }
+    assertParameter("url", url);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _clone({
+      fs: fsp,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      onPostCheckout,
+      dir,
+      gitdir: updatedGitdir,
+      url,
+      corsProxy,
+      ref,
+      remote,
+      depth,
+      since,
+      exclude,
+      relative,
+      singleBranch,
+      noCheckout,
+      noTags,
+      headers,
+      nonBlocking,
+      batchSize
+    });
+  } catch (err) {
+    err.caller = "git.clone";
+    throw err;
+  }
 }
 async function commit({
   fs: _fs,
@@ -11737,6 +11311,894 @@ async function commit({
     throw err;
   }
 }
+async function currentBranch({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  fullname = false,
+  test = false
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _currentBranch({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      fullname,
+      test
+    });
+  } catch (err) {
+    err.caller = "git.currentBranch";
+    throw err;
+  }
+}
+async function _deleteBranch({ fs, gitdir, ref }) {
+  ref = ref.startsWith("refs/heads/") ? ref : `refs/heads/${ref}`;
+  const exist = await GitRefManager.exists({ fs, gitdir, ref });
+  if (!exist) {
+    throw new NotFoundError(ref);
+  }
+  const fullRef = await GitRefManager.expand({ fs, gitdir, ref });
+  const currentRef = await _currentBranch({ fs, gitdir, fullname: true });
+  if (fullRef === currentRef) {
+    const value = await GitRefManager.resolve({ fs, gitdir, ref: fullRef });
+    await GitRefManager.writeRef({ fs, gitdir, ref: "HEAD", value });
+  }
+  await GitRefManager.deleteRef({ fs, gitdir, ref: fullRef });
+  const abbrevRef = abbreviateRef(ref);
+  const config = await GitConfigManager.get({ fs, gitdir });
+  await config.deleteSection("branch", abbrevRef);
+  await GitConfigManager.save({ fs, gitdir, config });
+}
+async function deleteBranch({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _deleteBranch({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref
+    });
+  } catch (err) {
+    err.caller = "git.deleteBranch";
+    throw err;
+  }
+}
+async function deleteRef({ fs, dir, gitdir = join(dir, ".git"), ref }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    await GitRefManager.deleteRef({ fs: fsp, gitdir: updatedGitdir, ref });
+  } catch (err) {
+    err.caller = "git.deleteRef";
+    throw err;
+  }
+}
+async function _deleteRemote({ fs, gitdir, remote }) {
+  const config = await GitConfigManager.get({ fs, gitdir });
+  await config.deleteSection("remote", remote);
+  await GitConfigManager.save({ fs, gitdir, config });
+}
+async function deleteRemote({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  remote
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("remote", remote);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _deleteRemote({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      remote
+    });
+  } catch (err) {
+    err.caller = "git.deleteRemote";
+    throw err;
+  }
+}
+async function _deleteTag({ fs, gitdir, ref }) {
+  ref = ref.startsWith("refs/tags/") ? ref : `refs/tags/${ref}`;
+  await GitRefManager.deleteRef({ fs, gitdir, ref });
+}
+async function deleteTag({ fs, dir, gitdir = join(dir, ".git"), ref }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _deleteTag({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref
+    });
+  } catch (err) {
+    err.caller = "git.deleteTag";
+    throw err;
+  }
+}
+async function expandOidLoose({ fs, gitdir, oid: short }) {
+  const prefix = short.slice(0, 2);
+  const objectsSuffixes = await fs.readdir(`${gitdir}/objects/${prefix}`);
+  return objectsSuffixes.map((suffix) => `${prefix}${suffix}`).filter((_oid) => _oid.startsWith(short));
+}
+async function expandOidPacked({
+  fs,
+  cache,
+  gitdir,
+  oid: short,
+  getExternalRefDelta
+}) {
+  const results = [];
+  let list = await fs.readdir(join(gitdir, "objects/pack"));
+  list = list.filter((x) => x.endsWith(".idx"));
+  for (const filename of list) {
+    const indexFile = `${gitdir}/objects/pack/${filename}`;
+    const p = await readPackIndex({
+      fs,
+      cache,
+      filename: indexFile,
+      getExternalRefDelta
+    });
+    if (p.error)
+      throw new InternalError(p.error);
+    for (const oid of p.offsets.keys()) {
+      if (oid.startsWith(short))
+        results.push(oid);
+    }
+  }
+  return results;
+}
+async function _expandOid({ fs, cache, gitdir, oid: short }) {
+  const getExternalRefDelta = (oid) => _readObject({ fs, cache, gitdir, oid });
+  const results = await expandOidLoose({ fs, gitdir, oid: short });
+  const packedOids = await expandOidPacked({
+    fs,
+    cache,
+    gitdir,
+    oid: short,
+    getExternalRefDelta
+  });
+  for (const packedOid of packedOids) {
+    if (results.indexOf(packedOid) === -1) {
+      results.push(packedOid);
+    }
+  }
+  if (results.length === 1) {
+    return results[0];
+  }
+  if (results.length > 1) {
+    throw new AmbiguousError("oids", short, results);
+  }
+  throw new NotFoundError(`an object matching "${short}"`);
+}
+async function expandOid({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _expandOid({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid
+    });
+  } catch (err) {
+    err.caller = "git.expandOid";
+    throw err;
+  }
+}
+async function expandRef({ fs, dir, gitdir = join(dir, ".git"), ref }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await GitRefManager.expand({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref
+    });
+  } catch (err) {
+    err.caller = "git.expandRef";
+    throw err;
+  }
+}
+async function _findMergeBase({ fs, cache, gitdir, oids }) {
+  const visits = {};
+  const passes = oids.length;
+  let heads = oids.map((oid, index2) => ({ index: index2, oid }));
+  while (heads.length) {
+    const result = /* @__PURE__ */ new Set();
+    for (const { oid, index: index2 } of heads) {
+      if (!visits[oid])
+        visits[oid] = /* @__PURE__ */ new Set();
+      visits[oid].add(index2);
+      if (visits[oid].size === passes) {
+        result.add(oid);
+      }
+    }
+    if (result.size > 0) {
+      return [...result];
+    }
+    const newheads = /* @__PURE__ */ new Map();
+    for (const { oid, index: index2 } of heads) {
+      try {
+        const { object } = await _readObject({ fs, cache, gitdir, oid });
+        const commit2 = GitCommit.from(object);
+        const { parent } = commit2.parseHeaders();
+        for (const oid2 of parent) {
+          if (!visits[oid2] || !visits[oid2].has(index2)) {
+            newheads.set(oid2 + ":" + index2, { oid: oid2, index: index2 });
+          }
+        }
+      } catch (err) {
+      }
+    }
+    heads = Array.from(newheads.values());
+  }
+  return [];
+}
+async function _merge({
+  fs,
+  cache,
+  dir,
+  gitdir,
+  ours,
+  theirs,
+  fastForward: fastForward2 = true,
+  fastForwardOnly = false,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  message,
+  author,
+  committer,
+  signingKey,
+  onSign,
+  mergeDriver,
+  allowUnrelatedHistories = false
+}) {
+  if (ours === void 0) {
+    ours = await _currentBranch({ fs, gitdir, fullname: true });
+  }
+  ours = await GitRefManager.expand({
+    fs,
+    gitdir,
+    ref: ours
+  });
+  theirs = await GitRefManager.expand({
+    fs,
+    gitdir,
+    ref: theirs
+  });
+  const ourOid = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: ours
+  });
+  const theirOid = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: theirs
+  });
+  const baseOids = await _findMergeBase({
+    fs,
+    cache,
+    gitdir,
+    oids: [ourOid, theirOid]
+  });
+  if (baseOids.length !== 1) {
+    if (baseOids.length === 0 && allowUnrelatedHistories) {
+      baseOids.push("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+    } else {
+      throw new MergeNotSupportedError();
+    }
+  }
+  const baseOid = baseOids[0];
+  if (baseOid === theirOid) {
+    return {
+      oid: ourOid,
+      alreadyMerged: true
+    };
+  }
+  if (fastForward2 && baseOid === ourOid) {
+    if (!dryRun && !noUpdateBranch) {
+      await GitRefManager.writeRef({ fs, gitdir, ref: ours, value: theirOid });
+    }
+    return {
+      oid: theirOid,
+      fastForward: true
+    };
+  } else {
+    if (fastForwardOnly) {
+      throw new FastForwardError();
+    }
+    const tree = await GitIndexManager.acquire(
+      { fs, gitdir, cache, allowUnmerged: false },
+      async (index2) => {
+        return mergeTree({
+          fs,
+          cache,
+          dir,
+          gitdir,
+          index: index2,
+          ourOid,
+          theirOid,
+          baseOid,
+          ourName: abbreviateRef(ours),
+          baseName: "base",
+          theirName: abbreviateRef(theirs),
+          dryRun,
+          abortOnConflict,
+          mergeDriver
+        });
+      }
+    );
+    if (tree instanceof MergeConflictError)
+      throw tree;
+    if (!message) {
+      message = `Merge branch '${abbreviateRef(theirs)}' into ${abbreviateRef(
+        ours
+      )}`;
+    }
+    const oid = await _commit({
+      fs,
+      cache,
+      gitdir,
+      message,
+      ref: ours,
+      tree,
+      parent: [ourOid, theirOid],
+      author,
+      committer,
+      signingKey,
+      onSign,
+      dryRun,
+      noUpdateBranch
+    });
+    return {
+      oid,
+      tree,
+      mergeCommit: true
+    };
+  }
+}
+async function _pull({
+  fs,
+  cache,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  dir,
+  gitdir,
+  ref,
+  url,
+  remote,
+  remoteRef,
+  prune,
+  pruneTags,
+  fastForward: fastForward2,
+  fastForwardOnly,
+  corsProxy,
+  singleBranch,
+  headers,
+  author,
+  committer,
+  signingKey
+}) {
+  try {
+    if (!ref) {
+      const head = await _currentBranch({ fs, gitdir });
+      if (!head) {
+        throw new MissingParameterError("ref");
+      }
+      ref = head;
+    }
+    const { fetchHead, fetchHeadDescription } = await _fetch({
+      fs,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      gitdir,
+      corsProxy,
+      ref,
+      url,
+      remote,
+      remoteRef,
+      singleBranch,
+      headers,
+      prune,
+      pruneTags
+    });
+    await _merge({
+      fs,
+      cache,
+      gitdir,
+      ours: ref,
+      theirs: fetchHead,
+      fastForward: fastForward2,
+      fastForwardOnly,
+      message: `Merge ${fetchHeadDescription}`,
+      author,
+      committer,
+      signingKey,
+      dryRun: false,
+      noUpdateBranch: false
+    });
+    await _checkout({
+      fs,
+      cache,
+      onProgress,
+      dir,
+      gitdir,
+      ref,
+      remote,
+      noCheckout: false
+    });
+  } catch (err) {
+    err.caller = "git.pull";
+    throw err;
+  }
+}
+async function fastForward({
+  fs,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  url,
+  remote,
+  remoteRef,
+  corsProxy,
+  singleBranch,
+  headers = {},
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("http", http);
+    assertParameter("gitdir", gitdir);
+    const thisWillNotBeUsed = {
+      name: "",
+      email: "",
+      timestamp: Date.now(),
+      timezoneOffset: 0
+    };
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _pull({
+      fs: fsp,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      dir,
+      gitdir: updatedGitdir,
+      ref,
+      url,
+      remote,
+      remoteRef,
+      fastForwardOnly: true,
+      corsProxy,
+      singleBranch,
+      headers,
+      author: thisWillNotBeUsed,
+      committer: thisWillNotBeUsed
+    });
+  } catch (err) {
+    err.caller = "git.fastForward";
+    throw err;
+  }
+}
+async function fetch({
+  fs,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  remote,
+  remoteRef,
+  url,
+  corsProxy,
+  depth = null,
+  since = null,
+  exclude = [],
+  relative = false,
+  tags = false,
+  singleBranch = false,
+  headers = {},
+  prune = false,
+  pruneTags = false,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("http", http);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _fetch({
+      fs: fsp,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      gitdir: updatedGitdir,
+      ref,
+      remote,
+      remoteRef,
+      url,
+      corsProxy,
+      depth,
+      since,
+      exclude,
+      relative,
+      tags,
+      singleBranch,
+      headers,
+      prune,
+      pruneTags
+    });
+  } catch (err) {
+    err.caller = "git.fetch";
+    throw err;
+  }
+}
+async function findMergeBase({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oids,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oids", oids);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _findMergeBase({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oids
+    });
+  } catch (err) {
+    err.caller = "git.findMergeBase";
+    throw err;
+  }
+}
+async function _findRoot({ fs, filepath }) {
+  if (await fs.exists(join(filepath, ".git"))) {
+    return filepath;
+  } else {
+    const parent = dirname(filepath);
+    if (parent === filepath) {
+      throw new NotFoundError(`git root for ${filepath}`);
+    }
+    return _findRoot({ fs, filepath: parent });
+  }
+}
+async function findRoot({ fs, filepath }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("filepath", filepath);
+    return await _findRoot({ fs: new FileSystem(fs), filepath });
+  } catch (err) {
+    err.caller = "git.findRoot";
+    throw err;
+  }
+}
+async function getConfig({ fs, dir, gitdir = join(dir, ".git"), path }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("path", path);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _getConfig({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      path
+    });
+  } catch (err) {
+    err.caller = "git.getConfig";
+    throw err;
+  }
+}
+async function _getConfigAll({ fs, gitdir, path }) {
+  const config = await GitConfigManager.get({ fs, gitdir });
+  return config.getall(path);
+}
+async function getConfigAll({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  path
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("path", path);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _getConfigAll({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      path
+    });
+  } catch (err) {
+    err.caller = "git.getConfigAll";
+    throw err;
+  }
+}
+async function getRemoteInfo({
+  http,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  corsProxy,
+  url,
+  headers = {},
+  forPush = false
+}) {
+  try {
+    assertParameter("http", http);
+    assertParameter("url", url);
+    const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
+    const remote = await GitRemoteHTTP2.discover({
+      http,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      headers,
+      protocolVersion: 1
+    });
+    const result = {
+      capabilities: [...remote.capabilities]
+    };
+    for (const [ref, oid] of remote.refs) {
+      const parts = ref.split("/");
+      const last = parts.pop();
+      let o = result;
+      for (const part of parts) {
+        o[part] = o[part] || {};
+        o = o[part];
+      }
+      o[last] = oid;
+    }
+    for (const [symref, ref] of remote.symrefs) {
+      const parts = symref.split("/");
+      const last = parts.pop();
+      let o = result;
+      for (const part of parts) {
+        o[part] = o[part] || {};
+        o = o[part];
+      }
+      o[last] = ref;
+    }
+    return result;
+  } catch (err) {
+    err.caller = "git.getRemoteInfo";
+    throw err;
+  }
+}
+function formatInfoRefs(remote, prefix, symrefs, peelTags) {
+  const refs = [];
+  for (const [key, value] of remote.refs) {
+    if (prefix && !key.startsWith(prefix))
+      continue;
+    if (key.endsWith("^{}")) {
+      if (peelTags) {
+        const _key = key.replace("^{}", "");
+        const last = refs[refs.length - 1];
+        const r = last.ref === _key ? last : refs.find((x) => x.ref === _key);
+        if (r === void 0) {
+          throw new Error("I did not expect this to happen");
+        }
+        r.peeled = value;
+      }
+      continue;
+    }
+    const ref = { ref: key, oid: value };
+    if (symrefs) {
+      if (remote.symrefs.has(key)) {
+        ref.target = remote.symrefs.get(key);
+      }
+    }
+    refs.push(ref);
+  }
+  return refs;
+}
+async function getRemoteInfo2({
+  http,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  corsProxy,
+  url,
+  headers = {},
+  forPush = false,
+  protocolVersion = 2
+}) {
+  try {
+    assertParameter("http", http);
+    assertParameter("url", url);
+    const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
+    const remote = await GitRemoteHTTP2.discover({
+      http,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      headers,
+      protocolVersion
+    });
+    if (remote.protocolVersion === 2) {
+      return {
+        protocolVersion: remote.protocolVersion,
+        capabilities: remote.capabilities2
+      };
+    }
+    const capabilities = {};
+    for (const cap of remote.capabilities) {
+      const [key, value] = cap.split("=");
+      if (value) {
+        capabilities[key] = value;
+      } else {
+        capabilities[key] = true;
+      }
+    }
+    return {
+      protocolVersion: 1,
+      capabilities,
+      refs: formatInfoRefs(remote, void 0, true, true)
+    };
+  } catch (err) {
+    err.caller = "git.getRemoteInfo2";
+    throw err;
+  }
+}
+async function hashObject({
+  type,
+  object,
+  format = "content",
+  oid = void 0
+}) {
+  if (format !== "deflated") {
+    if (format !== "wrapped") {
+      object = GitObject.wrap({ type, object });
+    }
+    oid = await shasum(object);
+  }
+  return { oid, object };
+}
+async function hashBlob({ object }) {
+  try {
+    assertParameter("object", object);
+    if (typeof object === "string") {
+      object = Buffer.from(object, "utf8");
+    } else if (!(object instanceof Uint8Array)) {
+      object = new Uint8Array(object);
+    }
+    const type = "blob";
+    const { oid, object: _object } = await hashObject({
+      type,
+      format: "content",
+      object
+    });
+    return { oid, type, object: _object, format: "wrapped" };
+  } catch (err) {
+    err.caller = "git.hashBlob";
+    throw err;
+  }
+}
+async function _indexPack({
+  fs,
+  cache,
+  onProgress,
+  dir,
+  gitdir,
+  filepath
+}) {
+  try {
+    filepath = join(dir, filepath);
+    const pack = await fs.read(filepath);
+    const getExternalRefDelta = (oid) => _readObject({ fs, cache, gitdir, oid });
+    const idx = await GitPackIndex.fromPack({
+      pack,
+      getExternalRefDelta,
+      onProgress
+    });
+    await fs.write(filepath.replace(/\.pack$/, ".idx"), await idx.toBuffer());
+    return {
+      oids: [...idx.hashes]
+    };
+  } catch (err) {
+    err.caller = "git.indexPack";
+    throw err;
+  }
+}
+async function indexPack({
+  fs,
+  onProgress,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("dir", dir);
+    assertParameter("gitdir", dir);
+    assertParameter("filepath", filepath);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _indexPack({
+      fs: fsp,
+      cache,
+      onProgress,
+      dir,
+      gitdir: updatedGitdir,
+      filepath
+    });
+  } catch (err) {
+    err.caller = "git.indexPack";
+    throw err;
+  }
+}
 async function init({
   fs,
   bare = false,
@@ -11764,10 +12226,391 @@ async function init({
     throw err;
   }
 }
+async function _isDescendent({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  ancestor,
+  depth
+}) {
+  const shallows = await GitShallowManager.read({ fs, gitdir });
+  if (!oid) {
+    throw new MissingParameterError("oid");
+  }
+  if (!ancestor) {
+    throw new MissingParameterError("ancestor");
+  }
+  if (oid === ancestor)
+    return false;
+  const queue = [oid];
+  const visited = /* @__PURE__ */ new Set();
+  let searchdepth = 0;
+  while (queue.length) {
+    if (searchdepth++ === depth) {
+      throw new MaxDepthError(depth);
+    }
+    const oid2 = queue.shift();
+    const { type, object } = await _readObject({
+      fs,
+      cache,
+      gitdir,
+      oid: oid2
+    });
+    if (type !== "commit") {
+      throw new ObjectTypeError(oid2, type, "commit");
+    }
+    const commit2 = GitCommit.from(object).parse();
+    for (const parent of commit2.parent) {
+      if (parent === ancestor)
+        return true;
+    }
+    if (!shallows.has(oid2)) {
+      for (const parent of commit2.parent) {
+        if (!visited.has(parent)) {
+          queue.push(parent);
+          visited.add(parent);
+        }
+      }
+    }
+  }
+  return false;
+}
+async function isDescendent({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  ancestor,
+  depth = -1,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    assertParameter("ancestor", ancestor);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _isDescendent({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid,
+      ancestor,
+      depth
+    });
+  } catch (err) {
+    err.caller = "git.isDescendent";
+    throw err;
+  }
+}
+async function isIgnored({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("dir", dir);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitIgnoreManager.isIgnored({
+      fs: fsp,
+      dir,
+      gitdir: updatedGitdir,
+      filepath
+    });
+  } catch (err) {
+    err.caller = "git.isIgnored";
+    throw err;
+  }
+}
+async function listBranches({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  remote
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitRefManager.listBranches({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      remote
+    });
+  } catch (err) {
+    err.caller = "git.listBranches";
+    throw err;
+  }
+}
+async function _listFiles({ fs, gitdir, ref, cache }) {
+  if (ref) {
+    const oid = await GitRefManager.resolve({ gitdir, fs, ref });
+    const filenames = [];
+    await accumulateFilesFromOid({
+      fs,
+      cache,
+      gitdir,
+      oid,
+      filenames,
+      prefix: ""
+    });
+    return filenames;
+  } else {
+    return GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        return index2.entries.map((x) => x.path);
+      }
+    );
+  }
+}
+async function accumulateFilesFromOid({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  filenames,
+  prefix
+}) {
+  const { tree } = await _readTree({ fs, cache, gitdir, oid });
+  for (const entry of tree) {
+    if (entry.type === "tree") {
+      await accumulateFilesFromOid({
+        fs,
+        cache,
+        gitdir,
+        oid: entry.oid,
+        filenames,
+        prefix: join(prefix, entry.path)
+      });
+    } else {
+      filenames.push(join(prefix, entry.path));
+    }
+  }
+}
+async function listFiles({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _listFiles({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      ref
+    });
+  } catch (err) {
+    err.caller = "git.listFiles";
+    throw err;
+  }
+}
+async function _listNotes({ fs, cache, gitdir, ref }) {
+  let parent;
+  try {
+    parent = await GitRefManager.resolve({ gitdir, fs, ref });
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return [];
+    }
+  }
+  const result = await _readTree({
+    fs,
+    cache,
+    gitdir,
+    oid: parent
+  });
+  const notes = result.tree.map((entry) => ({
+    target: entry.path,
+    note: entry.oid
+  }));
+  return notes;
+}
+async function listNotes({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref = "refs/notes/commits",
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _listNotes({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      ref
+    });
+  } catch (err) {
+    err.caller = "git.listNotes";
+    throw err;
+  }
+}
+async function listRefs({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitRefManager.listRefs({ fs: fsp, gitdir: updatedGitdir, filepath });
+  } catch (err) {
+    err.caller = "git.listRefs";
+    throw err;
+  }
+}
+async function _listRemotes({ fs, gitdir }) {
+  const config = await GitConfigManager.get({ fs, gitdir });
+  const remoteNames = await config.getSubsections("remote");
+  const remotes = Promise.all(
+    remoteNames.map(async (remote) => {
+      const url = await config.get(`remote.${remote}.url`);
+      return { remote, url };
+    })
+  );
+  return remotes;
+}
+async function listRemotes({ fs, dir, gitdir = join(dir, ".git") }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _listRemotes({
+      fs: fsp,
+      gitdir: updatedGitdir
+    });
+  } catch (err) {
+    err.caller = "git.listRemotes";
+    throw err;
+  }
+}
+async function parseListRefsResponse(stream) {
+  const read = GitPktLine.streamReader(stream);
+  const refs = [];
+  let line;
+  while (true) {
+    line = await read();
+    if (line === true)
+      break;
+    if (line === null)
+      continue;
+    line = line.toString("utf8").replace(/\n$/, "");
+    const [oid, ref, ...attrs] = line.split(" ");
+    const r = { ref, oid };
+    for (const attr of attrs) {
+      const [name, value] = attr.split(":");
+      if (name === "symref-target") {
+        r.target = value;
+      } else if (name === "peeled") {
+        r.peeled = value;
+      }
+    }
+    refs.push(r);
+  }
+  return refs;
+}
+async function writeListRefsRequest({ prefix, symrefs, peelTags }) {
+  const packstream = [];
+  packstream.push(GitPktLine.encode("command=ls-refs\n"));
+  packstream.push(GitPktLine.encode(`agent=${pkg.agent}
+`));
+  if (peelTags || symrefs || prefix) {
+    packstream.push(GitPktLine.delim());
+  }
+  if (peelTags)
+    packstream.push(GitPktLine.encode("peel"));
+  if (symrefs)
+    packstream.push(GitPktLine.encode("symrefs"));
+  if (prefix)
+    packstream.push(GitPktLine.encode(`ref-prefix ${prefix}`));
+  packstream.push(GitPktLine.flush());
+  return packstream;
+}
+async function listServerRefs({
+  http,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  corsProxy,
+  url,
+  headers = {},
+  forPush = false,
+  protocolVersion = 2,
+  prefix,
+  symrefs,
+  peelTags
+}) {
+  try {
+    assertParameter("http", http);
+    assertParameter("url", url);
+    const remote = await GitRemoteHTTP.discover({
+      http,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      headers,
+      protocolVersion
+    });
+    if (remote.protocolVersion === 1) {
+      return formatInfoRefs(remote, prefix, symrefs, peelTags);
+    }
+    const body = await writeListRefsRequest({ prefix, symrefs, peelTags });
+    const res = await GitRemoteHTTP.connect({
+      http,
+      auth: remote.auth,
+      headers,
+      corsProxy,
+      service: forPush ? "git-receive-pack" : "git-upload-pack",
+      url,
+      body
+    });
+    return parseListRefsResponse(res.body);
+  } catch (err) {
+    err.caller = "git.listServerRefs";
+    throw err;
+  }
+}
+async function listTags({ fs, dir, gitdir = join(dir, ".git") }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitRefManager.listTags({ fs: fsp, gitdir: updatedGitdir });
+  } catch (err) {
+    err.caller = "git.listTags";
+    throw err;
+  }
+}
 function compareAge(a, b) {
   return a.committer.timestamp - b.committer.timestamp;
 }
-var EMPTY_OID = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
 async function resolveFileIdInTree({ fs, cache, gitdir, oid, fileId }) {
   if (fileId === EMPTY_OID)
     return;
@@ -11992,6 +12835,1586 @@ async function log({
     throw err;
   }
 }
+async function merge({
+  fs: _fs,
+  onSign,
+  dir,
+  gitdir = join(dir, ".git"),
+  ours,
+  theirs,
+  fastForward: fastForward2 = true,
+  fastForwardOnly = false,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  message,
+  author: _author,
+  committer: _committer,
+  signingKey,
+  cache = {},
+  mergeDriver,
+  allowUnrelatedHistories = false
+}) {
+  try {
+    assertParameter("fs", _fs);
+    if (signingKey) {
+      assertParameter("onSign", onSign);
+    }
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
+    if (!author && (!fastForwardOnly || !fastForward2)) {
+      throw new MissingNameError("author");
+    }
+    const committer = await normalizeCommitterObject({
+      fs,
+      gitdir: updatedGitdir,
+      author,
+      committer: _committer
+    });
+    if (!committer && (!fastForwardOnly || !fastForward2)) {
+      throw new MissingNameError("committer");
+    }
+    return await _merge({
+      fs,
+      cache,
+      dir,
+      gitdir: updatedGitdir,
+      ours,
+      theirs,
+      fastForward: fastForward2,
+      fastForwardOnly,
+      dryRun,
+      noUpdateBranch,
+      abortOnConflict,
+      message,
+      author,
+      committer,
+      signingKey,
+      onSign,
+      mergeDriver,
+      allowUnrelatedHistories
+    });
+  } catch (err) {
+    err.caller = "git.merge";
+    throw err;
+  }
+}
+async function _pack({
+  fs,
+  cache,
+  dir,
+  gitdir = join(dir, ".git"),
+  oids
+}) {
+  const hash = new import_sha1.default();
+  const outputStream = [];
+  function write(chunk, enc) {
+    const buff = Buffer.from(chunk, enc);
+    outputStream.push(buff);
+    hash.update(buff);
+  }
+  async function writeObject2({ stype, object }) {
+    const type = types[stype];
+    let length = object.length;
+    let multibyte = length > 15 ? 128 : 0;
+    const lastFour = length & 15;
+    length = length >>> 4;
+    let byte = (multibyte | type | lastFour).toString(16);
+    write(byte, "hex");
+    while (multibyte) {
+      multibyte = length > 127 ? 128 : 0;
+      byte = multibyte | length & 127;
+      write(padHex(2, byte), "hex");
+      length = length >>> 7;
+    }
+    write(Buffer.from(await deflate(object)));
+  }
+  write("PACK");
+  write("00000002", "hex");
+  write(padHex(8, oids.length), "hex");
+  for (const oid of oids) {
+    const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+    await writeObject2({ write, object, stype: type });
+  }
+  const digest = hash.digest();
+  outputStream.push(digest);
+  return outputStream;
+}
+async function _packObjects({ fs, cache, gitdir, oids, write }) {
+  const buffers = await _pack({ fs, cache, gitdir, oids });
+  const packfile = Buffer.from(await collect(buffers));
+  const packfileSha = packfile.slice(-20).toString("hex");
+  const filename = `pack-${packfileSha}.pack`;
+  if (write) {
+    await fs.write(join(gitdir, `objects/pack/${filename}`), packfile);
+    return { filename };
+  }
+  return {
+    filename,
+    packfile: new Uint8Array(packfile)
+  };
+}
+async function packObjects({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oids,
+  write = false,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oids", oids);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _packObjects({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oids,
+      write
+    });
+  } catch (err) {
+    err.caller = "git.packObjects";
+    throw err;
+  }
+}
+async function pull({
+  fs: _fs,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  url,
+  remote,
+  remoteRef,
+  prune = false,
+  pruneTags = false,
+  fastForward: fastForward2 = true,
+  fastForwardOnly = false,
+  corsProxy,
+  singleBranch,
+  headers = {},
+  author: _author,
+  committer: _committer,
+  signingKey,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
+    if (!author)
+      throw new MissingNameError("author");
+    const committer = await normalizeCommitterObject({
+      fs,
+      gitdir: updatedGitdir,
+      author,
+      committer: _committer
+    });
+    if (!committer)
+      throw new MissingNameError("committer");
+    return await _pull({
+      fs,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      dir,
+      gitdir: updatedGitdir,
+      ref,
+      url,
+      remote,
+      remoteRef,
+      fastForward: fastForward2,
+      fastForwardOnly,
+      corsProxy,
+      singleBranch,
+      headers,
+      author,
+      committer,
+      signingKey,
+      prune,
+      pruneTags
+    });
+  } catch (err) {
+    err.caller = "git.pull";
+    throw err;
+  }
+}
+async function listCommitsAndTags({
+  fs,
+  cache,
+  dir,
+  gitdir = join(dir, ".git"),
+  start,
+  finish
+}) {
+  const shallows = await GitShallowManager.read({ fs, gitdir });
+  const startingSet = /* @__PURE__ */ new Set();
+  const finishingSet = /* @__PURE__ */ new Set();
+  for (const ref of start) {
+    startingSet.add(await GitRefManager.resolve({ fs, gitdir, ref }));
+  }
+  for (const ref of finish) {
+    try {
+      const oid = await GitRefManager.resolve({ fs, gitdir, ref });
+      finishingSet.add(oid);
+    } catch (err) {
+    }
+  }
+  const visited = /* @__PURE__ */ new Set();
+  async function walk2(oid) {
+    visited.add(oid);
+    const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+    if (type === "tag") {
+      const tag2 = GitAnnotatedTag.from(object);
+      const commit2 = tag2.headers().object;
+      return walk2(commit2);
+    }
+    if (type !== "commit") {
+      throw new ObjectTypeError(oid, type, "commit");
+    }
+    if (!shallows.has(oid)) {
+      const commit2 = GitCommit.from(object);
+      const parents = commit2.headers().parent;
+      for (oid of parents) {
+        if (!finishingSet.has(oid) && !visited.has(oid)) {
+          await walk2(oid);
+        }
+      }
+    }
+  }
+  for (const oid of startingSet) {
+    await walk2(oid);
+  }
+  return visited;
+}
+async function listObjects({
+  fs,
+  cache,
+  dir,
+  gitdir = join(dir, ".git"),
+  oids
+}) {
+  const visited = /* @__PURE__ */ new Set();
+  async function walk2(oid) {
+    if (visited.has(oid))
+      return;
+    visited.add(oid);
+    const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+    if (type === "tag") {
+      const tag2 = GitAnnotatedTag.from(object);
+      const obj = tag2.headers().object;
+      await walk2(obj);
+    } else if (type === "commit") {
+      const commit2 = GitCommit.from(object);
+      const tree = commit2.headers().tree;
+      await walk2(tree);
+    } else if (type === "tree") {
+      const tree = GitTree.from(object);
+      for (const entry of tree) {
+        if (entry.type === "blob") {
+          visited.add(entry.oid);
+        }
+        if (entry.type === "tree") {
+          await walk2(entry.oid);
+        }
+      }
+    }
+  }
+  for (const oid of oids) {
+    await walk2(oid);
+  }
+  return visited;
+}
+async function parseReceivePackResponse(packfile) {
+  const result = {};
+  let response = "";
+  const read = GitPktLine.streamReader(packfile);
+  let line = await read();
+  while (line !== true) {
+    if (line !== null)
+      response += line.toString("utf8") + "\n";
+    line = await read();
+  }
+  const lines = response.toString("utf8").split("\n");
+  line = lines.shift();
+  if (!line.startsWith("unpack ")) {
+    throw new ParseError('unpack ok" or "unpack [error message]', line);
+  }
+  result.ok = line === "unpack ok";
+  if (!result.ok) {
+    result.error = line.slice("unpack ".length);
+  }
+  result.refs = {};
+  for (const line2 of lines) {
+    if (line2.trim() === "")
+      continue;
+    const status2 = line2.slice(0, 2);
+    const refAndMessage = line2.slice(3);
+    let space = refAndMessage.indexOf(" ");
+    if (space === -1)
+      space = refAndMessage.length;
+    const ref = refAndMessage.slice(0, space);
+    const error = refAndMessage.slice(space + 1);
+    result.refs[ref] = {
+      ok: status2 === "ok",
+      error
+    };
+  }
+  return result;
+}
+async function writeReceivePackRequest({
+  capabilities = [],
+  triplets = []
+}) {
+  const packstream = [];
+  let capsFirstLine = `\0 ${capabilities.join(" ")}`;
+  for (const trip of triplets) {
+    packstream.push(
+      GitPktLine.encode(
+        `${trip.oldoid} ${trip.oid} ${trip.fullRef}${capsFirstLine}
+`
+      )
+    );
+    capsFirstLine = "";
+  }
+  packstream.push(GitPktLine.flush());
+  return packstream;
+}
+async function _push({
+  fs,
+  cache,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  onPrePush,
+  gitdir,
+  ref: _ref,
+  remoteRef: _remoteRef,
+  remote,
+  url: _url,
+  force = false,
+  delete: _delete = false,
+  corsProxy,
+  headers = {}
+}) {
+  const ref = _ref || await _currentBranch({ fs, gitdir });
+  if (typeof ref === "undefined") {
+    throw new MissingParameterError("ref");
+  }
+  const config = await GitConfigManager.get({ fs, gitdir });
+  remote = remote || await config.get(`branch.${ref}.pushRemote`) || await config.get("remote.pushDefault") || await config.get(`branch.${ref}.remote`) || "origin";
+  const url = _url || await config.get(`remote.${remote}.pushurl`) || await config.get(`remote.${remote}.url`);
+  if (typeof url === "undefined") {
+    throw new MissingParameterError("remote OR url");
+  }
+  const remoteRef = _remoteRef || await config.get(`branch.${ref}.merge`);
+  if (typeof url === "undefined") {
+    throw new MissingParameterError("remoteRef");
+  }
+  if (corsProxy === void 0) {
+    corsProxy = await config.get("http.corsProxy");
+  }
+  const fullRef = await GitRefManager.expand({ fs, gitdir, ref });
+  const oid = _delete ? "0000000000000000000000000000000000000000" : await GitRefManager.resolve({ fs, gitdir, ref: fullRef });
+  const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
+  const httpRemote = await GitRemoteHTTP2.discover({
+    http,
+    onAuth,
+    onAuthSuccess,
+    onAuthFailure,
+    corsProxy,
+    service: "git-receive-pack",
+    url,
+    headers,
+    protocolVersion: 1
+  });
+  const auth = httpRemote.auth;
+  let fullRemoteRef;
+  if (!remoteRef) {
+    fullRemoteRef = fullRef;
+  } else {
+    try {
+      fullRemoteRef = await GitRefManager.expandAgainstMap({
+        ref: remoteRef,
+        map: httpRemote.refs
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        fullRemoteRef = remoteRef.startsWith("refs/") ? remoteRef : `refs/heads/${remoteRef}`;
+      } else {
+        throw err;
+      }
+    }
+  }
+  const oldoid = httpRemote.refs.get(fullRemoteRef) || "0000000000000000000000000000000000000000";
+  if (onPrePush) {
+    const hookCancel = await onPrePush({
+      remote,
+      url,
+      localRef: { ref: _delete ? "(delete)" : fullRef, oid },
+      remoteRef: { ref: fullRemoteRef, oid: oldoid }
+    });
+    if (!hookCancel)
+      throw new UserCanceledError();
+  }
+  const thinPack = !httpRemote.capabilities.has("no-thin");
+  let objects = /* @__PURE__ */ new Set();
+  if (!_delete) {
+    const finish = [...httpRemote.refs.values()];
+    let skipObjects = /* @__PURE__ */ new Set();
+    if (oldoid !== "0000000000000000000000000000000000000000") {
+      const mergebase = await _findMergeBase({
+        fs,
+        cache,
+        gitdir,
+        oids: [oid, oldoid]
+      });
+      for (const oid2 of mergebase)
+        finish.push(oid2);
+      if (thinPack) {
+        skipObjects = await listObjects({ fs, cache, gitdir, oids: mergebase });
+      }
+    }
+    if (!finish.includes(oid)) {
+      const commits = await listCommitsAndTags({
+        fs,
+        cache,
+        gitdir,
+        start: [oid],
+        finish
+      });
+      objects = await listObjects({ fs, cache, gitdir, oids: commits });
+    }
+    if (thinPack) {
+      try {
+        const ref2 = await GitRefManager.resolve({
+          fs,
+          gitdir,
+          ref: `refs/remotes/${remote}/HEAD`,
+          depth: 2
+        });
+        const { oid: oid2 } = await GitRefManager.resolveAgainstMap({
+          ref: ref2.replace(`refs/remotes/${remote}/`, ""),
+          fullref: ref2,
+          map: httpRemote.refs
+        });
+        const oids = [oid2];
+        for (const oid3 of await listObjects({ fs, cache, gitdir, oids })) {
+          skipObjects.add(oid3);
+        }
+      } catch (e) {
+      }
+      for (const oid2 of skipObjects) {
+        objects.delete(oid2);
+      }
+    }
+    if (oid === oldoid)
+      force = true;
+    if (!force) {
+      if (fullRef.startsWith("refs/tags") && oldoid !== "0000000000000000000000000000000000000000") {
+        throw new PushRejectedError("tag-exists");
+      }
+      if (oid !== "0000000000000000000000000000000000000000" && oldoid !== "0000000000000000000000000000000000000000" && !await _isDescendent({
+        fs,
+        cache,
+        gitdir,
+        oid,
+        ancestor: oldoid,
+        depth: -1
+      })) {
+        throw new PushRejectedError("not-fast-forward");
+      }
+    }
+  }
+  const capabilities = filterCapabilities(
+    [...httpRemote.capabilities],
+    ["report-status", "side-band-64k", `agent=${pkg.agent}`]
+  );
+  const packstream1 = await writeReceivePackRequest({
+    capabilities,
+    triplets: [{ oldoid, oid, fullRef: fullRemoteRef }]
+  });
+  const packstream2 = _delete ? [] : await _pack({
+    fs,
+    cache,
+    gitdir,
+    oids: [...objects]
+  });
+  const res = await GitRemoteHTTP2.connect({
+    http,
+    onProgress,
+    corsProxy,
+    service: "git-receive-pack",
+    url,
+    auth,
+    headers,
+    body: [...packstream1, ...packstream2]
+  });
+  const { packfile, progress } = await GitSideBand.demux(res.body);
+  if (onMessage) {
+    const lines = splitLines(progress);
+    forAwait(lines, async (line) => {
+      await onMessage(line);
+    });
+  }
+  const result = await parseReceivePackResponse(packfile);
+  if (res.headers) {
+    result.headers = res.headers;
+  }
+  if (remote && result.ok && result.refs[fullRemoteRef].ok && !fullRef.startsWith("refs/tags")) {
+    const ref2 = `refs/remotes/${remote}/${fullRemoteRef.replace(
+      "refs/heads",
+      ""
+    )}`;
+    if (_delete) {
+      await GitRefManager.deleteRef({ fs, gitdir, ref: ref2 });
+    } else {
+      await GitRefManager.writeRef({ fs, gitdir, ref: ref2, value: oid });
+    }
+  }
+  if (result.ok && Object.values(result.refs).every((result2) => result2.ok)) {
+    return result;
+  } else {
+    const prettyDetails = Object.entries(result.refs).filter(([k, v]) => !v.ok).map(([k, v]) => `
+  - ${k}: ${v.error}`).join("");
+    throw new GitPushError(prettyDetails, result);
+  }
+}
+async function push({
+  fs,
+  http,
+  onProgress,
+  onMessage,
+  onAuth,
+  onAuthSuccess,
+  onAuthFailure,
+  onPrePush,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  remoteRef,
+  remote = "origin",
+  url,
+  force = false,
+  delete: _delete = false,
+  corsProxy,
+  headers = {},
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("http", http);
+    assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _push({
+      fs: fsp,
+      cache,
+      http,
+      onProgress,
+      onMessage,
+      onAuth,
+      onAuthSuccess,
+      onAuthFailure,
+      onPrePush,
+      gitdir: updatedGitdir,
+      ref,
+      remoteRef,
+      remote,
+      url,
+      force,
+      delete: _delete,
+      corsProxy,
+      headers
+    });
+  } catch (err) {
+    err.caller = "git.push";
+    throw err;
+  }
+}
+async function resolveBlob({ fs, cache, gitdir, oid }) {
+  const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+  if (type === "tag") {
+    oid = GitAnnotatedTag.from(object).parse().object;
+    return resolveBlob({ fs, cache, gitdir, oid });
+  }
+  if (type !== "blob") {
+    throw new ObjectTypeError(oid, type, "blob");
+  }
+  return { oid, blob: new Uint8Array(object) };
+}
+async function _readBlob({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  filepath = void 0
+}) {
+  if (filepath !== void 0) {
+    oid = await resolveFilepath({ fs, cache, gitdir, oid, filepath });
+  }
+  const blob = await resolveBlob({
+    fs,
+    cache,
+    gitdir,
+    oid
+  });
+  return blob;
+}
+async function readBlob({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  filepath,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _readBlob({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid,
+      filepath
+    });
+  } catch (err) {
+    err.caller = "git.readBlob";
+    throw err;
+  }
+}
+async function readCommit({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _readCommit({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid
+    });
+  } catch (err) {
+    err.caller = "git.readCommit";
+    throw err;
+  }
+}
+async function _readNote({
+  fs,
+  cache,
+  gitdir,
+  ref = "refs/notes/commits",
+  oid
+}) {
+  const parent = await GitRefManager.resolve({ gitdir, fs, ref });
+  const { blob } = await _readBlob({
+    fs,
+    cache,
+    gitdir,
+    oid: parent,
+    filepath: oid
+  });
+  return blob;
+}
+async function readNote({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref = "refs/notes/commits",
+  oid,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _readNote({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      ref,
+      oid
+    });
+  } catch (err) {
+    err.caller = "git.readNote";
+    throw err;
+  }
+}
+async function readObject({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  format = "parsed",
+  filepath = void 0,
+  encoding = void 0,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    if (filepath !== void 0) {
+      oid = await resolveFilepath({
+        fs,
+        cache,
+        gitdir: updatedGitdir,
+        oid,
+        filepath
+      });
+    }
+    const _format = format === "parsed" ? "content" : format;
+    const result = await _readObject({
+      fs,
+      cache,
+      gitdir: updatedGitdir,
+      oid,
+      format: _format
+    });
+    result.oid = oid;
+    if (format === "parsed") {
+      result.format = "parsed";
+      switch (result.type) {
+        case "commit":
+          result.object = GitCommit.from(result.object).parse();
+          break;
+        case "tree":
+          result.object = GitTree.from(result.object).entries();
+          break;
+        case "blob":
+          if (encoding) {
+            result.object = result.object.toString(encoding);
+          } else {
+            result.object = new Uint8Array(result.object);
+            result.format = "content";
+          }
+          break;
+        case "tag":
+          result.object = GitAnnotatedTag.from(result.object).parse();
+          break;
+        default:
+          throw new ObjectTypeError(
+            result.oid,
+            result.type,
+            "blob|commit|tag|tree"
+          );
+      }
+    } else if (result.format === "deflated" || result.format === "wrapped") {
+      result.type = result.format;
+    }
+    return result;
+  } catch (err) {
+    err.caller = "git.readObject";
+    throw err;
+  }
+}
+async function _readTag({ fs, cache, gitdir, oid }) {
+  const { type, object } = await _readObject({
+    fs,
+    cache,
+    gitdir,
+    oid,
+    format: "content"
+  });
+  if (type !== "tag") {
+    throw new ObjectTypeError(oid, type, "tag");
+  }
+  const tag2 = GitAnnotatedTag.from(object);
+  const result = {
+    oid,
+    tag: tag2.parse(),
+    payload: tag2.payload()
+  };
+  return result;
+}
+async function readTag({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _readTag({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid
+    });
+  } catch (err) {
+    err.caller = "git.readTag";
+    throw err;
+  }
+}
+async function readTree({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  filepath = void 0,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _readTree({
+      fs: fsp,
+      cache,
+      gitdir: updatedGitdir,
+      oid,
+      filepath
+    });
+  } catch (err) {
+    err.caller = "git.readTree";
+    throw err;
+  }
+}
+async function remove({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fsp = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    await GitIndexManager.acquire(
+      { fs: fsp, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        index2.delete({ filepath });
+      }
+    );
+  } catch (err) {
+    err.caller = "git.remove";
+    throw err;
+  }
+}
+async function _removeNote({
+  fs,
+  cache,
+  onSign,
+  gitdir,
+  ref = "refs/notes/commits",
+  oid,
+  author,
+  committer,
+  signingKey
+}) {
+  let parent;
+  try {
+    parent = await GitRefManager.resolve({ gitdir, fs, ref });
+  } catch (err) {
+    if (!(err instanceof NotFoundError)) {
+      throw err;
+    }
+  }
+  const result = await _readTree({
+    fs,
+    cache,
+    gitdir,
+    oid: parent || "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+  });
+  let tree = result.tree;
+  tree = tree.filter((entry) => entry.path !== oid);
+  const treeOid = await _writeTree({
+    fs,
+    gitdir,
+    tree
+  });
+  const commitOid = await _commit({
+    fs,
+    cache,
+    onSign,
+    gitdir,
+    ref,
+    tree: treeOid,
+    parent: parent && [parent],
+    message: `Note removed by 'isomorphic-git removeNote'
+`,
+    author,
+    committer,
+    signingKey
+  });
+  return commitOid;
+}
+async function removeNote({
+  fs: _fs,
+  onSign,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref = "refs/notes/commits",
+  oid,
+  author: _author,
+  committer: _committer,
+  signingKey,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
+    if (!author)
+      throw new MissingNameError("author");
+    const committer = await normalizeCommitterObject({
+      fs,
+      gitdir: updatedGitdir,
+      author,
+      committer: _committer
+    });
+    if (!committer)
+      throw new MissingNameError("committer");
+    return await _removeNote({
+      fs,
+      cache,
+      onSign,
+      gitdir: updatedGitdir,
+      ref,
+      oid,
+      author,
+      committer,
+      signingKey
+    });
+  } catch (err) {
+    err.caller = "git.removeNote";
+    throw err;
+  }
+}
+async function _renameBranch({
+  fs,
+  gitdir,
+  oldref,
+  ref,
+  checkout: checkout2 = false
+}) {
+  if (!isValidRef(ref, true)) {
+    throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
+  }
+  if (!isValidRef(oldref, true)) {
+    throw new InvalidRefNameError(oldref, import_clean_git_ref.default.clean(oldref));
+  }
+  const fulloldref = `refs/heads/${oldref}`;
+  const fullnewref = `refs/heads/${ref}`;
+  const newexist = await GitRefManager.exists({ fs, gitdir, ref: fullnewref });
+  if (newexist) {
+    throw new AlreadyExistsError("branch", ref, false);
+  }
+  const value = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: fulloldref,
+    depth: 1
+  });
+  await GitRefManager.writeRef({ fs, gitdir, ref: fullnewref, value });
+  await GitRefManager.deleteRef({ fs, gitdir, ref: fulloldref });
+  const fullCurrentBranchRef = await _currentBranch({
+    fs,
+    gitdir,
+    fullname: true
+  });
+  const isCurrentBranch = fullCurrentBranchRef === fulloldref;
+  if (checkout2 || isCurrentBranch) {
+    await GitRefManager.writeSymbolicRef({
+      fs,
+      gitdir,
+      ref: "HEAD",
+      value: fullnewref
+    });
+  }
+}
+async function renameBranch({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  oldref,
+  checkout: checkout2 = false
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    assertParameter("oldref", oldref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _renameBranch({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref,
+      oldref,
+      checkout: checkout2
+    });
+  } catch (err) {
+    err.caller = "git.renameBranch";
+    throw err;
+  }
+}
+async function hashObject$1({ gitdir, type, object }) {
+  return shasum(GitObject.wrap({ type, object }));
+}
+async function resetIndex({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath,
+  ref,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    let oid;
+    let workdirOid;
+    try {
+      oid = await GitRefManager.resolve({
+        fs,
+        gitdir: updatedGitdir,
+        ref: ref || "HEAD"
+      });
+    } catch (e) {
+      if (ref) {
+        throw e;
+      }
+    }
+    if (oid) {
+      try {
+        oid = await resolveFilepath({
+          fs,
+          cache,
+          gitdir: updatedGitdir,
+          oid,
+          filepath
+        });
+      } catch (e) {
+        oid = null;
+      }
+    }
+    let stats = {
+      ctime: /* @__PURE__ */ new Date(0),
+      mtime: /* @__PURE__ */ new Date(0),
+      dev: 0,
+      ino: 0,
+      mode: 0,
+      uid: 0,
+      gid: 0,
+      size: 0
+    };
+    const object = dir && await fs.read(join(dir, filepath));
+    if (object) {
+      workdirOid = await hashObject$1({
+        gitdir: updatedGitdir,
+        type: "blob",
+        object
+      });
+      if (oid === workdirOid) {
+        stats = await fs.lstat(join(dir, filepath));
+      }
+    }
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        index2.delete({ filepath });
+        if (oid) {
+          index2.insert({ filepath, stats, oid });
+        }
+      }
+    );
+  } catch (err) {
+    err.caller = "git.reset";
+    throw err;
+  }
+}
+async function resolveRef({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  depth
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    const oid = await GitRefManager.resolve({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      ref,
+      depth
+    });
+    return oid;
+  } catch (err) {
+    err.caller = "git.resolveRef";
+    throw err;
+  }
+}
+async function setConfig({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  path,
+  value,
+  append = false
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("path", path);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const config = await GitConfigManager.get({ fs, gitdir: updatedGitdir });
+    if (append) {
+      await config.append(path, value);
+    } else {
+      await config.set(path, value);
+    }
+    await GitConfigManager.save({ fs, gitdir: updatedGitdir, config });
+  } catch (err) {
+    err.caller = "git.setConfig";
+    throw err;
+  }
+}
+async function _writeCommit({ fs, gitdir, commit: commit2 }) {
+  const object = GitCommit.from(commit2).toObject();
+  const oid = await _writeObject({
+    fs,
+    gitdir,
+    type: "commit",
+    object,
+    format: "content"
+  });
+  return oid;
+}
+async function _createStashCommit({ fs, dir, gitdir, message = "" }) {
+  const stashMgr = new GitStashManager({ fs, dir, gitdir });
+  await stashMgr.getAuthor();
+  const branch2 = await _currentBranch({
+    fs,
+    gitdir,
+    fullname: false
+  });
+  const headCommit = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: "HEAD"
+  });
+  const headCommitObj = await readCommit({ fs, dir, gitdir, oid: headCommit });
+  const headMsg = headCommitObj.commit.message;
+  const stashCommitParents = [headCommit];
+  let stashCommitTree = null;
+  let workDirCompareBase = TREE({ ref: "HEAD" });
+  const indexTree = await writeTreeChanges({
+    fs,
+    dir,
+    gitdir,
+    treePair: [TREE({ ref: "HEAD" }), "stage"]
+  });
+  if (indexTree) {
+    const stashCommitOne = await stashMgr.writeStashCommit({
+      message: `stash-Index: WIP on ${branch2} - ${(/* @__PURE__ */ new Date()).toISOString()}`,
+      tree: indexTree,
+      parent: stashCommitParents
+    });
+    stashCommitParents.push(stashCommitOne);
+    stashCommitTree = indexTree;
+    workDirCompareBase = STAGE();
+  }
+  const workingTree = await writeTreeChanges({
+    fs,
+    dir,
+    gitdir,
+    treePair: [workDirCompareBase, "workdir"]
+  });
+  if (workingTree) {
+    const workingHeadCommit = await stashMgr.writeStashCommit({
+      message: `stash-WorkDir: WIP on ${branch2} - ${(/* @__PURE__ */ new Date()).toISOString()}`,
+      tree: workingTree,
+      parent: [stashCommitParents[stashCommitParents.length - 1]]
+    });
+    stashCommitParents.push(workingHeadCommit);
+    stashCommitTree = workingTree;
+  }
+  if (!stashCommitTree || !indexTree && !workingTree) {
+    throw new NotFoundError("changes, nothing to stash");
+  }
+  const stashMsg = (message.trim() || `WIP on ${branch2}`) + `: ${headCommit.substring(0, 7)} ${headMsg}`;
+  const stashCommit = await stashMgr.writeStashCommit({
+    message: stashMsg,
+    tree: stashCommitTree,
+    parent: stashCommitParents
+  });
+  return { stashCommit, stashMsg, branch: branch2, stashMgr };
+}
+async function _stashPush({ fs, dir, gitdir, message = "" }) {
+  const { stashCommit, stashMsg, branch: branch2, stashMgr } = await _createStashCommit({
+    fs,
+    dir,
+    gitdir,
+    message
+  });
+  await stashMgr.writeStashRef(stashCommit);
+  await stashMgr.writeStashReflogEntry({
+    stashCommit,
+    message: stashMsg
+  });
+  await checkout({
+    fs,
+    dir,
+    gitdir,
+    ref: branch2,
+    track: false,
+    force: true
+    // force checkout to discard changes
+  });
+  return stashCommit;
+}
+async function _stashCreate({ fs, dir, gitdir, message = "" }) {
+  const { stashCommit } = await _createStashCommit({
+    fs,
+    dir,
+    gitdir,
+    message
+  });
+  return stashCommit;
+}
+async function _stashApply({ fs, dir, gitdir, refIdx = 0 }) {
+  const stashMgr = new GitStashManager({ fs, dir, gitdir });
+  const stashCommit = await stashMgr.readStashCommit(refIdx);
+  const { parent: stashParents = null } = stashCommit.commit ? stashCommit.commit : {};
+  if (!stashParents || !Array.isArray(stashParents)) {
+    return;
+  }
+  for (let i = 0; i < stashParents.length - 1; i++) {
+    const applyingCommit = await _readCommit({
+      fs,
+      cache: {},
+      gitdir,
+      oid: stashParents[i + 1]
+    });
+    const wasStaged = applyingCommit.commit.message.startsWith("stash-Index");
+    await applyTreeChanges({
+      fs,
+      dir,
+      gitdir,
+      stashCommit: stashParents[i + 1],
+      parentCommit: stashParents[i],
+      wasStaged
+    });
+  }
+}
+async function _stashDrop({ fs, dir, gitdir, refIdx = 0 }) {
+  const stashMgr = new GitStashManager({ fs, dir, gitdir });
+  const stashCommit = await stashMgr.readStashCommit(refIdx);
+  if (!stashCommit.commit) {
+    return;
+  }
+  const stashRefPath = stashMgr.refStashPath;
+  await acquireLock$1(stashRefPath, async () => {
+    if (await fs.exists(stashRefPath)) {
+      await fs.rm(stashRefPath);
+    }
+  });
+  const reflogEntries = await stashMgr.readStashReflogs({ parsed: false });
+  if (!reflogEntries.length) {
+    return;
+  }
+  reflogEntries.splice(refIdx, 1);
+  const stashReflogPath = stashMgr.refLogsStashPath;
+  await acquireLock$1({ reflogEntries, stashReflogPath, stashMgr }, async () => {
+    if (reflogEntries.length) {
+      await fs.write(
+        stashReflogPath,
+        reflogEntries.reverse().join("\n") + "\n",
+        "utf8"
+      );
+      const lastStashCommit = reflogEntries[reflogEntries.length - 1].split(" ")[1];
+      await stashMgr.writeStashRef(lastStashCommit);
+    } else {
+      await fs.rm(stashReflogPath);
+    }
+  });
+}
+async function _stashList({ fs, dir, gitdir }) {
+  const stashMgr = new GitStashManager({ fs, dir, gitdir });
+  return stashMgr.readStashReflogs({ parsed: true });
+}
+async function _stashClear({ fs, dir, gitdir }) {
+  const stashMgr = new GitStashManager({ fs, dir, gitdir });
+  const stashRefPath = [stashMgr.refStashPath, stashMgr.refLogsStashPath];
+  await acquireLock$1(stashRefPath, async () => {
+    await Promise.all(
+      stashRefPath.map(async (path) => {
+        if (await fs.exists(path)) {
+          return fs.rm(path);
+        }
+      })
+    );
+  });
+}
+async function _stashPop({ fs, dir, gitdir, refIdx = 0 }) {
+  await _stashApply({ fs, dir, gitdir, refIdx });
+  await _stashDrop({ fs, dir, gitdir, refIdx });
+}
+async function stash({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  op = "push",
+  message = "",
+  refIdx = 0
+}) {
+  assertParameter("fs", fs);
+  assertParameter("dir", dir);
+  assertParameter("gitdir", gitdir);
+  assertParameter("op", op);
+  const stashMap = {
+    push: _stashPush,
+    apply: _stashApply,
+    drop: _stashDrop,
+    list: _stashList,
+    clear: _stashClear,
+    pop: _stashPop,
+    create: _stashCreate
+  };
+  const opsNeedRefIdx = ["apply", "drop", "pop"];
+  try {
+    const _fs = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp: _fs, dotgit: gitdir });
+    const folders = ["refs", "logs", "logs/refs"];
+    folders.map((f) => join(updatedGitdir, f)).forEach(async (folder) => {
+      if (!await _fs.exists(folder)) {
+        await _fs.mkdir(folder);
+      }
+    });
+    const opFunc = stashMap[op];
+    if (opFunc) {
+      if (opsNeedRefIdx.includes(op) && refIdx < 0) {
+        throw new InvalidRefNameError(
+          `stash@${refIdx}`,
+          "number that is in range of [0, num of stash pushed]"
+        );
+      }
+      return await opFunc({
+        fs: _fs,
+        dir,
+        gitdir: updatedGitdir,
+        message,
+        refIdx
+      });
+    }
+    throw new Error(`To be implemented: ${op}`);
+  } catch (err) {
+    err.caller = "git.stash";
+    throw err;
+  }
+}
+async function status({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  filepath,
+  cache = {},
+  refresh = true
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const ignored = await GitIgnoreManager.isIgnored({
+      fs,
+      gitdir: updatedGitdir,
+      dir,
+      filepath
+    });
+    if (ignored) {
+      return "ignored";
+    }
+    const headTree = await getHeadTree({ fs, cache, gitdir: updatedGitdir });
+    const treeOid = await getOidAtPath({
+      fs,
+      cache,
+      gitdir: updatedGitdir,
+      tree: headTree,
+      path: filepath
+    });
+    const indexEntry = await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        for (const entry of index2) {
+          if (entry.path === filepath)
+            return entry;
+        }
+        return null;
+      }
+    );
+    const stats = await fs.lstat(join(dir, filepath));
+    const H = treeOid !== null;
+    const I = indexEntry !== null;
+    const W = stats !== null;
+    const getWorkdirOid = async () => {
+      if (I && !compareStats(indexEntry, stats)) {
+        return indexEntry.oid;
+      } else {
+        const object = await fs.read(join(dir, filepath));
+        const workdirOid = await hashObject$1({
+          gitdir: updatedGitdir,
+          type: "blob",
+          object
+        });
+        if (refresh && I && indexEntry.oid === workdirOid) {
+          if (stats.size !== -1) {
+            GitIndexManager.acquire(
+              { fs, gitdir: updatedGitdir, cache },
+              async function(index2) {
+                index2.insert({ filepath, stats, oid: workdirOid });
+              }
+            );
+          }
+        }
+        return workdirOid;
+      }
+    };
+    if (!H && !W && !I)
+      return "absent";
+    if (!H && !W && I)
+      return "*absent";
+    if (!H && W && !I)
+      return "*added";
+    if (!H && W && I) {
+      const workdirOid = await getWorkdirOid();
+      return workdirOid === indexEntry.oid ? "added" : "*added";
+    }
+    if (H && !W && !I)
+      return "deleted";
+    if (H && !W && I) {
+      return treeOid === indexEntry.oid ? "*deleted" : "*deleted";
+    }
+    if (H && W && !I) {
+      const workdirOid = await getWorkdirOid();
+      return workdirOid === treeOid ? "*undeleted" : "*undeletemodified";
+    }
+    if (H && W && I) {
+      const workdirOid = await getWorkdirOid();
+      if (workdirOid === treeOid) {
+        return workdirOid === indexEntry.oid ? "unmodified" : "*unmodified";
+      } else {
+        return workdirOid === indexEntry.oid ? "modified" : "*modified";
+      }
+    }
+  } catch (err) {
+    err.caller = "git.status";
+    throw err;
+  }
+}
+async function getOidAtPath({ fs, cache, gitdir: updatedGitdir, tree, path }) {
+  if (typeof path === "string")
+    path = path.split("/");
+  const dirname2 = path.shift();
+  for (const entry of tree) {
+    if (entry.path === dirname2) {
+      if (path.length === 0) {
+        return entry.oid;
+      }
+      const { type, object } = await _readObject({
+        fs,
+        cache,
+        gitdir: updatedGitdir,
+        oid: entry.oid
+      });
+      if (type === "tree") {
+        const tree2 = GitTree.from(object);
+        return getOidAtPath({ fs, cache, gitdir: updatedGitdir, tree: tree2, path });
+      }
+      if (type === "blob") {
+        throw new ObjectTypeError(entry.oid, type, "blob", path.join("/"));
+      }
+    }
+  }
+  return null;
+}
+async function getHeadTree({ fs, cache, gitdir: updatedGitdir }) {
+  let oid;
+  try {
+    oid = await GitRefManager.resolve({
+      fs,
+      gitdir: updatedGitdir,
+      ref: "HEAD"
+    });
+  } catch (e) {
+    if (e instanceof NotFoundError) {
+      return [];
+    }
+  }
+  const { tree } = await _readTree({ fs, cache, gitdir: updatedGitdir, oid });
+  return tree;
+}
 async function statusMatrix({
   fs: _fs,
   dir,
@@ -12018,12 +14441,12 @@ async function statusMatrix({
       map: async function(filepath, [head, workdir, stage]) {
         if (!head && !stage && workdir) {
           if (!shouldIgnore) {
-            const isIgnored = await GitIgnoreManager.isIgnored({
+            const isIgnored2 = await GitIgnoreManager.isIgnored({
               fs,
               dir,
               filepath
             });
-            if (isIgnored) {
+            if (isIgnored2) {
               return null;
             }
           }
@@ -12070,17 +14493,4237 @@ async function statusMatrix({
     throw err;
   }
 }
+async function tag({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  object,
+  force = false
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    const fs = new FileSystem(_fs);
+    if (ref === void 0) {
+      throw new MissingParameterError("ref");
+    }
+    ref = ref.startsWith("refs/tags/") ? ref : `refs/tags/${ref}`;
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const value = await GitRefManager.resolve({
+      fs,
+      gitdir: updatedGitdir,
+      ref: object || "HEAD"
+    });
+    if (!force && await GitRefManager.exists({ fs, gitdir: updatedGitdir, ref })) {
+      throw new AlreadyExistsError("tag", ref);
+    }
+    await GitRefManager.writeRef({ fs, gitdir: updatedGitdir, ref, value });
+  } catch (err) {
+    err.caller = "git.tag";
+    throw err;
+  }
+}
+async function updateIndex$1({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  cache = {},
+  filepath,
+  oid,
+  mode,
+  add: add2,
+  remove: remove2,
+  force
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("filepath", filepath);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    if (remove2) {
+      return await GitIndexManager.acquire(
+        { fs, gitdir: updatedGitdir, cache },
+        async function(index2) {
+          if (!force) {
+            const fileStats2 = await fs.lstat(join(dir, filepath));
+            if (fileStats2) {
+              if (fileStats2.isDirectory()) {
+                throw new InvalidFilepathError("directory");
+              }
+              return;
+            }
+          }
+          if (index2.has({ filepath })) {
+            index2.delete({
+              filepath
+            });
+          }
+        }
+      );
+    }
+    let fileStats;
+    if (!oid) {
+      fileStats = await fs.lstat(join(dir, filepath));
+      if (!fileStats) {
+        throw new NotFoundError(
+          `file at "${filepath}" on disk and "remove" not set`
+        );
+      }
+      if (fileStats.isDirectory()) {
+        throw new InvalidFilepathError("directory");
+      }
+    }
+    return await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        if (!add2 && !index2.has({ filepath })) {
+          throw new NotFoundError(
+            `file at "${filepath}" in index and "add" not set`
+          );
+        }
+        let stats;
+        if (!oid) {
+          stats = fileStats;
+          const object = stats.isSymbolicLink() ? await fs.readlink(join(dir, filepath)) : await fs.read(join(dir, filepath));
+          oid = await _writeObject({
+            fs,
+            gitdir: updatedGitdir,
+            type: "blob",
+            format: "content",
+            object
+          });
+        } else {
+          stats = {
+            ctime: /* @__PURE__ */ new Date(0),
+            mtime: /* @__PURE__ */ new Date(0),
+            dev: 0,
+            ino: 0,
+            mode,
+            uid: 0,
+            gid: 0,
+            size: 0
+          };
+        }
+        index2.insert({
+          filepath,
+          oid,
+          stats
+        });
+        return oid;
+      }
+    );
+  } catch (err) {
+    err.caller = "git.updateIndex";
+    throw err;
+  }
+}
+function version() {
+  try {
+    return pkg.version;
+  } catch (err) {
+    err.caller = "git.version";
+    throw err;
+  }
+}
+async function walk({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  trees,
+  map,
+  reduce,
+  iterate,
+  cache = {}
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("trees", trees);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _walk({
+      fs: fsp,
+      cache,
+      dir,
+      gitdir: updatedGitdir,
+      trees,
+      map,
+      reduce,
+      iterate
+    });
+  } catch (err) {
+    err.caller = "git.walk";
+    throw err;
+  }
+}
+async function writeBlob({ fs, dir, gitdir = join(dir, ".git"), blob }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("blob", blob);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _writeObject({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      type: "blob",
+      object: blob,
+      format: "content"
+    });
+  } catch (err) {
+    err.caller = "git.writeBlob";
+    throw err;
+  }
+}
+async function writeCommit({
+  fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  commit: commit2
+}) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("commit", commit2);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _writeCommit({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      commit: commit2
+    });
+  } catch (err) {
+    err.caller = "git.writeCommit";
+    throw err;
+  }
+}
+async function writeObject({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  type,
+  object,
+  format = "parsed",
+  oid,
+  encoding = void 0
+}) {
+  try {
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    if (format === "parsed") {
+      switch (type) {
+        case "commit":
+          object = GitCommit.from(object).toObject();
+          break;
+        case "tree":
+          object = GitTree.from(object).toObject();
+          break;
+        case "blob":
+          object = Buffer.from(object, encoding);
+          break;
+        case "tag":
+          object = GitAnnotatedTag.from(object).toObject();
+          break;
+        default:
+          throw new ObjectTypeError(oid || "", type, "blob|commit|tag|tree");
+      }
+      format = "content";
+    }
+    oid = await _writeObject({
+      fs,
+      gitdir: updatedGitdir,
+      type,
+      object,
+      oid,
+      format
+    });
+    return oid;
+  } catch (err) {
+    err.caller = "git.writeObject";
+    throw err;
+  }
+}
+async function writeRef({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  ref,
+  value,
+  force = false,
+  symbolic = false
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("ref", ref);
+    assertParameter("value", value);
+    const fs = new FileSystem(_fs);
+    if (!isValidRef(ref, true)) {
+      throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
+    }
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    if (!force && await GitRefManager.exists({ fs, gitdir: updatedGitdir, ref })) {
+      throw new AlreadyExistsError("ref", ref);
+    }
+    if (symbolic) {
+      await GitRefManager.writeSymbolicRef({
+        fs,
+        gitdir: updatedGitdir,
+        ref,
+        value
+      });
+    } else {
+      value = await GitRefManager.resolve({
+        fs,
+        gitdir: updatedGitdir,
+        ref: value
+      });
+      await GitRefManager.writeRef({
+        fs,
+        gitdir: updatedGitdir,
+        ref,
+        value
+      });
+    }
+  } catch (err) {
+    err.caller = "git.writeRef";
+    throw err;
+  }
+}
+async function _writeTag({ fs, gitdir, tag: tag2 }) {
+  const object = GitAnnotatedTag.from(tag2).toObject();
+  const oid = await _writeObject({
+    fs,
+    gitdir,
+    type: "tag",
+    object,
+    format: "content"
+  });
+  return oid;
+}
+async function writeTag({ fs, dir, gitdir = join(dir, ".git"), tag: tag2 }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("tag", tag2);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _writeTag({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      tag: tag2
+    });
+  } catch (err) {
+    err.caller = "git.writeTag";
+    throw err;
+  }
+}
+async function writeTree({ fs, dir, gitdir = join(dir, ".git"), tree }) {
+  try {
+    assertParameter("fs", fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("tree", tree);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return await _writeTree({
+      fs: fsp,
+      gitdir: updatedGitdir,
+      tree
+    });
+  } catch (err) {
+    err.caller = "git.writeTree";
+    throw err;
+  }
+}
+var import_async_lock, import_sha1, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, lock$1, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, InvalidRefNameError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, bad, worthWalking, LINEBREAKS, _TreeMap, lock$2, abbreviateRx, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, lock$3, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
+var init_isomorphic_git = __esm({
+  "node_modules/isomorphic-git/index.js"() {
+    import_async_lock = __toESM(require_async_lock(), 1);
+    import_sha1 = __toESM(require_sha1(), 1);
+    import_crc_32 = __toESM(require_crc32(), 1);
+    import_pako = __toESM(require_pako(), 1);
+    import_pify = __toESM(require_pify(), 1);
+    import_ignore = __toESM(require_ignore(), 1);
+    import_clean_git_ref = __toESM(require_lib2(), 1);
+    import_diff3 = __toESM(require_diff3(), 1);
+    BaseError = class _BaseError extends Error {
+      constructor(message) {
+        super(message);
+        this.caller = "";
+      }
+      toJSON() {
+        return {
+          code: this.code,
+          data: this.data,
+          caller: this.caller,
+          message: this.message,
+          stack: this.stack
+        };
+      }
+      fromJSON(json) {
+        const e = new _BaseError(json.message);
+        e.code = json.code;
+        e.data = json.data;
+        e.caller = json.caller;
+        e.stack = json.stack;
+        return e;
+      }
+      get isIsomorphicGitError() {
+        return true;
+      }
+    };
+    UnmergedPathsError = class _UnmergedPathsError extends BaseError {
+      /**
+       * @param {Array<string>} filepaths
+       */
+      constructor(filepaths) {
+        super(
+          `Modifying the index is not possible because you have unmerged files: ${filepaths.toString}. Fix them up in the work tree, and then use 'git add/rm as appropriate to mark resolution and make a commit.`
+        );
+        this.code = this.name = _UnmergedPathsError.code;
+        this.data = { filepaths };
+      }
+    };
+    UnmergedPathsError.code = "UnmergedPathsError";
+    InternalError = class _InternalError extends BaseError {
+      /**
+       * @param {string} message
+       */
+      constructor(message) {
+        super(
+          `An internal error caused this command to fail.
+
+If you're using an application that depends on isomorphic-git, please report this error to that application's developers.
+
+If you're a developer and you believe this is a bug in isomorphic-git, please file an issue at https://github.com/isomorphic-git/isomorphic-git/issues with a minimal reproduction, version and environment details, and this error message: ${message}`
+        );
+        this.code = this.name = _InternalError.code;
+        this.data = { message };
+      }
+    };
+    InternalError.code = "InternalError";
+    UnsafeFilepathError = class _UnsafeFilepathError extends BaseError {
+      /**
+       * @param {string} filepath
+       */
+      constructor(filepath) {
+        super(`The filepath "${filepath}" contains unsafe character sequences`);
+        this.code = this.name = _UnsafeFilepathError.code;
+        this.data = { filepath };
+      }
+    };
+    UnsafeFilepathError.code = "UnsafeFilepathError";
+    BufferCursor = class {
+      constructor(buffer) {
+        this.buffer = buffer;
+        this._start = 0;
+      }
+      eof() {
+        return this._start >= this.buffer.length;
+      }
+      tell() {
+        return this._start;
+      }
+      seek(n) {
+        this._start = n;
+      }
+      slice(n) {
+        const r = this.buffer.slice(this._start, this._start + n);
+        this._start += n;
+        return r;
+      }
+      toString(enc, length) {
+        const r = this.buffer.toString(enc, this._start, this._start + length);
+        this._start += length;
+        return r;
+      }
+      write(value, length, enc) {
+        const r = this.buffer.write(value, this._start, length, enc);
+        this._start += length;
+        return r;
+      }
+      copy(source, start, end) {
+        const r = source.copy(this.buffer, this._start, start, end);
+        this._start += r;
+        return r;
+      }
+      readUInt8() {
+        const r = this.buffer.readUInt8(this._start);
+        this._start += 1;
+        return r;
+      }
+      writeUInt8(value) {
+        const r = this.buffer.writeUInt8(value, this._start);
+        this._start += 1;
+        return r;
+      }
+      readUInt16BE() {
+        const r = this.buffer.readUInt16BE(this._start);
+        this._start += 2;
+        return r;
+      }
+      writeUInt16BE(value) {
+        const r = this.buffer.writeUInt16BE(value, this._start);
+        this._start += 2;
+        return r;
+      }
+      readUInt32BE() {
+        const r = this.buffer.readUInt32BE(this._start);
+        this._start += 4;
+        return r;
+      }
+      writeUInt32BE(value) {
+        const r = this.buffer.writeUInt32BE(value, this._start);
+        this._start += 4;
+        return r;
+      }
+    };
+    MAX_UINT32 = 2 ** 32;
+    supportsSubtleSHA1 = null;
+    GitIndex = class _GitIndex {
+      /*::
+       _entries: Map<string, CacheEntry>
+       _dirty: boolean // Used to determine if index needs to be saved to filesystem
+       */
+      constructor(entries, unmergedPaths) {
+        this._dirty = false;
+        this._unmergedPaths = unmergedPaths || /* @__PURE__ */ new Set();
+        this._entries = entries || /* @__PURE__ */ new Map();
+      }
+      _addEntry(entry) {
+        if (entry.flags.stage === 0) {
+          entry.stages = [entry];
+          this._entries.set(entry.path, entry);
+          this._unmergedPaths.delete(entry.path);
+        } else {
+          let existingEntry = this._entries.get(entry.path);
+          if (!existingEntry) {
+            this._entries.set(entry.path, entry);
+            existingEntry = entry;
+          }
+          existingEntry.stages[entry.flags.stage] = entry;
+          this._unmergedPaths.add(entry.path);
+        }
+      }
+      static async from(buffer) {
+        if (Buffer.isBuffer(buffer)) {
+          return _GitIndex.fromBuffer(buffer);
+        } else if (buffer === null) {
+          return new _GitIndex(null);
+        } else {
+          throw new InternalError("invalid type passed to GitIndex.from");
+        }
+      }
+      static async fromBuffer(buffer) {
+        if (buffer.length === 0) {
+          throw new InternalError("Index file is empty (.git/index)");
+        }
+        const index2 = new _GitIndex();
+        const reader = new BufferCursor(buffer);
+        const magic = reader.toString("utf8", 4);
+        if (magic !== "DIRC") {
+          throw new InternalError(`Invalid dircache magic file number: ${magic}`);
+        }
+        const shaComputed = await shasum(buffer.slice(0, -20));
+        const shaClaimed = buffer.slice(-20).toString("hex");
+        if (shaClaimed !== shaComputed) {
+          throw new InternalError(
+            `Invalid checksum in GitIndex buffer: expected ${shaClaimed} but saw ${shaComputed}`
+          );
+        }
+        const version2 = reader.readUInt32BE();
+        if (version2 !== 2) {
+          throw new InternalError(`Unsupported dircache version: ${version2}`);
+        }
+        const numEntries = reader.readUInt32BE();
+        let i = 0;
+        while (!reader.eof() && i < numEntries) {
+          const entry = {};
+          entry.ctimeSeconds = reader.readUInt32BE();
+          entry.ctimeNanoseconds = reader.readUInt32BE();
+          entry.mtimeSeconds = reader.readUInt32BE();
+          entry.mtimeNanoseconds = reader.readUInt32BE();
+          entry.dev = reader.readUInt32BE();
+          entry.ino = reader.readUInt32BE();
+          entry.mode = reader.readUInt32BE();
+          entry.uid = reader.readUInt32BE();
+          entry.gid = reader.readUInt32BE();
+          entry.size = reader.readUInt32BE();
+          entry.oid = reader.slice(20).toString("hex");
+          const flags = reader.readUInt16BE();
+          entry.flags = parseCacheEntryFlags(flags);
+          const pathlength = buffer.indexOf(0, reader.tell() + 1) - reader.tell();
+          if (pathlength < 1) {
+            throw new InternalError(`Got a path length of: ${pathlength}`);
+          }
+          entry.path = reader.toString("utf8", pathlength);
+          if (entry.path.includes("..\\") || entry.path.includes("../")) {
+            throw new UnsafeFilepathError(entry.path);
+          }
+          let padding = 8 - (reader.tell() - 12) % 8;
+          if (padding === 0)
+            padding = 8;
+          while (padding--) {
+            const tmp = reader.readUInt8();
+            if (tmp !== 0) {
+              throw new InternalError(
+                `Expected 1-8 null characters but got '${tmp}' after ${entry.path}`
+              );
+            } else if (reader.eof()) {
+              throw new InternalError("Unexpected end of file");
+            }
+          }
+          entry.stages = [];
+          index2._addEntry(entry);
+          i++;
+        }
+        return index2;
+      }
+      get unmergedPaths() {
+        return [...this._unmergedPaths];
+      }
+      get entries() {
+        return [...this._entries.values()].sort(comparePath);
+      }
+      get entriesMap() {
+        return this._entries;
+      }
+      get entriesFlat() {
+        return [...this.entries].flatMap((entry) => {
+          return entry.stages.length > 1 ? entry.stages.filter((x) => x) : entry;
+        });
+      }
+      *[Symbol.iterator]() {
+        for (const entry of this.entries) {
+          yield entry;
+        }
+      }
+      insert({ filepath, stats, oid, stage = 0 }) {
+        if (!stats) {
+          stats = {
+            ctimeSeconds: 0,
+            ctimeNanoseconds: 0,
+            mtimeSeconds: 0,
+            mtimeNanoseconds: 0,
+            dev: 0,
+            ino: 0,
+            mode: 0,
+            uid: 0,
+            gid: 0,
+            size: 0
+          };
+        }
+        stats = normalizeStats(stats);
+        const bfilepath = Buffer.from(filepath);
+        const entry = {
+          ctimeSeconds: stats.ctimeSeconds,
+          ctimeNanoseconds: stats.ctimeNanoseconds,
+          mtimeSeconds: stats.mtimeSeconds,
+          mtimeNanoseconds: stats.mtimeNanoseconds,
+          dev: stats.dev,
+          ino: stats.ino,
+          // We provide a fallback value for `mode` here because not all fs
+          // implementations assign it, but we use it in GitTree.
+          // '100644' is for a "regular non-executable file"
+          mode: stats.mode || 33188,
+          uid: stats.uid,
+          gid: stats.gid,
+          size: stats.size,
+          path: filepath,
+          oid,
+          flags: {
+            assumeValid: false,
+            extended: false,
+            stage,
+            nameLength: bfilepath.length < 4095 ? bfilepath.length : 4095
+          },
+          stages: []
+        };
+        this._addEntry(entry);
+        this._dirty = true;
+      }
+      delete({ filepath }) {
+        if (this._entries.has(filepath)) {
+          this._entries.delete(filepath);
+        } else {
+          for (const key of this._entries.keys()) {
+            if (key.startsWith(filepath + "/")) {
+              this._entries.delete(key);
+            }
+          }
+        }
+        if (this._unmergedPaths.has(filepath)) {
+          this._unmergedPaths.delete(filepath);
+        }
+        this._dirty = true;
+      }
+      clear() {
+        this._entries.clear();
+        this._dirty = true;
+      }
+      has({ filepath }) {
+        return this._entries.has(filepath);
+      }
+      render() {
+        return this.entries.map((entry) => `${entry.mode.toString(8)} ${entry.oid}    ${entry.path}`).join("\n");
+      }
+      static async _entryToBuffer(entry) {
+        const bpath = Buffer.from(entry.path);
+        const length = Math.ceil((62 + bpath.length + 1) / 8) * 8;
+        const written = Buffer.alloc(length);
+        const writer = new BufferCursor(written);
+        const stat = normalizeStats(entry);
+        writer.writeUInt32BE(stat.ctimeSeconds);
+        writer.writeUInt32BE(stat.ctimeNanoseconds);
+        writer.writeUInt32BE(stat.mtimeSeconds);
+        writer.writeUInt32BE(stat.mtimeNanoseconds);
+        writer.writeUInt32BE(stat.dev);
+        writer.writeUInt32BE(stat.ino);
+        writer.writeUInt32BE(stat.mode);
+        writer.writeUInt32BE(stat.uid);
+        writer.writeUInt32BE(stat.gid);
+        writer.writeUInt32BE(stat.size);
+        writer.write(entry.oid, 20, "hex");
+        writer.writeUInt16BE(renderCacheEntryFlags(entry));
+        writer.write(entry.path, bpath.length, "utf8");
+        return written;
+      }
+      async toObject() {
+        const header = Buffer.alloc(12);
+        const writer = new BufferCursor(header);
+        writer.write("DIRC", 4, "utf8");
+        writer.writeUInt32BE(2);
+        writer.writeUInt32BE(this.entriesFlat.length);
+        let entryBuffers = [];
+        for (const entry of this.entries) {
+          entryBuffers.push(_GitIndex._entryToBuffer(entry));
+          if (entry.stages.length > 1) {
+            for (const stage of entry.stages) {
+              if (stage && stage !== entry) {
+                entryBuffers.push(_GitIndex._entryToBuffer(stage));
+              }
+            }
+          }
+        }
+        entryBuffers = await Promise.all(entryBuffers);
+        const body = Buffer.concat(entryBuffers);
+        const main = Buffer.concat([header, body]);
+        const sum = await shasum(main);
+        return Buffer.concat([main, Buffer.from(sum, "hex")]);
+      }
+    };
+    lock = null;
+    IndexCache = Symbol("IndexCache");
+    GitIndexManager = class {
+      /**
+       * Manages access to the Git index file, ensuring thread-safe operations and caching.
+       *
+       * @param {object} opts - Options for acquiring the Git index.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @param {object} opts.cache - A shared cache object for storing index data.
+       * @param {boolean} [opts.allowUnmerged=true] - Whether to allow unmerged paths in the index.
+       * @param {function(GitIndex): any} closure - A function to execute with the Git index.
+       * @returns {Promise<any>} The result of the closure function.
+       * @throws {UnmergedPathsError} If unmerged paths exist and `allowUnmerged` is `false`.
+       */
+      static async acquire({ fs, gitdir, cache, allowUnmerged = true }, closure) {
+        if (!cache[IndexCache]) {
+          cache[IndexCache] = createCache();
+        }
+        const filepath = `${gitdir}/index`;
+        if (lock === null)
+          lock = new import_async_lock.default({ maxPending: Infinity });
+        let result;
+        let unmergedPaths = [];
+        await lock.acquire(filepath, async () => {
+          const theIndexCache = cache[IndexCache];
+          if (await isIndexStale(fs, filepath, theIndexCache)) {
+            await updateCachedIndexFile(fs, filepath, theIndexCache);
+          }
+          const index2 = theIndexCache.map.get(filepath);
+          unmergedPaths = index2.unmergedPaths;
+          if (unmergedPaths.length && !allowUnmerged)
+            throw new UnmergedPathsError(unmergedPaths);
+          result = await closure(index2);
+          if (index2._dirty) {
+            const buffer = await index2.toObject();
+            await fs.write(filepath, buffer);
+            theIndexCache.stats.set(filepath, await fs.lstat(filepath));
+            index2._dirty = false;
+          }
+        });
+        return result;
+      }
+    };
+    GitWalkerIndex = class {
+      constructor({ fs, gitdir, cache }) {
+        this.treePromise = GitIndexManager.acquire(
+          { fs, gitdir, cache },
+          async function(index2) {
+            return flatFileListToDirectoryStructure(index2.entries);
+          }
+        );
+        const walker = this;
+        this.ConstructEntry = class StageEntry {
+          constructor(fullpath) {
+            this._fullpath = fullpath;
+            this._type = false;
+            this._mode = false;
+            this._stat = false;
+            this._oid = false;
+          }
+          async type() {
+            return walker.type(this);
+          }
+          async mode() {
+            return walker.mode(this);
+          }
+          async stat() {
+            return walker.stat(this);
+          }
+          async content() {
+            return walker.content(this);
+          }
+          async oid() {
+            return walker.oid(this);
+          }
+        };
+      }
+      async readdir(entry) {
+        const filepath = entry._fullpath;
+        const tree = await this.treePromise;
+        const inode = tree.get(filepath);
+        if (!inode)
+          return null;
+        if (inode.type === "blob")
+          return null;
+        if (inode.type !== "tree") {
+          throw new Error(`ENOTDIR: not a directory, scandir '${filepath}'`);
+        }
+        const names = inode.children.map((inode2) => inode2.fullpath);
+        names.sort(compareStrings);
+        return names;
+      }
+      async type(entry) {
+        if (entry._type === false) {
+          await entry.stat();
+        }
+        return entry._type;
+      }
+      async mode(entry) {
+        if (entry._mode === false) {
+          await entry.stat();
+        }
+        return entry._mode;
+      }
+      async stat(entry) {
+        if (entry._stat === false) {
+          const tree = await this.treePromise;
+          const inode = tree.get(entry._fullpath);
+          if (!inode) {
+            throw new Error(
+              `ENOENT: no such file or directory, lstat '${entry._fullpath}'`
+            );
+          }
+          const stats = inode.type === "tree" ? {} : normalizeStats(inode.metadata);
+          entry._type = inode.type === "tree" ? "tree" : mode2type(stats.mode);
+          entry._mode = stats.mode;
+          if (inode.type === "tree") {
+            entry._stat = void 0;
+          } else {
+            entry._stat = stats;
+          }
+        }
+        return entry._stat;
+      }
+      async content(_entry) {
+      }
+      async oid(entry) {
+        if (entry._oid === false) {
+          const tree = await this.treePromise;
+          const inode = tree.get(entry._fullpath);
+          entry._oid = inode.metadata.oid;
+        }
+        return entry._oid;
+      }
+    };
+    GitWalkSymbol = Symbol("GitWalkSymbol");
+    NotFoundError = class _NotFoundError extends BaseError {
+      /**
+       * @param {string} what
+       */
+      constructor(what) {
+        super(`Could not find ${what}.`);
+        this.code = this.name = _NotFoundError.code;
+        this.data = { what };
+      }
+    };
+    NotFoundError.code = "NotFoundError";
+    ObjectTypeError = class _ObjectTypeError extends BaseError {
+      /**
+       * @param {string} oid
+       * @param {'blob'|'commit'|'tag'|'tree'} actual
+       * @param {'blob'|'commit'|'tag'|'tree'} expected
+       * @param {string} [filepath]
+       */
+      constructor(oid, actual, expected, filepath) {
+        super(
+          `Object ${oid} ${filepath ? `at ${filepath}` : ""}was anticipated to be a ${expected} but it is a ${actual}.`
+        );
+        this.code = this.name = _ObjectTypeError.code;
+        this.data = { oid, actual, expected, filepath };
+      }
+    };
+    ObjectTypeError.code = "ObjectTypeError";
+    InvalidOidError = class _InvalidOidError extends BaseError {
+      /**
+       * @param {string} value
+       */
+      constructor(value) {
+        super(`Expected a 40-char hex object id but saw "${value}".`);
+        this.code = this.name = _InvalidOidError.code;
+        this.data = { value };
+      }
+    };
+    InvalidOidError.code = "InvalidOidError";
+    NoRefspecError = class _NoRefspecError extends BaseError {
+      /**
+       * @param {string} remote
+       */
+      constructor(remote) {
+        super(`Could not find a fetch refspec for remote "${remote}". Make sure the config file has an entry like the following:
+[remote "${remote}"]
+	fetch = +refs/heads/*:refs/remotes/origin/*
+`);
+        this.code = this.name = _NoRefspecError.code;
+        this.data = { remote };
+      }
+    };
+    NoRefspecError.code = "NoRefspecError";
+    GitPackedRefs = class _GitPackedRefs {
+      constructor(text) {
+        this.refs = /* @__PURE__ */ new Map();
+        this.parsedConfig = [];
+        if (text) {
+          let key = null;
+          this.parsedConfig = text.trim().split("\n").map((line) => {
+            if (/^\s*#/.test(line)) {
+              return { line, comment: true };
+            }
+            const i = line.indexOf(" ");
+            if (line.startsWith("^")) {
+              const value = line.slice(1);
+              this.refs.set(key + "^{}", value);
+              return { line, ref: key, peeled: value };
+            } else {
+              const value = line.slice(0, i);
+              key = line.slice(i + 1);
+              this.refs.set(key, value);
+              return { line, ref: key, oid: value };
+            }
+          });
+        }
+        return this;
+      }
+      static from(text) {
+        return new _GitPackedRefs(text);
+      }
+      delete(ref) {
+        this.parsedConfig = this.parsedConfig.filter((entry) => entry.ref !== ref);
+        this.refs.delete(ref);
+      }
+      toString() {
+        return this.parsedConfig.map(({ line }) => line).join("\n") + "\n";
+      }
+    };
+    GitRefSpec = class _GitRefSpec {
+      constructor({ remotePath, localPath, force, matchPrefix }) {
+        Object.assign(this, {
+          remotePath,
+          localPath,
+          force,
+          matchPrefix
+        });
+      }
+      static from(refspec) {
+        const [forceMatch, remotePath, remoteGlobMatch, localPath, localGlobMatch] = refspec.match(/^(\+?)(.*?)(\*?):(.*?)(\*?)$/).slice(1);
+        const force = forceMatch === "+";
+        const remoteIsGlob = remoteGlobMatch === "*";
+        const localIsGlob = localGlobMatch === "*";
+        if (remoteIsGlob !== localIsGlob) {
+          throw new InternalError("Invalid refspec");
+        }
+        return new _GitRefSpec({
+          remotePath,
+          localPath,
+          force,
+          matchPrefix: remoteIsGlob
+        });
+      }
+      translate(remoteBranch) {
+        if (this.matchPrefix) {
+          if (remoteBranch.startsWith(this.remotePath)) {
+            return this.localPath + remoteBranch.replace(this.remotePath, "");
+          }
+        } else {
+          if (remoteBranch === this.remotePath)
+            return this.localPath;
+        }
+        return null;
+      }
+      reverseTranslate(localBranch) {
+        if (this.matchPrefix) {
+          if (localBranch.startsWith(this.localPath)) {
+            return this.remotePath + localBranch.replace(this.localPath, "");
+          }
+        } else {
+          if (localBranch === this.localPath)
+            return this.remotePath;
+        }
+        return null;
+      }
+    };
+    GitRefSpecSet = class _GitRefSpecSet {
+      constructor(rules = []) {
+        this.rules = rules;
+      }
+      static from(refspecs) {
+        const rules = [];
+        for (const refspec of refspecs) {
+          rules.push(GitRefSpec.from(refspec));
+        }
+        return new _GitRefSpecSet(rules);
+      }
+      add(refspec) {
+        const rule = GitRefSpec.from(refspec);
+        this.rules.push(rule);
+      }
+      translate(remoteRefs) {
+        const result = [];
+        for (const rule of this.rules) {
+          for (const remoteRef of remoteRefs) {
+            const localRef = rule.translate(remoteRef);
+            if (localRef) {
+              result.push([remoteRef, localRef]);
+            }
+          }
+        }
+        return result;
+      }
+      translateOne(remoteRef) {
+        let result = null;
+        for (const rule of this.rules) {
+          const localRef = rule.translate(remoteRef);
+          if (localRef) {
+            result = localRef;
+          }
+        }
+        return result;
+      }
+      localNamespaces() {
+        return this.rules.filter((rule) => rule.matchPrefix).map((rule) => rule.localPath.replace(/\/$/, ""));
+      }
+    };
+    num = (val) => {
+      if (typeof val === "number") {
+        return val;
+      }
+      val = val.toLowerCase();
+      let n = parseInt(val);
+      if (val.endsWith("k"))
+        n *= 1024;
+      if (val.endsWith("m"))
+        n *= 1024 * 1024;
+      if (val.endsWith("g"))
+        n *= 1024 * 1024 * 1024;
+      return n;
+    };
+    bool = (val) => {
+      if (typeof val === "boolean") {
+        return val;
+      }
+      val = val.trim().toLowerCase();
+      if (val === "true" || val === "yes" || val === "on")
+        return true;
+      if (val === "false" || val === "no" || val === "off")
+        return false;
+      throw Error(
+        `Expected 'true', 'false', 'yes', 'no', 'on', or 'off', but got ${val}`
+      );
+    };
+    schema = {
+      core: {
+        filemode: bool,
+        bare: bool,
+        logallrefupdates: bool,
+        symlinks: bool,
+        ignorecase: bool,
+        bigFileThreshold: num
+      }
+    };
+    SECTION_LINE_REGEX = /^\[([A-Za-z0-9-.]+)(?: "(.*)")?\]$/;
+    SECTION_REGEX = /^[A-Za-z0-9-.]+$/;
+    VARIABLE_LINE_REGEX = /^([A-Za-z][A-Za-z-]*)(?: *= *(.*))?$/;
+    VARIABLE_NAME_REGEX = /^[A-Za-z][A-Za-z-]*$/;
+    VARIABLE_VALUE_COMMENT_REGEX = /^(.*?)( *[#;].*)$/;
+    extractSectionLine = (line) => {
+      const matches = SECTION_LINE_REGEX.exec(line);
+      if (matches != null) {
+        const [section, subsection] = matches.slice(1);
+        return [section, subsection];
+      }
+      return null;
+    };
+    extractVariableLine = (line) => {
+      const matches = VARIABLE_LINE_REGEX.exec(line);
+      if (matches != null) {
+        const [name, rawValue = "true"] = matches.slice(1);
+        const valueWithoutComments = removeComments(rawValue);
+        const valueWithoutQuotes = removeQuotes(valueWithoutComments);
+        return [name, valueWithoutQuotes];
+      }
+      return null;
+    };
+    removeComments = (rawValue) => {
+      const commentMatches = VARIABLE_VALUE_COMMENT_REGEX.exec(rawValue);
+      if (commentMatches == null) {
+        return rawValue;
+      }
+      const [valueWithoutComment, comment] = commentMatches.slice(1);
+      if (hasOddNumberOfQuotes(valueWithoutComment) && hasOddNumberOfQuotes(comment)) {
+        return `${valueWithoutComment}${comment}`;
+      }
+      return valueWithoutComment;
+    };
+    hasOddNumberOfQuotes = (text) => {
+      const numberOfQuotes = (text.match(/(?:^|[^\\])"/g) || []).length;
+      return numberOfQuotes % 2 !== 0;
+    };
+    removeQuotes = (text) => {
+      return text.split("").reduce((newText, c, idx, text2) => {
+        const isQuote = c === '"' && text2[idx - 1] !== "\\";
+        const isEscapeForQuote = c === "\\" && text2[idx + 1] === '"';
+        if (isQuote || isEscapeForQuote) {
+          return newText;
+        }
+        return newText + c;
+      }, "");
+    };
+    lower = (text) => {
+      return text != null ? text.toLowerCase() : null;
+    };
+    getPath = (section, subsection, name) => {
+      return [lower(section), subsection, lower(name)].filter((a) => a != null).join(".");
+    };
+    normalizePath = (path) => {
+      const pathSegments = path.split(".");
+      const section = pathSegments.shift();
+      const name = pathSegments.pop();
+      const subsection = pathSegments.length ? pathSegments.join(".") : void 0;
+      return {
+        section,
+        subsection,
+        name,
+        path: getPath(section, subsection, name),
+        sectionPath: getPath(section, subsection, null),
+        isSection: !!section
+      };
+    };
+    findLastIndex = (array, callback) => {
+      return array.reduce((lastIndex, item, index2) => {
+        return callback(item) ? index2 : lastIndex;
+      }, -1);
+    };
+    GitConfig = class _GitConfig {
+      constructor(text) {
+        let section = null;
+        let subsection = null;
+        this.parsedConfig = text ? text.split("\n").map((line) => {
+          let name = null;
+          let value = null;
+          const trimmedLine = line.trim();
+          const extractedSection = extractSectionLine(trimmedLine);
+          const isSection = extractedSection != null;
+          if (isSection) {
+            ;
+            [section, subsection] = extractedSection;
+          } else {
+            const extractedVariable = extractVariableLine(trimmedLine);
+            const isVariable = extractedVariable != null;
+            if (isVariable) {
+              ;
+              [name, value] = extractedVariable;
+            }
+          }
+          const path = getPath(section, subsection, name);
+          return { line, isSection, section, subsection, name, value, path };
+        }) : [];
+      }
+      static from(text) {
+        return new _GitConfig(text);
+      }
+      async get(path, getall = false) {
+        const normalizedPath = normalizePath(path).path;
+        const allValues = this.parsedConfig.filter((config) => config.path === normalizedPath).map(({ section, name, value }) => {
+          const fn = schema[section] && schema[section][name];
+          return fn ? fn(value) : value;
+        });
+        return getall ? allValues : allValues.pop();
+      }
+      async getall(path) {
+        return this.get(path, true);
+      }
+      async getSubsections(section) {
+        return this.parsedConfig.filter((config) => config.isSection && config.section === section).map((config) => config.subsection);
+      }
+      async deleteSection(section, subsection) {
+        this.parsedConfig = this.parsedConfig.filter(
+          (config) => !(config.section === section && config.subsection === subsection)
+        );
+      }
+      async append(path, value) {
+        return this.set(path, value, true);
+      }
+      async set(path, value, append = false) {
+        const {
+          section,
+          subsection,
+          name,
+          path: normalizedPath,
+          sectionPath,
+          isSection
+        } = normalizePath(path);
+        const configIndex = findLastIndex(
+          this.parsedConfig,
+          (config) => config.path === normalizedPath
+        );
+        if (value == null) {
+          if (configIndex !== -1) {
+            this.parsedConfig.splice(configIndex, 1);
+          }
+        } else {
+          if (configIndex !== -1) {
+            const config = this.parsedConfig[configIndex];
+            const modifiedConfig = Object.assign({}, config, {
+              name,
+              value,
+              modified: true
+            });
+            if (append) {
+              this.parsedConfig.splice(configIndex + 1, 0, modifiedConfig);
+            } else {
+              this.parsedConfig[configIndex] = modifiedConfig;
+            }
+          } else {
+            const sectionIndex = this.parsedConfig.findIndex(
+              (config) => config.path === sectionPath
+            );
+            const newConfig = {
+              section,
+              subsection,
+              name,
+              value,
+              modified: true,
+              path: normalizedPath
+            };
+            if (SECTION_REGEX.test(section) && VARIABLE_NAME_REGEX.test(name)) {
+              if (sectionIndex >= 0) {
+                this.parsedConfig.splice(sectionIndex + 1, 0, newConfig);
+              } else {
+                const newSection = {
+                  isSection,
+                  section,
+                  subsection,
+                  modified: true,
+                  path: sectionPath
+                };
+                this.parsedConfig.push(newSection, newConfig);
+              }
+            }
+          }
+        }
+      }
+      toString() {
+        return this.parsedConfig.map(({ line, section, subsection, name, value, modified: modified2 = false }) => {
+          if (!modified2) {
+            return line;
+          }
+          if (name != null && value != null) {
+            if (typeof value === "string" && /[#;]/.test(value)) {
+              return `	${name} = "${value}"`;
+            }
+            return `	${name} = ${value}`;
+          }
+          if (subsection != null) {
+            return `[${section} "${subsection}"]`;
+          }
+          return `[${section}]`;
+        }).join("\n");
+      }
+    };
+    GitConfigManager = class {
+      /**
+       * Reads the Git configuration file from the specified `.git` directory.
+       *
+       * @param {object} opts - Options for reading the Git configuration.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @returns {Promise<GitConfig>} A `GitConfig` object representing the parsed configuration.
+       */
+      static async get({ fs, gitdir }) {
+        const text = await fs.read(`${gitdir}/config`, { encoding: "utf8" });
+        return GitConfig.from(text);
+      }
+      /**
+       * Saves the provided Git configuration to the specified `.git` directory.
+       *
+       * @param {object} opts - Options for saving the Git configuration.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @param {GitConfig} opts.config - The `GitConfig` object to save.
+       * @returns {Promise<void>} Resolves when the configuration has been successfully saved.
+       */
+      static async save({ fs, gitdir, config }) {
+        await fs.write(`${gitdir}/config`, config.toString(), {
+          encoding: "utf8"
+        });
+      }
+    };
+    refpaths = (ref) => [
+      `${ref}`,
+      `refs/${ref}`,
+      `refs/tags/${ref}`,
+      `refs/heads/${ref}`,
+      `refs/remotes/${ref}`,
+      `refs/remotes/${ref}/HEAD`
+    ];
+    GIT_FILES = ["config", "description", "index", "shallow", "commondir"];
+    GitRefManager = class _GitRefManager {
+      /**
+       * Updates remote refs based on the provided refspecs and options.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.remote - The name of the remote.
+       * @param {Map<string, string>} args.refs - A map of refs to their object IDs.
+       * @param {Map<string, string>} args.symrefs - A map of symbolic refs.
+       * @param {boolean} args.tags - Whether to fetch tags.
+       * @param {string[]} [args.refspecs = undefined] - The refspecs to use.
+       * @param {boolean} [args.prune = false] - Whether to prune stale refs.
+       * @param {boolean} [args.pruneTags = false] - Whether to prune tags.
+       * @returns {Promise<Object>} - An object containing pruned refs.
+       */
+      static async updateRemoteRefs({
+        fs,
+        gitdir,
+        remote,
+        refs,
+        symrefs,
+        tags,
+        refspecs = void 0,
+        prune = false,
+        pruneTags = false
+      }) {
+        for (const value of refs.values()) {
+          if (!value.match(/[0-9a-f]{40}/)) {
+            throw new InvalidOidError(value);
+          }
+        }
+        const config = await GitConfigManager.get({ fs, gitdir });
+        if (!refspecs) {
+          refspecs = await config.getall(`remote.${remote}.fetch`);
+          if (refspecs.length === 0) {
+            throw new NoRefspecError(remote);
+          }
+          refspecs.unshift(`+HEAD:refs/remotes/${remote}/HEAD`);
+        }
+        const refspec = GitRefSpecSet.from(refspecs);
+        const actualRefsToWrite = /* @__PURE__ */ new Map();
+        if (pruneTags) {
+          const tags2 = await _GitRefManager.listRefs({
+            fs,
+            gitdir,
+            filepath: "refs/tags"
+          });
+          await _GitRefManager.deleteRefs({
+            fs,
+            gitdir,
+            refs: tags2.map((tag2) => `refs/tags/${tag2}`)
+          });
+        }
+        if (tags) {
+          for (const serverRef of refs.keys()) {
+            if (serverRef.startsWith("refs/tags") && !serverRef.endsWith("^{}")) {
+              if (!await _GitRefManager.exists({ fs, gitdir, ref: serverRef })) {
+                const oid = refs.get(serverRef);
+                actualRefsToWrite.set(serverRef, oid);
+              }
+            }
+          }
+        }
+        const refTranslations = refspec.translate([...refs.keys()]);
+        for (const [serverRef, translatedRef] of refTranslations) {
+          const value = refs.get(serverRef);
+          actualRefsToWrite.set(translatedRef, value);
+        }
+        const symrefTranslations = refspec.translate([...symrefs.keys()]);
+        for (const [serverRef, translatedRef] of symrefTranslations) {
+          const value = symrefs.get(serverRef);
+          const symtarget = refspec.translateOne(value);
+          if (symtarget) {
+            actualRefsToWrite.set(translatedRef, `ref: ${symtarget}`);
+          }
+        }
+        const pruned = [];
+        if (prune) {
+          for (const filepath of refspec.localNamespaces()) {
+            const refs2 = (await _GitRefManager.listRefs({
+              fs,
+              gitdir,
+              filepath
+            })).map((file) => `${filepath}/${file}`);
+            for (const ref of refs2) {
+              if (!actualRefsToWrite.has(ref)) {
+                pruned.push(ref);
+              }
+            }
+          }
+          if (pruned.length > 0) {
+            await _GitRefManager.deleteRefs({ fs, gitdir, refs: pruned });
+          }
+        }
+        for (const [key, value] of actualRefsToWrite) {
+          await acquireLock(
+            key,
+            async () => fs.write(join(gitdir, key), `${value.trim()}
+`, "utf8")
+          );
+        }
+        return { pruned };
+      }
+      /**
+       * Writes a ref to the file system.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to write.
+       * @param {string} args.value - The object ID to write.
+       * @returns {Promise<void>}
+       */
+      // TODO: make this less crude?
+      static async writeRef({ fs, gitdir, ref, value }) {
+        if (!value.match(/[0-9a-f]{40}/)) {
+          throw new InvalidOidError(value);
+        }
+        await acquireLock(
+          ref,
+          async () => fs.write(join(gitdir, ref), `${value.trim()}
+`, "utf8")
+        );
+      }
+      /**
+       * Writes a symbolic ref to the file system.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to write.
+       * @param {string} args.value - The target ref.
+       * @returns {Promise<void>}
+       */
+      static async writeSymbolicRef({ fs, gitdir, ref, value }) {
+        await acquireLock(
+          ref,
+          async () => fs.write(join(gitdir, ref), `ref: ${value.trim()}
+`, "utf8")
+        );
+      }
+      /**
+       * Deletes a single ref.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to delete.
+       * @returns {Promise<void>}
+       */
+      static async deleteRef({ fs, gitdir, ref }) {
+        return _GitRefManager.deleteRefs({ fs, gitdir, refs: [ref] });
+      }
+      /**
+       * Deletes multiple refs.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string[]} args.refs - The refs to delete.
+       * @returns {Promise<void>}
+       */
+      static async deleteRefs({ fs, gitdir, refs }) {
+        await Promise.all(refs.map((ref) => fs.rm(join(gitdir, ref))));
+        let text = await acquireLock(
+          "packed-refs",
+          async () => fs.read(`${gitdir}/packed-refs`, { encoding: "utf8" })
+        );
+        const packed = GitPackedRefs.from(text);
+        const beforeSize = packed.refs.size;
+        for (const ref of refs) {
+          if (packed.refs.has(ref)) {
+            packed.delete(ref);
+          }
+        }
+        if (packed.refs.size < beforeSize) {
+          text = packed.toString();
+          await acquireLock(
+            "packed-refs",
+            async () => fs.write(`${gitdir}/packed-refs`, text, { encoding: "utf8" })
+          );
+        }
+      }
+      /**
+       * Resolves a ref to its object ID.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to resolve.
+       * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
+       * @returns {Promise<string>} - The resolved object ID.
+       */
+      static async resolve({ fs, gitdir, ref, depth = void 0 }) {
+        if (depth !== void 0) {
+          depth--;
+          if (depth === -1) {
+            return ref;
+          }
+        }
+        if (ref.startsWith("ref: ")) {
+          ref = ref.slice("ref: ".length);
+          return _GitRefManager.resolve({ fs, gitdir, ref, depth });
+        }
+        if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
+          return ref;
+        }
+        const packedMap = await _GitRefManager.packedRefs({ fs, gitdir });
+        const allpaths = refpaths(ref).filter((p) => !GIT_FILES.includes(p));
+        for (const ref2 of allpaths) {
+          const sha = await acquireLock(
+            ref2,
+            async () => await fs.read(`${gitdir}/${ref2}`, { encoding: "utf8" }) || packedMap.get(ref2)
+          );
+          if (sha) {
+            return _GitRefManager.resolve({ fs, gitdir, ref: sha.trim(), depth });
+          }
+        }
+        throw new NotFoundError(ref);
+      }
+      /**
+       * Checks if a ref exists.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to check.
+       * @returns {Promise<boolean>} - True if the ref exists, false otherwise.
+       */
+      static async exists({ fs, gitdir, ref }) {
+        try {
+          await _GitRefManager.expand({ fs, gitdir, ref });
+          return true;
+        } catch (err) {
+          return false;
+        }
+      }
+      /**
+       * Expands a ref to its full name.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to expand.
+       * @returns {Promise<string>} - The full ref name.
+       */
+      static async expand({ fs, gitdir, ref }) {
+        if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
+          return ref;
+        }
+        const packedMap = await _GitRefManager.packedRefs({ fs, gitdir });
+        const allpaths = refpaths(ref);
+        for (const ref2 of allpaths) {
+          const refExists = await acquireLock(
+            ref2,
+            async () => fs.exists(`${gitdir}/${ref2}`)
+          );
+          if (refExists)
+            return ref2;
+          if (packedMap.has(ref2))
+            return ref2;
+        }
+        throw new NotFoundError(ref);
+      }
+      /**
+       * Expands a ref against a provided map.
+       *
+       * @param {Object} args
+       * @param {string} args.ref - The ref to expand.
+       * @param {Map<string, string>} args.map - The map of refs.
+       * @returns {Promise<string>} - The expanded ref.
+       */
+      static async expandAgainstMap({ ref, map }) {
+        const allpaths = refpaths(ref);
+        for (const ref2 of allpaths) {
+          if (await map.has(ref2))
+            return ref2;
+        }
+        throw new NotFoundError(ref);
+      }
+      /**
+       * Resolves a ref against a provided map.
+       *
+       * @param {Object} args
+       * @param {string} args.ref - The ref to resolve.
+       * @param {string} [args.fullref = args.ref] - The full ref name.
+       * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
+       * @param {Map<string, string>} args.map - The map of refs.
+       * @returns {Object} - An object containing the full ref and its object ID.
+       */
+      static resolveAgainstMap({ ref, fullref = ref, depth = void 0, map }) {
+        if (depth !== void 0) {
+          depth--;
+          if (depth === -1) {
+            return { fullref, oid: ref };
+          }
+        }
+        if (ref.startsWith("ref: ")) {
+          ref = ref.slice("ref: ".length);
+          return _GitRefManager.resolveAgainstMap({ ref, fullref, depth, map });
+        }
+        if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
+          return { fullref, oid: ref };
+        }
+        const allpaths = refpaths(ref);
+        for (const ref2 of allpaths) {
+          const sha = map.get(ref2);
+          if (sha) {
+            return _GitRefManager.resolveAgainstMap({
+              ref: sha.trim(),
+              fullref: ref2,
+              depth,
+              map
+            });
+          }
+        }
+        throw new NotFoundError(ref);
+      }
+      /**
+       * Reads the packed refs file and returns a map of refs.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<Map<string, string>>} - A map of packed refs.
+       */
+      static async packedRefs({ fs, gitdir }) {
+        const text = await acquireLock(
+          "packed-refs",
+          async () => fs.read(`${gitdir}/packed-refs`, { encoding: "utf8" })
+        );
+        const packed = GitPackedRefs.from(text);
+        return packed.refs;
+      }
+      /**
+       * Lists all refs matching a given filepath prefix.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.filepath - The filepath prefix to match.
+       * @returns {Promise<string[]>} - A sorted list of refs.
+       */
+      static async listRefs({ fs, gitdir, filepath }) {
+        const packedMap = _GitRefManager.packedRefs({ fs, gitdir });
+        let files = null;
+        try {
+          files = await fs.readdirDeep(`${gitdir}/${filepath}`);
+          files = files.map((x) => x.replace(`${gitdir}/${filepath}/`, ""));
+        } catch (err) {
+          files = [];
+        }
+        for (let key of (await packedMap).keys()) {
+          if (key.startsWith(filepath)) {
+            key = key.replace(filepath + "/", "");
+            if (!files.includes(key)) {
+              files.push(key);
+            }
+          }
+        }
+        files.sort(compareRefNames);
+        return files;
+      }
+      /**
+       * Lists all branches, optionally filtered by remote.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} [args.remote] - The remote to filter branches by.
+       * @returns {Promise<string[]>} - A list of branch names.
+       */
+      static async listBranches({ fs, gitdir, remote }) {
+        if (remote) {
+          return _GitRefManager.listRefs({
+            fs,
+            gitdir,
+            filepath: `refs/remotes/${remote}`
+          });
+        } else {
+          return _GitRefManager.listRefs({ fs, gitdir, filepath: `refs/heads` });
+        }
+      }
+      /**
+       * Lists all tags.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<string[]>} - A list of tag names.
+       */
+      static async listTags({ fs, gitdir }) {
+        const tags = await _GitRefManager.listRefs({
+          fs,
+          gitdir,
+          filepath: `refs/tags`
+        });
+        return tags.filter((x) => !x.endsWith("^{}"));
+      }
+    };
+    GitTree = class _GitTree {
+      constructor(entries) {
+        if (Buffer.isBuffer(entries)) {
+          this._entries = parseBuffer(entries);
+        } else if (Array.isArray(entries)) {
+          this._entries = entries.map(nudgeIntoShape);
+        } else {
+          throw new InternalError("invalid type passed to GitTree constructor");
+        }
+        this._entries.sort(comparePath);
+      }
+      static from(tree) {
+        return new _GitTree(tree);
+      }
+      render() {
+        return this._entries.map((entry) => `${entry.mode} ${entry.type} ${entry.oid}    ${entry.path}`).join("\n");
+      }
+      toObject() {
+        const entries = [...this._entries];
+        entries.sort(compareTreeEntryPath);
+        return Buffer.concat(
+          entries.map((entry) => {
+            const mode = Buffer.from(entry.mode.replace(/^0/, ""));
+            const space = Buffer.from(" ");
+            const path = Buffer.from(entry.path, "utf8");
+            const nullchar = Buffer.from([0]);
+            const oid = Buffer.from(entry.oid, "hex");
+            return Buffer.concat([mode, space, path, nullchar, oid]);
+          })
+        );
+      }
+      /**
+       * @returns {TreeEntry[]}
+       */
+      entries() {
+        return this._entries;
+      }
+      *[Symbol.iterator]() {
+        for (const entry of this._entries) {
+          yield entry;
+        }
+      }
+    };
+    GitObject = class {
+      /**
+       * Wraps a raw object with a Git header.
+       *
+       * @param {Object} params - The parameters for wrapping.
+       * @param {string} params.type - The type of the Git object (e.g., 'blob', 'tree', 'commit').
+       * @param {Uint8Array} params.object - The raw object data to wrap.
+       * @returns {Uint8Array} The wrapped Git object as a single buffer.
+       */
+      static wrap({ type, object }) {
+        const header = `${type} ${object.length}\0`;
+        const headerLen = header.length;
+        const totalLength = headerLen + object.length;
+        const wrappedObject = new Uint8Array(totalLength);
+        for (let i = 0; i < headerLen; i++) {
+          wrappedObject[i] = header.charCodeAt(i);
+        }
+        wrappedObject.set(object, headerLen);
+        return wrappedObject;
+      }
+      /**
+       * Unwraps a Git object buffer into its type and raw object data.
+       *
+       * @param {Buffer|Uint8Array} buffer - The buffer containing the wrapped Git object.
+       * @returns {{ type: string, object: Buffer }} An object containing the type and the raw object data.
+       * @throws {InternalError} If the length specified in the header does not match the actual object length.
+       */
+      static unwrap(buffer) {
+        const s = buffer.indexOf(32);
+        const i = buffer.indexOf(0);
+        const type = buffer.slice(0, s).toString("utf8");
+        const length = buffer.slice(s + 1, i).toString("utf8");
+        const actualLength = buffer.length - (i + 1);
+        if (parseInt(length) !== actualLength) {
+          throw new InternalError(
+            `Length mismatch: expected ${length} bytes but got ${actualLength} instead.`
+          );
+        }
+        return {
+          type,
+          object: Buffer.from(buffer.slice(i + 1))
+        };
+      }
+    };
+    StreamReader = class {
+      constructor(stream) {
+        if (typeof Buffer === "undefined") {
+          throw new Error("Missing Buffer dependency");
+        }
+        this.stream = getIterator(stream);
+        this.buffer = null;
+        this.cursor = 0;
+        this.undoCursor = 0;
+        this.started = false;
+        this._ended = false;
+        this._discardedBytes = 0;
+      }
+      eof() {
+        return this._ended && this.cursor === this.buffer.length;
+      }
+      tell() {
+        return this._discardedBytes + this.cursor;
+      }
+      async byte() {
+        if (this.eof())
+          return;
+        if (!this.started)
+          await this._init();
+        if (this.cursor === this.buffer.length) {
+          await this._loadnext();
+          if (this._ended)
+            return;
+        }
+        this._moveCursor(1);
+        return this.buffer[this.undoCursor];
+      }
+      async chunk() {
+        if (this.eof())
+          return;
+        if (!this.started)
+          await this._init();
+        if (this.cursor === this.buffer.length) {
+          await this._loadnext();
+          if (this._ended)
+            return;
+        }
+        this._moveCursor(this.buffer.length);
+        return this.buffer.slice(this.undoCursor, this.cursor);
+      }
+      async read(n) {
+        if (this.eof())
+          return;
+        if (!this.started)
+          await this._init();
+        if (this.cursor + n > this.buffer.length) {
+          this._trim();
+          await this._accumulate(n);
+        }
+        this._moveCursor(n);
+        return this.buffer.slice(this.undoCursor, this.cursor);
+      }
+      async skip(n) {
+        if (this.eof())
+          return;
+        if (!this.started)
+          await this._init();
+        if (this.cursor + n > this.buffer.length) {
+          this._trim();
+          await this._accumulate(n);
+        }
+        this._moveCursor(n);
+      }
+      async undo() {
+        this.cursor = this.undoCursor;
+      }
+      async _next() {
+        this.started = true;
+        let { done, value } = await this.stream.next();
+        if (done) {
+          this._ended = true;
+          if (!value)
+            return Buffer.alloc(0);
+        }
+        if (value) {
+          value = Buffer.from(value);
+        }
+        return value;
+      }
+      _trim() {
+        this.buffer = this.buffer.slice(this.undoCursor);
+        this.cursor -= this.undoCursor;
+        this._discardedBytes += this.undoCursor;
+        this.undoCursor = 0;
+      }
+      _moveCursor(n) {
+        this.undoCursor = this.cursor;
+        this.cursor += n;
+        if (this.cursor > this.buffer.length) {
+          this.cursor = this.buffer.length;
+        }
+      }
+      async _accumulate(n) {
+        if (this._ended)
+          return;
+        const buffers = [this.buffer];
+        while (this.cursor + n > lengthBuffers(buffers)) {
+          const nextbuffer = await this._next();
+          if (this._ended)
+            break;
+          buffers.push(nextbuffer);
+        }
+        this.buffer = Buffer.concat(buffers);
+      }
+      async _loadnext() {
+        this._discardedBytes += this.buffer.length;
+        this.undoCursor = 0;
+        this.cursor = 0;
+        this.buffer = await this._next();
+      }
+      async _init() {
+        this.buffer = await this._next();
+      }
+    };
+    supportsDecompressionStream = false;
+    GitPackIndex = class _GitPackIndex {
+      constructor(stuff) {
+        Object.assign(this, stuff);
+        this.offsetCache = {};
+      }
+      static async fromIdx({ idx, getExternalRefDelta }) {
+        const reader = new BufferCursor(idx);
+        const magic = reader.slice(4).toString("hex");
+        if (magic !== "ff744f63") {
+          return;
+        }
+        const version2 = reader.readUInt32BE();
+        if (version2 !== 2) {
+          throw new InternalError(
+            `Unable to read version ${version2} packfile IDX. (Only version 2 supported)`
+          );
+        }
+        if (idx.byteLength > 2048 * 1024 * 1024) {
+          throw new InternalError(
+            `To keep implementation simple, I haven't implemented the layer 5 feature needed to support packfiles > 2GB in size.`
+          );
+        }
+        reader.seek(reader.tell() + 4 * 255);
+        const size = reader.readUInt32BE();
+        const hashes = [];
+        for (let i = 0; i < size; i++) {
+          const hash = reader.slice(20).toString("hex");
+          hashes[i] = hash;
+        }
+        reader.seek(reader.tell() + 4 * size);
+        const offsets = /* @__PURE__ */ new Map();
+        for (let i = 0; i < size; i++) {
+          offsets.set(hashes[i], reader.readUInt32BE());
+        }
+        const packfileSha = reader.slice(20).toString("hex");
+        return new _GitPackIndex({
+          hashes,
+          crcs: {},
+          offsets,
+          packfileSha,
+          getExternalRefDelta
+        });
+      }
+      static async fromPack({ pack, getExternalRefDelta, onProgress }) {
+        const listpackTypes = {
+          1: "commit",
+          2: "tree",
+          3: "blob",
+          4: "tag",
+          6: "ofs-delta",
+          7: "ref-delta"
+        };
+        const offsetToObject = {};
+        const packfileSha = pack.slice(-20).toString("hex");
+        const hashes = [];
+        const crcs = {};
+        const offsets = /* @__PURE__ */ new Map();
+        let totalObjectCount = null;
+        let lastPercent = null;
+        await listpack([pack], async ({ data, type, reference, offset, num: num2 }) => {
+          if (totalObjectCount === null)
+            totalObjectCount = num2;
+          const percent = Math.floor(
+            (totalObjectCount - num2) * 100 / totalObjectCount
+          );
+          if (percent !== lastPercent) {
+            if (onProgress) {
+              await onProgress({
+                phase: "Receiving objects",
+                loaded: totalObjectCount - num2,
+                total: totalObjectCount
+              });
+            }
+          }
+          lastPercent = percent;
+          type = listpackTypes[type];
+          if (["commit", "tree", "blob", "tag"].includes(type)) {
+            offsetToObject[offset] = {
+              type,
+              offset
+            };
+          } else if (type === "ofs-delta") {
+            offsetToObject[offset] = {
+              type,
+              offset
+            };
+          } else if (type === "ref-delta") {
+            offsetToObject[offset] = {
+              type,
+              offset
+            };
+          }
+        });
+        const offsetArray = Object.keys(offsetToObject).map(Number);
+        for (const [i, start] of offsetArray.entries()) {
+          const end = i + 1 === offsetArray.length ? pack.byteLength - 20 : offsetArray[i + 1];
+          const o = offsetToObject[start];
+          const crc = import_crc_32.default.buf(pack.slice(start, end)) >>> 0;
+          o.end = end;
+          o.crc = crc;
+        }
+        const p = new _GitPackIndex({
+          pack: Promise.resolve(pack),
+          packfileSha,
+          crcs,
+          hashes,
+          offsets,
+          getExternalRefDelta
+        });
+        lastPercent = null;
+        let count = 0;
+        const objectsByDepth = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        for (let offset in offsetToObject) {
+          offset = Number(offset);
+          const percent = Math.floor(count * 100 / totalObjectCount);
+          if (percent !== lastPercent) {
+            if (onProgress) {
+              await onProgress({
+                phase: "Resolving deltas",
+                loaded: count,
+                total: totalObjectCount
+              });
+            }
+          }
+          count++;
+          lastPercent = percent;
+          const o = offsetToObject[offset];
+          if (o.oid)
+            continue;
+          try {
+            p.readDepth = 0;
+            p.externalReadDepth = 0;
+            const { type, object } = await p.readSlice({ start: offset });
+            objectsByDepth[p.readDepth] += 1;
+            const oid = await shasum(GitObject.wrap({ type, object }));
+            o.oid = oid;
+            hashes.push(oid);
+            offsets.set(oid, offset);
+            crcs[oid] = o.crc;
+          } catch (err) {
+            continue;
+          }
+        }
+        hashes.sort();
+        return p;
+      }
+      async toBuffer() {
+        const buffers = [];
+        const write = (str, encoding) => {
+          buffers.push(Buffer.from(str, encoding));
+        };
+        write("ff744f63", "hex");
+        write("00000002", "hex");
+        const fanoutBuffer = new BufferCursor(Buffer.alloc(256 * 4));
+        for (let i = 0; i < 256; i++) {
+          let count = 0;
+          for (const hash of this.hashes) {
+            if (parseInt(hash.slice(0, 2), 16) <= i)
+              count++;
+          }
+          fanoutBuffer.writeUInt32BE(count);
+        }
+        buffers.push(fanoutBuffer.buffer);
+        for (const hash of this.hashes) {
+          write(hash, "hex");
+        }
+        const crcsBuffer = new BufferCursor(Buffer.alloc(this.hashes.length * 4));
+        for (const hash of this.hashes) {
+          crcsBuffer.writeUInt32BE(this.crcs[hash]);
+        }
+        buffers.push(crcsBuffer.buffer);
+        const offsetsBuffer = new BufferCursor(Buffer.alloc(this.hashes.length * 4));
+        for (const hash of this.hashes) {
+          offsetsBuffer.writeUInt32BE(this.offsets.get(hash));
+        }
+        buffers.push(offsetsBuffer.buffer);
+        write(this.packfileSha, "hex");
+        const totalBuffer = Buffer.concat(buffers);
+        const sha = await shasum(totalBuffer);
+        const shaBuffer = Buffer.alloc(20);
+        shaBuffer.write(sha, "hex");
+        return Buffer.concat([totalBuffer, shaBuffer]);
+      }
+      async load({ pack }) {
+        this.pack = pack;
+      }
+      async unload() {
+        this.pack = null;
+      }
+      async read({ oid }) {
+        if (!this.offsets.get(oid)) {
+          if (this.getExternalRefDelta) {
+            this.externalReadDepth++;
+            return this.getExternalRefDelta(oid);
+          } else {
+            throw new InternalError(`Could not read object ${oid} from packfile`);
+          }
+        }
+        const start = this.offsets.get(oid);
+        return this.readSlice({ start });
+      }
+      async readSlice({ start }) {
+        if (this.offsetCache[start]) {
+          return Object.assign({}, this.offsetCache[start]);
+        }
+        this.readDepth++;
+        const types2 = {
+          16: "commit",
+          32: "tree",
+          48: "blob",
+          64: "tag",
+          96: "ofs_delta",
+          112: "ref_delta"
+        };
+        const pack = await this.pack;
+        if (!pack) {
+          throw new InternalError(
+            "Could not read packfile data. The packfile may be missing, corrupted, or too large to read into memory."
+          );
+        }
+        const raw = pack.slice(start);
+        const reader = new BufferCursor(raw);
+        const byte = reader.readUInt8();
+        const btype = byte & 112;
+        let type = types2[btype];
+        if (type === void 0) {
+          throw new InternalError("Unrecognized type: 0b" + btype.toString(2));
+        }
+        const lastFour = byte & 15;
+        let length = lastFour;
+        const multibyte = byte & 128;
+        if (multibyte) {
+          length = otherVarIntDecode(reader, lastFour);
+        }
+        let base = null;
+        let object = null;
+        if (type === "ofs_delta") {
+          const offset = decodeVarInt(reader);
+          const baseOffset = start - offset;
+          ({ object: base, type } = await this.readSlice({ start: baseOffset }));
+        }
+        if (type === "ref_delta") {
+          const oid = reader.slice(20).toString("hex");
+          ({ object: base, type } = await this.read({ oid }));
+        }
+        const buffer = raw.slice(reader.tell());
+        object = Buffer.from(await inflate(buffer));
+        if (object.byteLength !== length) {
+          throw new InternalError(
+            `Packfile told us object would have length ${length} but it had length ${object.byteLength}`
+          );
+        }
+        if (base) {
+          object = Buffer.from(applyDelta(object, base));
+        }
+        if (this.readDepth > 3) {
+          this.offsetCache[start] = { type, object };
+        }
+        return { type, format: "content", object };
+      }
+    };
+    PackfileCache = Symbol("PackfileCache");
+    AlreadyExistsError = class _AlreadyExistsError extends BaseError {
+      /**
+       * @param {'note'|'remote'|'tag'|'branch'} noun
+       * @param {string} where
+       * @param {boolean} canForce
+       */
+      constructor(noun, where, canForce = true) {
+        super(
+          `Failed to create ${noun} at ${where} because it already exists.${canForce ? ` (Hint: use 'force: true' parameter to overwrite existing ${noun}.)` : ""}`
+        );
+        this.code = this.name = _AlreadyExistsError.code;
+        this.data = { noun, where, canForce };
+      }
+    };
+    AlreadyExistsError.code = "AlreadyExistsError";
+    AmbiguousError = class _AmbiguousError extends BaseError {
+      /**
+       * @param {'oids'|'refs'} nouns
+       * @param {string} short
+       * @param {string[]} matches
+       */
+      constructor(nouns, short, matches) {
+        super(
+          `Found multiple ${nouns} matching "${short}" (${matches.join(
+            ", "
+          )}). Use a longer abbreviation length to disambiguate them.`
+        );
+        this.code = this.name = _AmbiguousError.code;
+        this.data = { nouns, short, matches };
+      }
+    };
+    AmbiguousError.code = "AmbiguousError";
+    CheckoutConflictError = class _CheckoutConflictError extends BaseError {
+      /**
+       * @param {string[]} filepaths
+       */
+      constructor(filepaths) {
+        super(
+          `Your local changes to the following files would be overwritten by checkout: ${filepaths.join(
+            ", "
+          )}`
+        );
+        this.code = this.name = _CheckoutConflictError.code;
+        this.data = { filepaths };
+      }
+    };
+    CheckoutConflictError.code = "CheckoutConflictError";
+    CherryPickMergeCommitError = class _CherryPickMergeCommitError extends BaseError {
+      /**
+       * @param {string} oid
+       * @param {number} parentCount
+       */
+      constructor(oid, parentCount) {
+        super(
+          `Cannot cherry-pick merge commit ${oid}. Merge commits have ${parentCount} parents and require specifying which parent to use as the base.`
+        );
+        this.code = this.name = _CherryPickMergeCommitError.code;
+        this.data = { oid, parentCount };
+      }
+    };
+    CherryPickMergeCommitError.code = "CherryPickMergeCommitError";
+    CherryPickRootCommitError = class _CherryPickRootCommitError extends BaseError {
+      /**
+       * @param {string} oid
+       */
+      constructor(oid) {
+        super(
+          `Cannot cherry-pick root commit ${oid}. Root commits have no parents.`
+        );
+        this.code = this.name = _CherryPickRootCommitError.code;
+        this.data = { oid };
+      }
+    };
+    CherryPickRootCommitError.code = "CherryPickRootCommitError";
+    CommitNotFetchedError = class _CommitNotFetchedError extends BaseError {
+      /**
+       * @param {string} ref
+       * @param {string} oid
+       */
+      constructor(ref, oid) {
+        super(
+          `Failed to checkout "${ref}" because commit ${oid} is not available locally. Do a git fetch to make the branch available locally.`
+        );
+        this.code = this.name = _CommitNotFetchedError.code;
+        this.data = { ref, oid };
+      }
+    };
+    CommitNotFetchedError.code = "CommitNotFetchedError";
+    EmptyServerResponseError = class _EmptyServerResponseError extends BaseError {
+      constructor() {
+        super(`Empty response from git server.`);
+        this.code = this.name = _EmptyServerResponseError.code;
+        this.data = {};
+      }
+    };
+    EmptyServerResponseError.code = "EmptyServerResponseError";
+    FastForwardError = class _FastForwardError extends BaseError {
+      constructor() {
+        super(`A simple fast-forward merge was not possible.`);
+        this.code = this.name = _FastForwardError.code;
+        this.data = {};
+      }
+    };
+    FastForwardError.code = "FastForwardError";
+    GitPushError = class _GitPushError extends BaseError {
+      /**
+       * @param {string} prettyDetails
+       * @param {PushResult} result
+       */
+      constructor(prettyDetails, result) {
+        super(`One or more branches were not updated: ${prettyDetails}`);
+        this.code = this.name = _GitPushError.code;
+        this.data = { prettyDetails, result };
+      }
+    };
+    GitPushError.code = "GitPushError";
+    HttpError = class _HttpError extends BaseError {
+      /**
+       * @param {number} statusCode
+       * @param {string} statusMessage
+       * @param {string} response
+       */
+      constructor(statusCode, statusMessage, response) {
+        super(`HTTP Error: ${statusCode} ${statusMessage}`);
+        this.code = this.name = _HttpError.code;
+        this.data = { statusCode, statusMessage, response };
+      }
+    };
+    HttpError.code = "HttpError";
+    InvalidFilepathError = class _InvalidFilepathError extends BaseError {
+      /**
+       * @param {'leading-slash'|'trailing-slash'|'directory'} [reason]
+       */
+      constructor(reason) {
+        let message = "invalid filepath";
+        if (reason === "leading-slash" || reason === "trailing-slash") {
+          message = `"filepath" parameter should not include leading or trailing directory separators because these can cause problems on some platforms.`;
+        } else if (reason === "directory") {
+          message = `"filepath" should not be a directory.`;
+        }
+        super(message);
+        this.code = this.name = _InvalidFilepathError.code;
+        this.data = { reason };
+      }
+    };
+    InvalidFilepathError.code = "InvalidFilepathError";
+    InvalidRefNameError = class _InvalidRefNameError extends BaseError {
+      /**
+       * @param {string} ref
+       * @param {string} suggestion
+       * @param {boolean} canForce
+       */
+      constructor(ref, suggestion) {
+        super(
+          `"${ref}" would be an invalid git reference. (Hint: a valid alternative would be "${suggestion}".)`
+        );
+        this.code = this.name = _InvalidRefNameError.code;
+        this.data = { ref, suggestion };
+      }
+    };
+    InvalidRefNameError.code = "InvalidRefNameError";
+    MaxDepthError = class _MaxDepthError extends BaseError {
+      /**
+       * @param {number} depth
+       */
+      constructor(depth) {
+        super(`Maximum search depth of ${depth} exceeded.`);
+        this.code = this.name = _MaxDepthError.code;
+        this.data = { depth };
+      }
+    };
+    MaxDepthError.code = "MaxDepthError";
+    MergeNotSupportedError = class _MergeNotSupportedError extends BaseError {
+      constructor() {
+        super(`Merges with conflicts are not supported yet.`);
+        this.code = this.name = _MergeNotSupportedError.code;
+        this.data = {};
+      }
+    };
+    MergeNotSupportedError.code = "MergeNotSupportedError";
+    MergeConflictError = class _MergeConflictError extends BaseError {
+      /**
+       * @param {Array<string>} filepaths
+       * @param {Array<string>} bothModified
+       * @param {Array<string>} deleteByUs
+       * @param {Array<string>} deleteByTheirs
+       */
+      constructor(filepaths, bothModified, deleteByUs, deleteByTheirs) {
+        super(
+          `Automatic merge failed with one or more merge conflicts in the following files: ${filepaths.toString()}. Fix conflicts then commit the result.`
+        );
+        this.code = this.name = _MergeConflictError.code;
+        this.data = { filepaths, bothModified, deleteByUs, deleteByTheirs };
+      }
+    };
+    MergeConflictError.code = "MergeConflictError";
+    MissingNameError = class _MissingNameError extends BaseError {
+      /**
+       * @param {'author'|'committer'|'tagger'} role
+       */
+      constructor(role) {
+        super(
+          `No name was provided for ${role} in the argument or in the .git/config file.`
+        );
+        this.code = this.name = _MissingNameError.code;
+        this.data = { role };
+      }
+    };
+    MissingNameError.code = "MissingNameError";
+    MissingParameterError = class _MissingParameterError extends BaseError {
+      /**
+       * @param {string} parameter
+       */
+      constructor(parameter) {
+        super(
+          `The function requires a "${parameter}" parameter but none was provided.`
+        );
+        this.code = this.name = _MissingParameterError.code;
+        this.data = { parameter };
+      }
+    };
+    MissingParameterError.code = "MissingParameterError";
+    MultipleGitError = class _MultipleGitError extends BaseError {
+      /**
+       * @param {Error[]} errors
+       * @param {string} message
+       */
+      constructor(errors) {
+        super(
+          `There are multiple errors that were thrown by the method. Please refer to the "errors" property to see more`
+        );
+        this.code = this.name = _MultipleGitError.code;
+        this.data = { errors };
+        this.errors = errors;
+      }
+    };
+    MultipleGitError.code = "MultipleGitError";
+    ParseError = class _ParseError extends BaseError {
+      /**
+       * @param {string} expected
+       * @param {string} actual
+       */
+      constructor(expected, actual) {
+        super(`Expected "${expected}" but received "${actual}".`);
+        this.code = this.name = _ParseError.code;
+        this.data = { expected, actual };
+      }
+    };
+    ParseError.code = "ParseError";
+    PushRejectedError = class _PushRejectedError extends BaseError {
+      /**
+       * @param {'not-fast-forward'|'tag-exists'} reason
+       */
+      constructor(reason) {
+        let message = "";
+        if (reason === "not-fast-forward") {
+          message = " because it was not a simple fast-forward";
+        } else if (reason === "tag-exists") {
+          message = " because tag already exists";
+        }
+        super(`Push rejected${message}. Use "force: true" to override.`);
+        this.code = this.name = _PushRejectedError.code;
+        this.data = { reason };
+      }
+    };
+    PushRejectedError.code = "PushRejectedError";
+    RemoteCapabilityError = class _RemoteCapabilityError extends BaseError {
+      /**
+       * @param {'shallow'|'deepen-since'|'deepen-not'|'deepen-relative'} capability
+       * @param {'depth'|'since'|'exclude'|'relative'} parameter
+       */
+      constructor(capability, parameter) {
+        super(
+          `Remote does not support the "${capability}" so the "${parameter}" parameter cannot be used.`
+        );
+        this.code = this.name = _RemoteCapabilityError.code;
+        this.data = { capability, parameter };
+      }
+    };
+    RemoteCapabilityError.code = "RemoteCapabilityError";
+    SmartHttpError = class _SmartHttpError extends BaseError {
+      /**
+       * @param {string} preview
+       * @param {string} response
+       */
+      constructor(preview, response) {
+        super(
+          `Remote did not reply using the "smart" HTTP protocol. Expected "001e# service=git-upload-pack" but received: ${preview}`
+        );
+        this.code = this.name = _SmartHttpError.code;
+        this.data = { preview, response };
+      }
+    };
+    SmartHttpError.code = "SmartHttpError";
+    UnknownTransportError = class _UnknownTransportError extends BaseError {
+      /**
+       * @param {string} url
+       * @param {string} transport
+       * @param {string} [suggestion]
+       */
+      constructor(url, transport, suggestion) {
+        super(
+          `Git remote "${url}" uses an unrecognized transport protocol: "${transport}"`
+        );
+        this.code = this.name = _UnknownTransportError.code;
+        this.data = { url, transport, suggestion };
+      }
+    };
+    UnknownTransportError.code = "UnknownTransportError";
+    UrlParseError = class _UrlParseError extends BaseError {
+      /**
+       * @param {string} url
+       */
+      constructor(url) {
+        super(`Cannot parse remote URL: "${url}"`);
+        this.code = this.name = _UrlParseError.code;
+        this.data = { url };
+      }
+    };
+    UrlParseError.code = "UrlParseError";
+    UserCanceledError = class _UserCanceledError extends BaseError {
+      constructor() {
+        super(`The operation was canceled.`);
+        this.code = this.name = _UserCanceledError.code;
+        this.data = {};
+      }
+    };
+    UserCanceledError.code = "UserCanceledError";
+    IndexResetError = class _IndexResetError extends BaseError {
+      /**
+       * @param {Array<string>} filepaths
+       */
+      constructor(filepath) {
+        super(
+          `Could not merge index: Entry for '${filepath}' is not up to date. Either reset the index entry to HEAD, or stage your unstaged changes.`
+        );
+        this.code = this.name = _IndexResetError.code;
+        this.data = { filepath };
+      }
+    };
+    IndexResetError.code = "IndexResetError";
+    NoCommitError = class _NoCommitError extends BaseError {
+      /**
+       * @param {string} ref
+       */
+      constructor(ref) {
+        super(
+          `"${ref}" does not point to any commit. You're maybe working on a repository with no commits yet. `
+        );
+        this.code = this.name = _NoCommitError.code;
+        this.data = { ref };
+      }
+    };
+    NoCommitError.code = "NoCommitError";
+    Errors = /* @__PURE__ */ Object.freeze({
+      __proto__: null,
+      AlreadyExistsError,
+      AmbiguousError,
+      CheckoutConflictError,
+      CherryPickMergeCommitError,
+      CherryPickRootCommitError,
+      CommitNotFetchedError,
+      EmptyServerResponseError,
+      FastForwardError,
+      GitPushError,
+      HttpError,
+      InternalError,
+      InvalidFilepathError,
+      InvalidOidError,
+      InvalidRefNameError,
+      MaxDepthError,
+      MergeNotSupportedError,
+      MergeConflictError,
+      MissingNameError,
+      MissingParameterError,
+      MultipleGitError,
+      NoRefspecError,
+      NotFoundError,
+      ObjectTypeError,
+      ParseError,
+      PushRejectedError,
+      RemoteCapabilityError,
+      SmartHttpError,
+      UnknownTransportError,
+      UnsafeFilepathError,
+      UrlParseError,
+      UserCanceledError,
+      UnmergedPathsError,
+      IndexResetError,
+      NoCommitError
+    });
+    GitAnnotatedTag = class _GitAnnotatedTag {
+      constructor(tag2) {
+        if (typeof tag2 === "string") {
+          this._tag = tag2;
+        } else if (Buffer.isBuffer(tag2)) {
+          this._tag = tag2.toString("utf8");
+        } else if (typeof tag2 === "object") {
+          this._tag = _GitAnnotatedTag.render(tag2);
+        } else {
+          throw new InternalError(
+            "invalid type passed to GitAnnotatedTag constructor"
+          );
+        }
+      }
+      static from(tag2) {
+        return new _GitAnnotatedTag(tag2);
+      }
+      static render(obj) {
+        return `object ${obj.object}
+type ${obj.type}
+tag ${obj.tag}
+tagger ${formatAuthor(obj.tagger)}
+
+${obj.message}
+${obj.gpgsig ? obj.gpgsig : ""}`;
+      }
+      justHeaders() {
+        return this._tag.slice(0, this._tag.indexOf("\n\n"));
+      }
+      message() {
+        const tag2 = this.withoutSignature();
+        return tag2.slice(tag2.indexOf("\n\n") + 2);
+      }
+      parse() {
+        return Object.assign(this.headers(), {
+          message: this.message(),
+          gpgsig: this.gpgsig()
+        });
+      }
+      render() {
+        return this._tag;
+      }
+      headers() {
+        const headers = this.justHeaders().split("\n");
+        const hs = [];
+        for (const h of headers) {
+          if (h[0] === " ") {
+            hs[hs.length - 1] += "\n" + h.slice(1);
+          } else {
+            hs.push(h);
+          }
+        }
+        const obj = {};
+        for (const h of hs) {
+          const key = h.slice(0, h.indexOf(" "));
+          const value = h.slice(h.indexOf(" ") + 1);
+          if (Array.isArray(obj[key])) {
+            obj[key].push(value);
+          } else {
+            obj[key] = value;
+          }
+        }
+        if (obj.tagger) {
+          obj.tagger = parseAuthor(obj.tagger);
+        }
+        if (obj.committer) {
+          obj.committer = parseAuthor(obj.committer);
+        }
+        return obj;
+      }
+      withoutSignature() {
+        const tag2 = normalizeNewlines(this._tag);
+        if (tag2.indexOf("\n-----BEGIN PGP SIGNATURE-----") === -1)
+          return tag2;
+        return tag2.slice(0, tag2.lastIndexOf("\n-----BEGIN PGP SIGNATURE-----"));
+      }
+      gpgsig() {
+        if (this._tag.indexOf("\n-----BEGIN PGP SIGNATURE-----") === -1)
+          return;
+        const signature = this._tag.slice(
+          this._tag.indexOf("-----BEGIN PGP SIGNATURE-----"),
+          this._tag.indexOf("-----END PGP SIGNATURE-----") + "-----END PGP SIGNATURE-----".length
+        );
+        return normalizeNewlines(signature);
+      }
+      payload() {
+        return this.withoutSignature() + "\n";
+      }
+      toObject() {
+        return Buffer.from(this._tag, "utf8");
+      }
+      static async sign(tag2, sign, secretKey) {
+        const payload = tag2.payload();
+        let { signature } = await sign({ payload, secretKey });
+        signature = normalizeNewlines(signature);
+        const signedTag = payload + signature;
+        return _GitAnnotatedTag.from(signedTag);
+      }
+    };
+    GitCommit = class _GitCommit {
+      constructor(commit2) {
+        if (typeof commit2 === "string") {
+          this._commit = commit2;
+        } else if (Buffer.isBuffer(commit2)) {
+          this._commit = commit2.toString("utf8");
+        } else if (typeof commit2 === "object") {
+          this._commit = _GitCommit.render(commit2);
+        } else {
+          throw new InternalError("invalid type passed to GitCommit constructor");
+        }
+      }
+      static fromPayloadSignature({ payload, signature }) {
+        const headers = _GitCommit.justHeaders(payload);
+        const message = _GitCommit.justMessage(payload);
+        const commit2 = normalizeNewlines(
+          headers + "\ngpgsig" + indent(signature) + "\n" + message
+        );
+        return new _GitCommit(commit2);
+      }
+      static from(commit2) {
+        return new _GitCommit(commit2);
+      }
+      toObject() {
+        return Buffer.from(this._commit, "utf8");
+      }
+      // Todo: allow setting the headers and message
+      headers() {
+        return this.parseHeaders();
+      }
+      // Todo: allow setting the headers and message
+      message() {
+        return _GitCommit.justMessage(this._commit);
+      }
+      parse() {
+        return Object.assign({ message: this.message() }, this.headers());
+      }
+      static justMessage(commit2) {
+        return normalizeNewlines(commit2.slice(commit2.indexOf("\n\n") + 2));
+      }
+      static justHeaders(commit2) {
+        return commit2.slice(0, commit2.indexOf("\n\n"));
+      }
+      parseHeaders() {
+        const headers = _GitCommit.justHeaders(this._commit).split("\n");
+        const hs = [];
+        for (const h of headers) {
+          if (h[0] === " ") {
+            hs[hs.length - 1] += "\n" + h.slice(1);
+          } else {
+            hs.push(h);
+          }
+        }
+        const obj = {
+          parent: []
+        };
+        for (const h of hs) {
+          const key = h.slice(0, h.indexOf(" "));
+          const value = h.slice(h.indexOf(" ") + 1);
+          if (Array.isArray(obj[key])) {
+            obj[key].push(value);
+          } else {
+            obj[key] = value;
+          }
+        }
+        if (obj.author) {
+          obj.author = parseAuthor(obj.author);
+        }
+        if (obj.committer) {
+          obj.committer = parseAuthor(obj.committer);
+        }
+        return obj;
+      }
+      static renderHeaders(obj) {
+        let headers = "";
+        if (obj.tree) {
+          headers += `tree ${obj.tree}
+`;
+        } else {
+          headers += `tree 4b825dc642cb6eb9a060e54bf8d69288fbee4904
+`;
+        }
+        if (obj.parent) {
+          if (obj.parent.length === void 0) {
+            throw new InternalError(`commit 'parent' property should be an array`);
+          }
+          for (const p of obj.parent) {
+            headers += `parent ${p}
+`;
+          }
+        }
+        const author = obj.author;
+        headers += `author ${formatAuthor(author)}
+`;
+        const committer = obj.committer || obj.author;
+        headers += `committer ${formatAuthor(committer)}
+`;
+        if (obj.gpgsig) {
+          headers += "gpgsig" + indent(obj.gpgsig);
+        }
+        return headers;
+      }
+      static render(obj) {
+        return _GitCommit.renderHeaders(obj) + "\n" + normalizeNewlines(obj.message);
+      }
+      render() {
+        return this._commit;
+      }
+      withoutSignature() {
+        const commit2 = normalizeNewlines(this._commit);
+        if (commit2.indexOf("\ngpgsig") === -1)
+          return commit2;
+        const headers = commit2.slice(0, commit2.indexOf("\ngpgsig"));
+        const message = commit2.slice(
+          commit2.indexOf("-----END PGP SIGNATURE-----\n") + "-----END PGP SIGNATURE-----\n".length
+        );
+        return normalizeNewlines(headers + "\n" + message);
+      }
+      isolateSignature() {
+        const signature = this._commit.slice(
+          this._commit.indexOf("-----BEGIN PGP SIGNATURE-----"),
+          this._commit.indexOf("-----END PGP SIGNATURE-----") + "-----END PGP SIGNATURE-----".length
+        );
+        return outdent(signature);
+      }
+      static async sign(commit2, sign, secretKey) {
+        const payload = commit2.withoutSignature();
+        const message = _GitCommit.justMessage(commit2._commit);
+        let { signature } = await sign({ payload, secretKey });
+        signature = normalizeNewlines(signature);
+        const headers = _GitCommit.justHeaders(commit2._commit);
+        const signedCommit = headers + "\ngpgsig" + indent(signature) + "\n" + message;
+        return _GitCommit.from(signedCommit);
+      }
+    };
+    GitWalkerRepo = class {
+      constructor({ fs, gitdir, ref, cache }) {
+        this.fs = fs;
+        this.cache = cache;
+        this.gitdir = gitdir;
+        this.mapPromise = (async () => {
+          const map = /* @__PURE__ */ new Map();
+          let oid;
+          try {
+            oid = await GitRefManager.resolve({ fs, gitdir, ref });
+          } catch (e) {
+            if (e instanceof NotFoundError) {
+              oid = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+            }
+          }
+          const tree = await resolveTree({ fs, cache: this.cache, gitdir, oid });
+          tree.type = "tree";
+          tree.mode = "40000";
+          map.set(".", tree);
+          return map;
+        })();
+        const walker = this;
+        this.ConstructEntry = class TreeEntry {
+          constructor(fullpath) {
+            this._fullpath = fullpath;
+            this._type = false;
+            this._mode = false;
+            this._stat = false;
+            this._content = false;
+            this._oid = false;
+          }
+          async type() {
+            return walker.type(this);
+          }
+          async mode() {
+            return walker.mode(this);
+          }
+          async stat() {
+            return walker.stat(this);
+          }
+          async content() {
+            return walker.content(this);
+          }
+          async oid() {
+            return walker.oid(this);
+          }
+        };
+      }
+      async readdir(entry) {
+        const filepath = entry._fullpath;
+        const { fs, cache, gitdir } = this;
+        const map = await this.mapPromise;
+        const obj = map.get(filepath);
+        if (!obj)
+          throw new Error(`No obj for ${filepath}`);
+        const oid = obj.oid;
+        if (!oid)
+          throw new Error(`No oid for obj ${JSON.stringify(obj)}`);
+        if (obj.type !== "tree") {
+          return null;
+        }
+        const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+        if (type !== obj.type) {
+          throw new ObjectTypeError(oid, type, obj.type);
+        }
+        const tree = GitTree.from(object);
+        for (const entry2 of tree) {
+          map.set(join(filepath, entry2.path), entry2);
+        }
+        return tree.entries().map((entry2) => join(filepath, entry2.path));
+      }
+      async type(entry) {
+        if (entry._type === false) {
+          const map = await this.mapPromise;
+          const { type } = map.get(entry._fullpath);
+          entry._type = type;
+        }
+        return entry._type;
+      }
+      async mode(entry) {
+        if (entry._mode === false) {
+          const map = await this.mapPromise;
+          const { mode } = map.get(entry._fullpath);
+          entry._mode = normalizeMode(parseInt(mode, 8));
+        }
+        return entry._mode;
+      }
+      async stat(_entry) {
+      }
+      async content(entry) {
+        if (entry._content === false) {
+          const map = await this.mapPromise;
+          const { fs, cache, gitdir } = this;
+          const obj = map.get(entry._fullpath);
+          const oid = obj.oid;
+          const { type, object } = await _readObject({ fs, cache, gitdir, oid });
+          if (type !== "blob") {
+            entry._content = void 0;
+          } else {
+            entry._content = new Uint8Array(object);
+          }
+        }
+        return entry._content;
+      }
+      async oid(entry) {
+        if (entry._oid === false) {
+          const map = await this.mapPromise;
+          const obj = map.get(entry._fullpath);
+          entry._oid = obj.oid;
+        }
+        return entry._oid;
+      }
+    };
+    GitWalkerFs = class {
+      constructor({ fs, dir, gitdir, cache, refresh = true }) {
+        this.fs = fs;
+        this.cache = cache;
+        this.dir = dir;
+        this.gitdir = gitdir;
+        this.refresh = refresh;
+        this.config = null;
+        const walker = this;
+        this.ConstructEntry = class WorkdirEntry {
+          constructor(fullpath) {
+            this._fullpath = fullpath;
+            this._type = false;
+            this._mode = false;
+            this._stat = false;
+            this._content = false;
+            this._oid = false;
+          }
+          async type() {
+            return walker.type(this);
+          }
+          async mode() {
+            return walker.mode(this);
+          }
+          async stat() {
+            return walker.stat(this);
+          }
+          async content() {
+            return walker.content(this);
+          }
+          async oid() {
+            return walker.oid(this);
+          }
+        };
+      }
+      async readdir(entry) {
+        const filepath = entry._fullpath;
+        const { fs, dir } = this;
+        const names = await fs.readdir(join(dir, filepath));
+        if (names === null)
+          return null;
+        return names.map((name) => join(filepath, name));
+      }
+      async type(entry) {
+        if (entry._type === false) {
+          await entry.stat();
+        }
+        return entry._type;
+      }
+      async mode(entry) {
+        if (entry._mode === false) {
+          await entry.stat();
+        }
+        return entry._mode;
+      }
+      async stat(entry) {
+        if (entry._stat === false) {
+          const { fs, dir } = this;
+          let stat = await fs.lstat(`${dir}/${entry._fullpath}`);
+          if (!stat) {
+            throw new Error(
+              `ENOENT: no such file or directory, lstat '${entry._fullpath}'`
+            );
+          }
+          let type = stat.isDirectory() ? "tree" : "blob";
+          if (type === "blob" && !stat.isFile() && !stat.isSymbolicLink()) {
+            type = "special";
+          }
+          entry._type = type;
+          stat = normalizeStats(stat);
+          entry._mode = stat.mode;
+          if (stat.size === -1 && entry._actualSize) {
+            stat.size = entry._actualSize;
+          }
+          entry._stat = stat;
+        }
+        return entry._stat;
+      }
+      async content(entry) {
+        if (entry._content === false) {
+          const { fs, dir, gitdir } = this;
+          if (await entry.type() === "tree") {
+            entry._content = void 0;
+          } else {
+            let content;
+            if (await entry.mode() >> 12 === 10) {
+              content = await fs.readlink(`${dir}/${entry._fullpath}`);
+            } else {
+              const config = await this._getGitConfig(fs, gitdir);
+              const autocrlf = await config.get("core.autocrlf");
+              content = await fs.read(`${dir}/${entry._fullpath}`, { autocrlf });
+            }
+            entry._actualSize = content.length;
+            if (entry._stat && entry._stat.size === -1) {
+              entry._stat.size = entry._actualSize;
+            }
+            entry._content = new Uint8Array(content);
+          }
+        }
+        return entry._content;
+      }
+      async oid(entry) {
+        if (entry._oid === false) {
+          const self = this;
+          const { fs, gitdir, cache } = this;
+          let oid;
+          await GitIndexManager.acquire(
+            { fs, gitdir, cache },
+            async function(index2) {
+              const stage = index2.entriesMap.get(entry._fullpath);
+              const stats = await entry.stat();
+              const config = await self._getGitConfig(fs, gitdir);
+              const filemode = await config.get("core.filemode");
+              const trustino = typeof process !== "undefined" ? !(process.platform === "win32") : true;
+              if (!stage || compareStats(stats, stage, filemode, trustino)) {
+                const content = await entry.content();
+                if (content === void 0) {
+                  oid = void 0;
+                } else {
+                  oid = await shasum(
+                    GitObject.wrap({ type: "blob", object: content })
+                  );
+                  if (self.refresh && stage && oid === stage.oid && (!filemode || stats.mode === stage.mode) && compareStats(stats, stage, filemode, trustino)) {
+                    index2.insert({
+                      filepath: entry._fullpath,
+                      stats,
+                      oid
+                    });
+                  }
+                }
+              } else {
+                oid = stage.oid;
+              }
+            }
+          );
+          entry._oid = oid;
+        }
+        return entry._oid;
+      }
+      async _getGitConfig(fs, gitdir) {
+        if (this.config) {
+          return this.config;
+        }
+        this.config = await GitConfigManager.get({ fs, gitdir });
+        return this.config;
+      }
+    };
+    flat = typeof Array.prototype.flat === "undefined" ? (entries) => entries.reduce((acc, x) => acc.concat(x), []) : (entries) => entries.flat();
+    RunningMinimum = class {
+      constructor() {
+        this.value = null;
+      }
+      consider(value) {
+        if (value === null || value === void 0)
+          return;
+        if (this.value === null) {
+          this.value = value;
+        } else if (value < this.value) {
+          this.value = value;
+        }
+      }
+      reset() {
+        this.value = null;
+      }
+    };
+    commands = [
+      "readFile",
+      "writeFile",
+      "mkdir",
+      "rmdir",
+      "unlink",
+      "stat",
+      "lstat",
+      "readdir",
+      "readlink",
+      "symlink"
+    ];
+    FileSystem = class {
+      /**
+       * Creates an instance of FileSystem.
+       *
+       * @param {Object} fs - A file system implementation to wrap.
+       */
+      constructor(fs) {
+        if (typeof fs._original_unwrapped_fs !== "undefined")
+          return fs;
+        const promises = Object.getOwnPropertyDescriptor(fs, "promises");
+        if (promises && promises.enumerable) {
+          bindFs(this, fs.promises);
+        } else {
+          bindFs(this, fs);
+        }
+        this._original_unwrapped_fs = fs;
+      }
+      /**
+       * Return true if a file exists, false if it doesn't exist.
+       * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filepath - The path to the file.
+       * @param {Object} [options] - Additional options.
+       * @returns {Promise<boolean>} - `true` if the file exists, `false` otherwise.
+       */
+      async exists(filepath, options = {}) {
+        try {
+          await this._stat(filepath);
+          return true;
+        } catch (err) {
+          if (err.code === "ENOENT" || err.code === "ENOTDIR" || (err.code || "").includes("ENS")) {
+            return false;
+          } else {
+            console.log('Unhandled error in "FileSystem.exists()" function', err);
+            throw err;
+          }
+        }
+      }
+      /**
+       * Return the contents of a file if it exists, otherwise returns null.
+       *
+       * @param {string} filepath - The path to the file.
+       * @param {Object} [options] - Options for reading the file.
+       * @returns {Promise<Buffer|string|null>} - The file contents, or `null` if the file doesn't exist.
+       */
+      async read(filepath, options = {}) {
+        try {
+          let buffer = await this._readFile(filepath, options);
+          if (options.autocrlf === "true") {
+            try {
+              buffer = new TextDecoder("utf8", { fatal: true }).decode(buffer);
+              buffer = buffer.replace(/\r\n/g, "\n");
+              buffer = new TextEncoder().encode(buffer);
+            } catch (error) {
+            }
+          }
+          if (typeof buffer !== "string") {
+            buffer = Buffer.from(buffer);
+          }
+          return buffer;
+        } catch (err) {
+          return null;
+        }
+      }
+      /**
+       * Write a file (creating missing directories if need be) without throwing errors.
+       *
+       * @param {string} filepath - The path to the file.
+       * @param {Buffer|Uint8Array|string} contents - The data to write.
+       * @param {Object|string} [options] - Options for writing the file.
+       * @returns {Promise<void>}
+       */
+      async write(filepath, contents, options = {}) {
+        try {
+          await this._writeFile(filepath, contents, options);
+        } catch (err) {
+          await this.mkdir(dirname(filepath));
+          await this._writeFile(filepath, contents, options);
+        }
+      }
+      /**
+       * Make a directory (or series of nested directories) without throwing an error if it already exists.
+       *
+       * @param {string} filepath - The path to the directory.
+       * @param {boolean} [_selfCall=false] - Internal flag to prevent infinite recursion.
+       * @returns {Promise<void>}
+       */
+      async mkdir(filepath, _selfCall = false) {
+        try {
+          await this._mkdir(filepath);
+        } catch (err) {
+          if (err === null)
+            return;
+          if (err.code === "EEXIST")
+            return;
+          if (_selfCall)
+            throw err;
+          if (err.code === "ENOENT") {
+            const parent = dirname(filepath);
+            if (parent === "." || parent === "/" || parent === filepath)
+              throw err;
+            await this.mkdir(parent);
+            await this.mkdir(filepath, true);
+          }
+        }
+      }
+      /**
+       * Delete a file without throwing an error if it is already deleted.
+       *
+       * @param {string} filepath - The path to the file.
+       * @returns {Promise<void>}
+       */
+      async rm(filepath) {
+        try {
+          await this._unlink(filepath);
+        } catch (err) {
+          if (err.code !== "ENOENT")
+            throw err;
+        }
+      }
+      /**
+       * Delete a directory without throwing an error if it is already deleted.
+       *
+       * @param {string} filepath - The path to the directory.
+       * @param {Object} [opts] - Options for deleting the directory.
+       * @returns {Promise<void>}
+       */
+      async rmdir(filepath, opts) {
+        try {
+          if (opts && opts.recursive) {
+            await this._rm(filepath, opts);
+          } else {
+            await this._rmdir(filepath);
+          }
+        } catch (err) {
+          if (err.code !== "ENOENT")
+            throw err;
+        }
+      }
+      /**
+       * Read a directory without throwing an error is the directory doesn't exist
+       *
+       * @param {string} filepath - The path to the directory.
+       * @returns {Promise<string[]|null>} - An array of file names, or `null` if the path is not a directory.
+       */
+      async readdir(filepath) {
+        try {
+          const names = await this._readdir(filepath);
+          names.sort(compareStrings);
+          return names;
+        } catch (err) {
+          if (err.code === "ENOTDIR")
+            return null;
+          return [];
+        }
+      }
+      /**
+       * Return a flat list of all the files nested inside a directory
+       *
+       * Based on an elegant concurrent recursive solution from SO
+       * https://stackoverflow.com/a/45130990/2168416
+       *
+       * @param {string} dir - The directory to read.
+       * @returns {Promise<string[]>} - A flat list of all files in the directory.
+       */
+      async readdirDeep(dir) {
+        const subdirs = await this._readdir(dir);
+        const files = await Promise.all(
+          subdirs.map(async (subdir) => {
+            const res = dir + "/" + subdir;
+            return (await this._stat(res)).isDirectory() ? this.readdirDeep(res) : res;
+          })
+        );
+        return files.reduce((a, f) => a.concat(f), []);
+      }
+      /**
+       * Return the Stats of a file/symlink if it exists, otherwise returns null.
+       * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filename - The path to the file or symlink.
+       * @returns {Promise<Object|null>} - The stats object, or `null` if the file doesn't exist.
+       */
+      async lstat(filename) {
+        try {
+          const stats = await this._lstat(filename);
+          return stats;
+        } catch (err) {
+          if (err.code === "ENOENT" || (err.code || "").includes("ENS")) {
+            return null;
+          }
+          throw err;
+        }
+      }
+      /**
+       * Reads the contents of a symlink if it exists, otherwise returns null.
+       * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filename - The path to the symlink.
+       * @param {Object} [opts={ encoding: 'buffer' }] - Options for reading the symlink.
+       * @returns {Promise<Buffer|null>} - The symlink target, or `null` if it doesn't exist.
+       */
+      async readlink(filename, opts = { encoding: "buffer" }) {
+        try {
+          const link = await this._readlink(filename, opts);
+          return Buffer.isBuffer(link) ? link : Buffer.from(link);
+        } catch (err) {
+          if (err.code === "ENOENT" || (err.code || "").includes("ENS")) {
+            return null;
+          }
+          throw err;
+        }
+      }
+      /**
+       * Write the contents of buffer to a symlink.
+       *
+       * @param {string} filename - The path to the symlink.
+       * @param {Buffer} buffer - The symlink target.
+       * @returns {Promise<void>}
+       */
+      async writelink(filename, buffer) {
+        return this._symlink(buffer.toString("utf8"), filename);
+      }
+    };
+    GitIgnoreManager = class {
+      /**
+       * Determines whether a given file is ignored based on `.gitignore` rules and exclusion files.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} args.dir - The working directory.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.filepath - The path of the file to check.
+       * @returns {Promise<boolean>} - `true` if the file is ignored, `false` otherwise.
+       */
+      static async isIgnored({ fs, dir, gitdir = join(dir, ".git"), filepath }) {
+        if (basename(filepath) === ".git")
+          return true;
+        if (filepath === ".")
+          return false;
+        let excludes = "";
+        const excludesFile = join(gitdir, "info", "exclude");
+        if (await fs.exists(excludesFile)) {
+          excludes = await fs.read(excludesFile, "utf8");
+        }
+        const pairs = [
+          {
+            gitignore: join(dir, ".gitignore"),
+            filepath
+          }
+        ];
+        const pieces = filepath.split("/").filter(Boolean);
+        for (let i = 1; i < pieces.length; i++) {
+          const folder = pieces.slice(0, i).join("/");
+          const file = pieces.slice(i).join("/");
+          pairs.push({
+            gitignore: join(dir, folder, ".gitignore"),
+            filepath: file
+          });
+        }
+        let ignoredStatus = false;
+        for (const p of pairs) {
+          let file;
+          try {
+            file = await fs.read(p.gitignore, "utf8");
+          } catch (err) {
+            if (err.code === "NOENT")
+              continue;
+          }
+          const ign = (0, import_ignore.default)().add(excludes);
+          ign.add(file);
+          const parentdir = dirname(p.filepath);
+          if (parentdir !== "." && ign.ignores(parentdir))
+            return true;
+          if (ignoredStatus) {
+            ignoredStatus = !ign.test(p.filepath).unignored;
+          } else {
+            ignoredStatus = ign.test(p.filepath).ignored;
+          }
+        }
+        return ignoredStatus;
+      }
+    };
+    supportsCompressionStream = null;
+    bad = /(^|[/.])([/.]|$)|^@$|@{|[\x00-\x20\x7f~^:?*[\\]|\.lock(\/|$)/;
+    worthWalking = (filepath, root) => {
+      if (filepath === "." || root == null || root.length === 0 || root === ".") {
+        return true;
+      }
+      if (root.length >= filepath.length) {
+        return root.startsWith(filepath);
+      } else {
+        return filepath.startsWith(root);
+      }
+    };
+    LINEBREAKS = /^.*(\r?\n|$)/gm;
+    _TreeMap = {
+      stage: STAGE,
+      workdir: WORKDIR
+    };
+    abbreviateRx = /^refs\/(heads\/|tags\/|remotes\/)?(.*)/;
+    GitPktLine = class {
+      static flush() {
+        return Buffer.from("0000", "utf8");
+      }
+      static delim() {
+        return Buffer.from("0001", "utf8");
+      }
+      static encode(line) {
+        if (typeof line === "string") {
+          line = Buffer.from(line);
+        }
+        const length = line.length + 4;
+        const hexlength = padHex(4, length);
+        return Buffer.concat([Buffer.from(hexlength, "utf8"), line]);
+      }
+      static streamReader(stream) {
+        const reader = new StreamReader(stream);
+        return async function read() {
+          try {
+            let length = await reader.read(4);
+            if (length == null)
+              return true;
+            length = parseInt(length.toString("utf8"), 16);
+            if (length === 0)
+              return null;
+            if (length === 1)
+              return null;
+            const buffer = await reader.read(length - 4);
+            if (buffer == null)
+              return true;
+            return buffer;
+          } catch (err) {
+            stream.error = err;
+            return true;
+          }
+        };
+      }
+    };
+    corsProxify = (corsProxy, url) => corsProxy.endsWith("?") ? `${corsProxy}${url}` : `${corsProxy}/${url.replace(/^https?:\/\//, "")}`;
+    updateHeaders = (headers, auth) => {
+      if (auth.username || auth.password) {
+        headers.Authorization = calculateBasicAuthHeader(auth);
+      }
+      if (auth.headers) {
+        Object.assign(headers, auth.headers);
+      }
+    };
+    stringifyBody = async (res) => {
+      try {
+        const data = Buffer.from(await collect(res.body));
+        const response = data.toString("utf8");
+        const preview = response.length < 256 ? response : response.slice(0, 256) + "...";
+        return { preview, response, data };
+      } catch (e) {
+        return {};
+      }
+    };
+    GitRemoteHTTP = class {
+      /**
+       * Returns the capabilities of the GitRemoteHTTP class.
+       *
+       * @returns {Promise<string[]>} - An array of supported capabilities.
+       */
+      static async capabilities() {
+        return ["discover", "connect"];
+      }
+      /**
+       * Discovers references from a remote Git repository.
+       *
+       * @param {Object} args
+       * @param {HttpClient} args.http - The HTTP client to use for requests.
+       * @param {ProgressCallback} [args.onProgress] - Callback for progress updates.
+       * @param {AuthCallback} [args.onAuth] - Callback for providing authentication credentials.
+       * @param {AuthFailureCallback} [args.onAuthFailure] - Callback for handling authentication failures.
+       * @param {AuthSuccessCallback} [args.onAuthSuccess] - Callback for handling successful authentication.
+       * @param {string} [args.corsProxy] - Optional CORS proxy URL.
+       * @param {string} args.service - The Git service (e.g., "git-upload-pack").
+       * @param {string} args.url - The URL of the remote repository.
+       * @param {Object<string, string>} args.headers - HTTP headers to include in the request.
+       * @param {1 | 2} args.protocolVersion - The Git protocol version to use.
+       * @returns {Promise<Object>} - The parsed response from the remote repository.
+       * @throws {HttpError} - If the HTTP request fails.
+       * @throws {SmartHttpError} - If the response cannot be parsed.
+       * @throws {UserCanceledError} - If the user cancels the operation.
+       */
+      static async discover({
+        http,
+        onProgress,
+        onAuth,
+        onAuthSuccess,
+        onAuthFailure,
+        corsProxy,
+        service,
+        url: _origUrl,
+        headers,
+        protocolVersion
+      }) {
+        let { url, auth } = extractAuthFromUrl(_origUrl);
+        const proxifiedURL = corsProxy ? corsProxify(corsProxy, url) : url;
+        if (auth.username || auth.password) {
+          headers.Authorization = calculateBasicAuthHeader(auth);
+        }
+        if (protocolVersion === 2) {
+          headers["Git-Protocol"] = "version=2";
+        }
+        let res;
+        let tryAgain;
+        let providedAuthBefore = false;
+        do {
+          res = await http.request({
+            onProgress,
+            method: "GET",
+            url: `${proxifiedURL}/info/refs?service=${service}`,
+            headers
+          });
+          tryAgain = false;
+          if (res.statusCode === 401 || res.statusCode === 203) {
+            const getAuth = providedAuthBefore ? onAuthFailure : onAuth;
+            if (getAuth) {
+              auth = await getAuth(url, {
+                ...auth,
+                headers: { ...headers }
+              });
+              if (auth && auth.cancel) {
+                throw new UserCanceledError();
+              } else if (auth) {
+                updateHeaders(headers, auth);
+                providedAuthBefore = true;
+                tryAgain = true;
+              }
+            }
+          } else if (res.statusCode === 200 && providedAuthBefore && onAuthSuccess) {
+            await onAuthSuccess(url, auth);
+          }
+        } while (tryAgain);
+        if (res.statusCode !== 200) {
+          const { response } = await stringifyBody(res);
+          throw new HttpError(res.statusCode, res.statusMessage, response);
+        }
+        if (res.headers["content-type"] === `application/x-${service}-advertisement`) {
+          const remoteHTTP = await parseRefsAdResponse(res.body, { service });
+          remoteHTTP.auth = auth;
+          return remoteHTTP;
+        } else {
+          const { preview, response, data } = await stringifyBody(res);
+          try {
+            const remoteHTTP = await parseRefsAdResponse([data], { service });
+            remoteHTTP.auth = auth;
+            return remoteHTTP;
+          } catch (e) {
+            throw new SmartHttpError(preview, response);
+          }
+        }
+      }
+      /**
+       * Connects to a remote Git repository and sends a request.
+       *
+       * @param {Object} args
+       * @param {HttpClient} args.http - The HTTP client to use for requests.
+       * @param {ProgressCallback} [args.onProgress] - Callback for progress updates.
+       * @param {string} [args.corsProxy] - Optional CORS proxy URL.
+       * @param {string} args.service - The Git service (e.g., "git-upload-pack").
+       * @param {string} args.url - The URL of the remote repository.
+       * @param {Object<string, string>} [args.headers] - HTTP headers to include in the request.
+       * @param {any} args.body - The request body to send.
+       * @param {any} args.auth - Authentication credentials.
+       * @returns {Promise<GitHttpResponse>} - The HTTP response from the remote repository.
+       * @throws {HttpError} - If the HTTP request fails.
+       */
+      static async connect({
+        http,
+        onProgress,
+        corsProxy,
+        service,
+        url,
+        auth,
+        body,
+        headers
+      }) {
+        const urlAuth = extractAuthFromUrl(url);
+        if (urlAuth)
+          url = urlAuth.url;
+        if (corsProxy)
+          url = corsProxify(corsProxy, url);
+        headers["content-type"] = `application/x-${service}-request`;
+        headers.accept = `application/x-${service}-result`;
+        updateHeaders(headers, auth);
+        const res = await http.request({
+          onProgress,
+          method: "POST",
+          url: `${url}/${service}`,
+          body,
+          headers
+        });
+        if (res.statusCode !== 200) {
+          const { response } = stringifyBody(res);
+          throw new HttpError(res.statusCode, res.statusMessage, response);
+        }
+        return res;
+      }
+    };
+    GitRemoteManager = class {
+      /**
+       * Determines the appropriate remote helper for the given URL.
+       *
+       * @param {Object} args
+       * @param {string} args.url - The URL of the remote repository.
+       * @returns {Object} - The remote helper class for the specified transport.
+       * @throws {UrlParseError} - If the URL cannot be parsed.
+       * @throws {UnknownTransportError} - If the transport is not supported.
+       */
+      static getRemoteHelperFor({ url }) {
+        const remoteHelpers = /* @__PURE__ */ new Map();
+        remoteHelpers.set("http", GitRemoteHTTP);
+        remoteHelpers.set("https", GitRemoteHTTP);
+        const parts = parseRemoteUrl({ url });
+        if (!parts) {
+          throw new UrlParseError(url);
+        }
+        if (remoteHelpers.has(parts.transport)) {
+          return remoteHelpers.get(parts.transport);
+        }
+        throw new UnknownTransportError(
+          url,
+          parts.transport,
+          parts.transport === "ssh" ? translateSSHtoHTTP(url) : void 0
+        );
+      }
+    };
+    lock$3 = null;
+    GitShallowManager = class {
+      /**
+       * Reads the `shallow` file in the Git repository and returns a set of object IDs (OIDs).
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<Set<string>>} - A set of shallow object IDs.
+       */
+      static async read({ fs, gitdir }) {
+        if (lock$3 === null)
+          lock$3 = new import_async_lock.default();
+        const filepath = join(gitdir, "shallow");
+        const oids = /* @__PURE__ */ new Set();
+        await lock$3.acquire(filepath, async function() {
+          const text = await fs.read(filepath, { encoding: "utf8" });
+          if (text === null)
+            return oids;
+          if (text.trim() === "")
+            return oids;
+          text.trim().split("\n").map((oid) => oids.add(oid));
+        });
+        return oids;
+      }
+      /**
+       * Writes a set of object IDs (OIDs) to the `shallow` file in the Git repository.
+       * If the set is empty, the `shallow` file is removed.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {Set<string>} args.oids - A set of shallow object IDs to write.
+       * @returns {Promise<void>}
+       */
+      static async write({ fs, gitdir, oids }) {
+        if (lock$3 === null)
+          lock$3 = new import_async_lock.default();
+        const filepath = join(gitdir, "shallow");
+        if (oids.size > 0) {
+          const text = [...oids].join("\n") + "\n";
+          await lock$3.acquire(filepath, async function() {
+            await fs.write(filepath, text, {
+              encoding: "utf8"
+            });
+          });
+        } else {
+          await lock$3.acquire(filepath, async function() {
+            await fs.rm(filepath);
+          });
+        }
+      }
+    };
+    pkg = {
+      name: "isomorphic-git",
+      version: "1.38.3",
+      agent: "git/isomorphic-git@1.38.3"
+    };
+    FIFO = class {
+      constructor() {
+        this._queue = [];
+      }
+      write(chunk) {
+        if (this._ended) {
+          throw Error("You cannot write to a FIFO that has already been ended!");
+        }
+        if (this._waiting) {
+          const resolve = this._waiting;
+          this._waiting = null;
+          resolve({ value: chunk });
+        } else {
+          this._queue.push(chunk);
+        }
+      }
+      end() {
+        this._ended = true;
+        if (this._waiting) {
+          const resolve = this._waiting;
+          this._waiting = null;
+          resolve({ done: true });
+        }
+      }
+      destroy(err) {
+        this.error = err;
+        this.end();
+      }
+      async next() {
+        if (this._queue.length > 0) {
+          return { value: this._queue.shift() };
+        }
+        if (this._ended) {
+          return { done: true };
+        }
+        if (this._waiting) {
+          throw Error(
+            "You cannot call read until the previous call to read has returned!"
+          );
+        }
+        return new Promise((resolve) => {
+          this._waiting = resolve;
+        });
+      }
+    };
+    GitSideBand = class {
+      static demux(input) {
+        const read = GitPktLine.streamReader(input);
+        const packetlines = new FIFO();
+        const packfile = new FIFO();
+        const progress = new FIFO();
+        const nextBit = async function() {
+          const line = await read();
+          if (line === null)
+            return nextBit();
+          if (line === true) {
+            packetlines.end();
+            progress.end();
+            input.error ? packfile.destroy(input.error) : packfile.end();
+            return;
+          }
+          switch (line[0]) {
+            case 1: {
+              packfile.write(line.slice(1));
+              break;
+            }
+            case 2: {
+              progress.write(line.slice(1));
+              break;
+            }
+            case 3: {
+              const error = line.slice(1);
+              progress.write(error);
+              packetlines.end();
+              progress.end();
+              packfile.destroy(new Error(error.toString("utf8")));
+              return;
+            }
+            default: {
+              packetlines.write(line);
+            }
+          }
+          nextBit();
+        };
+        nextBit();
+        return {
+          packetlines,
+          packfile,
+          progress
+        };
+      }
+      // static mux ({
+      //   protocol, // 'side-band' or 'side-band-64k'
+      //   packetlines,
+      //   packfile,
+      //   progress,
+      //   error
+      // }) {
+      //   const MAX_PACKET_LENGTH = protocol === 'side-band-64k' ? 999 : 65519
+      //   let output = new PassThrough()
+      //   packetlines.on('data', data => {
+      //     if (data === null) {
+      //       output.write(GitPktLine.flush())
+      //     } else {
+      //       output.write(GitPktLine.encode(data))
+      //     }
+      //   })
+      //   let packfileWasEmpty = true
+      //   let packfileEnded = false
+      //   let progressEnded = false
+      //   let errorEnded = false
+      //   let goodbye = Buffer.concat([
+      //     GitPktLine.encode(Buffer.from('010A', 'hex')),
+      //     GitPktLine.flush()
+      //   ])
+      //   packfile
+      //     .on('data', data => {
+      //       packfileWasEmpty = false
+      //       const buffers = splitBuffer(data, MAX_PACKET_LENGTH)
+      //       for (const buffer of buffers) {
+      //         output.write(
+      //           GitPktLine.encode(Buffer.concat([Buffer.from('01', 'hex'), buffer]))
+      //         )
+      //       }
+      //     })
+      //     .on('end', () => {
+      //       packfileEnded = true
+      //       if (!packfileWasEmpty) output.write(goodbye)
+      //       if (progressEnded && errorEnded) output.end()
+      //     })
+      //   progress
+      //     .on('data', data => {
+      //       const buffers = splitBuffer(data, MAX_PACKET_LENGTH)
+      //       for (const buffer of buffers) {
+      //         output.write(
+      //           GitPktLine.encode(Buffer.concat([Buffer.from('02', 'hex'), buffer]))
+      //         )
+      //       }
+      //     })
+      //     .on('end', () => {
+      //       progressEnded = true
+      //       if (packfileEnded && errorEnded) output.end()
+      //     })
+      //   error
+      //     .on('data', data => {
+      //       const buffers = splitBuffer(data, MAX_PACKET_LENGTH)
+      //       for (const buffer of buffers) {
+      //         output.write(
+      //           GitPktLine.encode(Buffer.concat([Buffer.from('03', 'hex'), buffer]))
+      //         )
+      //       }
+      //     })
+      //     .on('end', () => {
+      //       errorEnded = true
+      //       if (progressEnded && packfileEnded) output.end()
+      //     })
+      //   return output
+      // }
+    };
+    EMPTY_OID = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
+    types = {
+      commit: 16,
+      tree: 32,
+      blob: 48,
+      tag: 64,
+      ofs_delta: 96,
+      ref_delta: 112
+    };
+    GitRefStash = class _GitRefStash {
+      // constructor removed
+      static get timezoneOffsetForRefLogEntry() {
+        const offsetMinutes = (/* @__PURE__ */ new Date()).getTimezoneOffset();
+        const offsetHours = Math.abs(Math.floor(offsetMinutes / 60));
+        const offsetMinutesFormatted = Math.abs(offsetMinutes % 60).toString().padStart(2, "0");
+        const sign = offsetMinutes > 0 ? "-" : "+";
+        return `${sign}${offsetHours.toString().padStart(2, "0")}${offsetMinutesFormatted}`;
+      }
+      static createStashReflogEntry(author, stashCommit, message) {
+        const nameNoSpace = author.name.replace(/\s/g, "");
+        const z40 = "0000000000000000000000000000000000000000";
+        const timestamp = Math.floor(Date.now() / 1e3);
+        const timezoneOffset = _GitRefStash.timezoneOffsetForRefLogEntry;
+        return `${z40} ${stashCommit} ${nameNoSpace} ${author.email} ${timestamp} ${timezoneOffset}	${message}
+`;
+      }
+      static getStashReflogEntry(reflogString, parsed = false) {
+        const reflogLines = reflogString.split("\n");
+        const entries = reflogLines.filter((l) => l).reverse().map(
+          (line, idx) => parsed ? `stash@{${idx}}: ${line.split("	")[1]}` : line
+        );
+        return entries;
+      }
+    };
+    GitStashManager = class _GitStashManager {
+      /**
+       * Creates an instance of GitStashManager.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} args.dir - The working directory.
+       * @param {string}[args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       */
+      constructor({ fs, dir, gitdir = join(dir, ".git") }) {
+        Object.assign(this, {
+          fs,
+          dir,
+          gitdir,
+          _author: null
+        });
+      }
+      /**
+       * Gets the reference name for the stash.
+       *
+       * @returns {string} - The stash reference name.
+       */
+      static get refStash() {
+        return "refs/stash";
+      }
+      /**
+       * Gets the reference name for the stash reflogs.
+       *
+       * @returns {string} - The stash reflogs reference name.
+       */
+      static get refLogsStash() {
+        return "logs/refs/stash";
+      }
+      /**
+       * Gets the file path for the stash reference.
+       *
+       * @returns {string} - The file path for the stash reference.
+       */
+      get refStashPath() {
+        return join(this.gitdir, _GitStashManager.refStash);
+      }
+      /**
+       * Gets the file path for the stash reflogs.
+       *
+       * @returns {string} - The file path for the stash reflogs.
+       */
+      get refLogsStashPath() {
+        return join(this.gitdir, _GitStashManager.refLogsStash);
+      }
+      /**
+       * Retrieves the author information for the stash.
+       *
+       * @returns {Promise<Object>} - The author object.
+       * @throws {MissingNameError} - If the author name is missing.
+       */
+      async getAuthor() {
+        if (!this._author) {
+          this._author = await normalizeAuthorObject({
+            fs: this.fs,
+            gitdir: this.gitdir,
+            author: {}
+          });
+          if (!this._author)
+            throw new MissingNameError("author");
+        }
+        return this._author;
+      }
+      /**
+       * Gets the SHA of a stash entry by its index.
+       *
+       * @param {number} refIdx - The index of the stash entry.
+       * @param {string[]} [stashEntries] - Optional preloaded stash entries.
+       * @returns {Promise<string|null>} - The SHA of the stash entry or `null` if not found.
+       */
+      async getStashSHA(refIdx, stashEntries) {
+        if (!await this.fs.exists(this.refStashPath)) {
+          return null;
+        }
+        const entries = stashEntries || await this.readStashReflogs({ parsed: false });
+        return entries[refIdx].split(" ")[1];
+      }
+      /**
+       * Writes a stash commit to the repository.
+       *
+       * @param {Object} args
+       * @param {string} args.message - The commit message.
+       * @param {string} args.tree - The tree object ID.
+       * @param {string[]} args.parent - The parent commit object IDs.
+       * @returns {Promise<string>} - The object ID of the written commit.
+       */
+      async writeStashCommit({ message, tree, parent }) {
+        return _writeCommit({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          commit: {
+            message,
+            tree,
+            parent,
+            author: await this.getAuthor(),
+            committer: await this.getAuthor()
+          }
+        });
+      }
+      /**
+       * Reads a stash commit by its index.
+       *
+       * @param {number} refIdx - The index of the stash entry.
+       * @returns {Promise<Object>} - The stash commit object.
+       * @throws {InvalidRefNameError} - If the index is invalid.
+       */
+      async readStashCommit(refIdx) {
+        const stashEntries = await this.readStashReflogs({ parsed: false });
+        if (refIdx !== 0) {
+          if (refIdx < 0 || refIdx > stashEntries.length - 1) {
+            throw new InvalidRefNameError(
+              `stash@${refIdx}`,
+              "number that is in range of [0, num of stash pushed]"
+            );
+          }
+        }
+        const stashSHA = await this.getStashSHA(refIdx, stashEntries);
+        if (!stashSHA) {
+          return {};
+        }
+        return _readCommit({
+          fs: this.fs,
+          cache: {},
+          gitdir: this.gitdir,
+          oid: stashSHA
+        });
+      }
+      /**
+       * Writes a stash reference to the repository.
+       *
+       * @param {string} stashCommit - The object ID of the stash commit.
+       * @returns {Promise<void>}
+       */
+      async writeStashRef(stashCommit) {
+        return GitRefManager.writeRef({
+          fs: this.fs,
+          gitdir: this.gitdir,
+          ref: _GitStashManager.refStash,
+          value: stashCommit
+        });
+      }
+      /**
+       * Writes a reflog entry for a stash commit.
+       *
+       * @param {Object} args
+       * @param {string} args.stashCommit - The object ID of the stash commit.
+       * @param {string} args.message - The reflog message.
+       * @returns {Promise<void>}
+       */
+      async writeStashReflogEntry({ stashCommit, message }) {
+        const author = await this.getAuthor();
+        const entry = GitRefStash.createStashReflogEntry(
+          author,
+          stashCommit,
+          message
+        );
+        const filepath = this.refLogsStashPath;
+        await acquireLock$1({ filepath, entry }, async () => {
+          const appendTo = await this.fs.exists(filepath) ? await this.fs.read(filepath, "utf8") : "";
+          await this.fs.write(filepath, appendTo + entry, "utf8");
+        });
+      }
+      /**
+       * Reads the stash reflogs.
+       *
+       * @param {Object} args
+       * @param {boolean} [args.parsed=false] - Whether to parse the reflog entries.
+       * @returns {Promise<string[]|Object[]>} - The reflog entries as strings or parsed objects.
+       */
+      async readStashReflogs({ parsed = false }) {
+        if (!await this.fs.exists(this.refLogsStashPath)) {
+          return [];
+        }
+        const reflogString = await this.fs.read(this.refLogsStashPath, "utf8");
+        return GitRefStash.getStashReflogEntry(reflogString, parsed);
+      }
+    };
+    index = {
+      Errors,
+      STAGE,
+      TREE,
+      WORKDIR,
+      add,
+      abortMerge,
+      addNote,
+      addRemote,
+      annotatedTag,
+      branch,
+      cherryPick,
+      checkout,
+      clone,
+      commit,
+      getConfig,
+      getConfigAll,
+      setConfig,
+      currentBranch,
+      deleteBranch,
+      deleteRef,
+      deleteRemote,
+      deleteTag,
+      expandOid,
+      expandRef,
+      fastForward,
+      fetch,
+      findMergeBase,
+      findRoot,
+      getRemoteInfo,
+      getRemoteInfo2,
+      hashBlob,
+      indexPack,
+      init,
+      isDescendent,
+      isIgnored,
+      listBranches,
+      listFiles,
+      listNotes,
+      listRefs,
+      listRemotes,
+      listServerRefs,
+      listTags,
+      log,
+      merge,
+      packObjects,
+      pull,
+      push,
+      readBlob,
+      readCommit,
+      readNote,
+      readObject,
+      readTag,
+      readTree,
+      remove,
+      removeNote,
+      renameBranch,
+      resetIndex,
+      updateIndex: updateIndex$1,
+      resolveRef,
+      status,
+      statusMatrix,
+      tag,
+      version,
+      walk,
+      writeBlob,
+      writeCommit,
+      writeObject,
+      writeRef,
+      writeTag,
+      writeTree,
+      stash
+    };
+    isomorphic_git_default = index;
+  }
+});
 
 // src/main.ts
-var import_buffer = require("buffer");
-if (typeof window !== "undefined") {
-  window.Buffer = import_buffer.Buffer;
-}
+var main_exports = {};
+__export(main_exports, {
+  default: () => IsoGitDiagnosticPlugin
+});
+module.exports = __toCommonJS(main_exports);
+var import_obsidian = require("obsidian");
+var IsoGitDiagnosticPlugin = class extends import_obsidian.Plugin {
+  async onload() {
+    console.log("[IsoGitDiag] Plugin load starting...");
+    new import_obsidian.Notice("IsoGit Diagnostic: Plugin loaded", 3e3);
+    this.addCommand({
+      id: "test-isomorphic-git",
+      name: "Test isomorphic-git (mobile spike)",
+      callback: async () => {
+        await this.runTest();
+      }
+    });
+  }
+  async runTest() {
+    const results = [];
+    const log2 = (msg) => {
+      console.log("[IsoGitDiag]", msg);
+      results.push(msg);
+    };
+    try {
+      log2("=== Test 1: Buffer polyfill ===");
+      let Buffer2;
+      try {
+        const bufferModule = await import("buffer");
+        Buffer2 = bufferModule.Buffer;
+        if (typeof globalThis !== "undefined") {
+          globalThis.Buffer = Buffer2;
+        }
+        log2("\u2705 Buffer imported and polyfilled");
+      } catch (e) {
+        log2(`\u274C Buffer import failed: ${e.message}`);
+        new import_obsidian.Notice(`IsoGit \u274C Buffer failed: ${e.message}`, 1e4);
+        return;
+      }
+      log2("=== Test 2: isomorphic-git import ===");
+      let git;
+      try {
+        git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
+        log2("\u2705 isomorphic-git imported");
+      } catch (e) {
+        log2(`\u274C isomorphic-git import failed: ${e.message}`);
+        new import_obsidian.Notice(`IsoGit \u274C Import failed: ${e.message}`, 1e4);
+        return;
+      }
+      log2("=== Test 3: VaultFsAdapter ===");
+      const fs = new VaultFsAdapter(this.app.vault);
+      log2("\u2705 VaultFsAdapter created");
+      log2("=== Test 4: git.init ===");
+      await git.init({ fs, dir: ".", defaultBranch: "main" });
+      log2("\u2705 git.init succeeded");
+      log2("=== Test 5: Create file ===");
+      const testFile = "iso-git-test.md";
+      const content = `# Test
+Created ${(/* @__PURE__ */ new Date()).toISOString()}`;
+      const existing = this.app.vault.getAbstractFileByPath(testFile);
+      if (existing instanceof import_obsidian.TFile) {
+        await this.app.vault.modify(existing, content);
+      } else {
+        await this.app.vault.create(testFile, content);
+      }
+      log2("\u2705 Test file created");
+      log2("=== Test 6: git.add ===");
+      await git.add({ fs, dir: ".", filepath: testFile });
+      log2("\u2705 git.add succeeded");
+      log2("=== Test 7: git.commit ===");
+      await git.commit({
+        fs,
+        dir: ".",
+        message: "Test commit",
+        author: { name: "Test", email: "test@test.com" }
+      });
+      log2("\u2705 git.commit succeeded");
+      log2("=== Test 8: git.log ===");
+      const commits = await git.log({ fs, dir: ".", depth: 5 });
+      log2(`\u2705 git.log: ${commits.length} commits`);
+      new import_obsidian.Notice(`IsoGit \u2705 ALL PASSED
+${commits.length} commits`, 1e4);
+      console.log("=== IsoGit FULL RESULTS ===", results);
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      log2(`\u274C UNEXPECTED: ${errMsg}`);
+      console.error("IsoGit Error:", error);
+      new import_obsidian.Notice(`IsoGit \u274C FAILED: ${errMsg}`, 1e4);
+    }
+  }
+  onunload() {
+    console.log("[IsoGitDiag] Plugin unloaded");
+  }
+};
 var VaultFsAdapter = class {
   constructor(vault) {
     this.vault = vault;
   }
-  // Promisify helper
   callbackify(fn, cb) {
     fn().then((result) => cb(null, result)).catch((err) => cb(err));
   }
@@ -12095,7 +18738,7 @@ var VaultFsAdapter = class {
         const content = await this.vault.read(file);
         if (options.encoding === "utf8")
           return content;
-        return import_buffer.Buffer.from(content);
+        return Buffer.from(content);
       }
       throw new Error(`ENOENT: ${path}`);
     }, cb);
@@ -12105,7 +18748,7 @@ var VaultFsAdapter = class {
     };
     this.callbackify(async () => {
       const normalized = (0, import_obsidian.normalizePath)(path);
-      const content = data instanceof import_buffer.Buffer ? data.toString("utf8") : data;
+      const content = data instanceof Buffer ? data.toString("utf8") : data;
       const existing = this.vault.getAbstractFileByPath(normalized);
       if (existing instanceof import_obsidian.TFile) {
         await this.vault.modify(existing, content);
@@ -12118,18 +18761,16 @@ var VaultFsAdapter = class {
     const cb = typeof args[args.length - 1] === "function" ? args.pop() : () => {
     };
     this.callbackify(async () => {
-      const normalized = (0, import_obsidian.normalizePath)(path);
       try {
-        await this.vault.adapter.mkdir(normalized);
+        await this.vault.adapter.mkdir((0, import_obsidian.normalizePath)(path));
       } catch (e) {
       }
     }, cb);
   }
   rmdir(path, cb) {
     this.callbackify(async () => {
-      const normalized = (0, import_obsidian.normalizePath)(path);
       try {
-        await this.vault.adapter.rmdir(normalized);
+        await this.vault.adapter.rmdir((0, import_obsidian.normalizePath)(path));
       } catch (e) {
       }
     }, cb);
@@ -12138,9 +18779,8 @@ var VaultFsAdapter = class {
     const cb = typeof args[args.length - 1] === "function" ? args.pop() : () => {
     };
     this.callbackify(async () => {
-      const normalized = (0, import_obsidian.normalizePath)(path);
       try {
-        const result = await this.vault.adapter.list(normalized);
+        const result = await this.vault.adapter.list((0, import_obsidian.normalizePath)(path));
         const entries = [];
         if (result && typeof result === "object") {
           if (Array.isArray(result.folders))
@@ -12159,25 +18799,12 @@ var VaultFsAdapter = class {
       const normalized = (0, import_obsidian.normalizePath)(path);
       const file = this.vault.getAbstractFileByPath(normalized);
       if (file instanceof import_obsidian.TFile) {
-        return {
-          isFile: () => true,
-          isDirectory: () => false,
-          size: file.stat.size,
-          mtimeMs: file.stat.mtime,
-          ctimeMs: file.stat.ctime
-        };
+        return { isFile: () => true, isDirectory: () => false, size: file.stat.size, mtimeMs: file.stat.mtime, ctimeMs: file.stat.ctime };
       }
       try {
         const result = await this.vault.adapter.list(normalized);
-        if (result) {
-          return {
-            isFile: () => false,
-            isDirectory: () => true,
-            size: 0,
-            mtimeMs: Date.now(),
-            ctimeMs: Date.now()
-          };
-        }
+        if (result)
+          return { isFile: () => false, isDirectory: () => true, size: 0, mtimeMs: Date.now(), ctimeMs: Date.now() };
       } catch (e) {
       }
       throw new Error(`ENOENT: ${path}`);
@@ -12190,88 +18817,9 @@ var VaultFsAdapter = class {
     this.callbackify(async () => {
       const normalized = (0, import_obsidian.normalizePath)(path);
       const file = this.vault.getAbstractFileByPath(normalized);
-      if (file instanceof import_obsidian.TFile) {
+      if (file instanceof import_obsidian.TFile)
         await this.vault.delete(file);
-      }
     }, cb);
-  }
-};
-var IsomorphicGitTestPlugin = class extends import_obsidian.Plugin {
-  async onload() {
-    console.log("[IsoGitTest] Plugin loaded");
-    this.addCommand({
-      id: "test-isomorphic-git",
-      name: "Test isomorphic-git (mobile spike)",
-      callback: async () => {
-        await this.runTest();
-      }
-    });
-    new import_obsidian.Notice('IsoGit Test Plugin loaded. Run command "Test isomorphic-git" from palette.');
-  }
-  async runTest() {
-    const notices = [];
-    const log2 = (msg) => {
-      console.log("[IsoGitTest]", msg);
-      notices.push(msg);
-    };
-    try {
-      log2("Starting isomorphic-git test...");
-      const fs = new VaultFsAdapter(this.app.vault);
-      const dir = ".";
-      log2("Step 1: git.init...");
-      await init({ fs, dir, defaultBranch: "main" });
-      log2("\u2705 git.init succeeded");
-      log2("Step 2: Creating test file...");
-      const testFile = "iso-git-test.md";
-      const testContent = `# Test
-
-Created at ${(/* @__PURE__ */ new Date()).toISOString()}`;
-      const existing = this.app.vault.getAbstractFileByPath(testFile);
-      if (existing instanceof import_obsidian.TFile) {
-        await this.app.vault.modify(existing, testContent);
-      } else {
-        await this.app.vault.create(testFile, testContent);
-      }
-      log2("\u2705 Test file created");
-      log2("Step 3: git.add...");
-      await add({ fs, dir, filepath: testFile });
-      log2("\u2705 git.add succeeded");
-      log2("Step 4: git.commit...");
-      await commit({
-        fs,
-        dir,
-        message: "Test commit from isomorphic-git spike",
-        author: {
-          name: "Test User",
-          email: "test@example.com"
-        }
-      });
-      log2("\u2705 git.commit succeeded");
-      log2("Step 5: git.log...");
-      const commits = await log({ fs, dir, depth: 5 });
-      log2(`\u2705 git.log succeeded, found ${commits.length} commits`);
-      log2("Step 6: git.status...");
-      const status = await statusMatrix({ fs, dir });
-      log2(`\u2705 git.statusMatrix succeeded, ${status.length} entries`);
-      const summary = notices.join("\n");
-      new import_obsidian.Notice(`IsoGit Test \u2705 PASSED
-${commits.length} commits found
-See console for details`, 1e4);
-      console.log("=== IsoGit Test Results ===");
-      console.log(summary);
-      console.log("Commits:", commits);
-      console.log("Status:", status);
-    } catch (error) {
-      const errMsg = error instanceof Error ? error.message : String(error);
-      log2(`\u274C FAILED: ${errMsg}`);
-      console.error("IsoGit Test Error:", error);
-      new import_obsidian.Notice(`IsoGit Test \u274C FAILED
-${errMsg}
-See console for stack trace`, 1e4);
-    }
-  }
-  onunload() {
-    console.log("[IsoGitTest] Plugin unloaded");
   }
 };
 /*! Bundled license information:

@@ -1,7 +1,7 @@
 {
   "id": "obsidian-git-sync",
-  "name": "Git Sync (IsoGit Test)",
-  "version": "1.0.0-spike",
+  "name": "Git Sync (IsoGit Diag)",
+  "version": "1.0.0-diag",
   "minAppVersion": "0.15.0",
   "description": "Git synchronization plugin for Obsidian that works on desktop and mobile platforms",
   "author": "",
