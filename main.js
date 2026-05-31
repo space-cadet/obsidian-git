@@ -18238,6 +18238,9 @@ var ObsidianFsAdapter = class {
     if (filepath.startsWith("/")) {
       filepath = filepath.slice(1);
     }
+    if (filepath.startsWith("./")) {
+      filepath = filepath.slice(2);
+    }
     return filepath;
   }
   /**
@@ -18250,8 +18253,17 @@ var ObsidianFsAdapter = class {
     if (encoding === "utf8") {
       return this.adapter.read(path);
     }
-    const arrayBuffer = await this.adapter.readBinary(path);
-    return new Uint8Array(arrayBuffer);
+    try {
+      const arrayBuffer = await this.adapter.readBinary(path);
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        return new Uint8Array(0);
+      }
+      return new Uint8Array(arrayBuffer);
+    } catch (e) {
+      const err = new Error(`ENOENT: no such file or directory, open '${path}'`);
+      err.code = "ENOENT";
+      throw err;
+    }
   }
   /**
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
@@ -18819,17 +18831,23 @@ var GitManager = class _GitManager {
    * Unstage a single file (reset to HEAD)
    */
   async unstageFile(filepath) {
-    var _a;
     try {
-      await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
-      log2.debug("GitManager", `Unstaged file: ${filepath}`);
-    } catch (error) {
-      if ((_a = error.message) == null ? void 0 : _a.includes("resetIndex")) {
-        log2.warn("GitManager", `resetIndex not available, file remains staged: ${filepath}`);
-        throw new Error("Unstaging not supported in this isomorphic-git version");
+      if (resetIndex) {
+        await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
+        log2.debug("GitManager", `Unstaged file: ${filepath}`);
+        return;
       }
+      const { blob } = await readBlob({
+        fs: this.fs,
+        dir: this.dir,
+        oid: "HEAD",
+        filepath
+      });
+      await this.fs.promises.writeFile(this.dir + "/" + filepath, blob);
+      log2.debug("GitManager", `Unstaged file (fallback): ${filepath}`);
+    } catch (error) {
       log2.error("GitManager", `Failed to unstage file: ${filepath}`, error);
-      throw error;
+      throw new Error(`Cannot unstage ${filepath}: ${error.message}`);
     }
   }
   /**
@@ -18953,24 +18971,49 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("git-sidebar-container");
-    this.tabsContainer = container.createDiv("git-sidebar-tabs");
+    const tabsWrapper = container.createDiv("git-sidebar-tabs-wrapper");
+    this.tabsContainer = tabsWrapper.createDiv("git-sidebar-tabs");
     this.renderTabs();
+    const settingsBtn = tabsWrapper.createEl("button", {
+      cls: "git-settings-btn",
+      attr: { "aria-label": "Open Git Sync Settings", title: "Open Settings" }
+    });
+    settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+    settingsBtn.addEventListener("click", () => {
+      this.app.setting.open();
+      this.app.setting.openTabById(this.plugin.manifest.id);
+    });
     this.headerContainer = container.createDiv("git-sidebar-header");
     this.contentContainer = container.createDiv("git-sidebar-content");
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     await this.refresh();
-    this.refreshInterval = window.setInterval(() => {
-      if (this.containerEl.isShown()) {
-        this.refresh();
-      }
-    }, 3e4);
+    this.startAutoRefresh();
   }
   async onClose() {
+    this.stopAutoRefresh();
+  }
+  // ─── Auto Refresh ───
+  startAutoRefresh() {
+    this.stopAutoRefresh();
+    const ms = this.plugin.settings.refreshInterval * 1e3;
+    if (ms > 0) {
+      this.refreshInterval = window.setInterval(() => {
+        if (this.containerEl.isShown()) {
+          this.refresh();
+        }
+      }, ms);
+    }
+  }
+  stopAutoRefresh() {
     if (this.refreshInterval !== null) {
       window.clearInterval(this.refreshInterval);
       this.refreshInterval = null;
     }
+  }
+  updateRefreshInterval(seconds) {
+    this.plugin.settings.refreshInterval = seconds;
+    this.startAutoRefresh();
   }
   // ─── Tabs ───
   renderTabs() {
@@ -19086,7 +19129,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.renderHeader(branch2, ahead, behind, initialized);
     this.contentContainer.empty();
     if (!initialized) {
-      this.renderUninitializedContent();
+      await this.renderUninitializedContent();
       return;
     }
     switch (this.activeTab) {
@@ -19101,9 +19144,20 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         break;
     }
   }
-  renderUninitializedContent() {
+  async renderUninitializedContent() {
     const wrapper = this.contentContainer.createDiv("git-uninit-container");
-    const hasReal = this.plugin.detectRealGitRepo();
+    const hasReal = await this.plugin.detectRealGitRepo();
+    if (!hasReal) {
+      wrapper.createEl("p", {
+        text: "No git repository found in this vault.",
+        cls: "git-uninit-title"
+      });
+      wrapper.createEl("p", {
+        text: "Create a git repository or clone one to get started.",
+        cls: "git-uninit-desc"
+      });
+      return;
+    }
     wrapper.createEl("p", {
       text: "A git repository exists in this vault.",
       cls: "git-uninit-title"
@@ -19138,6 +19192,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   async renderStatusTab() {
     const listContainer = this.contentContainer.createDiv("git-status-list");
     try {
+      if (!this.plugin.gitManager) {
+        listContainer.createEl("p", { text: "Git manager not initialized", cls: "git-empty-state" });
+        return;
+      }
       const files = await this.plugin.gitManager.getDetailedStatus();
       if (files.length === 0) {
         listContainer.createEl("p", { text: "No changes \u2014 working tree clean", cls: "git-empty-state" });
@@ -19172,9 +19230,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const btn = actions.createEl("button", { text: "+", cls: "git-file-btn" });
           btn.setAttr("title", "Stage file");
           btn.addEventListener("click", async (e) => {
+            var _a;
             e.stopPropagation();
             try {
-              await this.plugin.gitManager.stageFile(file.filepath);
+              await ((_a = this.plugin.gitManager) == null ? void 0 : _a.stageFile(file.filepath));
               new import_obsidian4.Notice(`Staged ${file.filepath}`);
               await this.refresh();
             } catch (err) {
@@ -19185,9 +19244,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const btn = actions.createEl("button", { text: "\u2212", cls: "git-file-btn" });
           btn.setAttr("title", "Unstage file");
           btn.addEventListener("click", async (e) => {
+            var _a;
             e.stopPropagation();
             try {
-              await this.plugin.gitManager.unstageFile(file.filepath);
+              await ((_a = this.plugin.gitManager) == null ? void 0 : _a.unstageFile(file.filepath));
               new import_obsidian4.Notice(`Unstaged ${file.filepath}`);
               await this.refresh();
             } catch (err) {
@@ -19198,7 +19258,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     } catch (e) {
       log2.warn("GitSidebar", "Failed to get file status", e);
-      listContainer.createEl("p", { text: "Unable to read file status", cls: "git-empty-state" });
+      listContainer.empty();
+      const errContainer = listContainer.createDiv("git-uninit-container");
+      errContainer.createEl("p", { text: "Error reading git status", cls: "git-uninit-title" });
+      errContainer.createEl("p", { text: e.message || String(e), cls: "git-uninit-desc" });
     }
   }
   async renderHistoryTab() {
@@ -19286,7 +19349,9 @@ var DEFAULT_SETTINGS = {
     email: ""
   },
   autoSyncInterval: 0,
-  autoCommitMessage: "Vault backup: {{date}}"
+  autoCommitMessage: "Vault backup: {{date}}",
+  refreshInterval: 60
+  // default 60 seconds
 };
 var GitSyncPlugin = class extends import_obsidian5.Plugin {
   constructor() {
@@ -19446,7 +19511,7 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
   async ensureGitManager(requireRemote = false) {
     if (this.gitManager)
       return this.gitManager;
-    const vaultPath = "";
+    const vaultPath = ".";
     const hasRepo = await this.detectRealGitRepo();
     if (!hasRepo) {
       log2.warn("GitSyncPlugin", "No .git repo found in vault");
@@ -19589,6 +19654,19 @@ var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
     new import_obsidian5.Setting(containerEl).setName("Auto Commit Message").setDesc("Message for automatic commits. Use {{date}} for current date/time").addText((text) => text.setPlaceholder("Vault backup: {{date}}").setValue(this.plugin.settings.autoCommitMessage).onChange(async (value) => {
       this.plugin.settings.autoCommitMessage = value;
       await this.plugin.saveSettings();
+    }));
+    new import_obsidian5.Setting(containerEl).setName("Sidebar Refresh Interval").setDesc("How often to auto-refresh the sidebar (in seconds, 0 to disable)").addText((text) => text.setPlaceholder("60").setValue(String(this.plugin.settings.refreshInterval)).onChange(async (value) => {
+      const numValue = Number(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        this.plugin.settings.refreshInterval = numValue;
+        await this.plugin.saveSettings();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+        for (const leaf of leaves) {
+          if (leaf.view instanceof GitSidebarView) {
+            leaf.view.updateRefreshInterval(numValue);
+          }
+        }
+      }
     }));
     new import_obsidian5.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
       try {

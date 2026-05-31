@@ -9,12 +9,37 @@
 }
 
 /* Tabs — at the very top */
-.git-sidebar-tabs {
+.git-sidebar-tabs-wrapper {
     display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
     flex-shrink: 0;
-    padding: 0 8px;
+}
+
+.git-sidebar-tabs {
+    display: flex;
+    flex: 1;
+}
+
+.git-settings-btn {
+    background: transparent;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.git-settings-btn:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
 }
 
 .git-tab-btn {

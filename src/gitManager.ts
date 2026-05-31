@@ -470,20 +470,26 @@ export class GitManager {
      */
     async unstageFile(filepath: string): Promise<void> {
         try {
-            // isomorphic-git doesn't have direct unstage, but we can use remove/add trick
-            // For now, we'll re-read the file from HEAD and write it back
-            // Actually, isomorphic-git resetIndex exists in newer versions
-            // Fallback: use git.resetIndex if available, otherwise just log
-            await git.resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
-            log.debug('GitManager', `Unstaged file: ${filepath}`);
-        } catch (error: any) {
-            // If resetIndex fails, try alternative approach
-            if (error.message?.includes('resetIndex')) {
-                log.warn('GitManager', `resetIndex not available, file remains staged: ${filepath}`);
-                throw new Error('Unstaging not supported in this isomorphic-git version');
+            // Try resetIndex if available (newer isomorphic-git versions)
+            if ((git as any).resetIndex) {
+                await (git as any).resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
+                log.debug('GitManager', `Unstaged file: ${filepath}`);
+                return;
             }
+            
+            // Fallback: remove from staging by checking out from HEAD
+            // Read the file content from HEAD and write it back
+            const { blob } = await git.readBlob({
+                fs: this.fs,
+                dir: this.dir,
+                oid: 'HEAD',
+                filepath
+            });
+            await this.fs.promises.writeFile(this.dir + '/' + filepath, blob);
+            log.debug('GitManager', `Unstaged file (fallback): ${filepath}`);
+        } catch (error: any) {
             log.error('GitManager', `Failed to unstage file: ${filepath}`, error);
-            throw error;
+            throw new Error(`Cannot unstage ${filepath}: ${error.message}`);
         }
     }
 

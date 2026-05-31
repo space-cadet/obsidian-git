@@ -15,6 +15,7 @@ interface GitSyncSettings {
 	};
 	autoSyncInterval: number; // in minutes, 0 means disabled
 	autoCommitMessage: string;
+	refreshInterval: number; // in seconds, 0 means disabled
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -27,7 +28,8 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 		email: ''
 	},
 	autoSyncInterval: 0,
-	autoCommitMessage: 'Vault backup: {{date}}'
+	autoCommitMessage: 'Vault backup: {{date}}',
+	refreshInterval: 60, // default 60 seconds
 };
 
 export default class GitSyncPlugin extends Plugin {
@@ -225,8 +227,9 @@ export default class GitSyncPlugin extends Plugin {
 	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
 		if (this.gitManager) return this.gitManager;
 
-		// Use empty string as the "directory" since DataAdapter resolves relative to vault root
-		const vaultPath = '';
+		// Use '.' as the vault path (current directory) for isomorphic-git
+		// Empty string causes path resolution issues in isomorphic-git's findRoot
+		const vaultPath = '.';
 		
 		// Check if git repo exists via isomorphic-git itself
 		const hasRepo = await this.detectRealGitRepo();
@@ -456,6 +459,27 @@ class GitSyncSettingTab extends PluginSettingTab {
 				.onChange(async (value) => {
 					this.plugin.settings.autoCommitMessage = value;
 					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Sidebar Refresh Interval')
+			.setDesc('How often to auto-refresh the sidebar (in seconds, 0 to disable)')
+			.addText(text => text
+				.setPlaceholder('60')
+				.setValue(String(this.plugin.settings.refreshInterval))
+				.onChange(async (value) => {
+					const numValue = Number(value);
+					if (!isNaN(numValue) && numValue >= 0) {
+						this.plugin.settings.refreshInterval = numValue;
+						await this.plugin.saveSettings();
+						// Restart sidebar refresh with new interval
+						const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+						for (const leaf of leaves) {
+							if (leaf.view instanceof GitSidebarView) {
+								(leaf.view as GitSidebarView).updateRefreshInterval(numValue);
+							}
+						}
+					}
 				}));
 
 		// Add a button to test the connection

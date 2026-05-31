@@ -34,10 +34,14 @@ export class ObsidianFsAdapter {
 
     /** Resolve a relative path against the vault root */
     private resolve(filepath: string): string {
-        // isomorphic-git passes paths like '/.git/config' or 'README.md'
+        // isomorphic-git passes paths like '/.git/config' or 'README.md' or './.git/...'
         // We need paths relative to the vault root (this.dir)
         if (filepath.startsWith('/')) {
             filepath = filepath.slice(1);
+        }
+        // Remove './' prefix that isomorphic-git may add when dir is '.'
+        if (filepath.startsWith('./')) {
+            filepath = filepath.slice(2);
         }
         return filepath;
     }
@@ -55,8 +59,18 @@ export class ObsidianFsAdapter {
         }
 
         // Binary: return as Uint8Array (isomorphic-git accepts this)
-        const arrayBuffer = await this.adapter.readBinary(path);
-        return new Uint8Array(arrayBuffer);
+        try {
+            const arrayBuffer = await this.adapter.readBinary(path);
+            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+                // Return empty Uint8Array instead of null/undefined
+                return new Uint8Array(0);
+            }
+            return new Uint8Array(arrayBuffer);
+        } catch (e: any) {
+            const err: any = new Error(`ENOENT: no such file or directory, open '${path}'`);
+            err.code = 'ENOENT';
+            throw err;
+        }
     }
 
     /**

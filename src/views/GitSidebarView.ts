@@ -39,9 +39,21 @@ export class GitSidebarView extends ItemView {
         container.empty();
         container.addClass('git-sidebar-container');
 
-        // 1. TABS at the very top
-        this.tabsContainer = container.createDiv('git-sidebar-tabs');
+        // 1. TABS at the very top + settings icon
+        const tabsWrapper = container.createDiv('git-sidebar-tabs-wrapper');
+        this.tabsContainer = tabsWrapper.createDiv('git-sidebar-tabs');
         this.renderTabs();
+        
+        // Settings button in tabs area
+        const settingsBtn = tabsWrapper.createEl('button', {
+            cls: 'git-settings-btn',
+            attr: { 'aria-label': 'Open Git Sync Settings', title: 'Open Settings' }
+        });
+        settingsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+        settingsBtn.addEventListener('click', () => {
+            (this.app as any).setting.open();
+            (this.app as any).setting.openTabById(this.plugin.manifest.id);
+        });
 
         // 2. Compact header (branch, status)
         this.headerContainer = container.createDiv('git-sidebar-header');
@@ -56,19 +68,38 @@ export class GitSidebarView extends ItemView {
         // Initial load
         await this.refresh();
 
-        // Auto-refresh every 30s when visible
-        this.refreshInterval = window.setInterval(() => {
-            if (this.containerEl.isShown()) {
-                this.refresh();
-            }
-        }, 30000);
+        // Auto-refresh with configured interval
+        this.startAutoRefresh();
     }
 
     async onClose(): Promise<void> {
+        this.stopAutoRefresh();
+    }
+
+    // ─── Auto Refresh ───
+
+    private startAutoRefresh(): void {
+        this.stopAutoRefresh();
+        const ms = this.plugin.settings.refreshInterval * 1000;
+        if (ms > 0) {
+            this.refreshInterval = window.setInterval(() => {
+                if (this.containerEl.isShown()) {
+                    this.refresh();
+                }
+            }, ms);
+        }
+    }
+
+    private stopAutoRefresh(): void {
         if (this.refreshInterval !== null) {
             window.clearInterval(this.refreshInterval);
             this.refreshInterval = null;
         }
+    }
+
+    updateRefreshInterval(seconds: number): void {
+        this.plugin.settings.refreshInterval = seconds;
+        this.startAutoRefresh();
     }
 
     // ─── Tabs ───
@@ -224,7 +255,7 @@ export class GitSidebarView extends ItemView {
         this.contentContainer.empty();
 
         if (!initialized) {
-            this.renderUninitializedContent();
+            await this.renderUninitializedContent();
             return;
         }
 
@@ -241,12 +272,22 @@ export class GitSidebarView extends ItemView {
         }
     }
 
-    private renderUninitializedContent(): void {
+    private async renderUninitializedContent(): Promise<void> {
         const wrapper = this.contentContainer.createDiv('git-uninit-container');
         
-        const hasReal = this.plugin.detectRealGitRepo();
-        // Note: detectRealGitRepo is async but we can't await in render - 
-        // the header already checked. For simplicity, assume repo exists if we got here.
+        const hasReal = await this.plugin.detectRealGitRepo();
+        
+        if (!hasReal) {
+            wrapper.createEl('p', { 
+                text: 'No git repository found in this vault.', 
+                cls: 'git-uninit-title' 
+            });
+            wrapper.createEl('p', { 
+                text: 'Create a git repository or clone one to get started.',
+                cls: 'git-uninit-desc' 
+            });
+            return;
+        }
         
         wrapper.createEl('p', { 
             text: 'A git repository exists in this vault.', 
@@ -299,7 +340,12 @@ export class GitSidebarView extends ItemView {
         const listContainer = this.contentContainer.createDiv('git-status-list');
 
         try {
-            const files = await this.plugin.gitManager!.getDetailedStatus();
+            if (!this.plugin.gitManager) {
+                listContainer.createEl('p', { text: 'Git manager not initialized', cls: 'git-empty-state' });
+                return;
+            }
+
+            const files = await this.plugin.gitManager.getDetailedStatus();
             
             if (files.length === 0) {
                 listContainer.createEl('p', { text: 'No changes — working tree clean', cls: 'git-empty-state' });
@@ -333,7 +379,7 @@ export class GitSidebarView extends ItemView {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         try {
-                            await this.plugin.gitManager!.stageFile(file.filepath);
+                            await this.plugin.gitManager?.stageFile(file.filepath);
                             new Notice(`Staged ${file.filepath}`);
                             await this.refresh();
                         } catch (err: any) {
@@ -346,7 +392,7 @@ export class GitSidebarView extends ItemView {
                     btn.addEventListener('click', async (e) => {
                         e.stopPropagation();
                         try {
-                            await this.plugin.gitManager!.unstageFile(file.filepath);
+                            await this.plugin.gitManager?.unstageFile(file.filepath);
                             new Notice(`Unstaged ${file.filepath}`);
                             await this.refresh();
                         } catch (err: any) {
@@ -355,9 +401,12 @@ export class GitSidebarView extends ItemView {
                     });
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             log.warn('GitSidebar', 'Failed to get file status', e);
-            listContainer.createEl('p', { text: 'Unable to read file status', cls: 'git-empty-state' });
+            listContainer.empty();
+            const errContainer = listContainer.createDiv('git-uninit-container');
+            errContainer.createEl('p', { text: 'Error reading git status', cls: 'git-uninit-title' });
+            errContainer.createEl('p', { text: e.message || String(e), cls: 'git-uninit-desc' });
         }
     }
 
