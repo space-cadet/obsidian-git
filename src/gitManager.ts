@@ -446,8 +446,19 @@ export class GitManager {
                 result.push({ filepath, status });
             }
             return result;
-        } catch (error) {
+        } catch (error: any) {
             log.error('GitManager', 'Failed to get detailed status', error);
+            // Check if this is the known pack index issue
+            if (error.message?.includes("Cannot read properties of null") ||
+                error.stack?.includes("BufferCursor.slice") ||
+                error.stack?.includes("GitPackIndex")) {
+                const packErr = new Error(
+                    'Pack index reading failed. This is a known issue with isomorphic-git reading certain pack files. ' +
+                    'Check the Obsidian console for [ObsidianFsAdapter] warnings to see which file failed.'
+                );
+                (packErr as any).isPackIndexError = true;
+                throw packErr;
+            }
             throw error;
         }
     }

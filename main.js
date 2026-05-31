@@ -18256,11 +18256,17 @@ var ObsidianFsAdapter = class {
     try {
       const arrayBuffer = await this.adapter.readBinary(path);
       if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        return new Uint8Array(0);
+        console.warn("[ObsidianFsAdapter] readBinary returned null/empty for:", path);
+        const err = new Error(`ENOENT: cannot read '${path}' (null/empty buffer)`);
+        err.code = "ENOENT";
+        throw err;
       }
       return new Uint8Array(arrayBuffer);
     } catch (e) {
-      const err = new Error(`ENOENT: no such file or directory, open '${path}'`);
+      if (e.code === "ENOENT")
+        throw e;
+      console.warn("[ObsidianFsAdapter] readBinary error for:", path, (e == null ? void 0 : e.message) || e);
+      const err = new Error(`ENOENT: cannot read '${path}': ${(e == null ? void 0 : e.message) || String(e)}`);
       err.code = "ENOENT";
       throw err;
     }
@@ -18785,6 +18791,7 @@ var GitManager = class _GitManager {
    * Get detailed status of all files (staged, modified, untracked, etc.)
    */
   async getDetailedStatus() {
+    var _a, _b, _c;
     try {
       const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
       const result = [];
@@ -18812,6 +18819,13 @@ var GitManager = class _GitManager {
       return result;
     } catch (error) {
       log2.error("GitManager", "Failed to get detailed status", error);
+      if (((_a = error.message) == null ? void 0 : _a.includes("Cannot read properties of null")) || ((_b = error.stack) == null ? void 0 : _b.includes("BufferCursor.slice")) || ((_c = error.stack) == null ? void 0 : _c.includes("GitPackIndex"))) {
+        const packErr = new Error(
+          "Pack index reading failed. This is a known issue with isomorphic-git reading certain pack files. Check the Obsidian console for [ObsidianFsAdapter] warnings to see which file failed."
+        );
+        packErr.isPackIndexError = true;
+        throw packErr;
+      }
       throw error;
     }
   }
@@ -19190,6 +19204,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   // ─── Tab renders ───
   async renderStatusTab() {
+    var _a;
     const listContainer = this.contentContainer.createDiv("git-status-list");
     try {
       if (!this.plugin.gitManager) {
@@ -19230,10 +19245,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const btn = actions.createEl("button", { text: "+", cls: "git-file-btn" });
           btn.setAttr("title", "Stage file");
           btn.addEventListener("click", async (e) => {
-            var _a;
+            var _a2;
             e.stopPropagation();
             try {
-              await ((_a = this.plugin.gitManager) == null ? void 0 : _a.stageFile(file.filepath));
+              await ((_a2 = this.plugin.gitManager) == null ? void 0 : _a2.stageFile(file.filepath));
               new import_obsidian4.Notice(`Staged ${file.filepath}`);
               await this.refresh();
             } catch (err) {
@@ -19244,10 +19259,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const btn = actions.createEl("button", { text: "\u2212", cls: "git-file-btn" });
           btn.setAttr("title", "Unstage file");
           btn.addEventListener("click", async (e) => {
-            var _a;
+            var _a2;
             e.stopPropagation();
             try {
-              await ((_a = this.plugin.gitManager) == null ? void 0 : _a.unstageFile(file.filepath));
+              await ((_a2 = this.plugin.gitManager) == null ? void 0 : _a2.unstageFile(file.filepath));
               new import_obsidian4.Notice(`Unstaged ${file.filepath}`);
               await this.refresh();
             } catch (err) {
@@ -19259,9 +19274,22 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     } catch (e) {
       log2.warn("GitSidebar", "Failed to get file status", e);
       listContainer.empty();
-      const errContainer = listContainer.createDiv("git-uninit-container");
-      errContainer.createEl("p", { text: "Error reading git status", cls: "git-uninit-title" });
-      errContainer.createEl("p", { text: e.message || String(e), cls: "git-uninit-desc" });
+      if (e.isPackIndexError || ((_a = e.message) == null ? void 0 : _a.includes("Pack index"))) {
+        const errContainer = listContainer.createDiv("git-uninit-container");
+        errContainer.createEl("p", { text: "\u26A0\uFE0F Changes view temporarily unavailable", cls: "git-uninit-title" });
+        errContainer.createEl("p", {
+          text: 'isomorphic-git cannot read a pack index file in your repo. This happens with certain pack file formats. Try running "git repack -ad" in your repo to rebuild pack files, or use the command line for now.',
+          cls: "git-uninit-desc"
+        });
+        const btnRow = errContainer.createDiv("git-uninit-actions");
+        new import_obsidian4.ButtonComponent(btnRow).setButtonText("Retry").setClass("git-btn-primary").onClick(async () => {
+          await this.refresh();
+        });
+      } else {
+        const errContainer = listContainer.createDiv("git-uninit-container");
+        errContainer.createEl("p", { text: "Error reading git status", cls: "git-uninit-title" });
+        errContainer.createEl("p", { text: e.message || String(e), cls: "git-uninit-desc" });
+      }
     }
   }
   async renderHistoryTab() {

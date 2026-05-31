@@ -404,9 +404,27 @@ export class GitSidebarView extends ItemView {
         } catch (e: any) {
             log.warn('GitSidebar', 'Failed to get file status', e);
             listContainer.empty();
-            const errContainer = listContainer.createDiv('git-uninit-container');
-            errContainer.createEl('p', { text: 'Error reading git status', cls: 'git-uninit-title' });
-            errContainer.createEl('p', { text: e.message || String(e), cls: 'git-uninit-desc' });
+            
+            if (e.isPackIndexError || e.message?.includes('Pack index')) {
+                const errContainer = listContainer.createDiv('git-uninit-container');
+                errContainer.createEl('p', { text: '⚠️ Changes view temporarily unavailable', cls: 'git-uninit-title' });
+                errContainer.createEl('p', { 
+                    text: 'isomorphic-git cannot read a pack index file in your repo. This happens with certain pack file formats. Try running "git repack -ad" in your repo to rebuild pack files, or use the command line for now.',
+                    cls: 'git-uninit-desc' 
+                });
+                
+                const btnRow = errContainer.createDiv('git-uninit-actions');
+                new ButtonComponent(btnRow)
+                    .setButtonText('Retry')
+                    .setClass('git-btn-primary')
+                    .onClick(async () => {
+                        await this.refresh();
+                    });
+            } else {
+                const errContainer = listContainer.createDiv('git-uninit-container');
+                errContainer.createEl('p', { text: 'Error reading git status', cls: 'git-uninit-title' });
+                errContainer.createEl('p', { text: e.message || String(e), cls: 'git-uninit-desc' });
+            }
         }
     }
 

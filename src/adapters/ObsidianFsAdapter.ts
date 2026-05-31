@@ -62,12 +62,20 @@ export class ObsidianFsAdapter {
         try {
             const arrayBuffer = await this.adapter.readBinary(path);
             if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-                // Return empty Uint8Array instead of null/undefined
-                return new Uint8Array(0);
+                // Obsidian's readBinary can return null/empty for some binary files
+                // Throw ENOENT so isomorphic-git knows the file is unreadable
+                console.warn('[ObsidianFsAdapter] readBinary returned null/empty for:', path);
+                const err: any = new Error(`ENOENT: cannot read '${path}' (null/empty buffer)`);
+                err.code = 'ENOENT';
+                throw err;
             }
             return new Uint8Array(arrayBuffer);
         } catch (e: any) {
-            const err: any = new Error(`ENOENT: no such file or directory, open '${path}'`);
+            // If it's already an ENOENT, rethrow
+            if (e.code === 'ENOENT') throw e;
+            // Log the actual error for debugging
+            console.warn('[ObsidianFsAdapter] readBinary error for:', path, e?.message || e);
+            const err: any = new Error(`ENOENT: cannot read '${path}': ${e?.message || String(e)}`);
             err.code = 'ENOENT';
             throw err;
         }
