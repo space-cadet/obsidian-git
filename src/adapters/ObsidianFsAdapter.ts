@@ -48,37 +48,57 @@ export class ObsidianFsAdapter {
 
     /**
      * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
-     * no encoding for binary (expects Buffer).
+     * no encoding for binary (expects Buffer/Uint8Array).
+     * 
+     * CRITICAL: Obsidian's readBinary() can return null for .git/objects/pack/*.idx files.
+     * We add a Node.js fs fallback on desktop (Electron) to read these directly.
      */
     private async readFile(filepath: string, options?: { encoding?: string }): Promise<string | Uint8Array> {
         const path = this.resolve(filepath);
         const encoding = options?.encoding;
+        console.log(`[ObsidianFsAdapter] readFile: ${filepath} → ${path} (encoding: ${encoding || 'binary'})`);
 
         if (encoding === 'utf8') {
             return this.adapter.read(path);
         }
 
-        // Binary: return as Uint8Array (isomorphic-git accepts this)
+        // Try 1: Obsidian's readBinary
         try {
             const arrayBuffer = await this.adapter.readBinary(path);
-            if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-                // Obsidian's readBinary can return null/empty for some binary files
-                // Throw ENOENT so isomorphic-git knows the file is unreadable
-                console.warn('[ObsidianFsAdapter] readBinary returned null/empty for:', path);
-                const err: any = new Error(`ENOENT: cannot read '${path}' (null/empty buffer)`);
-                err.code = 'ENOENT';
-                throw err;
+            if (arrayBuffer && arrayBuffer.byteLength > 0) {
+                console.log(`[ObsidianFsAdapter] readBinary success: ${path}, size: ${arrayBuffer.byteLength}`);
+                return new Uint8Array(arrayBuffer);
             }
-            return new Uint8Array(arrayBuffer);
+            console.warn(`[ObsidianFsAdapter] readBinary returned null/empty for: ${path}`);
         } catch (e: any) {
-            // If it's already an ENOENT, rethrow
-            if (e.code === 'ENOENT') throw e;
-            // Log the actual error for debugging
-            console.warn('[ObsidianFsAdapter] readBinary error for:', path, e?.message || e);
-            const err: any = new Error(`ENOENT: cannot read '${path}': ${e?.message || String(e)}`);
-            err.code = 'ENOENT';
-            throw err;
+            console.warn(`[ObsidianFsAdapter] readBinary error for: ${path}`, e?.message || e);
         }
+
+        // Try 2: Node.js fs fallback (desktop/Electron only)
+        try {
+            // Check if we're in a Node.js environment (Electron desktop)
+            if (typeof require !== 'undefined') {
+                const nodeFs = require('fs') as typeof import('fs');
+                const nodePath = require('path') as typeof import('path');
+                
+                // Get vault base path from FileSystemAdapter
+                const basePath = (this.adapter as any).getBasePath?.();
+                if (basePath) {
+                    const fullPath = nodePath.join(basePath, path);
+                    console.log(`[ObsidianFsAdapter] Node.js fallback: ${fullPath}`);
+                    const buffer = await nodeFs.promises.readFile(fullPath);
+                    console.log(`[ObsidianFsAdapter] Node.js fallback success: ${fullPath}, size: ${buffer.length}`);
+                    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+                }
+            }
+        } catch (e: any) {
+            console.warn(`[ObsidianFsAdapter] Node.js fallback failed for: ${path}`, e?.message || e);
+        }
+
+        // All methods failed
+        const err: any = new Error(`ENOENT: cannot read '${path}' (all methods failed)`);
+        err.code = 'ENOENT';
+        throw err;
     }
 
     /**

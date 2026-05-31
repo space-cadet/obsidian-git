@@ -575,17 +575,20 @@ export class GitManager {
 
     /**
      * Perform a full sync operation: pull, add, commit, push
+     * If repoUrl is empty, only does local commit (no push)
      */
     async sync(repoUrl: string, branchName: string, commitMessage: string): Promise<void> {
         try {
-            log.info('GitManager', `Starting sync operation with repo: ${repoUrl}, branch: ${branchName}`);
+            log.info('GitManager', `Starting sync operation with repo: ${repoUrl || '(local only)'}, branch: ${branchName}`);
             
             // Initialize or check repository
             await this.initializeRepo(repoUrl, branchName);
             
-            // Pull changes first
-            log.debug('GitManager', 'Pulling latest changes before committing');
-            await this.pull(branchName);
+            // Pull changes first (only if remote URL is set)
+            if (repoUrl) {
+                log.debug('GitManager', 'Pulling latest changes before committing');
+                await this.pull(branchName);
+            }
             
             // Check if there are changes to commit
             log.debug('GitManager', 'Checking for local changes');
@@ -601,14 +604,18 @@ export class GitManager {
                 // Commit changes
                 await this.commit(commitMessage);
                 
-                // Push changes
-                await this.push(branchName);
-                
-                log.info('GitManager', `Sync completed successfully with ${changedFiles.length} files updated`);
-                new Notice(`Git sync completed: ${changedFiles.length} files updated`);
+                // Push changes (only if remote URL is set)
+                if (repoUrl) {
+                    await this.push(branchName);
+                    log.info('GitManager', `Sync completed with ${changedFiles.length} files updated`);
+                    new Notice(`Git sync completed: ${changedFiles.length} files updated`);
+                } else {
+                    log.info('GitManager', `Local commit completed: ${changedFiles.length} files`);
+                    new Notice(`Local commit: ${changedFiles.length} files`);
+                }
             } else {
                 log.info('GitManager', 'Sync completed: No changes to commit');
-                new Notice('Git sync completed: No changes to commit');
+                new Notice('Git sync: No changes to commit');
             }
             
             this.updateStatus('Ready');

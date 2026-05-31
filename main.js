@@ -18245,31 +18245,48 @@ var ObsidianFsAdapter = class {
   }
   /**
    * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
-   * no encoding for binary (expects Buffer).
+   * no encoding for binary (expects Buffer/Uint8Array).
+   * 
+   * CRITICAL: Obsidian's readBinary() can return null for .git/objects/pack/*.idx files.
+   * We add a Node.js fs fallback on desktop (Electron) to read these directly.
    */
   async readFile(filepath, options) {
+    var _a, _b;
     const path = this.resolve(filepath);
     const encoding = options == null ? void 0 : options.encoding;
+    console.log(`[ObsidianFsAdapter] readFile: ${filepath} \u2192 ${path} (encoding: ${encoding || "binary"})`);
     if (encoding === "utf8") {
       return this.adapter.read(path);
     }
     try {
       const arrayBuffer = await this.adapter.readBinary(path);
-      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        console.warn("[ObsidianFsAdapter] readBinary returned null/empty for:", path);
-        const err = new Error(`ENOENT: cannot read '${path}' (null/empty buffer)`);
-        err.code = "ENOENT";
-        throw err;
+      if (arrayBuffer && arrayBuffer.byteLength > 0) {
+        console.log(`[ObsidianFsAdapter] readBinary success: ${path}, size: ${arrayBuffer.byteLength}`);
+        return new Uint8Array(arrayBuffer);
       }
-      return new Uint8Array(arrayBuffer);
+      console.warn(`[ObsidianFsAdapter] readBinary returned null/empty for: ${path}`);
     } catch (e) {
-      if (e.code === "ENOENT")
-        throw e;
-      console.warn("[ObsidianFsAdapter] readBinary error for:", path, (e == null ? void 0 : e.message) || e);
-      const err = new Error(`ENOENT: cannot read '${path}': ${(e == null ? void 0 : e.message) || String(e)}`);
-      err.code = "ENOENT";
-      throw err;
+      console.warn(`[ObsidianFsAdapter] readBinary error for: ${path}`, (e == null ? void 0 : e.message) || e);
     }
+    try {
+      if (typeof require !== "undefined") {
+        const nodeFs = require("fs");
+        const nodePath = require("path");
+        const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
+        if (basePath) {
+          const fullPath = nodePath.join(basePath, path);
+          console.log(`[ObsidianFsAdapter] Node.js fallback: ${fullPath}`);
+          const buffer = await nodeFs.promises.readFile(fullPath);
+          console.log(`[ObsidianFsAdapter] Node.js fallback success: ${fullPath}, size: ${buffer.length}`);
+          return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        }
+      }
+    } catch (e) {
+      console.warn(`[ObsidianFsAdapter] Node.js fallback failed for: ${path}`, (e == null ? void 0 : e.message) || e);
+    }
+    const err = new Error(`ENOENT: cannot read '${path}' (all methods failed)`);
+    err.code = "ENOENT";
+    throw err;
   }
   /**
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
@@ -18930,13 +18947,16 @@ var GitManager = class _GitManager {
   }
   /**
    * Perform a full sync operation: pull, add, commit, push
+   * If repoUrl is empty, only does local commit (no push)
    */
   async sync(repoUrl, branchName, commitMessage) {
     try {
-      log2.info("GitManager", `Starting sync operation with repo: ${repoUrl}, branch: ${branchName}`);
+      log2.info("GitManager", `Starting sync operation with repo: ${repoUrl || "(local only)"}, branch: ${branchName}`);
       await this.initializeRepo(repoUrl, branchName);
-      log2.debug("GitManager", "Pulling latest changes before committing");
-      await this.pull(branchName);
+      if (repoUrl) {
+        log2.debug("GitManager", "Pulling latest changes before committing");
+        await this.pull(branchName);
+      }
       log2.debug("GitManager", "Checking for local changes");
       const changedFiles = await this.getChangedFiles();
       log2.info("GitManager", `Found ${changedFiles.length} changed files`);
@@ -18944,12 +18964,17 @@ var GitManager = class _GitManager {
         log2.debug("GitManager", `Changed files: ${changedFiles.join(", ")}`);
         await this.addAll();
         await this.commit(commitMessage);
-        await this.push(branchName);
-        log2.info("GitManager", `Sync completed successfully with ${changedFiles.length} files updated`);
-        new import_obsidian3.Notice(`Git sync completed: ${changedFiles.length} files updated`);
+        if (repoUrl) {
+          await this.push(branchName);
+          log2.info("GitManager", `Sync completed with ${changedFiles.length} files updated`);
+          new import_obsidian3.Notice(`Git sync completed: ${changedFiles.length} files updated`);
+        } else {
+          log2.info("GitManager", `Local commit completed: ${changedFiles.length} files`);
+          new import_obsidian3.Notice(`Local commit: ${changedFiles.length} files`);
+        }
       } else {
         log2.info("GitManager", "Sync completed: No changes to commit");
-        new import_obsidian3.Notice("Git sync completed: No changes to commit");
+        new import_obsidian3.Notice("Git sync: No changes to commit");
       }
       this.updateStatus("Ready");
     } catch (error) {
