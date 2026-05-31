@@ -29,6 +29,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
+    "buffer": "^6.0.3",
     "isomorphic-git": "^1.21.0"
   }
 }

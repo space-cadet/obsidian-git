@@ -49,6 +49,13 @@ export default class GitSyncPlugin extends Plugin {
 			!!(window as any).process;
 		log.info('GitSyncPlugin', `Platform: ${this.isDesktop ? 'desktop (Electron)' : 'mobile (WebView)'}`);
 
+		// Mobile: polyfill Buffer (required by isomorphic-git, not available in WebView)
+		if (!this.isDesktop && typeof Buffer === 'undefined') {
+			const { Buffer } = await import('buffer');
+			(window as any).Buffer = Buffer;
+			log.info('GitSyncPlugin', 'Buffer polyfill loaded for mobile');
+		}
+
 		// Configure logger
 		log.setLogLevel(LogLevel.DEBUG); // Set to DEBUG during development, INFO for production
 		log.info('GitSyncPlugin', 'Initializing Git Sync plugin');
