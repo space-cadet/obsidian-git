@@ -272,6 +272,21 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	/**
+	 * Initialize a new git repository in the vault (git init)
+	 */
+	async initializeNewRepo(): Promise<void> {
+		try {
+			const git = await import('isomorphic-git');
+			await git.init({ fs: this.fs, dir: '.', defaultBranch: 'main' });
+			log.info('GitSyncPlugin', 'New git repository initialized in vault');
+			new Notice('New git repository initialized');
+		} catch (e: any) {
+			log.error('GitSyncPlugin', 'Failed to initialize repo', e);
+			throw new Error('Failed to initialize repo: ' + e.message);
+		}
+	}
+
+	/**
 	 * Detect if vault has a real .git repo on the actual filesystem
 	 */
 	async detectRealGitRepo(): Promise<boolean> {

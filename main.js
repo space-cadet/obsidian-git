@@ -18244,47 +18244,47 @@ var ObsidianFsAdapter = class {
     return filepath;
   }
   /**
+   * Check if we're running in Electron desktop (has Node.js fs via window.require)
+   */
+  isNodeAvailable() {
+    return typeof window !== "undefined" && !!window.require && !!window.process;
+  }
+  /**
    * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
    * no encoding for binary (expects Buffer/Uint8Array).
    * 
-   * CRITICAL: Obsidian's readBinary() can return null for .git/objects/pack/*.idx files.
-   * We add a Node.js fs fallback on desktop (Electron) to read these directly.
+   * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
+   * We use Node.js fs via window.require (Electron desktop) as a fallback.
    */
   async readFile(filepath, options) {
     var _a, _b;
     const path = this.resolve(filepath);
     const encoding = options == null ? void 0 : options.encoding;
-    console.log(`[ObsidianFsAdapter] readFile: ${filepath} \u2192 ${path} (encoding: ${encoding || "binary"})`);
     if (encoding === "utf8") {
       return this.adapter.read(path);
     }
     try {
       const arrayBuffer = await this.adapter.readBinary(path);
       if (arrayBuffer && arrayBuffer.byteLength > 0) {
-        console.log(`[ObsidianFsAdapter] readBinary success: ${path}, size: ${arrayBuffer.byteLength}`);
         return new Uint8Array(arrayBuffer);
       }
-      console.warn(`[ObsidianFsAdapter] readBinary returned null/empty for: ${path}`);
     } catch (e) {
-      console.warn(`[ObsidianFsAdapter] readBinary error for: ${path}`, (e == null ? void 0 : e.message) || e);
     }
-    try {
-      if (typeof require !== "undefined") {
-        const nodeFs = require("fs");
-        const nodePath = require("path");
+    if (this.isNodeAvailable()) {
+      try {
+        const nodeRequire = window.require;
+        const nodeFs = nodeRequire("fs");
+        const nodePath = nodeRequire("path");
         const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
         if (basePath) {
           const fullPath = nodePath.join(basePath, path);
-          console.log(`[ObsidianFsAdapter] Node.js fallback: ${fullPath}`);
           const buffer = await nodeFs.promises.readFile(fullPath);
-          console.log(`[ObsidianFsAdapter] Node.js fallback success: ${fullPath}, size: ${buffer.length}`);
           return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
         }
+      } catch (e) {
       }
-    } catch (e) {
-      console.warn(`[ObsidianFsAdapter] Node.js fallback failed for: ${path}`, (e == null ? void 0 : e.message) || e);
     }
-    const err = new Error(`ENOENT: cannot read '${path}' (all methods failed)`);
+    const err = new Error(`ENOENT: cannot read '${path}'`);
     err.code = "ENOENT";
     throw err;
   }
@@ -19075,17 +19075,21 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   // ─── Header ───
-  renderHeader(branch2, ahead, behind, initialized) {
+  renderHeader(branch2, ahead, behind, initialized, hasRealRepo) {
     this.headerContainer.empty();
     const branchRow = this.headerContainer.createDiv("git-header-branch");
     branchRow.createSpan({ text: "\u25CF", cls: "git-branch-dot" });
     branchRow.createSpan({
-      text: initialized ? branch2 : "Not initialized",
+      text: initialized ? branch2 : hasRealRepo ? "local" : "No repo",
       cls: "git-branch-name" + (initialized ? "" : " git-branch-uninit")
     });
     const statusRow = this.headerContainer.createDiv("git-header-status");
     if (!initialized) {
-      statusRow.createSpan({ text: "Git repo detected \u2014 initialize to sync", cls: "git-header-hint" });
+      if (!hasRealRepo) {
+        statusRow.createSpan({ text: "No git repository \u2014 initialize to create", cls: "git-header-hint" });
+      } else {
+        statusRow.createSpan({ text: "Git repo detected \u2014 initialize to sync", cls: "git-header-hint" });
+      }
     } else if (this.isLocalOnly) {
       statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
     } else if (ahead > 0 || behind > 0) {
@@ -19145,6 +19149,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       this.hasRemote = !!this.plugin.settings.repoUrl;
       this.isLocalOnly = !this.hasRemote;
     }
+    let hasReal = false;
+    try {
+      hasReal = await this.plugin.detectRealGitRepo();
+    } catch (e) {
+      log2.warn("GitSidebar", "detectRealGitRepo failed", e);
+    }
     let branch2 = "unknown";
     let ahead = 0;
     let behind = 0;
@@ -19157,18 +19167,15 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       } catch (e) {
         log2.warn("GitSidebar", "Failed to get branch/status", e);
       }
+    } else if (hasReal) {
+      branch2 = "local";
     } else {
-      const hasReal = await this.plugin.detectRealGitRepo();
-      if (hasReal) {
-        branch2 = "local";
-      } else {
-        branch2 = "No repo";
-      }
+      branch2 = "No repo";
     }
-    this.renderHeader(branch2, ahead, behind, initialized);
+    this.renderHeader(branch2, ahead, behind, initialized, hasReal);
     this.contentContainer.empty();
     if (!initialized) {
-      await this.renderUninitializedContent();
+      await this.renderUninitializedContent(hasReal);
       return;
     }
     switch (this.activeTab) {
@@ -19183,18 +19190,38 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         break;
     }
   }
-  async renderUninitializedContent() {
+  async renderUninitializedContent(hasReal) {
     const wrapper = this.contentContainer.createDiv("git-uninit-container");
-    const hasReal = await this.plugin.detectRealGitRepo();
     if (!hasReal) {
       wrapper.createEl("p", {
         text: "No git repository found in this vault.",
         cls: "git-uninit-title"
       });
       wrapper.createEl("p", {
-        text: "Create a git repository or clone one to get started.",
+        text: "Create a git repository to start tracking changes.",
         cls: "git-uninit-desc"
       });
+      const btnRow2 = wrapper.createDiv("git-uninit-actions");
+      new import_obsidian4.ButtonComponent(btnRow2).setButtonText("Initialize New Repo").setTooltip("Create a new git repository in this vault").setClass("git-btn-primary").onClick(async () => {
+        try {
+          await this.plugin.initializeNewRepo();
+          new import_obsidian4.Notice("Git repository initialized");
+          await this.refresh();
+        } catch (e) {
+          new import_obsidian4.Notice("Initialize failed: " + e.message);
+        }
+      });
+      if (this.plugin.settings.repoUrl) {
+        new import_obsidian4.ButtonComponent(btnRow2).setButtonText("Clone Remote").setTooltip("Clone from configured remote URL").setClass("git-btn-secondary").onClick(async () => {
+          try {
+            await this.plugin.syncVault();
+            new import_obsidian4.Notice("Remote cloned");
+            await this.refresh();
+          } catch (e) {
+            new import_obsidian4.Notice("Clone failed: " + e.message);
+          }
+        });
+      }
       return;
     }
     wrapper.createEl("p", {
@@ -19594,6 +19621,20 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
       }
     }
     return this.gitManager;
+  }
+  /**
+   * Initialize a new git repository in the vault (git init)
+   */
+  async initializeNewRepo() {
+    try {
+      const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
+      await git.init({ fs: this.fs, dir: ".", defaultBranch: "main" });
+      log2.info("GitSyncPlugin", "New git repository initialized in vault");
+      new import_obsidian5.Notice("New git repository initialized");
+    } catch (e) {
+      log2.error("GitSyncPlugin", "Failed to initialize repo", e);
+      throw new Error("Failed to initialize repo: " + e.message);
+    }
   }
   /**
    * Detect if vault has a real .git repo on the actual filesystem

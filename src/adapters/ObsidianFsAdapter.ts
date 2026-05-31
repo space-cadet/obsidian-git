@@ -47,16 +47,24 @@ export class ObsidianFsAdapter {
     }
 
     /**
+     * Check if we're running in Electron desktop (has Node.js fs via window.require)
+     */
+    private isNodeAvailable(): boolean {
+        return typeof window !== 'undefined' && 
+               !!(window as any).require &&
+               !!(window as any).process;
+    }
+
+    /**
      * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
      * no encoding for binary (expects Buffer/Uint8Array).
      * 
-     * CRITICAL: Obsidian's readBinary() can return null for .git/objects/pack/*.idx files.
-     * We add a Node.js fs fallback on desktop (Electron) to read these directly.
+     * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
+     * We use Node.js fs via window.require (Electron desktop) as a fallback.
      */
     private async readFile(filepath: string, options?: { encoding?: string }): Promise<string | Uint8Array> {
         const path = this.resolve(filepath);
         const encoding = options?.encoding;
-        console.log(`[ObsidianFsAdapter] readFile: ${filepath} → ${path} (encoding: ${encoding || 'binary'})`);
 
         if (encoding === 'utf8') {
             return this.adapter.read(path);
@@ -66,37 +74,33 @@ export class ObsidianFsAdapter {
         try {
             const arrayBuffer = await this.adapter.readBinary(path);
             if (arrayBuffer && arrayBuffer.byteLength > 0) {
-                console.log(`[ObsidianFsAdapter] readBinary success: ${path}, size: ${arrayBuffer.byteLength}`);
                 return new Uint8Array(arrayBuffer);
             }
-            console.warn(`[ObsidianFsAdapter] readBinary returned null/empty for: ${path}`);
         } catch (e: any) {
-            console.warn(`[ObsidianFsAdapter] readBinary error for: ${path}`, e?.message || e);
+            // Obsidian readBinary failed, try fallback below
         }
 
-        // Try 2: Node.js fs fallback (desktop/Electron only)
-        try {
-            // Check if we're in a Node.js environment (Electron desktop)
-            if (typeof require !== 'undefined') {
-                const nodeFs = require('fs') as typeof import('fs');
-                const nodePath = require('path') as typeof import('path');
+        // Try 2: Node.js fs via window.require (Electron desktop only)
+        if (this.isNodeAvailable()) {
+            try {
+                const nodeRequire = (window as any).require;
+                const nodeFs = nodeRequire('fs');
+                const nodePath = nodeRequire('path');
                 
-                // Get vault base path from FileSystemAdapter
+                // Get vault base path
                 const basePath = (this.adapter as any).getBasePath?.();
                 if (basePath) {
                     const fullPath = nodePath.join(basePath, path);
-                    console.log(`[ObsidianFsAdapter] Node.js fallback: ${fullPath}`);
                     const buffer = await nodeFs.promises.readFile(fullPath);
-                    console.log(`[ObsidianFsAdapter] Node.js fallback success: ${fullPath}, size: ${buffer.length}`);
                     return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
                 }
+            } catch (e: any) {
+                // Node fs fallback failed, throw below
             }
-        } catch (e: any) {
-            console.warn(`[ObsidianFsAdapter] Node.js fallback failed for: ${path}`, e?.message || e);
         }
 
         // All methods failed
-        const err: any = new Error(`ENOENT: cannot read '${path}' (all methods failed)`);
+        const err: any = new Error(`ENOENT: cannot read '${path}'`);
         err.code = 'ENOENT';
         throw err;
     }

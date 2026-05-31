@@ -128,19 +128,23 @@ export class GitSidebarView extends ItemView {
 
     // ─── Header ───
 
-    private renderHeader(branch: string, ahead: number, behind: number, initialized: boolean): void {
+    private renderHeader(branch: string, ahead: number, behind: number, initialized: boolean, hasRealRepo: boolean): void {
         this.headerContainer.empty();
         
         const branchRow = this.headerContainer.createDiv('git-header-branch');
         branchRow.createSpan({ text: '●', cls: 'git-branch-dot' });
         branchRow.createSpan({ 
-            text: initialized ? branch : 'Not initialized', 
+            text: initialized ? branch : (hasRealRepo ? 'local' : 'No repo'), 
             cls: 'git-branch-name' + (initialized ? '' : ' git-branch-uninit') 
         });
         
         const statusRow = this.headerContainer.createDiv('git-header-status');
         if (!initialized) {
-            statusRow.createSpan({ text: 'Git repo detected — initialize to sync', cls: 'git-header-hint' });
+            if (!hasRealRepo) {
+                statusRow.createSpan({ text: 'No git repository — initialize to create', cls: 'git-header-hint' });
+            } else {
+                statusRow.createSpan({ text: 'Git repo detected — initialize to sync', cls: 'git-header-hint' });
+            }
         } else if (this.isLocalOnly) {
             statusRow.createSpan({ text: 'Local only — no remote', cls: 'git-local-only' });
         } else if (ahead > 0 || behind > 0) {
@@ -224,6 +228,14 @@ export class GitSidebarView extends ItemView {
             this.isLocalOnly = !this.hasRemote;
         }
 
+        // Check if real repo exists (for header and UI state)
+        let hasReal = false;
+        try {
+            hasReal = await this.plugin.detectRealGitRepo();
+        } catch (e) {
+            log.warn('GitSidebar', 'detectRealGitRepo failed', e);
+        }
+
         // Try to get git info for header
         let branch = 'unknown';
         let ahead = 0;
@@ -238,24 +250,20 @@ export class GitSidebarView extends ItemView {
             } catch (e) {
                 log.warn('GitSidebar', 'Failed to get branch/status', e);
             }
+        } else if (hasReal) {
+            branch = 'local';
         } else {
-            // Check if real repo exists
-            const hasReal = await this.plugin.detectRealGitRepo();
-            if (hasReal) {
-                branch = 'local';
-            } else {
-                branch = 'No repo';
-            }
+            branch = 'No repo';
         }
 
-        // Update header
-        this.renderHeader(branch, ahead, behind, initialized);
+        // Update header with hasReal status
+        this.renderHeader(branch, ahead, behind, initialized, hasReal);
 
         // Render tab content
         this.contentContainer.empty();
 
         if (!initialized) {
-            await this.renderUninitializedContent();
+            await this.renderUninitializedContent(hasReal);
             return;
         }
 
@@ -272,10 +280,8 @@ export class GitSidebarView extends ItemView {
         }
     }
 
-    private async renderUninitializedContent(): Promise<void> {
+    private async renderUninitializedContent(hasReal: boolean): Promise<void> {
         const wrapper = this.contentContainer.createDiv('git-uninit-container');
-        
-        const hasReal = await this.plugin.detectRealGitRepo();
         
         if (!hasReal) {
             wrapper.createEl('p', { 
@@ -283,9 +289,41 @@ export class GitSidebarView extends ItemView {
                 cls: 'git-uninit-title' 
             });
             wrapper.createEl('p', { 
-                text: 'Create a git repository or clone one to get started.',
+                text: 'Create a git repository to start tracking changes.',
                 cls: 'git-uninit-desc' 
             });
+            
+            const btnRow = wrapper.createDiv('git-uninit-actions');
+            
+            new ButtonComponent(btnRow)
+                .setButtonText('Initialize New Repo')
+                .setTooltip('Create a new git repository in this vault')
+                .setClass('git-btn-primary')
+                .onClick(async () => {
+                    try {
+                        await this.plugin.initializeNewRepo();
+                        new Notice('Git repository initialized');
+                        await this.refresh();
+                    } catch (e: any) {
+                        new Notice('Initialize failed: ' + e.message);
+                    }
+                });
+            
+            if (this.plugin.settings.repoUrl) {
+                new ButtonComponent(btnRow)
+                    .setButtonText('Clone Remote')
+                    .setTooltip('Clone from configured remote URL')
+                    .setClass('git-btn-secondary')
+                    .onClick(async () => {
+                        try {
+                            await this.plugin.syncVault();
+                            new Notice('Remote cloned');
+                            await this.refresh();
+                        } catch (e: any) {
+                            new Notice('Clone failed: ' + e.message);
+                        }
+                    });
+            }
             return;
         }
         
