@@ -19627,11 +19627,11 @@ var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
       this.plugin.settings.branchName = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Username").setDesc("Your Git username").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Username").setDesc("Git username (optional when using a Personal Access Token)").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Password/Token").setDesc("Your Git password or personal access token").addText((text) => text.setPlaceholder("password or token").setValue(this.plugin.settings.password).onChange(async (value) => {
+    new import_obsidian5.Setting(containerEl).setName("Password / Personal Access Token").setDesc("Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.").addText((text) => text.setPlaceholder("ghp_... or password").setValue(this.plugin.settings.password).onChange(async (value) => {
       text.inputEl.type = "password";
       this.plugin.settings.password = value;
       await this.plugin.saveSettings();

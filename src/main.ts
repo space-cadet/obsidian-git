@@ -393,7 +393,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Username')
-			.setDesc('Your Git username')
+			.setDesc('Git username (optional when using a Personal Access Token)')
 			.addText(text => text
 				.setPlaceholder('username')
 				.setValue(this.plugin.settings.username)
@@ -403,10 +403,10 @@ class GitSyncSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Password/Token')
-			.setDesc('Your Git password or personal access token')
+			.setName('Password / Personal Access Token')
+			.setDesc('Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.')
 			.addText(text => text
-				.setPlaceholder('password or token')
+				.setPlaceholder('ghp_... or password')
 				.setValue(this.plugin.settings.password)
 				.onChange(async (value: string) => {
 					text.inputEl.type = 'password';
