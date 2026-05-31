@@ -19618,10 +19618,8 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
         email: this.settings.author.email || "user@example.com"
       }
     };
-    if (!this.statusBarItem) {
-      return null;
-    }
-    this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
+    const statusEl = this.statusBarItem || void 0;
+    this.gitManager = new GitManager(this.fs, vaultPath, credentials, statusEl);
     if (this.settings.repoUrl) {
       await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
     }
