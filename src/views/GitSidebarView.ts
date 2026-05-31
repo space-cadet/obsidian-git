@@ -491,7 +491,7 @@ export class GitSidebarView extends ItemView {
                 meta.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
             }
         } catch (e: any) {
-            log.warn('GitSidebar', 'Failed to get commit log', e);
+            log.debug('GitSidebar', 'Failed to get commit log (expected for fresh repos)', e);
             
             // Check if this is a "no commits yet" error (fresh repo)
             const msg = e.message || String(e);

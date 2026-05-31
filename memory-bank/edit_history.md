@@ -1,14 +1,38 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-05-31 15:45:00 IST*
+*Last Updated: 2026-05-31 18:00:00 IST*
 
-#### 15:45:00 IST - T29: Fix `findRoot` directory path bug — existing repos not detected
-- Modified `src/main.ts` — `detectRealGitRepo()`: Added Node.js fs fallback (Method 3), changed `findRoot` to use `filepath: 'dummy.txt'` instead of `filepath: '.'` (Method 4)
-- Modified `src/main.ts` — `ensureGitManager()`: Clear `this.gitManager` and return `null` when `isRepository()` returns false (previously returned invalid manager)
+#### 17:55:00 IST - T29: v15 — History tab empty-state for fresh repos
+- Modified `src/views/GitSidebarView.ts` — `renderHistoryTab()`: Detects "no commits" errors ("Could not find", "refs/heads", "unknown revision") and shows friendly "No commits yet — stage files and tap Sync" message instead of error toast
+- Build passes, committed to GitHub
+
+#### 17:52:00 IST - T29: v14 — Fix path duplication in ObsidianFsAdapter readdir()
+- Modified `src/adapters/ObsidianFsAdapter.ts` — `readdir()`: Added `stripDirPrefix` helper to strip directory prefix from Obsidian `list()` results (returns vault-root-relative paths, not directory-relative)
+- Build passes, committed to GitHub
+
+#### 17:48:00 IST - T29: v13 — Buffer polyfill for mobile only
+- Added `buffer` npm package dependency
+- Modified `src/main.ts`: Mobile-only polyfill — `globalThis.Buffer = require('buffer').Buffer` (guarded by `!isDesktop`)
+- Desktop keeps native Node.js Buffer untouched
+- Build passes, committed to GitHub
+
+#### 17:45:00 IST - T29: v12 — Fix statusBarItem null check in ensureGitManager()
+- Modified `src/main.ts` — `ensureGitManager()`: Removed `if (!this.statusBarItem) return null;` — status bar is optional on mobile
+- Modified `src/gitManager.ts` — `refreshStatus()`: Only calls `setText()` if `statusBarItem` exists
+- Build passes, committed to GitHub
+
+#### 17:25:00 IST - T29: v11 — Platform detection + diagnostics command
+- Added `isDesktop` property to plugin class — detects Electron by checking `window.require` and `window.process`
+- Rewrote `detectRealGitRepo()` to be platform-aware (desktop: Node fs first, mobile: adapter + findRoot)
+- Restored diagnostic command: "Run compatibility diagnostics" — shows platform, fs checks, repo detection, git init test
+- Build passes, committed to GitHub
+
+#### 15:45:00 IST - T29: v10 — Fix `findRoot` directory path bug
+- Modified `src/main.ts` — `detectRealGitRepo()`: Changed `findRoot` from `filepath: '.'` to `filepath: 'dummy.txt'` + Node fs fallback
+- Modified `src/main.ts` — `ensureGitManager()`: Clear `this.gitManager` and return `null` when `isRepository()` returns false
 - Modified `src/gitManager.ts` — `isRepository()`: Changed `filepath: this.dir` to `filepath: 'dummy.txt'`
-- Created `memory-bank/edits/2026-05-31/154500-T29-findRoot-fix.md` — Edit chunk documenting the fix
-- Updated `memory-bank/tasks/T29.md` — Marked repo detection fix as complete, added lesson about `findRoot` file path requirement
+- Build passes, committed to GitHub
 
 #### 13:30:00 IST - T29 Phase 3: Pack index fix, settings UI, Initialize button, v9
 - Created `src/adapters/ObsidianFsAdapter.ts` — Custom filesystem adapter for isomorphic-git using Obsidian's DataAdapter API

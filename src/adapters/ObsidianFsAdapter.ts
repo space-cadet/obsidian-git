@@ -16,19 +16,31 @@ export class ObsidianFsAdapter {
         this.dir = dir;
     }
 
+    // Direct fs methods — isomorphic-git may call these directly (not just via promises)
+    readFile = this.readFileImpl.bind(this);
+    writeFile = this.writeFileImpl.bind(this);
+    mkdir = this.mkdirImpl.bind(this);
+    rmdir = this.rmdirImpl.bind(this);
+    readdir = this.readdirImpl.bind(this);
+    unlink = this.unlinkImpl.bind(this);
+    stat = this.statImpl.bind(this);
+    lstat = this.statImpl.bind(this);
+    readlink = this.readlinkImpl.bind(this);
+    symlink = this.symlinkImpl.bind(this);
+
     /** Return the fs.promises-compatible API that isomorphic-git expects */
     get promises() {
         return {
-            readFile: this.readFile.bind(this),
-            writeFile: this.writeFile.bind(this),
-            mkdir: this.mkdir.bind(this),
-            rmdir: this.rmdir.bind(this),
-            readdir: this.readdir.bind(this),
-            unlink: this.unlink.bind(this),
-            stat: this.stat.bind(this),
-            lstat: this.stat.bind(this), // Obsidian doesn't expose symlinks; treat as stat
-            readlink: this.readlink.bind(this),
-            symlink: this.symlink.bind(this),
+            readFile: this.readFileImpl.bind(this),
+            writeFile: this.writeFileImpl.bind(this),
+            mkdir: this.mkdirImpl.bind(this),
+            rmdir: this.rmdirImpl.bind(this),
+            readdir: this.readdirImpl.bind(this),
+            unlink: this.unlinkImpl.bind(this),
+            stat: this.statImpl.bind(this),
+            lstat: this.statImpl.bind(this), // Obsidian doesn't expose symlinks; treat as stat
+            readlink: this.readlinkImpl.bind(this),
+            symlink: this.symlinkImpl.bind(this),
         };
     }
 
@@ -62,7 +74,7 @@ export class ObsidianFsAdapter {
      * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
      * We use Node.js fs via window.require (Electron desktop) as a fallback.
      */
-    private async readFile(filepath: string, options?: { encoding?: string }): Promise<string | Uint8Array> {
+    private async readFileImpl(filepath: string, options?: { encoding?: string }): Promise<string | Uint8Array> {
         const path = this.resolve(filepath);
         const encoding = options?.encoding;
 
@@ -73,7 +85,7 @@ export class ObsidianFsAdapter {
         // Try 1: Obsidian's readBinary
         try {
             const arrayBuffer = await this.adapter.readBinary(path);
-            if (arrayBuffer && arrayBuffer.byteLength > 0) {
+            if (arrayBuffer != null) {
                 return new Uint8Array(arrayBuffer);
             }
         } catch (e: any) {
@@ -108,7 +120,7 @@ export class ObsidianFsAdapter {
     /**
      * writeFile — data may be string, Uint8Array, or ArrayBuffer
      */
-    private async writeFile(filepath: string, data: string | Uint8Array | ArrayBuffer): Promise<void> {
+    private async writeFileImpl(filepath: string, data: string | Uint8Array | ArrayBuffer): Promise<void> {
         const path = this.resolve(filepath);
 
         if (typeof data === 'string') {
@@ -123,7 +135,7 @@ export class ObsidianFsAdapter {
         }
     }
 
-    private async mkdir(filepath: string, _options?: { recursive?: boolean }): Promise<void> {
+    private async mkdirImpl(filepath: string, _options?: { recursive?: boolean }): Promise<void> {
         const path = this.resolve(filepath);
         try {
             await this.adapter.mkdir(path);
@@ -135,7 +147,7 @@ export class ObsidianFsAdapter {
         }
     }
 
-    private async rmdir(filepath: string, _options?: { recursive?: boolean }): Promise<void> {
+    private async rmdirImpl(filepath: string, _options?: { recursive?: boolean }): Promise<void> {
         const path = this.resolve(filepath);
         try {
             await this.adapter.rmdir(path, true);
@@ -146,7 +158,7 @@ export class ObsidianFsAdapter {
         }
     }
 
-    private async readdir(filepath: string, _options?: { encoding?: string }): Promise<string[]> {
+    private async readdirImpl(filepath: string, _options?: { encoding?: string }): Promise<string[]> {
         const path = this.resolve(filepath);
         const listed: ListedFiles = await this.adapter.list(path);
         
@@ -165,7 +177,7 @@ export class ObsidianFsAdapter {
         return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
     }
 
-    private async unlink(filepath: string): Promise<void> {
+    private async unlinkImpl(filepath: string): Promise<void> {
         const path = this.resolve(filepath);
         try {
             await this.adapter.remove(path);
@@ -176,7 +188,7 @@ export class ObsidianFsAdapter {
         }
     }
 
-    private async stat(filepath: string): Promise<any> {
+    private async statImpl(filepath: string): Promise<any> {
         const path = this.resolve(filepath);
         const stat: Stat | null = await this.adapter.stat(path);
 
@@ -201,14 +213,14 @@ export class ObsidianFsAdapter {
         };
     }
 
-    private async readlink(filepath: string): Promise<string> {
+    private async readlinkImpl(filepath: string): Promise<string> {
         // Obsidian doesn't expose symlinks; throw as if not a symlink
         const err: any = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
         err.code = 'EINVAL';
         throw err;
     }
 
-    private async symlink(_target: string, _filepath: string): Promise<void> {
+    private async symlinkImpl(_target: string, _filepath: string): Promise<void> {
         // Obsidian doesn't support creating symlinks via DataAdapter
         const err: any = new Error(`EPERM: operation not permitted, symlink`);
         err.code = 'EPERM';

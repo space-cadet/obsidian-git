@@ -18436,23 +18436,34 @@ var import_obsidian5 = require("obsidian");
 // src/adapters/ObsidianFsAdapter.ts
 var ObsidianFsAdapter = class {
   constructor(adapter, dir) {
+    // Direct fs methods — isomorphic-git may call these directly (not just via promises)
+    this.readFile = this.readFileImpl.bind(this);
+    this.writeFile = this.writeFileImpl.bind(this);
+    this.mkdir = this.mkdirImpl.bind(this);
+    this.rmdir = this.rmdirImpl.bind(this);
+    this.readdir = this.readdirImpl.bind(this);
+    this.unlink = this.unlinkImpl.bind(this);
+    this.stat = this.statImpl.bind(this);
+    this.lstat = this.statImpl.bind(this);
+    this.readlink = this.readlinkImpl.bind(this);
+    this.symlink = this.symlinkImpl.bind(this);
     this.adapter = adapter;
     this.dir = dir;
   }
   /** Return the fs.promises-compatible API that isomorphic-git expects */
   get promises() {
     return {
-      readFile: this.readFile.bind(this),
-      writeFile: this.writeFile.bind(this),
-      mkdir: this.mkdir.bind(this),
-      rmdir: this.rmdir.bind(this),
-      readdir: this.readdir.bind(this),
-      unlink: this.unlink.bind(this),
-      stat: this.stat.bind(this),
-      lstat: this.stat.bind(this),
+      readFile: this.readFileImpl.bind(this),
+      writeFile: this.writeFileImpl.bind(this),
+      mkdir: this.mkdirImpl.bind(this),
+      rmdir: this.rmdirImpl.bind(this),
+      readdir: this.readdirImpl.bind(this),
+      unlink: this.unlinkImpl.bind(this),
+      stat: this.statImpl.bind(this),
+      lstat: this.statImpl.bind(this),
       // Obsidian doesn't expose symlinks; treat as stat
-      readlink: this.readlink.bind(this),
-      symlink: this.symlink.bind(this)
+      readlink: this.readlinkImpl.bind(this),
+      symlink: this.symlinkImpl.bind(this)
     };
   }
   /** Resolve a relative path against the vault root */
@@ -18478,7 +18489,7 @@ var ObsidianFsAdapter = class {
    * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
    * We use Node.js fs via window.require (Electron desktop) as a fallback.
    */
-  async readFile(filepath, options) {
+  async readFileImpl(filepath, options) {
     var _a, _b;
     const path = this.resolve(filepath);
     const encoding = options == null ? void 0 : options.encoding;
@@ -18487,7 +18498,7 @@ var ObsidianFsAdapter = class {
     }
     try {
       const arrayBuffer = await this.adapter.readBinary(path);
-      if (arrayBuffer && arrayBuffer.byteLength > 0) {
+      if (arrayBuffer != null) {
         return new Uint8Array(arrayBuffer);
       }
     } catch (e) {
@@ -18513,7 +18524,7 @@ var ObsidianFsAdapter = class {
   /**
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
    */
-  async writeFile(filepath, data) {
+  async writeFileImpl(filepath, data) {
     const path = this.resolve(filepath);
     if (typeof data === "string") {
       await this.adapter.write(path, data);
@@ -18525,7 +18536,7 @@ var ObsidianFsAdapter = class {
       await this.adapter.write(path, String(data));
     }
   }
-  async mkdir(filepath, _options) {
+  async mkdirImpl(filepath, _options) {
     var _a, _b;
     const path = this.resolve(filepath);
     try {
@@ -18536,7 +18547,7 @@ var ObsidianFsAdapter = class {
       }
     }
   }
-  async rmdir(filepath, _options) {
+  async rmdirImpl(filepath, _options) {
     var _a, _b;
     const path = this.resolve(filepath);
     try {
@@ -18547,7 +18558,7 @@ var ObsidianFsAdapter = class {
       }
     }
   }
-  async readdir(filepath, _options) {
+  async readdirImpl(filepath, _options) {
     const path = this.resolve(filepath);
     const listed = await this.adapter.list(path);
     const stripDirPrefix = (name) => {
@@ -18561,7 +18572,7 @@ var ObsidianFsAdapter = class {
     };
     return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
   }
-  async unlink(filepath) {
+  async unlinkImpl(filepath) {
     var _a, _b;
     const path = this.resolve(filepath);
     try {
@@ -18572,7 +18583,7 @@ var ObsidianFsAdapter = class {
       }
     }
   }
-  async stat(filepath) {
+  async statImpl(filepath) {
     const path = this.resolve(filepath);
     const stat = await this.adapter.stat(path);
     if (!stat) {
@@ -18593,12 +18604,12 @@ var ObsidianFsAdapter = class {
       ino: 0
     };
   }
-  async readlink(filepath) {
+  async readlinkImpl(filepath) {
     const err = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
     err.code = "EINVAL";
     throw err;
   }
-  async symlink(_target, _filepath) {
+  async symlinkImpl(_target, _filepath) {
     const err = new Error(`EPERM: operation not permitted, symlink`);
     err.code = "EPERM";
     throw err;
@@ -19594,7 +19605,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         meta.createSpan({ text: this.formatDate(commit2.date), cls: "git-commit-date" });
       }
     } catch (e) {
-      log2.warn("GitSidebar", "Failed to get commit log", e);
+      log2.debug("GitSidebar", "Failed to get commit log (expected for fresh repos)", e);
       const msg = e.message || String(e);
       if (msg.includes("Could not find") || msg.includes("refs/heads") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
         listContainer.empty();
