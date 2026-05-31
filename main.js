@@ -18550,7 +18550,16 @@ var ObsidianFsAdapter = class {
   async readdir(filepath, _options) {
     const path = this.resolve(filepath);
     const listed = await this.adapter.list(path);
-    return [...listed.files, ...listed.folders];
+    const stripDirPrefix = (name) => {
+      if (path !== "." && name.startsWith(path + "/")) {
+        return name.slice(path.length + 1);
+      }
+      if (name.startsWith("./")) {
+        return name.slice(2);
+      }
+      return name;
+    };
+    return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
   }
   async unlink(filepath) {
     var _a, _b;

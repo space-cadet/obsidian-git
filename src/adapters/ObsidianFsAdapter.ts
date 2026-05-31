@@ -149,7 +149,20 @@ export class ObsidianFsAdapter {
     private async readdir(filepath: string, _options?: { encoding?: string }): Promise<string[]> {
         const path = this.resolve(filepath);
         const listed: ListedFiles = await this.adapter.list(path);
-        return [...listed.files, ...listed.folders];
+        
+        // Obsidian's list() may return paths relative to the vault root,
+        // not relative to the queried directory. If so, strip the directory prefix.
+        const stripDirPrefix = (name: string): string => {
+            if (path !== '.' && name.startsWith(path + '/')) {
+                return name.slice(path.length + 1);
+            }
+            if (name.startsWith('./')) {
+                return name.slice(2);
+            }
+            return name;
+        };
+        
+        return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
     }
 
     private async unlink(filepath: string): Promise<void> {
