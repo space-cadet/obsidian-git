@@ -3,6 +3,23 @@
 *Created: 2026-05-28 20:16:00 IST*
 *Last Updated: 2026-05-30 22:56:00 IST*
 
+#### 13:30:00 IST - T29 Phase 3: Pack index fix, settings UI, Initialize button, v9
+- Created `src/adapters/ObsidianFsAdapter.ts` — Custom filesystem adapter for isomorphic-git using Obsidian's DataAdapter API
+- Created `src/gitManager.ts` — GitManager class wrapping isomorphic-git operations (init, clone, add, commit, push, pull, status, log)
+- Created `src/views/GitSidebarView.ts` — Three-tab sidebar view (Status/History/Log) with file staging, commit viewing, and action buttons
+- Created `src/logger.ts` — Structured logging utility with context prefix
+- Created `src/main.ts` — Main plugin entry point with settings tab, sync command, and git manager lifecycle
+- Modified `src/adapters/ObsidianFsAdapter.ts` — Node.js fs fallback for desktop (Electron window.require) to read .git/objects/pack/*.idx files that Obsidian's readBinary returns null for
+- Modified `src/views/GitSidebarView.ts` — Added settings icon (gear), refresh interval control, Initialize button for new repos, correct header state for no-repo vs detected-repo
+- Modified `src/main.ts` — Added `refreshInterval` setting, `initializeNewRepo()` method, `updateRefreshInterval()` on sidebar, `ensureGitManager()` lazy init
+- Modified `src/gitManager.ts` — Fixed `getChangedFiles()` to return row[0] from statusMatrix, `getDetailedStatus()` with error handling, `sync()` skips push/pull when no repo URL, `initializeRepo()` with optional remote
+- Modified `styles.css` — Zen mode, settings button, dropdown styling, mobile responsiveness, horizontal scroll ActionBar, uninit container styles
+- Created `memory-bank/tasks/T29.md` — Renamed from T6, merged with detailed workspace content
+- Created `memory-bank/implementation-details/T29-obsidian-git.md` — Architecture documentation from workspace
+- Created `memory-bank/edits/2026-05-31/133000-T29-edit-chunk.md` — Edit chunk from workspace
+- Updated `memory-bank/sessions/2026-05-31-morning.md` — Merged with detailed session log from workspace
+- Removed `memory-bank/tasks/T6.md` — Replaced by T29
+
 ### 2026-05-30
 
 #### 23:25:00 IST - T6, T7: New tasks created per user request

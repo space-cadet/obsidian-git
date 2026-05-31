@@ -1,0 +1,260 @@
+# T29 Implementation: obsidian-git Plugin Architecture
+
+*Created: 2026-05-31 13:45 IST*
+*Task: T29*
+
+## Overview
+
+Obsidian plugin for git synchronization using `isomorphic-git` (pure JavaScript, no native git binary). Designed for desktop (Electron) and mobile (iOS/Android) Obsidian.
+
+## Core Components
+
+### 1. GitManager (`src/gitManager.ts`)
+
+Wraps `isomorphic-git` operations. Centralized git control with error handling and logging.
+
+**Constructor:**
+```typescript
+new GitManager(vaultPath: string, adapter: DataAdapter, logger: Logger, onAuth?: () => Promise<Auth>)
+```
+
+**Key methods:**
+- `init()` — `git.init({ fs: this.fs, dir: this.vaultPath, defaultBranch: 'main' })`
+- `clone()` — `git.clone({ url, dir, onAuth })` with single branch, no tags
+- `add(filepath)` — `git.add({ fs, dir, filepath })`
+- `commit(message)` — `git.commit({ fs, dir, message, author })` with `GitManager.AUTHOR` constant
+- `push()` — `git.push({ fs, dir, remote, onAuth })` with force=true
+- `pull()` — `git.pull({ fs, dir, remote, onAuth, fastForwardOnly: true })`
+- `sync()` — `pull` → `add('*')` → `commit('sync: ...')` → `push`. Skips remote ops if `repoUrl` empty.
+- `getDetailedStatus()` — returns `{ hasRepo, status, changes: { added, modified, deleted, untracked } }`
+- `getChangedFiles()` — parses `statusMatrix` result, filters rows where WORKDIR or STAGE differs from HEAD
+- `stageFile(filepath)` — `git.add({ fs, dir, filepath })`
+- `unstageFile(filepath)` — `git.remove({ fs, dir, filepath })` (removes from index, keeps in working tree)
+- `log()` — `git.log({ fs, dir, depth: 50 })`
+
+**Error handling:**
+- All methods catch errors, log with `[GitManager]` prefix, throw for UI to display
+- `getDetailedStatus()` returns `{ hasRepo: false, ... }` on error rather than crashing
+- `sync()` catches push/pull errors but continues with local commit
+
+### 2. ObsidianFsAdapter (`src/adapters/ObsidianFsAdapter.ts`)
+
+Custom filesystem adapter for `isomorphic-git`. Implements the `fs` interface expected by isomorphic-git.
+
+**Interface:**
+```typescript
+interface FsAdapter {
+  readFile(path: string, opts?: { encoding?: string }): Promise<Buffer | string>
+  writeFile(path: string, data: Buffer | string, opts?: { encoding?: string, mode?: number }): Promise<void>
+  readdir(path: string): Promise<string[]>
+  stat(path: string): Promise<{ type: 'file' | 'directory', size: number, mtimeMs: number }>
+  mkdir(path: string, opts?: { recursive?: boolean, mode?: number }): Promise<void>
+  rmdir(path: string): Promise<void>
+}
+```
+
+**Implementation details:**
+- `readFile(path, opts)`:
+  - Binary read: `adapter.readBinary(path)` → returns `ArrayBuffer` → `Buffer.from(arrayBuffer)`
+  - Text read: `adapter.read(path)` → returns `string`
+  - **CRITICAL FIX**: For `.git/objects/pack/*.idx` files, `readBinary()` returns `null` on desktop. Falls back to Node.js `fs` via `window.require('fs')` on Electron desktop.
+  - Desktop detection: `typeof window !== 'undefined' && (window as any).require && (window as any).process` (checks for Electron renderer process)
+- `writeFile(path, data, opts)`:
+  - Binary: `adapter.writeBinary(path, new Uint8Array(buffer))`
+  - Text: `adapter.write(path, data)`
+- `readdir(path)` — `adapter.list(path)` returns array of strings
+- `stat(path)` — constructs from `adapter.list(path)` (presence check) + `adapter.read(path)` for size
+- `mkdir(path)` — `adapter.mkdir(path)`
+- `rmdir(path)` — `adapter.rmdir(path, true)` (recursive)
+
+**Pack Index Problem:**
+- Obsidian's `DataAdapter.readBinary()` returns `null` for `.git/objects/pack/*.idx` files (pack index files)
+- This causes `BufferCursor.slice` to fail with "Cannot read properties of null (reading 'slice')"
+- Root cause: isomorphic-git's `FileSystem.read` catches all errors and returns null (known bug)
+- **Desktop fix**: `window.require('fs')` direct read via `fs.promises.readFile(path)` → returns `Buffer`
+- **Mobile fix**: Not yet implemented. Options: LightningFS, wasm-git, or use a different git library
+
+**Path resolution:**
+- `vaultPath` defaults to `'.'` (not `''`) — `findRoot` fails with empty string
+- `dir: this.vaultPath` passed to all isomorphic-git operations
+- For `window.require` fallback: constructs absolute path via `adapter.getBasePath() + '/' + path`
+
+### 3. GitSidebarView (`src/views/GitSidebarView.ts`)
+
+Three-tab sidebar view for Obsidian's right sidebar.
+
+**View type:** `VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view'`
+
+**Tabs:**
+1. **Changes** — Shows modified/untracked files. Each file has stage/unstage toggle, diff preview. Staging area for commit.
+2. **History** — Shows commit history with message, author, date. Click to see diff.
+3. **Git Log** — Raw git log output with branch visualization.
+
+**Header:**
+- Repo status indicator (green dot = synced, yellow = uncommitted, red = no repo)
+- Settings gear icon → opens `GitSettingTab`
+- Initialize button (when no repo detected)
+- Refresh button (manual refresh)
+
+**States:**
+- **Has repo**: Shows three tabs, file list, action buttons (stage all, commit, sync, pull, push)
+- **No repo**: Shows "No git repository" message with Initialize button
+- **Error**: Shows error card with retry button and detailed error message
+
+**Auto-refresh:**
+- `updateRefreshInterval(interval: number)` — sets/clears `setInterval` for status refresh
+- Interval configurable in settings (seconds, 0 = disabled)
+- Clears previous interval before setting new one
+
+**Mobile responsiveness:**
+- Horizontal scroll on ActionBar (overflow-x: auto, scrollbar-width: none)
+- Wider message bubbles
+- Auto-expand textarea in ChatInput
+- Always-visible message actions
+
+### 4. GitSettingTab (`src/main.ts` — inner class)
+
+Obsidian plugin settings UI. Accessible via:
+- Settings → Community Plugins → Git Sync → Options
+- Gear icon in sidebar header
+
+**Fields:**
+1. **Remote Repository URL** — GitHub repo URL (e.g., `https://github.com/user/repo`)
+2. **Branch** — Default branch name (default: `main`)
+3. **Author Name** — Git commit author name
+4. **Author Email** — Git commit author email
+5. **Username** — Git auth username (for GitHub, any value works with PAT)
+6. **Password / Personal Access Token** — Git auth password or PAT. Help text: "For GitHub, use a Personal Access Token (PAT). Fine-grained PATs work with any username."
+7. **Auto-sync Interval** — Seconds between auto-sync (0 = disabled)
+
+**Test Connection button:**
+- Validates credentials by attempting a git operation
+- Shows success/error notice
+
+### 5. Logger (`src/logger.ts`)
+
+Structured logging with context prefix.
+
+```typescript
+class Logger {
+  prefix: string
+  log(...args: any[]): void
+  error(...args: any[]): void
+}
+```
+
+Usage: `new Logger('GitManager')` → logs `[Git Sync][GitManager] message`
+
+## State Flow
+
+### Initialization Flow
+```
+Plugin.onload()
+  → GitSyncPlugin.onLoad()
+    → registerView(VIEW_TYPE_GIT_SIDEBAR, GitSidebarView)
+    → addCommand('git-sync:sync') → this.sync()
+    → addCommand('git-sync:open-sidebar') → revealSidebar()
+
+Sidebar opens
+  → GitSidebarView.onOpen()
+    → this.plugin.ensureGitManager() (lazy init)
+    → refresh() → renderStatusTab()
+
+ensureGitManager()
+  → if (!gitManager) create new GitManager(vaultPath, adapter, logger, onAuth)
+  → GitManager constructor creates ObsidianFsAdapter
+```
+
+### Sync Flow
+```
+User clicks Sync / Auto-sync fires
+  → GitManager.sync()
+    → if (repoUrl) git.pull()
+    → git.add('*')
+    → git.commit('sync: ...')
+    → if (repoUrl) git.push()
+  → GitSidebarView.refresh() (update UI)
+```
+
+### Status Detection Flow
+```
+renderStatusTab()
+  → plugin.detectRealGitRepo() (check .git/HEAD exists)
+  → if (!hasRepo) renderUninit()
+  → gitManager.getDetailedStatus()
+    → git.statusMatrix() → parse rows
+    → return { hasRepo, status, changes }
+  → render file list with stage/unstage toggles
+```
+
+## Auth Flow
+
+```
+GitManager.onAuth()
+  → read settings (username, password/PAT)
+  → return { username, password }
+  → isomorphic-git passes this to git HTTP basic auth
+
+GitHub fine-grained PAT:
+  - username: any string (e.g., 'token', 'x-access-token', user's name)
+  - password: the PAT (e.g., 'github_pat_11A...')
+  - GitHub accepts any username for PAT-based basic auth
+```
+
+## CSS Architecture
+
+**File**: `styles.css`
+
+**Key classes:**
+- `.git-sidebar` — Root container
+- `.git-sidebar-header` — Title + status + action buttons
+- `.git-sidebar-tabs` — Tab navigation
+- `.git-sidebar-tab` — Individual tab content
+- `.git-sidebar-uninit` — No-repo state container
+- `.git-sidebar-error` — Error card
+- `.git-sidebar-action-bar` — Horizontal scroll action buttons
+- `.git-sidebar-settings-btn` — Gear icon button
+- `.zen-mode` — Hides chrome, minimal UI
+
+**Mobile:**
+- `@media (max-width: 768px)` — Wider bubbles, horizontal scroll, compact buttons
+- `scrollbar-width: none` (Firefox) + `::-webkit-scrollbar { display: none }` (WebKit)
+
+## Build System
+
+**esbuild.config.mjs:**
+- Entry: `src/main.ts`
+- Output: `main.js` (bundled for Obsidian)
+- External: `obsidian` (provided by Obsidian runtime)
+- Format: IIFE
+- Production: `NODE_ENV=production`
+
+**TypeScript:**
+- Target: ES2020
+- Strict mode enabled
+- `skipLibCheck: true` (for isomorphic-git type compatibility)
+
+## Testing Checklist
+
+- [x] Plugin loads in Obsidian
+- [x] Sidebar opens with three tabs
+- [x] Settings tab opens from gear icon
+- [x] Refresh interval configurable (0 = disabled)
+- [x] Initialize button creates new repo
+- [ ] Pack index fix works on desktop (v9 pending test)
+- [ ] Mobile shows correct "No repo" message (v9 pending test)
+- [ ] Mobile Initialize button works (v9 pending test)
+- [ ] Push/pull with GitHub PAT works
+- [ ] Auto-sync interval fires correctly
+- [ ] Stage/unstage individual files
+- [ ] Commit with custom message
+- [ ] Git log displays correctly
+- [ ] Mobile responsive layout
+- [ ] GitHub release automation
+
+## References
+
+- isomorphic-git docs: https://isomorphic-git.org/
+- Obsidian API docs: https://docs.obsidian.md/
+- GitHub PAT docs: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+- Pack index issue: https://github.com/isomorphic-git/isomorphic-git/issues/XXXX (TBD)
