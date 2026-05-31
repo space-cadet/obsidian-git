@@ -4,10 +4,10 @@
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 IN PROGRESS (v15 shipped, mobile partially working)
+### T29: obsidian-git Plugin — 🔄 IN PROGRESS (v16 shipped, mobile staging test pending)
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI — ✅ COMPLETED), T7 (Multi-Repo — pending)
-- **Phase 3**: Pack index fix, settings UI, Initialize button, v9-v15 releases
+- **Phase 3**: Pack index fix, settings UI, Initialize button, v9-v16 releases
 - **Repo detection bug**: ✅ Fixed — `findRoot` with `filepath: '.'` failed to detect existing repos. Now uses `filepath: 'dummy.txt'` + Node fs fallback.
 - **Platform detection**: ✅ Fixed — `isDesktop` checks `window.require` AND `window.process`
 - **Diagnostics**: ✅ Restored — "Run compatibility diagnostics" command shows platform, fs checks, repo detection
@@ -15,10 +15,13 @@
 - **Mobile Buffer**: ✅ Fixed — `buffer` npm package with mobile-only polyfill
 - **Mobile path duplication**: ✅ Fixed — `readdir()` strips directory prefix from Obsidian `list()` results
 - **Mobile History empty-state**: ✅ Fixed — shows "No commits yet" instead of error for fresh repos
+- **Mobile History noise**: ✅ Fixed — log.warn → log.debug for fresh repos, no toast spam
+- **Mobile empty file staging**: ✅ Fixed — readFileImpl no longer rejects byteLength=0 files
 - **Mobile Changes**: ✅ WORKING — user confirmed seeing untracked files on mobile
 - **Pack index**: Desktop fix via `window.require('fs')` — pending user test
 - **Push/pull**: GitHub fine-grained PAT — not yet tested
 - **Release**: GitHub release automation — not started
+- **Next test**: User to test staging a file + Sync on mobile with v16
 
 ## Completed Tasks
 

@@ -3,6 +3,12 @@
 *Created: 2026-05-28 20:16:00 IST*
 *Last Updated: 2026-05-31 18:00:00 IST*
 
+#### 18:15:00 IST - T29: v16 — Empty file read + History tab noise
+- Modified `src/adapters/ObsidianFsAdapter.ts` — `readFileImpl()`: Changed `if (arrayBuffer && arrayBuffer.byteLength > 0)` to `if (arrayBuffer != null)` — empty files (byteLength=0) ARE valid and readable by git.add()
+- Modified `src/views/GitSidebarView.ts` — `renderHistoryTab()`: Changed `log.warn()` to `log.debug()` for fresh repos with no commits — prevents toast noise on mobile
+- Modified `src/adapters/ObsidianFsAdapter.ts` — Added direct fs methods (readFile, writeFile, etc.) as class properties so isomorphic-git can call them directly, not just via fs.promises
+- Build passes, committed to GitHub (6b58d77)
+
 #### 17:55:00 IST - T29: v15 — History tab empty-state for fresh repos
 - Modified `src/views/GitSidebarView.ts` — `renderHistoryTab()`: Detects "no commits" errors ("Could not find", "refs/heads", "unknown revision") and shows friendly "No commits yet — stage files and tap Sync" message instead of error toast
 - Build passes, committed to GitHub
