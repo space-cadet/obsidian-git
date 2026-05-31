@@ -8,6 +8,7 @@
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI — ✅ COMPLETED), T7 (Multi-Repo — pending)
 - **Phase 3**: Pack index fix, settings UI, Initialize button, v9 release
+- **Repo detection bug**: ✅ Fixed — `findRoot` with `filepath: '.'` failed to detect existing repos. Now uses `filepath: 'dummy.txt'` + Node fs fallback.
 - **Pack index**: Desktop fix via `window.require('fs')` — pending user test
 - **Mobile**: Initialize button + correct detection — pending user test
 - **Push/pull**: GitHub fine-grained PAT — not yet tested

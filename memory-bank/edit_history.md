@@ -1,7 +1,14 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-05-30 22:56:00 IST*
+*Last Updated: 2026-05-31 15:45:00 IST*
+
+#### 15:45:00 IST - T29: Fix `findRoot` directory path bug — existing repos not detected
+- Modified `src/main.ts` — `detectRealGitRepo()`: Added Node.js fs fallback (Method 3), changed `findRoot` to use `filepath: 'dummy.txt'` instead of `filepath: '.'` (Method 4)
+- Modified `src/main.ts` — `ensureGitManager()`: Clear `this.gitManager` and return `null` when `isRepository()` returns false (previously returned invalid manager)
+- Modified `src/gitManager.ts` — `isRepository()`: Changed `filepath: this.dir` to `filepath: 'dummy.txt'`
+- Created `memory-bank/edits/2026-05-31/154500-T29-findRoot-fix.md` — Edit chunk documenting the fix
+- Updated `memory-bank/tasks/T29.md` — Marked repo detection fix as complete, added lesson about `findRoot` file path requirement
 
 #### 13:30:00 IST - T29 Phase 3: Pack index fix, settings UI, Initialize button, v9
 - Created `src/adapters/ObsidianFsAdapter.ts` — Custom filesystem adapter for isomorphic-git using Obsidian's DataAdapter API

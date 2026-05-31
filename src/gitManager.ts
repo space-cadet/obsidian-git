@@ -228,11 +228,13 @@ export class GitManager {
      */
     async isRepository(): Promise<boolean> {
         try {
-            await git.findRoot({ fs: this.fs, filepath: this.dir });
-            log.debug('GitManager', `Local Git repository found at ${this.dir}`);
+            // Use a dummy file path — findRoot expects a file, not a directory
+            // It will walk up the tree looking for .git
+            await git.findRoot({ fs: this.fs, filepath: 'dummy.txt' });
+            log.debug('GitManager', `Local Git repository found`);
             return true;
         } catch (error) {
-            log.debug('GitManager', `No local Git repository found at ${this.dir}`);
+            log.debug('GitManager', `No local Git repository found`);
             return false;
         }
     }

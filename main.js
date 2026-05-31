@@ -18642,11 +18642,11 @@ var GitManager = class _GitManager {
    */
   async isRepository() {
     try {
-      await findRoot({ fs: this.fs, filepath: this.dir });
-      log2.debug("GitManager", `Local Git repository found at ${this.dir}`);
+      await findRoot({ fs: this.fs, filepath: "dummy.txt" });
+      log2.debug("GitManager", `Local Git repository found`);
       return true;
     } catch (error) {
-      log2.debug("GitManager", `No local Git repository found at ${this.dir}`);
+      log2.debug("GitManager", `No local Git repository found`);
       return false;
     }
   }
@@ -19618,6 +19618,8 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
       const isRepo = await this.gitManager.isRepository();
       if (!isRepo) {
         log2.warn("GitSyncPlugin", "GitManager could not verify repo");
+        this.gitManager = null;
+        return null;
       }
     }
     return this.gitManager;
@@ -19640,6 +19642,7 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
    * Detect if vault has a real .git repo on the actual filesystem
    */
   async detectRealGitRepo() {
+    var _a;
     try {
       const adapter = this.app.vault.adapter;
       try {
@@ -19659,9 +19662,27 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
         log2.debug("GitSyncPlugin", "detectRealGitRepo: .git stat failed", e);
       }
       try {
+        if (typeof window !== "undefined" && window.require) {
+          const nodeRequire = window.require;
+          const nodeFs = nodeRequire("fs");
+          const nodePath = nodeRequire("path");
+          const basePath = (_a = adapter.getBasePath) == null ? void 0 : _a.call(adapter);
+          if (basePath) {
+            const gitPath = nodePath.join(basePath, ".git");
+            const stat = await nodeFs.promises.stat(gitPath);
+            if (stat.isDirectory()) {
+              log2.debug("GitSyncPlugin", "detectRealGitRepo: .git found via Node fs");
+              return true;
+            }
+          }
+        }
+      } catch (e) {
+        log2.debug("GitSyncPlugin", "detectRealGitRepo: Node fs fallback failed", e);
+      }
+      try {
         const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
-        const root = await git.findRoot({ fs: this.fs, filepath: "." });
-        if (root) {
+        const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
+        if (root !== void 0) {
           log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
           return true;
         }

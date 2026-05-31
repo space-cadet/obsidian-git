@@ -265,6 +265,8 @@ export default class GitSyncPlugin extends Plugin {
 			const isRepo = await this.gitManager.isRepository();
 			if (!isRepo) {
 				log.warn('GitSyncPlugin', 'GitManager could not verify repo');
+				this.gitManager = null;
+				return null;
 			}
 		}
 		
@@ -291,8 +293,9 @@ export default class GitSyncPlugin extends Plugin {
 	 */
 	async detectRealGitRepo(): Promise<boolean> {
 		try {
-			// Method 1: Try to read .git/HEAD via the adapter (desktop + mobile)
 			const adapter = this.app.vault.adapter;
+			
+			// Method 1: Try to read .git/HEAD via the adapter (desktop + mobile)
 			try {
 				await adapter.read('.git/HEAD');
 				log.debug('GitSyncPlugin', 'detectRealGitRepo: .git/HEAD readable');
@@ -312,11 +315,33 @@ export default class GitSyncPlugin extends Plugin {
 				log.debug('GitSyncPlugin', 'detectRealGitRepo: .git stat failed', e);
 			}
 			
-			// Method 3: Try isomorphic-git findRoot with our fs adapter
+			// Method 3: Desktop Node.js fs fallback (Electron only)
+			try {
+				if (typeof window !== 'undefined' && (window as any).require) {
+					const nodeRequire = (window as any).require;
+					const nodeFs = nodeRequire('fs');
+					const nodePath = nodeRequire('path');
+					const basePath = (adapter as any).getBasePath?.();
+					if (basePath) {
+						const gitPath = nodePath.join(basePath, '.git');
+						const stat = await nodeFs.promises.stat(gitPath);
+						if (stat.isDirectory()) {
+							log.debug('GitSyncPlugin', 'detectRealGitRepo: .git found via Node fs');
+							return true;
+						}
+					}
+				}
+			} catch (e) {
+				log.debug('GitSyncPlugin', 'detectRealGitRepo: Node fs fallback failed', e);
+			}
+			
+			// Method 4: Try isomorphic-git findRoot with a file path
+			// findRoot expects a FILE path, not a directory. It walks up looking for .git
 			try {
 				const git = await import('isomorphic-git');
-				const root = await git.findRoot({ fs: this.fs, filepath: '.' });
-				if (root) {
+				// Use a dummy file path — findRoot will walk up from it
+				const root = await git.findRoot({ fs: this.fs, filepath: 'dummy.txt' });
+				if (root !== undefined) {
 					log.debug('GitSyncPlugin', 'detectRealGitRepo: findRoot found repo at', root);
 					return true;
 				}
