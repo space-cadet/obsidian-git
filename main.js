@@ -19580,7 +19580,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     try {
       const commits = await this.plugin.gitManager.getLog(25);
       if (commits.length === 0) {
-        listContainer.createEl("p", { text: "No commits yet", cls: "git-empty-state" });
+        listContainer.createEl("p", { text: "No commits yet \u2014 stage files and sync to create your first commit", cls: "git-empty-state" });
         return;
       }
       for (const commit2 of commits) {
@@ -19595,7 +19595,15 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     } catch (e) {
       log2.warn("GitSidebar", "Failed to get commit log", e);
-      listContainer.createEl("p", { text: "Unable to read commit history", cls: "git-empty-state" });
+      const msg = e.message || String(e);
+      if (msg.includes("Could not find") || msg.includes("refs/heads") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
+        listContainer.empty();
+        const empty = listContainer.createDiv("git-uninit-container");
+        empty.createEl("p", { text: "No commits yet", cls: "git-uninit-title" });
+        empty.createEl("p", { text: "Stage files and tap Sync to create your first commit.", cls: "git-uninit-desc" });
+      } else {
+        listContainer.createEl("p", { text: "Unable to read commit history", cls: "git-empty-state" });
+      }
     }
   }
   async renderLogTab() {
