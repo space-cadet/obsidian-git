@@ -19439,9 +19439,12 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     this.intervalId = null;
     this.gitManager = null;
     this.statusBarItem = null;
+    this.isDesktop = false;
   }
   async onload() {
     await this.loadSettings();
+    this.isDesktop = typeof window !== "undefined" && !!window.require && !!window.process;
+    log2.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
     log2.setLogLevel(0 /* DEBUG */);
     log2.info("GitSyncPlugin", "Initializing Git Sync plugin");
     this.fs = new ObsidianFsAdapter(this.app.vault.adapter, ".").promises;
@@ -19535,6 +19538,13 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
       }
     });
     this.addCommand({
+      id: "git-sync-test-compatibility",
+      name: "Run compatibility diagnostics",
+      callback: async () => {
+        await this.runCompatibilityDiagnostics();
+      }
+    });
+    this.addCommand({
       id: "git-sync-open-sidebar",
       name: "Open Git sidebar",
       callback: async () => {
@@ -19614,13 +19624,6 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.statusBarItem);
     if (this.settings.repoUrl) {
       await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
-    } else {
-      const isRepo = await this.gitManager.isRepository();
-      if (!isRepo) {
-        log2.warn("GitSyncPlugin", "GitManager could not verify repo");
-        this.gitManager = null;
-        return null;
-      }
     }
     return this.gitManager;
   }
@@ -19639,61 +19642,54 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     }
   }
   /**
-   * Detect if vault has a real .git repo on the actual filesystem
+   * Detect if vault has a real .git repo — platform aware
+   * Desktop: tries Node.js fs first (most reliable), then adapter, then findRoot
+   * Mobile: skips Node fs, uses adapter methods + findRoot
    */
   async detectRealGitRepo() {
     var _a;
-    try {
-      const adapter = this.app.vault.adapter;
+    const adapter = this.app.vault.adapter;
+    if (this.isDesktop) {
       try {
-        await adapter.read(".git/HEAD");
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: .git/HEAD readable");
-        return true;
-      } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: .git/HEAD not readable", e);
-      }
-      try {
-        const stat = await adapter.stat(".git");
-        if (stat && stat.type === "folder") {
-          log2.debug("GitSyncPlugin", "detectRealGitRepo: .git dir found via stat");
+        const nodeRequire = window.require;
+        const nodeFs = nodeRequire("fs");
+        const nodePath = nodeRequire("path");
+        const basePath = (_a = adapter.getBasePath) == null ? void 0 : _a.call(adapter);
+        if (basePath) {
+          const gitPath = nodePath.join(basePath, ".git");
+          await nodeFs.promises.access(gitPath);
+          log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs found .git");
           return true;
         }
       } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: .git stat failed", e);
+        log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs failed, trying adapter");
       }
-      try {
-        if (typeof window !== "undefined" && window.require) {
-          const nodeRequire = window.require;
-          const nodeFs = nodeRequire("fs");
-          const nodePath = nodeRequire("path");
-          const basePath = (_a = adapter.getBasePath) == null ? void 0 : _a.call(adapter);
-          if (basePath) {
-            const gitPath = nodePath.join(basePath, ".git");
-            const stat = await nodeFs.promises.stat(gitPath);
-            if (stat.isDirectory()) {
-              log2.debug("GitSyncPlugin", "detectRealGitRepo: .git found via Node fs");
-              return true;
-            }
-          }
-        }
-      } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: Node fs fallback failed", e);
-      }
-      try {
-        const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
-        const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
-        if (root !== void 0) {
-          log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
-          return true;
-        }
-      } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed", e);
-      }
-      return false;
-    } catch (e) {
-      log2.warn("GitSyncPlugin", "detectRealGitRepo error", e);
-      return false;
     }
+    try {
+      await adapter.read(".git/HEAD");
+      log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.read .git/HEAD succeeded");
+      return true;
+    } catch (e) {
+    }
+    try {
+      const stat = await adapter.stat(".git");
+      if (stat && stat.type === "folder") {
+        log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.stat .git succeeded");
+        return true;
+      }
+    } catch (e) {
+    }
+    try {
+      const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
+      const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
+      if (root !== void 0) {
+        log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
+        return true;
+      }
+    } catch (e) {
+      log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed");
+    }
+    return false;
   }
   async syncVault() {
     const commitMessage = this.settings.autoCommitMessage.replace(
@@ -19723,6 +19719,86 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
       console.error("Sync failed:", error);
       throw error;
     }
+  }
+  /**
+   * Run platform and git compatibility diagnostics
+   * Reports: platform, fs capabilities, repo detection, git init test
+   */
+  async runCompatibilityDiagnostics() {
+    var _a, _b;
+    const results = [];
+    results.push(`Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
+    results.push(`window.require: ${typeof window !== "undefined" && !!window.require ? "yes" : "no"}`);
+    results.push(`window.process: ${typeof window !== "undefined" && !!window.process ? "yes" : "no"}`);
+    if (this.isDesktop) {
+      try {
+        const nodeRequire = window.require;
+        const nodeFs = nodeRequire("fs");
+        const basePath = (_b = (_a = this.app.vault.adapter).getBasePath) == null ? void 0 : _b.call(_a);
+        results.push(`Node fs: available`);
+        results.push(`Vault basePath: ${basePath || "unknown"}`);
+        if (basePath) {
+          const gitPath = nodeRequire("path").join(basePath, ".git");
+          try {
+            await nodeFs.promises.access(gitPath);
+            results.push(`Node fs .git check: found`);
+          } catch (e) {
+            results.push(`Node fs .git check: not found`);
+          }
+        }
+      } catch (e) {
+        results.push(`Node fs: error \u2014 ${e.message}`);
+      }
+    } else {
+      results.push(`Node fs: not available (mobile)`);
+    }
+    const adapter = this.app.vault.adapter;
+    try {
+      await adapter.read(".git/HEAD");
+      results.push(`Adapter .git/HEAD: readable`);
+    } catch (e) {
+      results.push(`Adapter .git/HEAD: not readable`);
+    }
+    try {
+      const stat = await adapter.stat(".git");
+      results.push(`Adapter .git stat: ${stat ? "found (" + stat.type + ")" : "null"}`);
+    } catch (e) {
+      results.push(`Adapter .git stat: not found`);
+    }
+    try {
+      const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
+      const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
+      results.push(`findRoot: found at '${root}'`);
+    } catch (e) {
+      results.push(`findRoot: not found`);
+    }
+    const hasRepo = await this.detectRealGitRepo();
+    results.push(`Repo detected: ${hasRepo ? "YES" : "NO"}`);
+    try {
+      const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
+      const testDir = ".obsidian-git-test-" + Date.now();
+      await this.fs.mkdir(testDir, { recursive: true });
+      await git.init({ fs: this.fs, dir: testDir, defaultBranch: "main" });
+      const testRoot = await git.findRoot({ fs: this.fs, filepath: testDir + "/dummy.txt" });
+      results.push(`Git init test: ${testRoot ? "PASS" : "FAIL"}`);
+      const entries = await this.fs.readdir(".", { encoding: "utf8" });
+      for (const entry of entries) {
+        if (entry.startsWith(".obsidian-git-test-")) {
+          try {
+            await this.fs.rmdir(entry, { recursive: true });
+          } catch (e) {
+          }
+        }
+      }
+    } catch (e) {
+      results.push(`Git init test: FAIL \u2014 ${e.message}`);
+    }
+    const message = results.join("\n");
+    log2.info("GitSyncPlugin", "Diagnostics:\n" + message);
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText("Git Sync Diagnostics");
+    modal.contentEl.createEl("pre", { text: message, cls: "git-diagnostics" });
+    modal.open();
   }
 };
 var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
