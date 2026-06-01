@@ -7968,7 +7968,7 @@ __export(isomorphic_git_exports, {
   expandOid: () => expandOid,
   expandRef: () => expandRef,
   fastForward: () => fastForward,
-  fetch: () => fetch,
+  fetch: () => fetch2,
   findMergeBase: () => findMergeBase,
   findRoot: () => findRoot,
   getConfig: () => getConfig,
@@ -11925,7 +11925,7 @@ async function fastForward({
     throw err;
   }
 }
-async function fetch({
+async function fetch2({
   fs,
   http,
   onProgress,
@@ -18374,7 +18374,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       expandOid,
       expandRef,
       fastForward,
-      fetch,
+      fetch: fetch2,
       findMergeBase,
       findRoot,
       getRemoteInfo,
@@ -19488,7 +19488,7 @@ var init_gitManager = __esm({
           }
           onMessage == null ? void 0 : onMessage("Connecting to remote...");
           startDownloadTimer();
-          await fetch({
+          await fetch2({
             fs: this.fs,
             http: new GitHttpClient(this.credentials),
             dir: this.dir,
@@ -19876,7 +19876,10 @@ Try again with a faster connection or smaller repository.`
         }
       }
       /**
-       * Get list of files changed in a specific commit (compared to its parent)
+       * Get list of files changed in a specific commit (compared to its parent).
+       * 
+       * For shallow clones, the commit may not exist locally. This method gracefully
+       * handles that by returning an empty array and logging a warning (not error).
        */
       async getCommitFiles(oid) {
         var _a, _b;
@@ -19905,8 +19908,62 @@ Try again with a faster connection or smaller repository.`
           }
           return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
         } catch (error) {
-          log2.error("GitManager", `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+          const msg = (error == null ? void 0 : error.message) || String(error);
+          if (msg.includes("Could not find") || msg.includes("not found")) {
+            log2.warn("GitManager", `Commit ${oid.slice(0, 7)} not found locally (shallow clone?)`, msg);
+          } else {
+            log2.error("GitManager", `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+          }
           return [];
+        }
+      }
+      /**
+       * Fetch commit file changes from GitHub API.
+       * Useful for remote commits that don't exist in a shallow local clone.
+       * Returns same format as getCommitFiles() for consistency.
+       */
+      static async fetchCommitFilesFromGitHub(repoUrl, token, ref) {
+        try {
+          const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/);
+          if (!match) {
+            log2.warn("GitManager", "Cannot fetch commit files: not a GitHub URL", repoUrl);
+            return null;
+          }
+          const [, owner, repo] = match;
+          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`;
+          log2.debug("GitManager", `Fetching commit files from GitHub API: ${apiUrl}`);
+          const headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "obsidian-git-sync"
+          };
+          if (token) {
+            headers["Authorization"] = `token ${token}`;
+          }
+          const response = await fetch(apiUrl, { headers });
+          if (!response.ok) {
+            log2.warn("GitManager", `GitHub API commit fetch returned ${response.status}`, await response.text());
+            return null;
+          }
+          const data = await response.json();
+          if (!data.files || !Array.isArray(data.files)) {
+            log2.warn("GitManager", "GitHub API commit response missing files", data);
+            return null;
+          }
+          const statusMap = {
+            "added": "added",
+            "modified": "modified",
+            "removed": "deleted",
+            "renamed": "modified"
+          };
+          const files = data.files.map((f) => ({
+            filepath: f.filename || f.previous_filename || "unknown",
+            status: statusMap[f.status] || "modified"
+          })).sort((a, b) => a.filepath.localeCompare(b.filepath));
+          log2.info("GitManager", `Fetched ${files.length} files for commit ${ref.slice(0, 7)} from GitHub API`);
+          return files;
+        } catch (error) {
+          log2.warn("GitManager", `GitHub API commit file fetch failed for ${ref.slice(0, 7)}`, error);
+          return null;
         }
       }
       /**
@@ -20240,6 +20297,7 @@ init_logger();
 
 // src/views/GitSidebarView.ts
 var import_obsidian4 = require("obsidian");
+init_gitManager();
 init_logger();
 var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
 var GitSidebarView = class extends import_obsidian4.ItemView {
@@ -20805,16 +20863,31 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   async renderCommitDetail(row, oid) {
+    var _a;
     const existing = row.querySelector(".git-commit-detail");
     if (existing)
       existing.remove();
     const detail = row.createDiv("git-commit-detail");
     detail.createDiv("git-commit-detail-loading").setText("Loading...");
     try {
-      const files = await this.plugin.gitManager.getCommitFiles(oid);
+      let files = [];
+      files = await this.plugin.gitManager.getCommitFiles(oid);
+      if (files.length === 0 && this.commitsViewMode === "remote" && this.plugin.settings.repoUrl) {
+        (_a = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _a.setText("Fetching from GitHub...");
+        const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
+          this.plugin.settings.repoUrl,
+          this.plugin.settings.password,
+          oid
+        );
+        if (remoteFiles) {
+          files = remoteFiles;
+        }
+      }
       detail.empty();
       if (files.length === 0) {
-        detail.createEl("p", { text: "No file changes detected", cls: "git-commit-detail-empty" });
+        const isRemoteMode = this.commitsViewMode === "remote";
+        const msg = isRemoteMode ? "Commit details not available locally. Try initializing with full history, or this commit may be empty." : "No file changes detected";
+        detail.createEl("p", { text: msg, cls: "git-commit-detail-empty" });
         return;
       }
       for (const f of files) {

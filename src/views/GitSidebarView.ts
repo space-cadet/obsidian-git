@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent } from 'obsidian';
 import GitSyncPlugin from '../main';
-import { GitFileStatus, GitCommit } from '../gitManager';
+import { GitManager, GitFileStatus, GitCommit } from '../gitManager';
 import { log, LogEntry } from '../logger';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
@@ -757,11 +757,33 @@ export class GitSidebarView extends ItemView {
         detail.createDiv('git-commit-detail-loading').setText('Loading...');
 
         try {
-            const files = await this.plugin.gitManager!.getCommitFiles(oid);
+            let files: { filepath: string; status: 'added' | 'modified' | 'deleted' }[] = [];
+            
+            // Try local first
+            files = await this.plugin.gitManager!.getCommitFiles(oid);
+            
+            // If no files found locally and we're viewing remote commits, try GitHub API
+            if (files.length === 0 && this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl) {
+                detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
+                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
+                    this.plugin.settings.repoUrl,
+                    this.plugin.settings.password,
+                    oid
+                );
+                if (remoteFiles) {
+                    files = remoteFiles;
+                }
+            }
+            
             detail.empty();
 
             if (files.length === 0) {
-                detail.createEl('p', { text: 'No file changes detected', cls: 'git-commit-detail-empty' });
+                // Check if this is a shallow clone situation
+                const isRemoteMode = this.commitsViewMode === 'remote';
+                const msg = isRemoteMode
+                    ? 'Commit details not available locally. Try initializing with full history, or this commit may be empty.'
+                    : 'No file changes detected';
+                detail.createEl('p', { text: msg, cls: 'git-commit-detail-empty' });
                 return;
             }
 

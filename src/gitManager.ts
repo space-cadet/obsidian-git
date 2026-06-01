@@ -1195,7 +1195,10 @@ export class GitManager {
     }
 
     /**
-     * Get list of files changed in a specific commit (compared to its parent)
+     * Get list of files changed in a specific commit (compared to its parent).
+     * 
+     * For shallow clones, the commit may not exist locally. This method gracefully
+     * handles that by returning an empty array and logging a warning (not error).
      */
     async getCommitFiles(oid: string): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted' }[]> {
         try {
@@ -1227,9 +1230,78 @@ export class GitManager {
             }
 
             return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
-        } catch (error) {
-            log.error('GitManager', `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+        } catch (error: any) {
+            const msg = error?.message || String(error);
+            // "Could not find" is expected for shallow clones — don't spam error notices
+            if (msg.includes('Could not find') || msg.includes('not found')) {
+                log.warn('GitManager', `Commit ${oid.slice(0, 7)} not found locally (shallow clone?)`, msg);
+            } else {
+                log.error('GitManager', `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+            }
             return [];
+        }
+    }
+
+    /**
+     * Fetch commit file changes from GitHub API.
+     * Useful for remote commits that don't exist in a shallow local clone.
+     * Returns same format as getCommitFiles() for consistency.
+     */
+    static async fetchCommitFilesFromGitHub(
+        repoUrl: string,
+        token: string | undefined,
+        ref: string
+    ): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted' }[] | null> {
+        try {
+            const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/);
+            if (!match) {
+                log.warn('GitManager', 'Cannot fetch commit files: not a GitHub URL', repoUrl);
+                return null;
+            }
+            const [, owner, repo] = match;
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`;
+            
+            log.debug('GitManager', `Fetching commit files from GitHub API: ${apiUrl}`);
+            
+            const headers: Record<string, string> = {
+                'Accept': 'application/vnd.github.v3+json',
+                'User-Agent': 'obsidian-git-sync'
+            };
+            if (token) {
+                headers['Authorization'] = `token ${token}`;
+            }
+            
+            const response = await fetch(apiUrl, { headers });
+            if (!response.ok) {
+                log.warn('GitManager', `GitHub API commit fetch returned ${response.status}`, await response.text());
+                return null;
+            }
+            
+            const data = await response.json();
+            if (!data.files || !Array.isArray(data.files)) {
+                log.warn('GitManager', 'GitHub API commit response missing files', data);
+                return null;
+            }
+            
+            const statusMap: Record<string, 'added' | 'modified' | 'deleted'> = {
+                'added': 'added',
+                'modified': 'modified',
+                'removed': 'deleted',
+                'renamed': 'modified',
+            };
+            
+            const files = data.files
+                .map((f: any) => ({
+                    filepath: f.filename || f.previous_filename || 'unknown',
+                    status: statusMap[f.status] || 'modified'
+                }))
+                .sort((a: any, b: any) => a.filepath.localeCompare(b.filepath));
+            
+            log.info('GitManager', `Fetched ${files.length} files for commit ${ref.slice(0, 7)} from GitHub API`);
+            return files;
+        } catch (error) {
+            log.warn('GitManager', `GitHub API commit file fetch failed for ${ref.slice(0, 7)}`, error);
+            return null;
         }
     }
 
