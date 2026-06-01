@@ -1,78 +1,203 @@
-# Obsidian Git Sync Plugin
+# Obsidian Git Plugin
 
-A Git synchronization plugin for Obsidian that works on desktop and mobile platforms.
+A powerful Git synchronization plugin for [Obsidian](https://obsidian.md) that works on **both desktop and mobile** — using `isomorphic-git` under the hood, so you never need a native `git` CLI.
+
+![Sidebar Overview](screenshots/sidebar-overview.png)
+
+---
 
 ## Features
 
-- Synchronize your Obsidian vault with a Git repository
-- Works on desktop (Windows, macOS, Linux) and mobile (iOS, Android) platforms
-- Automatic and manual sync options
-- Configurable commit messages
-- Status bar indicator for sync status
+- 🔁 **Sync your vault** — pull, commit, and push with one action
+- 📱 **Mobile-ready** — works on iOS & Android via `isomorphic-git`
+- 📁 **Changes tab** — stage/unstage files individually or in bulk
+- 📜 **Commits tab** — view local & remote commit history, expand to see changed files
+- 🌿 **Local & Remote** — toggle between your local `HEAD` and `origin` commits
+- 🔐 **Token-based auth** — Personal Access Token (PAT) support for GitHub/GitLab
+- ⚡ **Force Push** — for first-time pushes or resolving diverged histories
+- 🔄 **Auto-refresh** — configurable sidebar refresh interval
+- 📝 **Custom commit messages** — or auto-generated timestamped messages
+- 🎨 **Native Obsidian UI** — matches your theme, no jarring external styles
+
+---
 
 ## Installation
 
-### From Obsidian Community Plugins
+### From Release (Recommended)
 
-1. Open Obsidian
-2. Go to Settings > Community Plugins
-3. Disable Safe Mode if necessary
-4. Click Browse and search for "Git Sync"
-5. Install the plugin
-6. Enable the plugin in the Community Plugins tab
+1. Download the latest release ZIP from [GitHub Releases](https://github.com/space-cadet/obsidian-git/releases)
+2. Extract to your vault: `.obsidian/plugins/obsidian-git/`
+3. Reload Obsidian (Command Palette → "Reload app without saving")
+4. Enable in Settings → Community Plugins
 
-### Manual Installation
+### From Source
 
-1. Download the latest release from the GitHub repository
-2. Extract the files to your vault's `.obsidian/plugins/obsidian-git-sync` directory
-3. Reload Obsidian
-4. Enable the plugin in Settings > Community Plugins
+```bash
+pnpm install
+pnpm run build
+```
 
-## Usage
+Copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/obsidian-git/`.
 
-### Configuration
+---
 
-1. Go to Settings > Git Sync
-2. Enter your Git repository URL
-3. Configure your Git credentials (username and password/token)
-4. Set your author name and email for commits
-5. Configure auto-sync interval if desired
+## Setup
 
-### Manual Sync
+1. Open **Settings → Git Sync**
+2. Enter your **GitHub repository URL** (e.g. `https://github.com/username/vault.git`)
+3. Enter a **Personal Access Token** (PAT) as the password:
+   - GitHub: Settings → Developer settings → Personal access tokens → Tokens (classic) → `repo` scope
+   - The username field is ignored for PATs — any value works
+4. Set your **author name & email** for commits
+5. (Optional) Set **auto-sync interval** — 0 = disabled
 
-Click the Git Sync icon in the ribbon to manually sync your vault.
+---
 
-### Automatic Sync
+## The Sidebar
 
-Enable automatic sync by setting a non-zero interval in the settings.
+Open the **Git Sidebar** from the ribbon icon (or Command Palette → "Open Git Sidebar").
+
+### Changes Tab
+
+![Changes Tab](screenshots/changes-tab.png)
+
+The **Changes** tab shows your working directory in two sections:
+
+- **Staged** — files ready to commit
+- **Uncommitted** — modified or new files not yet staged
+
+**Actions per file:**
+- **±** — stage/unstage a file
+- **↺** — discard changes (restore from HEAD)
+- **↑** — stage all unstaged files
+- **↓** — unstage all staged files
+
+**Commit** — type a message in the footer, hit **Commit**.
+
+**Footer buttons:**
+- **Commit** — commit staged files
+- **↑** — push to remote
+- **↑↑** — force push (with confirmation dialog)
+- **↓** — pull from remote
+- **↻** — refresh sidebar
+
+All buttons are **always visible** — disabled with a tooltip when not applicable (no hidden UI).
+
+### Commits Tab
+
+![Commits Tab](screenshots/commits-tab.png)
+
+The **Commits** tab shows your commit history with a **Local / Remote** toggle at the top:
+
+- **Local** — your `HEAD` commits
+- **Remote** — `origin/main` (or whichever branch you configured)
+
+**Click any commit** to expand it and see the files changed in that commit:
+
+| Icon | Meaning |
+|------|---------|
+| **+** | File added |
+| **−** | File deleted |
+| **●** | File modified |
+
+### Log Tab
+
+The **Log** tab shows internal plugin activity — useful for debugging sync issues.
+
+---
+
+## Commands
+
+| Command | Action |
+|---------|--------|
+| **Git: Sync** | Pull → Add → Commit → Push (full sync) |
+| **Git: Pull** | Pull from remote |
+| **Git: Commit** | Commit all changes |
+| **Git: Push** | Push to remote |
+| **Git: Initialize Repository** | Create a local git repo |
+| **Git: Open Sidebar** | Open the Git sidebar |
+
+---
 
 ## How It Works
 
-This plugin uses [isomorphic-git](https://isomorphic-git.org/), a pure JavaScript implementation of Git, to provide Git functionality across all platforms, including mobile devices where traditional Git clients are not available.
+This plugin uses [**isomorphic-git**](https://isomorphic-git.org/) — a pure JavaScript Git implementation — combined with Obsidian's native `requestUrl` API for HTTP. This means:
+
+- ✅ No `git` CLI required on desktop
+- ✅ Works on iOS and Android (where `git` isn't available)
+- ✅ Uses Obsidian's Capacitor bridge to bypass CORS
+- ✅ Your `.git` directory lives in your vault folder — fully portable
+
+---
 
 ## Troubleshooting
 
-- **Authentication Issues**: Make sure your username and password/token are correct. For GitHub, you'll need to use a Personal Access Token instead of your password.
-- **Sync Failures**: Check the console logs for more detailed error messages.
+### "Push rejected" — not a fast-forward
+The remote has commits you don't have locally. **Pull first**, then push. If this is a first-time push to an empty repo, use **Force Push (↑↑)**.
+
+### "Authentication failed" — 401/403
+- Check your **Personal Access Token** in settings
+- Ensure your token has `Contents: Read and Write` permission
+- For GitHub fine-grained tokens, the **username** field can be anything — PATs don't need it
+
+### "Pack index reading failed"
+This is a known `isomorphic-git` limitation with certain pack files. The plugin now falls back to Node.js `fs` on desktop for pack index operations. On mobile, this is a hard limitation — consider using `git gc` on your repo to repack with a smaller index.
+
+### "No remote configured" (local-only mode)
+If your **repo URL** is empty, the plugin works in **local-only mode** — commits are saved locally but never pushed. Set a remote URL to enable push/pull.
+
+---
 
 ## Development
 
-### Building the Plugin
-
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
-# Build the plugin
-npm run build
+# Build for production
+pnpm run build
+
+# Dev mode with watch
+pnpm exec vite
+
+# The build outputs:
+#   main.js     — bundled plugin
+#   styles.css  — sidebar styles
+#   manifest.json — plugin metadata
 ```
 
-### Development Mode
-
-```bash
-npm run dev
-```
+---
 
 ## License
 
 MIT
+
+---
+
+## Changelog
+
+### v25 (2026-06-01)
+- **Commits tab** — renamed from "History", now with expandable file lists
+- **Local/Remote toggle** — switch between your commits and `origin` commits
+- **Remote commit badges** — origin commits styled with accent bar
+- **Expandable commits** — click to see added/modified/deleted files
+
+### v24 (2026-05-31)
+- Force Push button with confirmation dialog
+- Token visibility bug fix (password field)
+- Pull author error handling
+
+### v23 (2026-05-30)
+- Pull rejection error handling
+- Empty remote clone fallback
+
+### v22 (2026-05-30)
+- Commit UI with message input
+- Staged/Uncommitted sections in Changes tab
+- Bulk stage/unstage actions
+
+### v9 (2026-05-25)
+- Initial mobile-compatible release
+- isomorphic-git + ObsidianFsAdapter
+- Pack index fix for desktop
+- Settings UI with Initialize button
