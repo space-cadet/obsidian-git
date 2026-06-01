@@ -349,25 +349,28 @@
     padding: 6px 12px;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
+    justify-content: center;
 }
 
 .git-commits-toggle-btn {
-    flex: 1;
-    padding: 4px 8px;
+    flex: none;
+    min-width: 80px;
+    padding: 5px 16px;
     border: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     cursor: pointer;
     transition: all 0.15s;
+    font-weight: 500;
 }
 
 .git-commits-toggle-btn:first-child {
-    border-radius: 4px 0 0 4px;
+    border-radius: 6px 0 0 6px;
 }
 
 .git-commits-toggle-btn:last-child {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 6px 6px 0;
     margin-left: -1px;
 }
 
@@ -383,6 +386,17 @@
     font-weight: 600;
 }
 
+/* Desktop: give toggle bar a max-width so buttons don't stretch too wide */
+@media (min-width: 400px) {
+    .git-commits-toggle-bar {
+        justify-content: center;
+    }
+    .git-commits-toggle-btn {
+        min-width: 100px;
+        padding: 6px 20px;
+    }
+}
+
 .git-commit-row {
     display: flex;
     flex-direction: column;
@@ -396,6 +410,15 @@
     background: var(--background-modifier-hover);
 }
 
+/* Active/expanded state */
+.git-commit-row[data-expanded="true"] {
+    background: var(--background-secondary-alt);
+}
+
+.git-commit-row[data-expanded="true"] .git-commit-main {
+    background: var(--background-secondary-alt);
+}
+
 .git-commit-remote {
     border-left: 2px solid var(--text-accent);
 }
@@ -404,16 +427,17 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    padding: 6px 12px;
+    padding: 8px 12px 4px;
     gap: 6px;
 }
 
 .git-commit-toggle {
     font-size: 10px;
-    width: 12px;
+    width: 14px;
     text-align: center;
     flex-shrink: 0;
     color: var(--text-faint);
+    user-select: none;
 }
 
 .git-commit-hash {
@@ -421,6 +445,7 @@
     color: var(--text-faint);
     font-size: 11px;
     flex-shrink: 0;
+    min-width: 56px;
 }
 
 .git-commit-message {
@@ -430,6 +455,7 @@
     white-space: nowrap;
     color: var(--text-normal);
     min-width: 0;
+    font-weight: 500;
 }
 
 .git-commit-remote-badge {
@@ -447,7 +473,7 @@
     display: flex;
     gap: 8px;
     width: 100%;
-    padding-left: 26px;
+    padding: 2px 12px 6px 32px;
     font-size: 11px;
     color: var(--text-faint);
 }
@@ -462,7 +488,7 @@
 
 /* Commit detail (expanded file list) */
 .git-commit-detail {
-    padding: 4px 12px 8px 38px;
+    padding: 4px 12px 8px 32px;
     border-top: 1px solid var(--background-modifier-border-hover);
     background: var(--background-secondary-alt);
 }
@@ -486,7 +512,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 2px 0;
+    padding: 3px 0;
     font-size: 11px;
 }
 

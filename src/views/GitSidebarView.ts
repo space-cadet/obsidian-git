@@ -708,8 +708,12 @@ export class GitSidebarView extends ItemView {
                 meta.createSpan({ text: commit.author, cls: 'git-commit-author' });
                 meta.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
 
-                // Click to expand/collapse
-                mainRow.addEventListener('click', async () => {
+                // Click ANYWHERE on the row to expand/collapse — not just the padded mainRow area
+                row.addEventListener('click', async (e) => {
+                    // Don't toggle if clicking a link or button inside the detail view
+                    const target = e.target as HTMLElement;
+                    if (target.closest('a') || target.closest('button')) return;
+                    
                     const currentlyExpanded = this.expandedCommitOids.has(commit.oid);
                     if (currentlyExpanded) {
                         this.expandedCommitOids.delete(commit.oid);

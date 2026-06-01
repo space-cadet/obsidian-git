@@ -19030,13 +19030,21 @@ var init_gitManager = __esm({
         return result.buffer;
       }
       /**
-       * Convert an ArrayBuffer into an async iterator of Uint8Arrays
-       * (isomorphic-git expects body as an async iterable)
+       * Convert an ArrayBuffer into an async iterator of Uint8Arrays.
+       * 
+       * CHUNKING STRATEGY: Yield in 64KB chunks instead of the entire buffer at once.
+       * This allows isomorphic-git's packfile parser to process objects incrementally
+       * and potentially free memory between chunks, reducing peak memory usage on mobile.
+       * 
+       * Uses subarray() (view, not copy) to avoid additional memory allocation.
        */
-      toAsyncIterator(arrayBuffer) {
+      toAsyncIterator(arrayBuffer, chunkSize = 65536) {
         return {
           [Symbol.asyncIterator]: async function* () {
-            yield new Uint8Array(arrayBuffer);
+            const view = new Uint8Array(arrayBuffer);
+            for (let offset = 0; offset < view.length; offset += chunkSize) {
+              yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
+            }
           }
         };
       }
@@ -19368,7 +19376,24 @@ var init_gitManager = __esm({
             return;
           }
           const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Pulling from remote") : createProgressNotice("Pulling from remote");
+          const pullStartTime = Date.now();
+          let pullTimer = null;
+          const startPullTimer = () => {
+            if (pullTimer)
+              window.clearInterval(pullTimer);
+            pullTimer = window.setInterval(() => {
+              const elapsed = ((Date.now() - pullStartTime) / 1e3).toFixed(1);
+              onMessage == null ? void 0 : onMessage(`Downloading updates... (${elapsed}s elapsed)`);
+            }, 1e3);
+          };
+          const stopPullTimer = () => {
+            if (pullTimer) {
+              window.clearInterval(pullTimer);
+              pullTimer = null;
+            }
+          };
           try {
+            startPullTimer();
             await pull({
               fs: this.fs,
               http: new GitHttpClient(this.credentials),
@@ -19387,9 +19412,11 @@ var init_gitManager = __esm({
               onProgress,
               onMessage
             });
+            stopPullTimer();
             hideNotice();
             this.updateStatus("Pull completed");
           } catch (error) {
+            stopPullTimer();
             hideNotice();
             throw error;
           }
@@ -19402,14 +19429,38 @@ var init_gitManager = __esm({
       /**
        * Shallow fetch + checkout for empty repos.
        * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
+       * 
+       * MEMORY-SAFE STRATEGY:
+       * 1. Try git.clone first — handles packfile streaming incrementally
+       * 2. Fallback to git.fetch + git.checkout with chunked ArrayBuffer processing
+       * 3. Show download progress timer (since isomorphic-git doesn't emit progress during HTTP)
+       * 4. Catch OOM and timeout errors with helpful messages
        */
       async shallowFetchAndCheckout(branchName) {
         const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Fetching remote files") : createProgressNotice("Fetching remote files");
+        const startTime = Date.now();
+        let downloadTimer = null;
+        const startDownloadTimer = () => {
+          if (downloadTimer)
+            window.clearInterval(downloadTimer);
+          downloadTimer = window.setInterval(() => {
+            const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
+            onMessage == null ? void 0 : onMessage(`Downloading from server... (${elapsed}s elapsed)`);
+          }, 1e3);
+        };
+        const stopDownloadTimer = () => {
+          if (downloadTimer) {
+            window.clearInterval(downloadTimer);
+            downloadTimer = null;
+          }
+        };
         try {
           try {
             this.updateStatus("Cloning repository (memory-efficient)...");
             log2.info("GitManager", "Attempting clone for memory efficiency");
+            onMessage == null ? void 0 : onMessage("Preparing to clone...");
             await this.fs.promises.rmdir(this.dir + "/.git", { recursive: true });
+            startDownloadTimer();
             await clone({
               fs: this.fs,
               http: new GitHttpClient(this.credentials),
@@ -19425,13 +19476,18 @@ var init_gitManager = __esm({
               onProgress,
               onMessage
             });
+            stopDownloadTimer();
             hideNotice();
             this.updateStatus("Repository cloned");
             log2.info("GitManager", `Clone successful for ${branchName}`);
             return;
           } catch (cloneError) {
+            stopDownloadTimer();
             log2.warn("GitManager", `Clone failed, falling back to fetch: ${cloneError.message}`);
+            onMessage == null ? void 0 : onMessage(`Clone unavailable, using fetch...`);
           }
+          onMessage == null ? void 0 : onMessage("Connecting to remote...");
+          startDownloadTimer();
           await fetch({
             fs: this.fs,
             http: new GitHttpClient(this.credentials),
@@ -19446,6 +19502,8 @@ var init_gitManager = __esm({
             }),
             onMessage
           });
+          stopDownloadTimer();
+          onMessage == null ? void 0 : onMessage("Download complete, processing...");
           const remoteRef = `refs/remotes/origin/${branchName}`;
           const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
           log2.info("GitManager", `Fetched branch tip: ${oid.slice(0, 7)}`);
@@ -19455,6 +19513,7 @@ var init_gitManager = __esm({
             ref: `refs/heads/${branchName}`,
             value: oid
           });
+          onMessage == null ? void 0 : onMessage("Writing files to vault...");
           await checkout({
             fs: this.fs,
             dir: this.dir,
@@ -19465,7 +19524,28 @@ var init_gitManager = __esm({
           this.updateStatus("Repository fetched");
           log2.info("GitManager", `Checked out ${branchName} at ${oid.slice(0, 7)}`);
         } catch (error) {
+          stopDownloadTimer();
           hideNotice();
+          const msg = error.message || String(error);
+          if (msg.includes("Out Of Memory") || msg.includes("out of memory") || msg.includes("OOM") || msg.includes("allocation")) {
+            log2.error("GitManager", "Memory exhausted during fetch \u2014 repo may be too large for mobile", error);
+            throw new Error(
+              `Memory exhausted while downloading repository. The repository may be too large for your device.
+
+Suggestions:
+\u2022 Try on desktop first, then sync to mobile
+\u2022 Remove large files (images, videos) from the repo
+\u2022 Use a smaller vault or split into multiple repos`
+            );
+          }
+          if (msg.includes("timeout") || msg.includes("ETIMEDOUT") || msg.includes("Connection reset")) {
+            log2.error("GitManager", "Network timeout during fetch", error);
+            throw new Error(
+              `Connection timed out while downloading. The repository may be too large or your connection too slow.
+
+Try again with a faster connection or smaller repository.`
+            );
+          }
           throw error;
         }
       }
@@ -20688,7 +20768,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         const meta = mainRow.createDiv("git-commit-meta");
         meta.createSpan({ text: commit2.author, cls: "git-commit-author" });
         meta.createSpan({ text: this.formatDate(commit2.date), cls: "git-commit-date" });
-        mainRow.addEventListener("click", async () => {
+        row.addEventListener("click", async (e) => {
+          const target = e.target;
+          if (target.closest("a") || target.closest("button"))
+            return;
           const currentlyExpanded = this.expandedCommitOids.has(commit2.oid);
           if (currentlyExpanded) {
             this.expandedCommitOids.delete(commit2.oid);
