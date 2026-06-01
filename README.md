@@ -2,7 +2,7 @@
 
 A powerful Git synchronization plugin for [Obsidian](https://obsidian.md) that works on **both desktop and mobile** — using `isomorphic-git` under the hood, so you never need a native `git` CLI.
 
-![Sidebar Overview](screenshots/sidebar-overview.png)
+![Sidebar Overview](screenshots/sidebar-overview.jpg)
 
 ---
 
@@ -59,7 +59,7 @@ Open the **Git Sidebar** from the ribbon icon (or Command Palette → "Open Git 
 
 ### Changes Tab
 
-![Changes Tab](screenshots/changes-tab.png)
+![Changes Tab](screenshots/changes-tab.jpg)
 
 The **Changes** tab shows your working directory in two sections:
 
@@ -85,7 +85,7 @@ All buttons are **always visible** — disabled with a tooltip when not applicab
 
 ### Commits Tab
 
-![Commits Tab](screenshots/commits-tab.png)
+![Commits Tab](screenshots/commits-tab.jpg)
 
 The **Commits** tab shows your commit history with a **Local / Remote** toggle at the top:
 
