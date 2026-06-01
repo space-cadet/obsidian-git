@@ -25,12 +25,12 @@ A powerful Git synchronization plugin for [Obsidian](https://obsidian.md) that w
 
 ### From Release (Recommended)
 
-1. Download the latest release ZIP from [GitHub Releases](https://github.com/space-cadet/obsidian-git/releases)
-2. Extract to your vault: `.obsidian/plugins/obsidian-git/`
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [GitHub repository](https://github.com/space-cadet/obsidian-git)
+2. Copy them into your vault's `.obsidian/plugins/obsidian-git/` directory
 3. Reload Obsidian (Command Palette → "Reload app without saving")
 4. Enable in Settings → Community Plugins
 
-### From Source
+### Manual Build
 
 ```bash
 pnpm install
