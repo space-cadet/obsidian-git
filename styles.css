@@ -341,16 +341,14 @@
 .git-commits-toggle-bar {
     display: flex;
     gap: 0;
-    padding: 6px 12px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
-    justify-content: center;
 }
 
 .git-commits-toggle-btn {
-    flex: none;
-    min-width: 80px;
-    padding: 5px 16px;
+    flex: 1;
+    padding: 8px 16px;
     border: 1px solid var(--background-modifier-border);
     background: var(--background-primary);
     color: var(--text-muted);
@@ -361,11 +359,11 @@
 }
 
 .git-commits-toggle-btn:first-child {
-    border-radius: 6px 0 0 6px;
+    border-radius: 8px 0 0 8px;
 }
 
 .git-commits-toggle-btn:last-child {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 8px 8px 0;
     margin-left: -1px;
 }
 
@@ -381,14 +379,14 @@
     font-weight: 600;
 }
 
-/* Desktop: give toggle bar a max-width so buttons don't stretch too wide */
+/* Desktop: larger toggle bar with more padding */
 @media (min-width: 400px) {
     .git-commits-toggle-bar {
-        justify-content: center;
+        padding: 12px 20px;
     }
     .git-commits-toggle-btn {
-        min-width: 100px;
-        padding: 6px 20px;
+        padding: 10px 20px;
+        font-size: 13px;
     }
 }
 
@@ -422,8 +420,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    padding: 8px 12px 4px;
-    gap: 6px;
+    padding: 10px 14px 2px;
+    gap: 8px;
 }
 
 .git-commit-toggle {
@@ -450,26 +448,28 @@
     white-space: nowrap;
     color: var(--text-normal);
     min-width: 0;
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 13px;
 }
 
 .git-commit-remote-badge {
     font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 3px;
+    padding: 2px 6px;
+    border-radius: 4px;
     background: var(--text-accent);
     color: var(--text-on-accent);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     flex-shrink: 0;
+    letter-spacing: 0.3px;
 }
 
 .git-commit-meta {
     display: flex;
     gap: 8px;
     width: 100%;
-    padding: 2px 12px 6px 32px;
-    font-size: 11px;
+    padding: 2px 14px 8px 36px;
+    font-size: 12px;
     color: var(--text-faint);
 }
 
