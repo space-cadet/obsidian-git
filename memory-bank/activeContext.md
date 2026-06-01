@@ -4,12 +4,12 @@
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 v25 shipped, CI workflow active
+### T29: obsidian-git Plugin — 🔄 v26 shipped, CI workflow active
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending)
-- **Phase 5**: v25 (Commits tab redesign) + CI workflow + README
-- **Status**: Core sync workflow functional. Commits tab expandable. Dev releases auto-created on every push.
-- **Next**: Test v25, tagged v1.0.0 release
+- **Phase 6**: v26 (Mobile crash fix, progress display, GitHub API remote commits, debug logs)
+- **Status**: Core sync workflow functional. Remote commits visible without local repo. Progress tracking for all operations. Shallow fetch prevents mobile crash.
+- **Next**: Test v26 on mobile, tagged v1.0.0 release
 
 ### T30: Remote Commits View — ✅ COMPLETED
 - **Scope**: Display remote commit history alongside local in Commits tab (local/remote toggle)
@@ -33,6 +33,7 @@
 5. **T5: Error Handling & Logging** — Replaced winston with simple Logger ✅
 6. **T6: Git Sidebar UI** — Status panel, commit log, file staging ✅
 7. **T30: Remote Commits View** — Local/Remote toggle, expandable commits ✅ (merged into T29 v25)
+8. **T32: Mobile Crash Fix + Progress** — Shallow fetch, GitHub API fallback, progress notices, debug logs ✅ (v26)
 
 ## T29: obsidian-git Plugin Completed Sub-Tasks
 - **v17-v19**: Changes tab redesign (Staged/Uncommitted sections, per-file + bulk actions)
@@ -41,29 +42,29 @@
 - **v23**: Pull author error fix, push rejection error handling, empty remote clone fallback
 - **v24**: Force Push button (↑↑) with confirmation dialog
 - **v25**: Commits tab redesign (renamed from History, expandable file lists, Local/Remote toggle)
+- **v26**: Mobile crash fix, progress tracking, GitHub API remote commits, debug log export
 - **README**: Full documentation with screenshots
 - **CI**: GitHub Actions workflow (build, archive, artifact, dev release, stable release)
 
 ## Next Steps
-1. **Test v25 on desktop** — Verify Commits tab, expandable files, Local/Remote toggle
-2. **Test v25 on mobile** — Verify all features work on Android/iOS
-3. **Fix screenshot labels** — User noted some are incorrect (will fix later)
-4. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
-5. **Plugin store submission prep** — manifest, README, release notes
+1. **Test v26 on mobile** — Verify progress notices, shallow fetch, remote commits without repo, debug log export
+2. **Fix screenshot labels** — User noted some are incorrect (will fix later)
+3. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
+4. **Plugin store submission prep** — manifest, README, release notes
 
 ## System Status
 
-- **Plugin**: v1.0.0 (manifest), v25 internal dev, core features + sidebar complete
+- **Plugin**: v1.0.0 (manifest), v26 internal dev, core features + sidebar + crash fix + progress + API fallback
 - **Build**: ~280KB, mobile-compatible, tsc + esbuild pass
 - **CI**: GitHub Actions working, dev releases on every push
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
-- **Memory Bank**: T29 as top-level task, T1-T6 as sub-tasks, T30 completed
+- **Memory Bank**: T29 as top-level task, T1-T6 as sub-tasks, T30/T32 completed
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
 
 ## Decisions Made
 
 - **isomorphic-git over native git**: Cross-platform compatibility ✅
-- **ObsidianFsAdapter over LightningFS**: Delegates to `app.vault.adapter` for native filesystem access ✅
+- **ObsidianFsAdapter over LightningFS**: Delegates to `app.vault.adapter` ✅
 - **Node.js fs fallback**: `window.require('fs')` for pack index files on desktop ✅
 - **Lazy git manager init**: Only created when sidebar opens or sync command runs ✅
 - **Refresh interval 0 = disabled**: No auto-refresh when set to 0 ✅
@@ -71,7 +72,11 @@
 - **PAT auth**: Any username works with fine-grained PATs ✅
 - **No conditional UI hiding**: All buttons always visible, disabled when not applicable ✅
 - **Dev releases on every push**: `dev` tag auto-updated, pre-release, not latest ✅
-- **v1.0.0 as public release**: v25 was internal dev version ✅
+- **v1.0.0 as public release**: v26 was internal dev version ✅
+- **GitHub API fallback for remote commits**: Use GitHub REST API when local repo unavailable ✅
+- **Shallow fetch on empty repo**: `depth: 1` prevents mobile crash on large repos ✅
+- **Progress notices**: `createProgressNotice()` shows phase, %, KB transferred ✅
+- **Debug log export**: `Logger.exportToFile()` writes markdown to vault ✅
 
 ## Decisions Pending
 
