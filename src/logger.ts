@@ -47,6 +47,50 @@ export class Logger {
   }
 
   /**
+   * Export logs to a markdown file in the vault
+   */
+  public async exportToFile(vault: any, filename?: string): Promise<string> {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
+    
+    const lines: string[] = [
+      '# Obsidian Git Sync — Debug Log',
+      '',
+      `**Generated:** ${new Date().toLocaleString()}`,
+      `**Entries:** ${this.entries.length}`,
+      `**Log Level:** ${LogLevel[this.logLevel]}`,
+      '',
+      '---',
+      '',
+    ];
+
+    for (const entry of this.entries) {
+      const time = new Date(entry.timestamp).toLocaleTimeString();
+      const emoji = entry.level === 'error' ? '🔴' : entry.level === 'warn' ? '⚠️' : entry.level === 'debug' ? '🔍' : 'ℹ️';
+      lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} — ${time}`);
+      lines.push('');
+      lines.push(entry.message);
+      if (entry.data) {
+        lines.push('');
+        lines.push('```json');
+        try {
+          lines.push(JSON.stringify(entry.data, null, 2).slice(0, 2000));
+        } catch {
+          lines.push(String(entry.data).slice(0, 2000));
+        }
+        lines.push('```');
+      }
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+
+    const content = lines.join('\n');
+    await vault.adapter.write(path, content);
+    return path;
+  }
+
+  /**
    * Set the maximum number of entries to keep in memory
    */
   public setMaxEntries(max: number): void {

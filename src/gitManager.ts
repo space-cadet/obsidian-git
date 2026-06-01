@@ -1,5 +1,5 @@
 import * as git from 'isomorphic-git';
-import { requestUrl, RequestUrlResponse } from 'obsidian';
+import { requestUrl, RequestUrlResponse, Notice } from 'obsidian';
 import { log } from './logger';
 
 /**
@@ -109,7 +109,124 @@ class GitHttpClient {
     return messages[status] || 'Unknown';
   }
 }
-import { Notice } from 'obsidian';
+
+// Progress event emitter for isomorphic-git
+export class GitProgressEmitter {
+    private listeners: Map<string, ((data: any) => void)[]> = new Map();
+    private currentPhase: string = '';
+
+    on(event: string, callback: (data: any) => void): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+    }
+
+    emit(event: string, data: any): void {
+        const callbacks = this.listeners.get(event) || [];
+        for (const cb of callbacks) {
+            try { cb(data); } catch (e) { /* ignore */ }
+        }
+    }
+
+    /**
+     * Create an emitter that shows progress via Notice toasts
+     */
+    static withNotice(initialMessage: string): GitProgressEmitter {
+        const emitter = new GitProgressEmitter();
+        let notice: Notice | null = new Notice(initialMessage, 0); // 0 = persistent
+
+        emitter.on('progress', (event: any) => {
+            const { phase, loaded, total, lengthComputable } = event?.payload || event || {};
+            if (phase && phase !== emitter.currentPhase) {
+                emitter.currentPhase = phase;
+            }
+            let msg = `${initialMessage} — ${phase || 'working'}`;
+            if (lengthComputable && total > 0) {
+                const pct = Math.round((loaded / total) * 100);
+                msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
+            } else if (loaded > 0) {
+                msg += ` (${Math.round(loaded / 1024)}KB)`;
+            }
+            if (notice) {
+                notice.setMessage(msg);
+            }
+        });
+
+        emitter.on('message', (event: any) => {
+            const text = event?.payload?.text || event?.text || String(event);
+            log.debug('GitProgress', text);
+        });
+
+        emitter.on('complete', () => {
+            if (notice) {
+                notice.hide();
+                notice = null;
+            }
+        });
+
+        emitter.on('error', () => {
+            if (notice) {
+                notice.hide();
+                notice = null;
+            }
+        });
+
+        return emitter;
+    }
+
+    hideNotice(): void {
+        // Handled by complete/error events
+    }
+}
+
+// Simple EventEmitter-compatible object for isomorphic-git
+export function createGitEmitter(onProgress?: (phase: string, loaded: number, total: number, lengthComputable: boolean) => void): any {
+    const emitter = new GitProgressEmitter();
+    if (onProgress) {
+        emitter.on('progress', (e: any) => {
+            const p = e?.payload || e || {};
+            onProgress(p.phase || '', p.loaded || 0, p.total || 0, p.lengthComputable || false);
+        });
+    }
+    return emitter;
+}
+
+/**
+ * Create an onProgress callback that updates a persistent Notice.
+ * Returns [callback, hideNotice] so caller can clean up on success/error.
+ */
+export function createProgressNotice(initialMessage: string): [(event: any) => void, () => void] {
+    let notice: Notice | null = new Notice(initialMessage, 0);
+    let currentPhase = '';
+
+    const onProgress = (event: any) => {
+        const { phase, loaded, total, lengthComputable } = event;
+        if (phase && phase !== currentPhase) {
+            currentPhase = phase;
+        }
+        let msg = `${initialMessage} — ${phase || 'working'}`;
+        if (lengthComputable && total > 0) {
+            const pct = Math.round((loaded / total) * 100);
+            msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
+        } else if (loaded > 0) {
+            msg += ` (${Math.round(loaded / 1024)}KB)`;
+        }
+        if (notice) {
+            notice.setMessage(msg);
+        }
+    };
+
+    const hideNotice = () => {
+        if (notice) {
+            notice.hide();
+            notice = null;
+        }
+    };
+
+    return [onProgress, hideNotice];
+}
+
 
 export interface GitFileStatus {
     filepath: string;
@@ -206,25 +323,9 @@ export class GitManager {
             if (!isRepo) {
                 // Try to clone first, but if remote is empty, fall back to local init
                 try {
-                    this.updateStatus('Cloning repository...');
                     log.info('GitManager', `Cloning repository from ${repoUrl} (branch: ${branchName})`);
                     
-                    await git.clone({
-                        fs: this.fs,
-                        http: new GitHttpClient(this.credentials),
-                        dir: this.dir,
-                        url: repoUrl,
-                        ref: branchName,
-                        singleBranch: true,
-                        depth: 1,
-                        onAuth: () => {
-                            log.debug('GitManager', 'Authentication requested by remote');
-                            return {
-                                username: this.credentials.username,
-                                password: this.credentials.password
-                            };
-                        }
-                    });
+                    await this.cloneRepository(repoUrl, branchName, 1);
                     
                     this.updateStatus('Repository cloned');
                     log.info('GitManager', `Repository successfully cloned to ${this.dir}`);
@@ -292,38 +393,288 @@ export class GitManager {
     }
 
     /**
-     * Pull changes from the remote repository
+     * Get remote commit log (from origin/branch)
+     * Falls back to GitHub API if local repo has no commits or isn't initialized
+     */
+    async getRemoteLog(branchName: string, maxCount: number = 20): Promise<GitCommit[]> {
+        try {
+            // Try local origin refs first (if repo exists and has fetched)
+            const commits = await git.log({
+                fs: this.fs,
+                dir: this.dir,
+                ref: `origin/${branchName}`,
+                depth: maxCount
+            });
+            return commits.map(c => ({
+                oid: c.oid,
+                message: c.commit?.message || '',
+                author: c.commit?.author?.name || 'Unknown',
+                date: new Date((c.commit?.author?.timestamp || 0) * 1000),
+                commit: c.commit
+            }));
+        } catch (error) {
+            log.warn('GitManager', `Local origin/${branchName} not available, trying GitHub API fallback`, error);
+            // Fall back to GitHub API — works even without local repo
+            return this.fetchRemoteCommitsViaApi(branchName, maxCount);
+        }
+    }
+
+    /**
+     * Fetch remote commits via GitHub REST API (no local repo required)
+     * Static version for use when no GitManager instance exists.
+     */
+    static async fetchRemoteCommitsFromGitHub(
+        repoUrl: string,
+        password: string,
+        branchName: string,
+        maxCount: number = 20
+    ): Promise<GitCommit[]> {
+        try {
+            // Parse owner/repo from URL
+            let match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
+            if (!match) {
+                match = repoUrl.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
+            }
+            if (!match) {
+                log.warn('GitManager', 'Cannot fetch remote commits: not a GitHub repo URL');
+                return [];
+            }
+
+            const owner = match[1];
+            const repo = match[2];
+            const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branchName)}&per_page=${maxCount}`;
+
+            log.debug('GitManager', `Fetching commits via GitHub API: ${apiUrl}`);
+
+            const headers: Record<string, string> = {
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28'
+            };
+
+            if (password) {
+                headers['Authorization'] = `Bearer ${password}`;
+            }
+
+            const response = await requestUrl({
+                url: apiUrl,
+                method: 'GET',
+                headers,
+                throw: false
+            });
+
+            if (response.status !== 200) {
+                log.warn('GitManager', `GitHub API returned ${response.status}`, response.text);
+                return [];
+            }
+
+            const data = JSON.parse(response.text);
+            if (!Array.isArray(data)) {
+                log.warn('GitManager', 'GitHub API returned non-array', data);
+                return [];
+            }
+
+            return data.map((c: any) => ({
+                oid: c.sha || '',
+                message: c.commit?.message || '',
+                author: c.commit?.author?.name || c.author?.login || 'Unknown',
+                date: new Date(c.commit?.author?.date || 0),
+                commit: c.commit,
+                remote: true as const
+            }));
+        } catch (error) {
+            log.error('GitManager', 'GitHub API commit fetch failed', error);
+            return [];
+        }
+    }
+
+    /**
+     * Fetch remote commits via GitHub REST API (instance method, delegates to static)
+     */
+    private async fetchRemoteCommitsViaApi(branchName: string, maxCount: number = 20): Promise<GitCommit[]> {
+        return GitManager.fetchRemoteCommitsFromGitHub(
+            this.credentials.repoUrl || '',
+            this.credentials.password,
+            branchName,
+            maxCount
+        );
+    }
+
+    /**
+     * Parse owner/repo from a GitHub repository URL
+     */
+    private parseGitHubRepoUrl(): { owner: string; repo: string } | null {
+        const url = this.credentials.repoUrl;
+        if (!url) return null;
+
+        // HTTPS: https://github.com/owner/repo.git or https://github.com/owner/repo
+        let match = url.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
+        if (match) {
+            return { owner: match[1], repo: match[2] };
+        }
+
+        // SSH: git@github.com:owner/repo.git
+        match = url.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
+        if (match) {
+            return { owner: match[1], repo: match[2] };
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if local repository has any commits
+     */
+    async hasLocalCommits(): Promise<boolean> {
+        try {
+            const commits = await git.log({ fs: this.fs, dir: this.dir, ref: 'HEAD', depth: 1 });
+            return commits.length > 0;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Pull changes from the remote repository.
+     * For empty repos (no local commits), does a shallow fetch+checkout instead of full pull.
      */
     async pull(branchName: string): Promise<void> {
         try {
             this.updateStatus('Pulling changes...');
-            
+
             // Ensure remote is configured before pulling
             if (this.credentials.repoUrl) {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
-            
-            await git.pull({
-                fs: this.fs,
-                http: new GitHttpClient(this.credentials),
-                dir: this.dir,
-                ref: branchName,
-                singleBranch: true,
-                fastForwardOnly: true,
-                author: {
-                    name: this.credentials.author.name || 'Obsidian Git',
-                    email: this.credentials.author.email || 'obsidian@example.com'
-                },
-                onAuth: () => ({
-                    username: this.credentials.username,
-                    password: this.credentials.password
-                })
-            });
-            
-            this.updateStatus('Pull completed');
+
+            // Check if local repo has any commits
+            const hasCommits = await this.hasLocalCommits();
+
+            if (!hasCommits) {
+                log.info('GitManager', 'No local commits — doing shallow fetch instead of pull');
+                await this.shallowFetchAndCheckout(branchName);
+                return;
+            }
+
+            const [onProgress, hideNotice] = createProgressNotice('Pulling from remote');
+
+            try {
+                await git.pull({
+                    fs: this.fs,
+                    http: new GitHttpClient(this.credentials),
+                    dir: this.dir,
+                    ref: branchName,
+                    singleBranch: true,
+                    fastForwardOnly: true,
+                    author: {
+                        name: this.credentials.author.name || 'Obsidian Git',
+                        email: this.credentials.author.email || 'obsidian@example.com'
+                    },
+                    onAuth: () => ({
+                        username: this.credentials.username,
+                        password: this.credentials.password
+                    }),
+                    onProgress
+                });
+
+                hideNotice();
+                this.updateStatus('Pull completed');
+            } catch (error) {
+                hideNotice();
+                throw error;
+            }
         } catch (error) {
             console.error('Failed to pull changes:', error);
             this.updateStatus('Pull failed');
+            throw error;
+        }
+    }
+
+    /**
+     * Shallow fetch + checkout for empty repos.
+     * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
+     */
+    private async shallowFetchAndCheckout(branchName: string): Promise<void> {
+        const [onProgress, hideNotice] = createProgressNotice('Fetching remote files');
+
+        try {
+            // Fetch only the branch tip with depth 1
+            await git.fetch({
+                fs: this.fs,
+                http: new GitHttpClient(this.credentials),
+                dir: this.dir,
+                remote: 'origin',
+                ref: branchName,
+                depth: 1,
+                singleBranch: true,
+                onAuth: () => ({
+                    username: this.credentials.username,
+                    password: this.credentials.password
+                }),
+                onProgress
+            });
+
+            // Get the fetched commit OID
+            const remoteRef = `refs/remotes/origin/${branchName}`;
+            const oid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+
+            log.info('GitManager', `Fetched branch tip: ${oid.slice(0, 7)}`);
+
+            // Create local branch pointing to the same commit
+            await git.writeRef({
+                fs: this.fs,
+                dir: this.dir,
+                ref: `refs/heads/${branchName}`,
+                value: oid
+            });
+
+            // Checkout the branch (write files to working tree)
+            await git.checkout({
+                fs: this.fs,
+                dir: this.dir,
+                ref: branchName,
+                force: true
+            });
+
+            hideNotice();
+            this.updateStatus('Repository fetched');
+            log.info('GitManager', `Checked out ${branchName} at ${oid.slice(0, 7)}`);
+        } catch (error) {
+            hideNotice();
+            throw error;
+        }
+    }
+
+    /**
+     * Clone a repository with progress tracking and shallow depth.
+     * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
+     */
+    async cloneRepository(repoUrl: string, branchName: string, depth: number = 1): Promise<void> {
+        const [onProgress, hideNotice] = createProgressNotice(`Cloning ${branchName}`);
+
+        try {
+            this.updateStatus('Cloning repository...');
+            log.info('GitManager', `Cloning ${repoUrl} (branch: ${branchName}, depth: ${depth})`);
+
+            await git.clone({
+                fs: this.fs,
+                http: new GitHttpClient(this.credentials),
+                dir: this.dir,
+                url: repoUrl,
+                ref: branchName,
+                singleBranch: true,
+                depth,
+                onAuth: () => ({
+                    username: this.credentials.username,
+                    password: this.credentials.password
+                }),
+                onProgress
+            });
+
+            hideNotice();
+            this.updateStatus('Repository cloned');
+            log.info('GitManager', `Repository cloned successfully`);
+        } catch (error) {
+            hideNotice();
             throw error;
         }
     }
@@ -407,6 +758,7 @@ export class GitManager {
      * Push changes to the remote repository
      */
     async push(branchName: string, force: boolean = false): Promise<void> {
+        let hideNotice: (() => void) | null = null;
         try {
             this.updateStatus('Pushing changes...');
             log.debug('GitManager', `Pushing changes to remote branch: ${branchName}`);
@@ -415,6 +767,9 @@ export class GitManager {
             if (this.credentials.repoUrl) {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
+            
+            const [onProgress, hn] = createProgressNotice('Pushing to remote');
+            hideNotice = hn;
             
             await git.push({
                 fs: this.fs,
@@ -429,12 +784,15 @@ export class GitManager {
                         username: this.credentials.username,
                         password: this.credentials.password
                     };
-                }
+                },
+                onProgress
             });
             
+            hideNotice();
             this.updateStatus('Push completed');
             log.info('GitManager', `Successfully pushed changes to remote branch: ${branchName}`);
         } catch (error: any) {
+            if (hideNotice) hideNotice();
             log.error('GitManager', `Failed to push changes to branch ${branchName}`, error);
             this.updateStatus('Push failed');
             
@@ -726,30 +1084,6 @@ export class GitManager {
             log.warn('GitManager', `Failed to read tree ${treeOid.slice(0, 7)}`, e);
         }
         return result;
-    }
-
-    /**
-     * Get remote commit log (from origin/branch)
-     */
-    async getRemoteLog(branchName: string, maxCount: number = 20): Promise<GitCommit[]> {
-        try {
-            const commits = await git.log({
-                fs: this.fs,
-                dir: this.dir,
-                ref: `origin/${branchName}`,
-                depth: maxCount
-            });
-            return commits.map(c => ({
-                oid: c.oid,
-                message: c.commit?.message || '',
-                author: c.commit?.author?.name || 'Unknown',
-                date: new Date((c.commit?.author?.timestamp || 0) * 1000),
-                commit: c.commit
-            }));
-        } catch (error) {
-            log.warn('GitManager', `Failed to get remote log for origin/${branchName}`, error);
-            return [];
-        }
     }
 
     /**

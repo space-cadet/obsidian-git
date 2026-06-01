@@ -636,15 +636,49 @@ export class GitSidebarView extends ItemView {
         });
 
         try {
-            const branch = await this.plugin.gitManager!.getCurrentBranch();
-            const commits = this.commitsViewMode === 'local'
-                ? await this.plugin.gitManager!.getLog(25)
-                : await this.plugin.gitManager!.getRemoteLog(branch, 25);
+            let branch = this.plugin.settings.branchName || 'main';
+            let commits: GitCommit[] = [];
+
+            if (this.commitsViewMode === 'local') {
+                // Local commits: need gitManager
+                if (!this.plugin.gitManager) {
+                    listContainer.createEl('p', {
+                        text: 'No local repository — initialize or clone to see local commits',
+                        cls: 'git-empty-state'
+                    });
+                    return;
+                }
+                branch = await this.plugin.gitManager.getCurrentBranch();
+                commits = await this.plugin.gitManager.getLog(25);
+            } else {
+                // Remote commits: try gitManager first, then fall back to GitHub API
+                if (this.plugin.gitManager) {
+                    try {
+                        branch = await this.plugin.gitManager.getCurrentBranch();
+                    } catch (e) {
+                        // use settings branch
+                    }
+                    commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                }
+                // If no commits from gitManager (or no gitManager), try direct GitHub API
+                if (commits.length === 0 && this.plugin.settings.repoUrl) {
+                    log.debug('GitSidebar', 'No local gitManager or origin refs, trying GitHub API');
+                    const { GitManager } = await import('../gitManager');
+                    commits = await GitManager.fetchRemoteCommitsFromGitHub(
+                        this.plugin.settings.repoUrl,
+                        this.plugin.settings.password,
+                        branch,
+                        25
+                    );
+                }
+            }
 
             if (commits.length === 0) {
                 const emptyMsg = this.commitsViewMode === 'local'
                     ? 'No commits yet — stage files and commit to create your first commit'
-                    : `No remote commits on origin/${branch} — push to populate the remote history`;
+                    : this.plugin.settings.repoUrl
+                        ? `No remote commits found on ${branch} — check your repo URL and token`
+                        : 'No remote URL configured — add one in settings to see remote commits';
                 listContainer.createEl('p', { text: emptyMsg, cls: 'git-empty-state' });
                 return;
             }

@@ -183,6 +183,18 @@ export default class GitSyncPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'git-sync-export-logs',
+			name: 'Export debug logs',
+			callback: async () => {
+				try {
+					const path = await log.exportToFile(this.app.vault);
+					new Notice(`Debug log exported to ${path}`);
+				} catch (error: any) {
+					new Notice(`Export failed: ${error.message}`);
+				}
+			}
+		});
 
 		this.setupAutoSync();
 	}
