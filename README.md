@@ -25,8 +25,8 @@ A powerful Git synchronization plugin for [Obsidian](https://obsidian.md) that w
 
 ### From Release (Recommended)
 
-1. Download `main.js`, `manifest.json`, and `styles.css` from the [GitHub repository](https://github.com/space-cadet/obsidian-git)
-2. Copy them into your vault's `.obsidian/plugins/obsidian-git/` directory
+1. Download the latest release from [GitHub Releases](https://github.com/space-cadet/obsidian-git/releases)
+2. Extract the ZIP to your vault's `.obsidian/plugins/obsidian-git/` directory
 3. Reload Obsidian (Command Palette → "Reload app without saving")
 4. Enable in Settings → Community Plugins
 
@@ -176,28 +176,18 @@ MIT
 
 ## Changelog
 
-### v25 (2026-06-01)
+### 1.0.0 (2026-06-01) — Public Release
 - **Commits tab** — renamed from "History", now with expandable file lists
 - **Local/Remote toggle** — switch between your commits and `origin` commits
 - **Remote commit badges** — origin commits styled with accent bar
 - **Expandable commits** — click to see added/modified/deleted files
+- **GitHub Actions CI** — automated builds and releases
 
-### v24 (2026-05-31)
+### v25 (2026-06-01) — Internal development
 - Force Push button with confirmation dialog
 - Token visibility bug fix (password field)
 - Pull author error handling
 
-### v23 (2026-05-30)
-- Pull rejection error handling
-- Empty remote clone fallback
-
-### v22 (2026-05-30)
-- Commit UI with message input
-- Staged/Uncommitted sections in Changes tab
-- Bulk stage/unstage actions
-
-### v9 (2026-05-25)
-- Initial mobile-compatible release
-- isomorphic-git + ObsidianFsAdapter
-- Pack index fix for desktop
-- Settings UI with Initialize button
+### v24 (2026-05-31)
+- Commit UI with message input, Commit/Push/Pull/Refresh buttons
+- Changes tab redesign with staged/uncommitted sections
