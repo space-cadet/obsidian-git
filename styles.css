@@ -675,3 +675,230 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* ============================================
+   Git Progress Modal — Git Bash Dark Theme
+   ============================================ */
+
+.git-progress-modal .modal-content {
+    padding: 0;
+    background: var(--background-primary);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.git-progress-modal .modal-close-button {
+    color: var(--text-muted);
+    top: 8px;
+    right: 8px;
+}
+
+.git-progress-modal .modal-close-button:hover {
+    color: var(--text-normal);
+}
+
+.git-progress-container {
+    display: flex;
+    flex-direction: column;
+    min-width: 400px;
+    max-width: 500px;
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Header */
+.git-progress-header {
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+}
+
+.git-progress-title {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-normal);
+    margin-bottom: 4px;
+}
+
+.git-progress-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.git-progress-status-success {
+    color: var(--text-success);
+    font-style: normal;
+    font-weight: 600;
+}
+
+.git-progress-status-error {
+    color: var(--text-error);
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* Phases */
+.git-progress-phases {
+    padding: 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.git-progress-phase {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: background 0.15s;
+}
+
+.git-progress-phase:hover {
+    background: var(--background-modifier-hover);
+}
+
+.git-progress-phase-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.git-progress-phase-pending .git-progress-phase-icon { color: var(--text-faint); }
+.git-progress-phase-active .git-progress-phase-icon { color: var(--text-accent); }
+.git-progress-phase-completed .git-progress-phase-icon { color: var(--text-success); }
+.git-progress-phase-error .git-progress-phase-icon { color: var(--text-error); }
+
+.git-progress-phase-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.git-progress-phase-name {
+    color: var(--text-normal);
+    font-weight: 500;
+}
+
+.git-progress-phase-completed .git-progress-phase-name {
+    color: var(--text-muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--text-faint);
+}
+
+.git-progress-phase-active .git-progress-phase-name {
+    color: var(--text-accent);
+    font-weight: 600;
+}
+
+.git-progress-phase-error .git-progress-phase-name {
+    color: var(--text-error);
+}
+
+.git-progress-phase-detail {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-monospace);
+}
+
+/* Progress Bar */
+.git-progress-bar-container {
+    width: 100%;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.git-progress-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+}
+
+.git-progress-bar-fill {
+    height: 100%;
+    background: var(--interactive-accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.git-progress-bar-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 36px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Footer */
+.git-progress-footer {
+    padding: 10px 20px 16px;
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    font-family: var(--font-monospace);
+}
+
+/* Scrollbar for phases */
+.git-progress-phases::-webkit-scrollbar { width: 4px; }
+.git-progress-phases::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border);
+    border-radius: 2px;
+}
+
+/* Animation for active phase */
+.git-progress-phase-active .git-progress-phase-icon {
+    animation: git-progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes git-progress-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Dark theme adjustments */
+.theme-dark .git-progress-modal .modal-content {
+    background: #1e1e1e;
+    border: 1px solid #333;
+}
+
+.theme-dark .git-progress-header {
+    background: #252526;
+    border-color: #333;
+}
+
+.theme-dark .git-progress-footer {
+    background: #252526;
+    border-color: #333;
+}
+
+.theme-dark .git-progress-bar {
+    background: #333;
+}
+
+.theme-dark .git-progress-bar-fill {
+    background: #0e7afe;
+}
+
+.theme-dark .git-progress-phase-active .git-progress-phase-name { color: #4ec9b0; }
+.theme-dark .git-progress-phase-active .git-progress-phase-icon { color: #0e7afe; }
+.theme-dark .git-progress-phase-completed .git-progress-phase-icon { color: #4ec9b0; }
+.theme-dark .git-progress-phase-error .git-progress-phase-icon { color: #f14c4c; }
+.theme-dark .git-progress-phase-error .git-progress-phase-name { color: #f14c4c; }
+.theme-dark .git-progress-status-success { color: #4ec9b0; }
+.theme-dark .git-progress-status-error { color: #f14c4c; }

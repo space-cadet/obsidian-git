@@ -261,6 +261,8 @@ export interface GitCommitFile {
     status: 'added' | 'modified' | 'deleted';
 }
 
+import { GitProgressModal, createProgressModal } from './ui/GitProgressModal';
+
 export interface GitCredentials {
     username: string;
     password: string;
@@ -276,11 +278,13 @@ export class GitManager {
     private dir: string;
     private credentials: GitCredentials;
     private statusBarItem: HTMLElement | null = null;
+    private app: any;
 
-    constructor(fs: any, dir: string, credentials: GitCredentials, statusBarItem?: HTMLElement) {
+    constructor(fs: any, dir: string, credentials: GitCredentials, app?: any, statusBarItem?: HTMLElement) {
         this.fs = fs;
         this.dir = dir;
         this.credentials = credentials;
+        this.app = app || null;
         this.statusBarItem = statusBarItem || null;
     }
 
@@ -576,7 +580,9 @@ export class GitManager {
                 return;
             }
 
-            const [onProgress, hideNotice] = createProgressNotice('Pulling from remote');
+            const [onProgress, hideNotice] = this.app 
+                ? createProgressModal(this.app, 'Pulling from remote')
+                : createProgressNotice('Pulling from remote');
 
             try {
                 await git.pull({
@@ -615,7 +621,9 @@ export class GitManager {
      * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
      */
     private async shallowFetchAndCheckout(branchName: string): Promise<void> {
-        const [onProgress, hideNotice] = createProgressNotice('Fetching remote files');
+        const [onProgress, hideNotice] = this.app
+            ? createProgressModal(this.app, 'Fetching remote files')
+            : createProgressNotice('Fetching remote files');
 
         try {
             // Fetch only the branch tip with depth 1
@@ -670,7 +678,9 @@ export class GitManager {
      * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
      */
     async cloneRepository(repoUrl: string, branchName: string, depth: number = 1): Promise<void> {
-        const [onProgress, hideNotice] = createProgressNotice(`Cloning ${branchName}`);
+        const [onProgress, hideNotice] = this.app
+            ? createProgressModal(this.app, `Cloning ${branchName}`)
+            : createProgressNotice(`Cloning ${branchName}`);
 
         try {
             this.updateStatus('Cloning repository...');
@@ -789,7 +799,9 @@ export class GitManager {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
             
-            const [onProgress, hn] = createProgressNotice('Pushing to remote');
+            const [onProgress, hn] = this.app
+                ? createProgressModal(this.app, 'Pushing to remote')
+                : createProgressNotice('Pushing to remote');
             hideNotice = hn;
             
             await git.push({

@@ -286,7 +286,7 @@ export default class GitSyncPlugin extends Plugin {
 		// Status bar is optional (may be null on mobile)
 		const statusEl = this.statusBarItem || undefined;
 
-		this.gitManager = new GitManager(this.fs, vaultPath, credentials, statusEl);
+		this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
 		
 		if (this.settings.repoUrl) {
 			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
