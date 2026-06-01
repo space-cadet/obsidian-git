@@ -18646,7 +18646,9 @@ var init_gitManager = __esm({
       constructor(credentials) {
         this.credentials = credentials;
       }
-      async request(config) {
+      async request(config, attempt = 1) {
+        var _a, _b, _c, _d, _e;
+        const maxAttempts = 3;
         log2.debug("GitHttpClient", `Requesting: ${config.method || "GET"} ${config.url}`);
         const headers = {
           ...config.headers
@@ -18678,6 +18680,13 @@ var init_gitManager = __esm({
             headers: response.headers
           };
         } catch (error) {
+          const isRetryable = ((_a = error.message) == null ? void 0 : _a.includes("Connection reset")) || ((_b = error.message) == null ? void 0 : _b.includes("timeout")) || ((_c = error.message) == null ? void 0 : _c.includes("ETIMEDOUT")) || ((_d = error.message) == null ? void 0 : _d.includes("ECONNRESET")) || ((_e = error.message) == null ? void 0 : _e.includes("SocketException"));
+          if (isRetryable && attempt < maxAttempts) {
+            const delayMs = 1e3 * attempt;
+            log2.warn("GitHttpClient", `Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
+            await new Promise((r) => setTimeout(r, delayMs));
+            return this.request(config, attempt + 1);
+          }
           log2.error("GitHttpClient", `Request failed: ${error.message}`, error);
           throw error;
         }
@@ -18897,7 +18906,7 @@ var init_gitManager = __esm({
       }
       /**
        * Get remote commit log (from origin/branch)
-       * Falls back to GitHub API if local repo has no commits or isn't initialized
+       * Falls back to GitHub API if local repo has no fetched origin refs
        */
       async getRemoteLog(branchName, maxCount = 20) {
         try {
@@ -18918,7 +18927,12 @@ var init_gitManager = __esm({
             };
           });
         } catch (error) {
-          log2.warn("GitManager", `Local origin/${branchName} not available, trying GitHub API fallback`, error);
+          const msg = error.message || String(error);
+          if (msg.includes("Could not find") || msg.includes("unknown revision")) {
+            log2.info("GitManager", `No fetched origin/${branchName} \u2014 using GitHub API fallback`);
+          } else {
+            log2.warn("GitManager", `Local origin/${branchName} error, trying GitHub API fallback`, error);
+          }
           return this.fetchRemoteCommitsViaApi(branchName, maxCount);
         }
       }
@@ -18962,6 +18976,7 @@ var init_gitManager = __esm({
             log2.warn("GitManager", "GitHub API returned non-array", data);
             return [];
           }
+          log2.info("GitManager", `Fetched ${data.length} commits from GitHub API for ${owner}/${repo}@${branchName}`);
           return data.map((c) => {
             var _a, _b, _c, _d, _e, _f;
             return {
@@ -19506,6 +19521,11 @@ var init_gitManager = __esm({
             };
           });
         } catch (error) {
+          const msg = error.message || String(error);
+          if (msg.includes("Could not find") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
+            log2.info("GitManager", "No commits in repository yet");
+            return [];
+          }
           log2.error("GitManager", "Failed to get commit log", error);
           throw error;
         }

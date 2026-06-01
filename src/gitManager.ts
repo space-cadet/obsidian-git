@@ -16,7 +16,8 @@ class GitHttpClient {
     this.credentials = credentials;
   }
 
-  async request(config: any) {
+  async request(config: any, attempt: number = 1): Promise<any> {
+    const maxAttempts = 3;
     log.debug('GitHttpClient', `Requesting: ${config.method || 'GET'} ${config.url}`);
 
     // Build headers with Basic Auth
@@ -56,6 +57,19 @@ class GitHttpClient {
         headers: response.headers,
       };
     } catch (error: any) {
+      const isRetryable = error.message?.includes('Connection reset')
+        || error.message?.includes('timeout')
+        || error.message?.includes('ETIMEDOUT')
+        || error.message?.includes('ECONNRESET')
+        || error.message?.includes('SocketException');
+
+      if (isRetryable && attempt < maxAttempts) {
+        const delayMs = 1000 * attempt;
+        log.warn('GitHttpClient', `Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
+        await new Promise(r => setTimeout(r, delayMs));
+        return this.request(config, attempt + 1);
+      }
+
       log.error('GitHttpClient', `Request failed: ${error.message}`, error);
       throw error;
     }
@@ -394,7 +408,7 @@ export class GitManager {
 
     /**
      * Get remote commit log (from origin/branch)
-     * Falls back to GitHub API if local repo has no commits or isn't initialized
+     * Falls back to GitHub API if local repo has no fetched origin refs
      */
     async getRemoteLog(branchName: string, maxCount: number = 20): Promise<GitCommit[]> {
         try {
@@ -412,8 +426,13 @@ export class GitManager {
                 date: new Date((c.commit?.author?.timestamp || 0) * 1000),
                 commit: c.commit
             }));
-        } catch (error) {
-            log.warn('GitManager', `Local origin/${branchName} not available, trying GitHub API fallback`, error);
+        } catch (error: any) {
+            const msg = error.message || String(error);
+            if (msg.includes('Could not find') || msg.includes('unknown revision')) {
+                log.info('GitManager', `No fetched origin/${branchName} — using GitHub API fallback`);
+            } else {
+                log.warn('GitManager', `Local origin/${branchName} error, trying GitHub API fallback`, error);
+            }
             // Fall back to GitHub API — works even without local repo
             return this.fetchRemoteCommitsViaApi(branchName, maxCount);
         }
@@ -472,6 +491,8 @@ export class GitManager {
                 log.warn('GitManager', 'GitHub API returned non-array', data);
                 return [];
             }
+
+            log.info('GitManager', `Fetched ${data.length} commits from GitHub API for ${owner}/${repo}@${branchName}`);
 
             return data.map((c: any) => ({
                 oid: c.sha || '',
@@ -1099,7 +1120,12 @@ export class GitManager {
                 date: new Date((c.commit?.author?.timestamp || 0) * 1000),
                 commit: c.commit
             }));
-        } catch (error) {
+        } catch (error: any) {
+            const msg = error.message || String(error);
+            if (msg.includes('Could not find') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
+                log.info('GitManager', 'No commits in repository yet');
+                return [];
+            }
             log.error('GitManager', 'Failed to get commit log', error);
             throw error;
         }
