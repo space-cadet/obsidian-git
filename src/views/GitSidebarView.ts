@@ -733,7 +733,7 @@ export class GitSidebarView extends ItemView {
         } catch (e: any) {
             log.debug('GitSidebar', 'Failed to get commit log', e);
             const msg = e.message || String(e);
-            if (msg.includes('Could not find') || msg.includes('refs/heads') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
+            if (msg.includes('Could not find') || msg.includes('refs/head') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
                 listContainer.empty();
                 const empty = listContainer.createDiv('git-uninit-container');
                 empty.createEl('p', { text: 'No commits yet', cls: 'git-uninit-title' });

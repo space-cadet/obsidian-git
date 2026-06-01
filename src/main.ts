@@ -698,5 +698,20 @@ class GitSyncSettingTab extends PluginSettingTab {
 						new Notice(`Git sync failed: ${error.message}`);
 					}
 				}));
+
+		// Add a button to export debug logs
+		new Setting(containerEl)
+			.setName('Export Debug Logs')
+			.setDesc('Export captured debug logs to a markdown file in your vault')
+			.addButton(button => button
+				.setButtonText('Export Logs')
+				.onClick(async () => {
+					try {
+						const path = await log.exportToFile(this.app.vault);
+						new Notice(`Debug log exported to ${path}`);
+					} catch (error: any) {
+						new Notice(`Export failed: ${error.message}`);
+					}
+				}));
 	}
 }

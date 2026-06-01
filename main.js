@@ -18463,8 +18463,20 @@ var init_logger = __esm({
        * Export logs to a markdown file in the vault
        */
       async exportToFile(vault, filename) {
+        var _a;
         const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
         const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
+        const normalizedPath = (0, import_obsidian.normalizePath)(path);
+        const folder = normalizedPath.split("/").slice(0, -1).join("/");
+        if (folder) {
+          try {
+            await vault.adapter.mkdir(folder);
+          } catch (e) {
+            if (!((_a = e.message) == null ? void 0 : _a.includes("already exists"))) {
+              throw e;
+            }
+          }
+        }
         const lines = [
           "# Obsidian Git Sync \u2014 Debug Log",
           "",
@@ -20331,7 +20343,7 @@ var GitSidebarView = class extends import_obsidian3.ItemView {
     } catch (e) {
       log2.debug("GitSidebar", "Failed to get commit log", e);
       const msg = e.message || String(e);
-      if (msg.includes("Could not find") || msg.includes("refs/heads") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
+      if (msg.includes("Could not find") || msg.includes("refs/head") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
         listContainer.empty();
         const empty = listContainer.createDiv("git-uninit-container");
         empty.createEl("p", { text: "No commits yet", cls: "git-uninit-title" });
@@ -20926,6 +20938,14 @@ var GitSyncSettingTab = class extends import_obsidian4.PluginSettingTab {
         new import_obsidian4.Notice("Git sync completed successfully");
       } catch (error) {
         new import_obsidian4.Notice(`Git sync failed: ${error.message}`);
+      }
+    }));
+    new import_obsidian4.Setting(containerEl).setName("Export Debug Logs").setDesc("Export captured debug logs to a markdown file in your vault").addButton((button) => button.setButtonText("Export Logs").onClick(async () => {
+      try {
+        const path = await log2.exportToFile(this.app.vault);
+        new import_obsidian4.Notice(`Debug log exported to ${path}`);
+      } catch (error) {
+        new import_obsidian4.Notice(`Export failed: ${error.message}`);
       }
     }));
   }

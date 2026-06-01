@@ -3,7 +3,7 @@
  * Provides consistent logging functionality with different log levels
  */
 
-import { Notice } from 'obsidian';
+import { Notice, normalizePath } from 'obsidian';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -52,6 +52,20 @@ export class Logger {
   public async exportToFile(vault: any, filename?: string): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
+    
+    // Ensure parent directory exists
+    const normalizedPath = normalizePath(path);
+    const folder = normalizedPath.split('/').slice(0, -1).join('/');
+    if (folder) {
+      try {
+        await vault.adapter.mkdir(folder);
+      } catch (e: any) {
+        // Directory might already exist, that's fine
+        if (!e.message?.includes('already exists')) {
+          throw e;
+        }
+      }
+    }
     
     const lines: string[] = [
       '# Obsidian Git Sync — Debug Log',
