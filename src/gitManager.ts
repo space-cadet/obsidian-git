@@ -122,6 +122,12 @@ export interface GitCommit {
     author: string;
     date: Date;
     commit: any;
+    files?: { filepath: string; status: 'added' | 'modified' | 'deleted' }[];
+}
+
+export interface GitCommitFile {
+    filepath: string;
+    status: 'added' | 'modified' | 'deleted';
 }
 
 export interface GitCredentials {
@@ -656,6 +662,93 @@ export class GitManager {
         } catch (error: any) {
             log.error('GitManager', 'Failed to unstage all files', error);
             throw error;
+        }
+    }
+
+    /**
+     * Get list of files changed in a specific commit (compared to its parent)
+     */
+    async getCommitFiles(oid: string): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted' }[]> {
+        try {
+            const commit = await git.readCommit({ fs: this.fs, dir: this.dir, oid });
+            const treeOid = commit.commit.tree;
+            const parentOid = commit.commit?.parent?.[0];
+
+            let parentFiles: Map<string, string> = new Map();
+            if (parentOid) {
+                const parentCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: parentOid });
+                parentFiles = await this.readTreeRecursive(parentCommit.commit.tree);
+            }
+
+            const currentFiles = await this.readTreeRecursive(treeOid);
+            const result: { filepath: string; status: 'added' | 'modified' | 'deleted' }[] = [];
+
+            for (const [path, oid] of currentFiles.entries()) {
+                if (!parentFiles.has(path)) {
+                    result.push({ filepath: path, status: 'added' });
+                } else if (parentFiles.get(path) !== oid) {
+                    result.push({ filepath: path, status: 'modified' });
+                }
+            }
+
+            for (const [path] of parentFiles.entries()) {
+                if (!currentFiles.has(path)) {
+                    result.push({ filepath: path, status: 'deleted' });
+                }
+            }
+
+            return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
+        } catch (error) {
+            log.error('GitManager', `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+            return [];
+        }
+    }
+
+    /**
+     * Recursively read a git tree and return a flat map of path -> oid
+     */
+    private async readTreeRecursive(treeOid: string, prefix: string = ''): Promise<Map<string, string>> {
+        const result = new Map<string, string>();
+        try {
+            const tree = await git.readTree({ fs: this.fs, dir: this.dir, oid: treeOid });
+            for (const entry of tree.tree) {
+                const fullPath = prefix + entry.path;
+                if (entry.type === 'tree') {
+                    const subMap = await this.readTreeRecursive(entry.oid, fullPath + '/');
+                    for (const [subPath, subOid] of subMap.entries()) {
+                        result.set(subPath, subOid);
+                    }
+                } else {
+                    result.set(fullPath, entry.oid);
+                }
+            }
+        } catch (e) {
+            log.warn('GitManager', `Failed to read tree ${treeOid.slice(0, 7)}`, e);
+        }
+        return result;
+    }
+
+    /**
+     * Get remote commit log (from origin/branch)
+     */
+    async getRemoteLog(branchName: string, maxCount: number = 20): Promise<GitCommit[]> {
+        try {
+            const commits = await git.log({
+                fs: this.fs,
+                dir: this.dir,
+                ref: `origin/${branchName}`,
+                depth: maxCount
+            });
+            return commits.map(c => ({
+                oid: c.oid,
+                message: c.commit?.message || '',
+                author: c.commit?.author?.name || 'Unknown',
+                date: new Date((c.commit?.author?.timestamp || 0) * 1000),
+                commit: c.commit
+            }));
+        } catch (error) {
+            log.warn('GitManager', `Failed to get remote log for origin/${branchName}`, error);
+            return [];
         }
     }
 

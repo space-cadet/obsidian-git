@@ -19248,6 +19248,89 @@ var GitManager = class _GitManager {
     }
   }
   /**
+   * Get list of files changed in a specific commit (compared to its parent)
+   */
+  async getCommitFiles(oid) {
+    var _a, _b;
+    try {
+      const commit2 = await readCommit({ fs: this.fs, dir: this.dir, oid });
+      const treeOid = commit2.commit.tree;
+      const parentOid = (_b = (_a = commit2.commit) == null ? void 0 : _a.parent) == null ? void 0 : _b[0];
+      let parentFiles = /* @__PURE__ */ new Map();
+      if (parentOid) {
+        const parentCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: parentOid });
+        parentFiles = await this.readTreeRecursive(parentCommit.commit.tree);
+      }
+      const currentFiles = await this.readTreeRecursive(treeOid);
+      const result = [];
+      for (const [path, oid2] of currentFiles.entries()) {
+        if (!parentFiles.has(path)) {
+          result.push({ filepath: path, status: "added" });
+        } else if (parentFiles.get(path) !== oid2) {
+          result.push({ filepath: path, status: "modified" });
+        }
+      }
+      for (const [path] of parentFiles.entries()) {
+        if (!currentFiles.has(path)) {
+          result.push({ filepath: path, status: "deleted" });
+        }
+      }
+      return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
+    } catch (error) {
+      log2.error("GitManager", `Failed to get commit files for ${oid.slice(0, 7)}`, error);
+      return [];
+    }
+  }
+  /**
+   * Recursively read a git tree and return a flat map of path -> oid
+   */
+  async readTreeRecursive(treeOid, prefix = "") {
+    const result = /* @__PURE__ */ new Map();
+    try {
+      const tree = await readTree({ fs: this.fs, dir: this.dir, oid: treeOid });
+      for (const entry of tree.tree) {
+        const fullPath = prefix + entry.path;
+        if (entry.type === "tree") {
+          const subMap = await this.readTreeRecursive(entry.oid, fullPath + "/");
+          for (const [subPath, subOid] of subMap.entries()) {
+            result.set(subPath, subOid);
+          }
+        } else {
+          result.set(fullPath, entry.oid);
+        }
+      }
+    } catch (e) {
+      log2.warn("GitManager", `Failed to read tree ${treeOid.slice(0, 7)}`, e);
+    }
+    return result;
+  }
+  /**
+   * Get remote commit log (from origin/branch)
+   */
+  async getRemoteLog(branchName, maxCount = 20) {
+    try {
+      const commits = await log({
+        fs: this.fs,
+        dir: this.dir,
+        ref: `origin/${branchName}`,
+        depth: maxCount
+      });
+      return commits.map((c) => {
+        var _a, _b, _c, _d, _e;
+        return {
+          oid: c.oid,
+          message: ((_a = c.commit) == null ? void 0 : _a.message) || "",
+          author: ((_c = (_b = c.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
+          date: new Date((((_e = (_d = c.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
+          commit: c.commit
+        };
+      });
+    } catch (error) {
+      log2.warn("GitManager", `Failed to get remote log for origin/${branchName}`, error);
+      return [];
+    }
+  }
+  /**
    * Get commit log (history)
    */
   async getLog(maxCount = 20) {
@@ -19361,6 +19444,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.commitMessageInput = null;
     this.stagedCount = 0;
     this.activeTab = "status";
+    this.commitsViewMode = "local";
+    this.expandedCommitOids = /* @__PURE__ */ new Set();
     this.hasRemote = false;
     this.isLocalOnly = false;
     this.plugin = plugin;
@@ -19427,7 +19512,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.tabsContainer.empty();
     const tabs = [
       { id: "status", label: "Changes" },
-      { id: "history", label: "History" },
+      { id: "commits", label: "Commits" },
       { id: "log", label: "Log" }
     ];
     for (const tab of tabs) {
@@ -19607,8 +19692,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       case "status":
         await this.renderStatusTab();
         break;
-      case "history":
-        await this.renderHistoryTab();
+      case "commits":
+        await this.renderCommitsTab();
         break;
       case "log":
         await this.renderLogTab();
@@ -19804,36 +19889,120 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     }
   }
-  async renderHistoryTab() {
+  async renderCommitsTab() {
     const listContainer = this.contentContainer.createDiv("git-log-list");
+    const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
+    const localBtn = toggleBar.createEl("button", {
+      text: "Local",
+      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "local" ? " git-commits-toggle-active" : "")
+    });
+    localBtn.addEventListener("click", async () => {
+      this.commitsViewMode = "local";
+      await this.refresh();
+    });
+    const remoteBtn = toggleBar.createEl("button", {
+      text: "Remote",
+      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "remote" ? " git-commits-toggle-active" : "")
+    });
+    remoteBtn.addEventListener("click", async () => {
+      this.commitsViewMode = "remote";
+      await this.refresh();
+    });
     try {
-      const commits = await this.plugin.gitManager.getLog(25);
+      const branch2 = await this.plugin.gitManager.getCurrentBranch();
+      const commits = this.commitsViewMode === "local" ? await this.plugin.gitManager.getLog(25) : await this.plugin.gitManager.getRemoteLog(branch2, 25);
       if (commits.length === 0) {
-        listContainer.createEl("p", { text: "No commits yet \u2014 stage files and sync to create your first commit", cls: "git-empty-state" });
+        const emptyMsg = this.commitsViewMode === "local" ? "No commits yet \u2014 stage files and commit to create your first commit" : `No remote commits on origin/${branch2} \u2014 push to populate the remote history`;
+        listContainer.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
         return;
       }
       for (const commit2 of commits) {
-        const row = listContainer.createDiv("git-commit-row");
-        const hash = row.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
+        const isExpanded = this.expandedCommitOids.has(commit2.oid);
+        const row = listContainer.createDiv("git-commit-row" + (this.commitsViewMode === "remote" ? " git-commit-remote" : ""));
+        row.setAttr("data-oid", commit2.oid);
+        row.setAttr("data-expanded", String(isExpanded));
+        const mainRow = row.createDiv("git-commit-main");
+        const toggle = mainRow.createSpan({ cls: "git-commit-toggle" });
+        toggle.setText(isExpanded ? "\u25BE" : "\u25B8");
+        const hash = mainRow.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
         hash.setAttr("title", commit2.oid);
-        const msg = row.createSpan({ text: this.truncateMessage(commit2.message), cls: "git-commit-message" });
+        const msg = mainRow.createSpan({ text: this.truncateMessage(commit2.message), cls: "git-commit-message" });
         msg.setAttr("title", commit2.message);
-        const meta = row.createDiv("git-commit-meta");
+        if (this.commitsViewMode === "remote") {
+          mainRow.createSpan({ text: "origin", cls: "git-commit-remote-badge" });
+        }
+        const meta = mainRow.createDiv("git-commit-meta");
         meta.createSpan({ text: commit2.author, cls: "git-commit-author" });
         meta.createSpan({ text: this.formatDate(commit2.date), cls: "git-commit-date" });
+        mainRow.addEventListener("click", async () => {
+          const currentlyExpanded = this.expandedCommitOids.has(commit2.oid);
+          if (currentlyExpanded) {
+            this.expandedCommitOids.delete(commit2.oid);
+            row.setAttr("data-expanded", "false");
+            toggle.setText("\u25B8");
+            const detailEl = row.querySelector(".git-commit-detail");
+            if (detailEl)
+              detailEl.remove();
+          } else {
+            this.expandedCommitOids.add(commit2.oid);
+            row.setAttr("data-expanded", "true");
+            toggle.setText("\u25BE");
+            await this.renderCommitDetail(row, commit2.oid);
+          }
+        });
+        if (isExpanded) {
+          await this.renderCommitDetail(row, commit2.oid);
+        }
       }
     } catch (e) {
-      log2.debug("GitSidebar", "Failed to get commit log (expected for fresh repos)", e);
+      log2.debug("GitSidebar", "Failed to get commit log", e);
       const msg = e.message || String(e);
       if (msg.includes("Could not find") || msg.includes("refs/heads") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
         listContainer.empty();
         const empty = listContainer.createDiv("git-uninit-container");
         empty.createEl("p", { text: "No commits yet", cls: "git-uninit-title" });
-        empty.createEl("p", { text: "Stage files and tap Sync to create your first commit.", cls: "git-uninit-desc" });
+        empty.createEl("p", { text: "Stage files and commit to create your first commit.", cls: "git-uninit-desc" });
       } else {
         listContainer.createEl("p", { text: "Unable to read commit history", cls: "git-empty-state" });
       }
     }
+  }
+  async renderCommitDetail(row, oid) {
+    const existing = row.querySelector(".git-commit-detail");
+    if (existing)
+      existing.remove();
+    const detail = row.createDiv("git-commit-detail");
+    detail.createDiv("git-commit-detail-loading").setText("Loading...");
+    try {
+      const files = await this.plugin.gitManager.getCommitFiles(oid);
+      detail.empty();
+      if (files.length === 0) {
+        detail.createEl("p", { text: "No file changes detected", cls: "git-commit-detail-empty" });
+        return;
+      }
+      for (const f of files) {
+        const fileRow = detail.createDiv("git-commit-file-row");
+        const iconSpan = fileRow.createSpan({ cls: "git-commit-file-icon" });
+        if (f.status === "added") {
+          iconSpan.setText("+");
+          iconSpan.addClass("git-commit-file-added");
+        } else if (f.status === "deleted") {
+          iconSpan.setText("\u2212");
+          iconSpan.addClass("git-commit-file-deleted");
+        } else {
+          iconSpan.setText("\u25CF");
+          iconSpan.addClass("git-commit-file-modified");
+        }
+        fileRow.createSpan({ text: f.filepath, cls: "git-commit-file-path" });
+        fileRow.createSpan({ text: f.status, cls: "git-commit-file-status" });
+      }
+    } catch (e) {
+      detail.empty();
+      detail.createEl("p", { text: "Failed to load file changes", cls: "git-commit-detail-empty" });
+    }
+  }
+  async renderHistoryTab() {
+    await this.renderCommitsTab();
   }
   async renderLogTab() {
     const listContainer = this.contentContainer.createDiv("git-log-list");

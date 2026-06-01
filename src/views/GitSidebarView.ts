@@ -5,7 +5,7 @@ import { log, LogEntry } from '../logger';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
-type SidebarTab = 'status' | 'history' | 'log';
+type SidebarTab = 'status' | 'commits' | 'log';
 
 export class GitSidebarView extends ItemView {
     plugin: GitSyncPlugin;
@@ -16,6 +16,8 @@ export class GitSidebarView extends ItemView {
     private commitMessageInput: HTMLInputElement | null = null;
     private stagedCount: number = 0;
     private activeTab: SidebarTab = 'status';
+    private commitsViewMode: 'local' | 'remote' = 'local';
+    private expandedCommitOids: Set<string> = new Set();
     private hasRemote: boolean = false;
     private isLocalOnly: boolean = false;
 
@@ -111,7 +113,7 @@ export class GitSidebarView extends ItemView {
         
         const tabs: { id: SidebarTab; label: string }[] = [
             { id: 'status', label: 'Changes' },
-            { id: 'history', label: 'History' },
+            { id: 'commits', label: 'Commits' },
             { id: 'log', label: 'Log' }
         ];
 
@@ -354,8 +356,8 @@ export class GitSidebarView extends ItemView {
             case 'status':
                 await this.renderStatusTab();
                 break;
-            case 'history':
-                await this.renderHistoryTab();
+            case 'commits':
+                await this.renderCommitsTab();
                 break;
             case 'log':
                 await this.renderLogTab();
@@ -611,44 +613,145 @@ export class GitSidebarView extends ItemView {
         }
     }
 
-    private async renderHistoryTab(): Promise<void> {
+    private async renderCommitsTab(): Promise<void> {
         const listContainer = this.contentContainer.createDiv('git-log-list');
 
+        // Toggle bar: Local / Remote
+        const toggleBar = listContainer.createDiv('git-commits-toggle-bar');
+        const localBtn = toggleBar.createEl('button', {
+            text: 'Local',
+            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'local' ? ' git-commits-toggle-active' : '')
+        });
+        localBtn.addEventListener('click', async () => {
+            this.commitsViewMode = 'local';
+            await this.refresh();
+        });
+        const remoteBtn = toggleBar.createEl('button', {
+            text: 'Remote',
+            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'remote' ? ' git-commits-toggle-active' : '')
+        });
+        remoteBtn.addEventListener('click', async () => {
+            this.commitsViewMode = 'remote';
+            await this.refresh();
+        });
+
         try {
-            const commits = await this.plugin.gitManager!.getLog(25);
-            
+            const branch = await this.plugin.gitManager!.getCurrentBranch();
+            const commits = this.commitsViewMode === 'local'
+                ? await this.plugin.gitManager!.getLog(25)
+                : await this.plugin.gitManager!.getRemoteLog(branch, 25);
+
             if (commits.length === 0) {
-                listContainer.createEl('p', { text: 'No commits yet — stage files and sync to create your first commit', cls: 'git-empty-state' });
+                const emptyMsg = this.commitsViewMode === 'local'
+                    ? 'No commits yet — stage files and commit to create your first commit'
+                    : `No remote commits on origin/${branch} — push to populate the remote history`;
+                listContainer.createEl('p', { text: emptyMsg, cls: 'git-empty-state' });
                 return;
             }
 
             for (const commit of commits) {
-                const row = listContainer.createDiv('git-commit-row');
-                
-                const hash = row.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
+                const isExpanded = this.expandedCommitOids.has(commit.oid);
+                const row = listContainer.createDiv('git-commit-row' + (this.commitsViewMode === 'remote' ? ' git-commit-remote' : ''));
+                row.setAttr('data-oid', commit.oid);
+                row.setAttr('data-expanded', String(isExpanded));
+
+                const mainRow = row.createDiv('git-commit-main');
+
+                const toggle = mainRow.createSpan({ cls: 'git-commit-toggle' });
+                toggle.setText(isExpanded ? '▾' : '▸');
+
+                const hash = mainRow.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
                 hash.setAttr('title', commit.oid);
-                
-                const msg = row.createSpan({ text: this.truncateMessage(commit.message), cls: 'git-commit-message' });
+
+                const msg = mainRow.createSpan({ text: this.truncateMessage(commit.message), cls: 'git-commit-message' });
                 msg.setAttr('title', commit.message);
-                
-                const meta = row.createDiv('git-commit-meta');
+
+                if (this.commitsViewMode === 'remote') {
+                    mainRow.createSpan({ text: 'origin', cls: 'git-commit-remote-badge' });
+                }
+
+                const meta = mainRow.createDiv('git-commit-meta');
                 meta.createSpan({ text: commit.author, cls: 'git-commit-author' });
                 meta.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
+
+                // Click to expand/collapse
+                mainRow.addEventListener('click', async () => {
+                    const currentlyExpanded = this.expandedCommitOids.has(commit.oid);
+                    if (currentlyExpanded) {
+                        this.expandedCommitOids.delete(commit.oid);
+                        row.setAttr('data-expanded', 'false');
+                        toggle.setText('▸');
+                        const detailEl = row.querySelector('.git-commit-detail');
+                        if (detailEl) detailEl.remove();
+                    } else {
+                        this.expandedCommitOids.add(commit.oid);
+                        row.setAttr('data-expanded', 'true');
+                        toggle.setText('▾');
+                        await this.renderCommitDetail(row, commit.oid);
+                    }
+                });
+
+                // If already expanded, render detail
+                if (isExpanded) {
+                    await this.renderCommitDetail(row, commit.oid);
+                }
             }
         } catch (e: any) {
-            log.debug('GitSidebar', 'Failed to get commit log (expected for fresh repos)', e);
-            
-            // Check if this is a "no commits yet" error (fresh repo)
+            log.debug('GitSidebar', 'Failed to get commit log', e);
             const msg = e.message || String(e);
             if (msg.includes('Could not find') || msg.includes('refs/heads') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
                 listContainer.empty();
                 const empty = listContainer.createDiv('git-uninit-container');
                 empty.createEl('p', { text: 'No commits yet', cls: 'git-uninit-title' });
-                empty.createEl('p', { text: 'Stage files and tap Sync to create your first commit.', cls: 'git-uninit-desc' });
+                empty.createEl('p', { text: 'Stage files and commit to create your first commit.', cls: 'git-uninit-desc' });
             } else {
                 listContainer.createEl('p', { text: 'Unable to read commit history', cls: 'git-empty-state' });
             }
         }
+    }
+
+    private async renderCommitDetail(row: HTMLElement, oid: string): Promise<void> {
+        // Remove existing detail if any
+        const existing = row.querySelector('.git-commit-detail');
+        if (existing) existing.remove();
+
+        const detail = row.createDiv('git-commit-detail');
+        detail.createDiv('git-commit-detail-loading').setText('Loading...');
+
+        try {
+            const files = await this.plugin.gitManager!.getCommitFiles(oid);
+            detail.empty();
+
+            if (files.length === 0) {
+                detail.createEl('p', { text: 'No file changes detected', cls: 'git-commit-detail-empty' });
+                return;
+            }
+
+            for (const f of files) {
+                const fileRow = detail.createDiv('git-commit-file-row');
+                const iconSpan = fileRow.createSpan({ cls: 'git-commit-file-icon' });
+                if (f.status === 'added') {
+                    iconSpan.setText('+');
+                    iconSpan.addClass('git-commit-file-added');
+                } else if (f.status === 'deleted') {
+                    iconSpan.setText('−');
+                    iconSpan.addClass('git-commit-file-deleted');
+                } else {
+                    iconSpan.setText('●');
+                    iconSpan.addClass('git-commit-file-modified');
+                }
+                fileRow.createSpan({ text: f.filepath, cls: 'git-commit-file-path' });
+                fileRow.createSpan({ text: f.status, cls: 'git-commit-file-status' });
+            }
+        } catch (e) {
+            detail.empty();
+            detail.createEl('p', { text: 'Failed to load file changes', cls: 'git-commit-detail-empty' });
+        }
+    }
+
+    private async renderHistoryTab(): Promise<void> {
+        // Deprecated: renamed to renderCommitsTab
+        await this.renderCommitsTab();
     }
 
     private async renderLogTab(): Promise<void> {
