@@ -13,6 +13,8 @@ export class GitSidebarView extends ItemView {
     private headerContainer: HTMLElement;
     private tabsContainer: HTMLElement;
     private refreshInterval: number | null = null;
+    private commitMessageInput: HTMLInputElement | null = null;
+    private stagedCount: number = 0;
     private activeTab: SidebarTab = 'status';
     private hasRemote: boolean = false;
     private isLocalOnly: boolean = false;
@@ -161,51 +163,132 @@ export class GitSidebarView extends ItemView {
 
     private renderFooter(container: HTMLElement): void {
         container.empty();
+        container.addClass('git-sidebar-footer');
 
-        new ButtonComponent(container)
-            .setButtonText('Stage All')
-            .setTooltip('Stage all changes')
+        // 1. Commit message input
+        const msgRow = container.createDiv('git-footer-message-row');
+        this.commitMessageInput = msgRow.createEl('input', {
+            type: 'text',
+            cls: 'git-footer-message-input',
+            placeholder: 'Commit message...',
+            value: this.commitMessageInput?.value || ''
+        });
+
+        // 2. Action buttons row
+        const btnRow = container.createDiv('git-footer-buttons-row');
+
+        // Commit button — always visible
+        const commitBtn = new ButtonComponent(btnRow)
+            .setButtonText('Commit')
+            .setTooltip(this.stagedCount > 0 ? 'Commit staged changes' : 'No staged files to commit')
+            .setClass('git-btn-primary')
+            .setDisabled(this.stagedCount === 0);
+        commitBtn.onClick(async () => {
+            try {
+                if (!this.plugin.gitManager) {
+                    new Notice('Git not initialized');
+                    return;
+                }
+                if (this.stagedCount === 0) {
+                    new Notice('No staged files to commit');
+                    return;
+                }
+                const message = this.commitMessageInput?.value?.trim()
+                    || this.plugin.settings.autoCommitMessage.replace('{{date}}', new Date().toLocaleString())
+                    || 'Update from Obsidian';
+                await this.plugin.gitManager.commit(message);
+                new Notice('Changes committed');
+                if (this.commitMessageInput) this.commitMessageInput.value = '';
+                await this.refresh();
+            } catch (e: any) {
+                new Notice('Commit failed: ' + e.message);
+            }
+        });
+
+        // Push button — always visible, disabled if no remote
+        new ButtonComponent(btnRow)
+            .setButtonText('↑')
+            .setTooltip(this.hasRemote ? 'Push to remote' : 'No remote configured — set repo URL in settings')
             .setClass('git-btn-secondary')
+            .setDisabled(!this.hasRemote)
             .onClick(async () => {
                 try {
                     if (!this.plugin.gitManager) {
                         new Notice('Git not initialized');
                         return;
                     }
-                    await this.plugin.gitManager.addAll();
-                    new Notice('All changes staged');
+                    if (!this.hasRemote) {
+                        new Notice('No remote configured');
+                        return;
+                    }
+                    await this.plugin.gitManager.push(this.plugin.settings.branchName);
+                    new Notice('Pushed to remote');
                     await this.refresh();
                 } catch (e: any) {
-                    new Notice('Stage failed: ' + e.message);
+                    new Notice('Push failed: ' + e.message);
                 }
             });
 
-        new ButtonComponent(container)
-            .setButtonText(this.isLocalOnly ? 'Commit' : 'Sync')
-            .setTooltip(this.isLocalOnly ? 'Commit changes' : 'Pull, commit, push')
-            .setClass('git-btn-primary')
+        // Force Push button — always visible, disabled if no remote
+        // Use this for first-time pushes to an empty repo or when histories diverge
+        new ButtonComponent(btnRow)
+            .setButtonText('↑↑')
+            .setTooltip(this.hasRemote ? 'Force push (overwrites remote history)' : 'No remote configured')
+            .setClass('git-btn-danger')
+            .setDisabled(!this.hasRemote)
             .onClick(async () => {
                 try {
-                    if (this.isLocalOnly || !this.plugin.settings.repoUrl) {
-                        // Local-only: just commit
-                        if (!this.plugin.gitManager) {
-                            new Notice('Git not initialized');
-                            return;
-                        }
-                        await this.plugin.gitManager.commit('Update from Obsidian');
-                        new Notice('Changes committed');
-                    } else {
-                        await this.plugin.syncVault();
-                        new Notice('Sync complete');
+                    if (!this.plugin.gitManager) {
+                        new Notice('Git not initialized');
+                        return;
                     }
+                    if (!this.hasRemote) {
+                        new Notice('No remote configured');
+                        return;
+                    }
+                    // Confirm before force push
+                    const confirmed = window.confirm(
+                        'Force push will overwrite remote history.\n\n' +
+                        'Only use this for first-time pushes or when you know the remote is safe to overwrite.\n\n' +
+                        'Continue?'
+                    );
+                    if (!confirmed) return;
+                    
+                    await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
+                    new Notice('Force pushed to remote');
                     await this.refresh();
                 } catch (e: any) {
-                    new Notice((this.isLocalOnly ? 'Commit' : 'Sync') + ' failed: ' + e.message);
+                    new Notice('Force push failed: ' + e.message);
                 }
             });
 
-        new ButtonComponent(container)
-            .setButtonText('Refresh')
+        // Pull button — always visible, disabled if no remote
+        new ButtonComponent(btnRow)
+            .setButtonText('↓')
+            .setTooltip(this.hasRemote ? 'Pull from remote' : 'No remote configured — set repo URL in settings')
+            .setClass('git-btn-secondary')
+            .setDisabled(!this.hasRemote)
+            .onClick(async () => {
+                try {
+                    if (!this.plugin.gitManager) {
+                        new Notice('Git not initialized');
+                        return;
+                    }
+                    if (!this.hasRemote) {
+                        new Notice('No remote configured');
+                        return;
+                    }
+                    await this.plugin.gitManager.pull(this.plugin.settings.branchName);
+                    new Notice('Pulled from remote');
+                    await this.refresh();
+                } catch (e: any) {
+                    new Notice('Pull failed: ' + e.message);
+                }
+            });
+
+        // Refresh button — always visible
+        new ButtonComponent(btnRow)
+            .setButtonText('↻')
             .setTooltip('Refresh git status')
             .setClass('git-btn-ghost')
             .onClick(async () => {
@@ -277,6 +360,12 @@ export class GitSidebarView extends ItemView {
             case 'log':
                 await this.renderLogTab();
                 break;
+        }
+
+        // Re-render footer so Commit button state reflects current stagedCount
+        const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
+        if (footerEl) {
+            this.renderFooter(footerEl);
         }
     }
 
@@ -375,82 +464,53 @@ export class GitSidebarView extends ItemView {
     // ─── Tab renders ───
 
     private async renderStatusTab(): Promise<void> {
-        const listContainer = this.contentContainer.createDiv('git-status-list');
+        const container = this.contentContainer.createDiv('git-status-container');
 
         try {
             if (!this.plugin.gitManager) {
-                listContainer.createEl('p', { text: 'Git manager not initialized', cls: 'git-empty-state' });
+                container.createEl('p', { text: 'Git manager not initialized', cls: 'git-empty-state' });
                 return;
             }
 
-            const files = await this.plugin.gitManager.getDetailedStatus();
-            
-            if (files.length === 0) {
-                listContainer.createEl('p', { text: 'No changes — working tree clean', cls: 'git-empty-state' });
-                return;
-            }
+            const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
+            this.stagedCount = staged.length;
 
-            const statusIcons: Record<string, string> = {
-                modified: 'M', added: 'A', deleted: 'D',
-                untracked: '?', staged: 'S', conflict: 'C'
-            };
-            const statusClasses: Record<string, string> = {
-                modified: 'git-status-modified', added: 'git-status-added',
-                deleted: 'git-status-deleted', untracked: 'git-status-untracked',
-                staged: 'git-status-staged', conflict: 'git-status-conflict'
-            };
-
-            for (const file of files) {
-                const row = listContainer.createDiv('git-file-row');
-                row.createSpan({ 
-                    text: statusIcons[file.status] || file.status[0].toUpperCase(), 
-                    cls: 'git-status-icon ' + (statusClasses[file.status] || '') 
-                });
-                
-                const pathEl = row.createSpan({ text: file.filepath, cls: 'git-file-path' });
-                pathEl.setAttr('title', file.filepath);
-
-                const actions = row.createDiv('git-file-actions');
-                if (file.status === 'untracked' || file.status === 'modified') {
-                    const btn = actions.createEl('button', { text: '+', cls: 'git-file-btn' });
-                    btn.setAttr('title', 'Stage file');
-                    btn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        try {
-                            await this.plugin.gitManager?.stageFile(file.filepath);
-                            new Notice(`Staged ${file.filepath}`);
-                            await this.refresh();
-                        } catch (err: any) {
-                            new Notice('Stage failed: ' + err.message);
-                        }
-                    });
-                } else if (file.status === 'staged') {
-                    const btn = actions.createEl('button', { text: '−', cls: 'git-file-btn' });
-                    btn.setAttr('title', 'Unstage file');
-                    btn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        try {
-                            await this.plugin.gitManager?.unstageFile(file.filepath);
-                            new Notice(`Unstaged ${file.filepath}`);
-                            await this.refresh();
-                        } catch (err: any) {
-                            new Notice('Unstage failed: ' + err.message);
-                        }
-                    });
+            // ── Staged section ── (always show, default collapsed if empty)
+            this.renderCollapsibleSection(container, 'Staged', staged, 'staged', '−', '− all',
+                async (fp) => {
+                    await this.plugin.gitManager!.unstageFile(fp);
+                    new Notice(`Unstaged ${fp}`);
+                },
+                async () => {
+                    await this.plugin.gitManager!.unstageAll();
+                    new Notice('All files unstaged');
                 }
-            }
+            );
+
+            // ── Uncommitted section ── (always show, default collapsed if empty)
+            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', '+', '+ all',
+                async (fp) => {
+                    await this.plugin.gitManager!.stageFile(fp);
+                    new Notice(`Staged ${fp}`);
+                },
+                async () => {
+                    await this.plugin.gitManager!.addAll();
+                    new Notice('All changes staged');
+                }
+            );
+
         } catch (e: any) {
             log.warn('GitSidebar', 'Failed to get file status', e);
-            listContainer.empty();
-            
+            container.empty();
+
             if (e.isPackIndexError || e.message?.includes('Pack index')) {
-                const errContainer = listContainer.createDiv('git-uninit-container');
+                const errContainer = container.createDiv('git-uninit-container');
                 errContainer.createEl('p', { text: '⚠️ Changes view temporarily unavailable', cls: 'git-uninit-title' });
-                errContainer.createEl('p', { 
+                errContainer.createEl('p', {
                     text: 'isomorphic-git cannot read a pack index file in your repo. This happens with certain pack file formats. Try running "git repack -ad" in your repo to rebuild pack files, or use the command line for now.',
-                    cls: 'git-uninit-desc' 
+                    cls: 'git-uninit-desc'
                 });
-                
+
                 const btnRow = errContainer.createDiv('git-uninit-actions');
                 new ButtonComponent(btnRow)
                     .setButtonText('Retry')
@@ -459,9 +519,94 @@ export class GitSidebarView extends ItemView {
                         await this.refresh();
                     });
             } else {
-                const errContainer = listContainer.createDiv('git-uninit-container');
+                const errContainer = container.createDiv('git-uninit-container');
                 errContainer.createEl('p', { text: 'Error reading git status', cls: 'git-uninit-title' });
                 errContainer.createEl('p', { text: e.message || String(e), cls: 'git-uninit-desc' });
+            }
+        }
+    }
+
+    private renderCollapsibleSection(
+        container: HTMLElement,
+        title: string,
+        files: string[],
+        sectionClass: string,
+        actionLabel: string,
+        bulkLabel: string,
+        onAction: (filepath: string) => Promise<void>,
+        onBulk: () => Promise<void>
+    ): void {
+        const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
+        
+        // Default: expanded if files exist, collapsed if empty
+        const isCollapsed = files.length === 0;
+        section.setAttr('data-collapsed', String(isCollapsed));
+
+        // Header with toggle arrow + title + count + bulk button
+        const header = section.createDiv('git-status-section-header');
+        
+        const toggle = header.createSpan({ cls: 'git-section-toggle' });
+        toggle.setText(isCollapsed ? '▸' : '▾');
+        
+        header.createSpan({ text: title, cls: 'git-status-section-label' });
+        
+        // File count badge
+        const countBadge = header.createSpan({ 
+            text: String(files.length), 
+            cls: 'git-status-section-count' 
+        });
+        
+        // Bulk action button (always visible)
+        const bulkBtn = header.createEl('button', { text: bulkLabel, cls: 'git-status-section-action' });
+        bulkBtn.setAttr('title', bulkLabel);
+        bulkBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await onBulk();
+                await this.refresh();
+            } catch (err: any) {
+                new Notice(`${bulkLabel} failed: ${err.message}`);
+            }
+        });
+
+        // Toggle fold/unfold on header click (but not on bulk button)
+        header.addEventListener('click', (e) => {
+            if (e.target === bulkBtn || bulkBtn.contains(e.target as Node)) return;
+            const currentlyCollapsed = section.getAttr('data-collapsed') === 'true';
+            section.setAttr('data-collapsed', String(!currentlyCollapsed));
+            toggle.setText(!currentlyCollapsed ? '▸' : '▾');
+        });
+
+        const list = section.createDiv('git-status-section-list');
+        
+        if (files.length === 0) {
+            const emptyMsg = sectionClass === 'staged' 
+                ? 'No staged files' 
+                : 'No uncommitted changes';
+            list.createEl('p', { text: emptyMsg, cls: 'git-empty-state' });
+        } else {
+            for (const filepath of files) {
+                const row = list.createDiv('git-file-row');
+
+                const iconClass = sectionClass === 'staged' ? 'git-status-staged' : 'git-status-modified';
+                const iconText = sectionClass === 'staged' ? 'S' : 'M';
+                row.createSpan({ text: iconText, cls: `git-status-icon ${iconClass}` });
+
+                const pathEl = row.createSpan({ text: filepath, cls: 'git-file-path' });
+                pathEl.setAttr('title', filepath);
+
+                const actions = row.createDiv('git-file-actions');
+                const btn = actions.createEl('button', { text: actionLabel, cls: 'git-file-btn' });
+                btn.setAttr('title', sectionClass === 'staged' ? 'Unstage file' : 'Stage file');
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    try {
+                        await onAction(filepath);
+                        await this.refresh();
+                    } catch (err: any) {
+                        new Notice(`${actionLabel} failed: ${err.message}`);
+                    }
+                });
             }
         }
     }

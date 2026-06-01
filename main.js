@@ -18831,32 +18831,69 @@ var GitManager = class _GitManager {
   /**
    * Initialize a new repository or check if one exists
    */
+  /**
+   * Ensure the 'origin' remote is configured with the given URL
+   */
+  async ensureRemote(repoUrl) {
+    try {
+      const remotes = await listRemotes({ fs: this.fs, dir: this.dir });
+      const hasOrigin = remotes.some((r) => r.remote === "origin");
+      if (!hasOrigin) {
+        log2.info("GitManager", `Adding remote 'origin' -> ${repoUrl}`);
+        await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: repoUrl });
+      } else {
+        const origin = remotes.find((r) => r.remote === "origin");
+        if (origin && origin.url !== repoUrl) {
+          log2.info("GitManager", `Updating remote 'origin' URL: ${origin.url} -> ${repoUrl}`);
+          await deleteRemote({ fs: this.fs, dir: this.dir, remote: "origin" });
+          await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: repoUrl });
+        }
+      }
+    } catch (error) {
+      log2.error("GitManager", "Failed to ensure remote", error);
+      throw error;
+    }
+  }
   async initializeRepo(repoUrl, branchName) {
     try {
       log2.debug("GitManager", `Initializing repository: ${repoUrl}, branch: ${branchName}`);
       const isRepo = await this.isRepository();
       if (!isRepo) {
-        this.updateStatus("Cloning repository...");
-        log2.info("GitManager", `Cloning repository from ${repoUrl} (branch: ${branchName})`);
-        await clone({
-          fs: this.fs,
-          http: new GitHttpClient(this.credentials),
-          dir: this.dir,
-          url: repoUrl,
-          ref: branchName,
-          singleBranch: true,
-          depth: 1,
-          onAuth: () => {
-            log2.debug("GitManager", "Authentication requested by remote");
-            return {
-              username: this.credentials.username,
-              password: this.credentials.password
-            };
-          }
-        });
-        this.updateStatus("Repository cloned");
-        log2.info("GitManager", `Repository successfully cloned to ${this.dir}`);
-        return true;
+        try {
+          this.updateStatus("Cloning repository...");
+          log2.info("GitManager", `Cloning repository from ${repoUrl} (branch: ${branchName})`);
+          await clone({
+            fs: this.fs,
+            http: new GitHttpClient(this.credentials),
+            dir: this.dir,
+            url: repoUrl,
+            ref: branchName,
+            singleBranch: true,
+            depth: 1,
+            onAuth: () => {
+              log2.debug("GitManager", "Authentication requested by remote");
+              return {
+                username: this.credentials.username,
+                password: this.credentials.password
+              };
+            }
+          });
+          this.updateStatus("Repository cloned");
+          log2.info("GitManager", `Repository successfully cloned to ${this.dir}`);
+          return true;
+        } catch (cloneError) {
+          log2.warn("GitManager", `Clone failed, initializing locally: ${cloneError.message}`);
+          this.updateStatus("Initializing local repository...");
+          log2.info("GitManager", `Initializing empty repo at ${this.dir}`);
+          await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+          await this.ensureRemote(repoUrl);
+          this.updateStatus("Local repository initialized");
+          log2.info("GitManager", `Local repo initialized, remote configured: ${repoUrl}`);
+          return true;
+        }
+      }
+      if (repoUrl) {
+        await this.ensureRemote(repoUrl);
       }
       this.updateStatus("Validating repository...");
       log2.debug("GitManager", `Validating remote repository URL: ${repoUrl}`);
@@ -18898,6 +18935,9 @@ var GitManager = class _GitManager {
   async pull(branchName) {
     try {
       this.updateStatus("Pulling changes...");
+      if (this.credentials.repoUrl) {
+        await this.ensureRemote(this.credentials.repoUrl);
+      }
       await pull({
         fs: this.fs,
         http: new GitHttpClient(this.credentials),
@@ -18905,6 +18945,10 @@ var GitManager = class _GitManager {
         ref: branchName,
         singleBranch: true,
         fastForwardOnly: true,
+        author: {
+          name: this.credentials.author.name || "Obsidian Git",
+          email: this.credentials.author.email || "obsidian@example.com"
+        },
         onAuth: () => ({
           username: this.credentials.username,
           password: this.credentials.password
@@ -18981,16 +19025,21 @@ var GitManager = class _GitManager {
   /**
    * Push changes to the remote repository
    */
-  async push(branchName) {
+  async push(branchName, force = false) {
+    var _a, _b, _c, _d, _e;
     try {
       this.updateStatus("Pushing changes...");
       log2.debug("GitManager", `Pushing changes to remote branch: ${branchName}`);
+      if (this.credentials.repoUrl) {
+        await this.ensureRemote(this.credentials.repoUrl);
+      }
       await push({
         fs: this.fs,
         http: new GitHttpClient(this.credentials),
         dir: this.dir,
         remote: "origin",
         ref: branchName,
+        force,
         onAuth: () => {
           log2.debug("GitManager", "Authentication requested for push operation");
           return {
@@ -19004,6 +19053,16 @@ var GitManager = class _GitManager {
     } catch (error) {
       log2.error("GitManager", `Failed to push changes to branch ${branchName}`, error);
       this.updateStatus("Push failed");
+      if (((_a = error.message) == null ? void 0 : _a.includes("not a fast-forward")) || ((_b = error.message) == null ? void 0 : _b.includes("rejected"))) {
+        throw new Error(
+          `Push rejected: The remote has commits that you don't have locally. Pull first to get the latest changes, then push again. If this is a first-time push to an empty repo, use Force Push.`
+        );
+      }
+      if (((_c = error.message) == null ? void 0 : _c.includes("auth")) || ((_d = error.message) == null ? void 0 : _d.includes("401")) || ((_e = error.message) == null ? void 0 : _e.includes("403"))) {
+        throw new Error(
+          `Authentication failed. Check your token/username in the plugin settings. Make sure your PAT has 'Contents: Read and Write' permission.`
+        );
+      }
       throw error;
     }
   }
@@ -19070,7 +19129,7 @@ var GitManager = class _GitManager {
         else if (head === 1 && workdir === 1 && stage === 2)
           status2 = "staged";
         else if (head === 1 && workdir === 2 && stage === 2)
-          status2 = "modified";
+          status2 = "staged";
         else
           status2 = "modified";
         result.push({ filepath, status: status2 });
@@ -19089,6 +19148,34 @@ var GitManager = class _GitManager {
     }
   }
   /**
+   * Get status groups: staged and unstaged file lists
+   * A file that is both staged AND modified appears only in staged.
+   */
+  async getStatusGroups() {
+    try {
+      const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+      const staged = [];
+      const unstaged = [];
+      for (const row of matrix) {
+        const [filepath, head, workdir, stage] = row;
+        if (head === 1 && workdir === 1 && stage === 1)
+          continue;
+        const hasStagedChanges = stage !== 1 && stage !== 0;
+        const hasWorkdirChanges = workdir !== 1;
+        if (hasStagedChanges) {
+          staged.push(filepath);
+        }
+        if (hasWorkdirChanges && !hasStagedChanges) {
+          unstaged.push(filepath);
+        }
+      }
+      return { staged, unstaged };
+    } catch (error) {
+      log2.error("GitManager", "Failed to get status groups", error);
+      throw error;
+    }
+  }
+  /**
    * Stage a single file
    */
   async stageFile(filepath) {
@@ -19101,26 +19188,63 @@ var GitManager = class _GitManager {
     }
   }
   /**
-   * Unstage a single file (reset to HEAD)
+   * Unstage a single file (reset to HEAD, or remove from index for new files)
    */
   async unstageFile(filepath) {
     try {
       if (resetIndex) {
-        await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
+        await resetIndex({ fs: this.fs, dir: this.dir, filepath });
         log2.debug("GitManager", `Unstaged file: ${filepath}`);
         return;
       }
-      const { blob } = await readBlob({
-        fs: this.fs,
-        dir: this.dir,
-        oid: "HEAD",
-        filepath
-      });
-      await this.fs.promises.writeFile(this.dir + "/" + filepath, blob);
-      log2.debug("GitManager", `Unstaged file (fallback): ${filepath}`);
+      try {
+        const { blob } = await readBlob({
+          fs: this.fs,
+          dir: this.dir,
+          oid: "HEAD",
+          filepath
+        });
+        await this.fs.promises.writeFile(this.dir + "/" + filepath, blob);
+        log2.debug("GitManager", `Unstaged file (HEAD fallback): ${filepath}`);
+      } catch (headErr) {
+        log2.warn("GitManager", `Cannot unstage new file ${filepath}: resetIndex not available and file not in HEAD`);
+        throw new Error(`Cannot unstage new file "${filepath}". Please upgrade isomorphic-git or use git CLI.`);
+      }
     } catch (error) {
       log2.error("GitManager", `Failed to unstage file: ${filepath}`, error);
-      throw new Error(`Cannot unstage ${filepath}: ${error.message}`);
+      throw error;
+    }
+  }
+  /**
+   * Unstage all staged files
+   */
+  async unstageAll() {
+    try {
+      const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+      let successCount = 0;
+      let failCount = 0;
+      for (const row of matrix) {
+        const [filepath, head, workdir, stage] = row;
+        if (head === 1 && workdir === 1 && stage === 1)
+          continue;
+        const hasStagedChanges = stage !== 1 && stage !== 0;
+        if (hasStagedChanges) {
+          try {
+            await this.unstageFile(filepath);
+            successCount++;
+          } catch (err) {
+            failCount++;
+            log2.warn("GitManager", `Failed to unstage ${filepath}: ${err.message}`);
+          }
+        }
+      }
+      log2.debug("GitManager", `Unstaged ${successCount} files, ${failCount} failed`);
+      if (failCount > 0 && successCount === 0) {
+        throw new Error(`Could not unstage ${failCount} file(s). resetIndex may not be available.`);
+      }
+    } catch (error) {
+      log2.error("GitManager", "Failed to unstage all files", error);
+      throw error;
     }
   }
   /**
@@ -19234,6 +19358,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.refreshInterval = null;
+    this.commitMessageInput = null;
+    this.stagedCount = 0;
     this.activeTab = "status";
     this.hasRemote = false;
     this.isLocalOnly = false;
@@ -19345,39 +19471,96 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   // ─── Footer ───
   renderFooter(container) {
+    var _a;
     container.empty();
-    new import_obsidian4.ButtonComponent(container).setButtonText("Stage All").setTooltip("Stage all changes").setClass("git-btn-secondary").onClick(async () => {
+    container.addClass("git-sidebar-footer");
+    const msgRow = container.createDiv("git-footer-message-row");
+    this.commitMessageInput = msgRow.createEl("input", {
+      type: "text",
+      cls: "git-footer-message-input",
+      placeholder: "Commit message...",
+      value: ((_a = this.commitMessageInput) == null ? void 0 : _a.value) || ""
+    });
+    const btnRow = container.createDiv("git-footer-buttons-row");
+    const commitBtn = new import_obsidian4.ButtonComponent(btnRow).setButtonText("Commit").setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
+    commitBtn.onClick(async () => {
+      var _a2, _b;
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian4.Notice("Git not initialized");
           return;
         }
-        await this.plugin.gitManager.addAll();
-        new import_obsidian4.Notice("All changes staged");
-        await this.refresh();
-      } catch (e) {
-        new import_obsidian4.Notice("Stage failed: " + e.message);
-      }
-    });
-    new import_obsidian4.ButtonComponent(container).setButtonText(this.isLocalOnly ? "Commit" : "Sync").setTooltip(this.isLocalOnly ? "Commit changes" : "Pull, commit, push").setClass("git-btn-primary").onClick(async () => {
-      try {
-        if (this.isLocalOnly || !this.plugin.settings.repoUrl) {
-          if (!this.plugin.gitManager) {
-            new import_obsidian4.Notice("Git not initialized");
-            return;
-          }
-          await this.plugin.gitManager.commit("Update from Obsidian");
-          new import_obsidian4.Notice("Changes committed");
-        } else {
-          await this.plugin.syncVault();
-          new import_obsidian4.Notice("Sync complete");
+        if (this.stagedCount === 0) {
+          new import_obsidian4.Notice("No staged files to commit");
+          return;
         }
+        const message = ((_b = (_a2 = this.commitMessageInput) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim()) || this.plugin.settings.autoCommitMessage.replace("{{date}}", (/* @__PURE__ */ new Date()).toLocaleString()) || "Update from Obsidian";
+        await this.plugin.gitManager.commit(message);
+        new import_obsidian4.Notice("Changes committed");
+        if (this.commitMessageInput)
+          this.commitMessageInput.value = "";
         await this.refresh();
       } catch (e) {
-        new import_obsidian4.Notice((this.isLocalOnly ? "Commit" : "Sync") + " failed: " + e.message);
+        new import_obsidian4.Notice("Commit failed: " + e.message);
       }
     });
-    new import_obsidian4.ButtonComponent(container).setButtonText("Refresh").setTooltip("Refresh git status").setClass("git-btn-ghost").onClick(async () => {
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2191").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+      try {
+        if (!this.plugin.gitManager) {
+          new import_obsidian4.Notice("Git not initialized");
+          return;
+        }
+        if (!this.hasRemote) {
+          new import_obsidian4.Notice("No remote configured");
+          return;
+        }
+        await this.plugin.gitManager.push(this.plugin.settings.branchName);
+        new import_obsidian4.Notice("Pushed to remote");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Push failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2191\u2191").setTooltip(this.hasRemote ? "Force push (overwrites remote history)" : "No remote configured").setClass("git-btn-danger").setDisabled(!this.hasRemote).onClick(async () => {
+      try {
+        if (!this.plugin.gitManager) {
+          new import_obsidian4.Notice("Git not initialized");
+          return;
+        }
+        if (!this.hasRemote) {
+          new import_obsidian4.Notice("No remote configured");
+          return;
+        }
+        const confirmed = window.confirm(
+          "Force push will overwrite remote history.\n\nOnly use this for first-time pushes or when you know the remote is safe to overwrite.\n\nContinue?"
+        );
+        if (!confirmed)
+          return;
+        await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
+        new import_obsidian4.Notice("Force pushed to remote");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Force push failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2193").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+      try {
+        if (!this.plugin.gitManager) {
+          new import_obsidian4.Notice("Git not initialized");
+          return;
+        }
+        if (!this.hasRemote) {
+          new import_obsidian4.Notice("No remote configured");
+          return;
+        }
+        await this.plugin.gitManager.pull(this.plugin.settings.branchName);
+        new import_obsidian4.Notice("Pulled from remote");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Pull failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u21BB").setTooltip("Refresh git status").setClass("git-btn-ghost").onClick(async () => {
       await this.refresh();
     });
   }
@@ -19430,6 +19613,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       case "log":
         await this.renderLogTab();
         break;
+    }
+    const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
+    if (footerEl) {
+      this.renderFooter(footerEl);
     }
   }
   async renderUninitializedContent(hasReal) {
@@ -19499,77 +19686,51 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   // ─── Tab renders ───
   async renderStatusTab() {
     var _a;
-    const listContainer = this.contentContainer.createDiv("git-status-list");
+    const container = this.contentContainer.createDiv("git-status-container");
     try {
       if (!this.plugin.gitManager) {
-        listContainer.createEl("p", { text: "Git manager not initialized", cls: "git-empty-state" });
+        container.createEl("p", { text: "Git manager not initialized", cls: "git-empty-state" });
         return;
       }
-      const files = await this.plugin.gitManager.getDetailedStatus();
-      if (files.length === 0) {
-        listContainer.createEl("p", { text: "No changes \u2014 working tree clean", cls: "git-empty-state" });
-        return;
-      }
-      const statusIcons = {
-        modified: "M",
-        added: "A",
-        deleted: "D",
-        untracked: "?",
-        staged: "S",
-        conflict: "C"
-      };
-      const statusClasses = {
-        modified: "git-status-modified",
-        added: "git-status-added",
-        deleted: "git-status-deleted",
-        untracked: "git-status-untracked",
-        staged: "git-status-staged",
-        conflict: "git-status-conflict"
-      };
-      for (const file of files) {
-        const row = listContainer.createDiv("git-file-row");
-        row.createSpan({
-          text: statusIcons[file.status] || file.status[0].toUpperCase(),
-          cls: "git-status-icon " + (statusClasses[file.status] || "")
-        });
-        const pathEl = row.createSpan({ text: file.filepath, cls: "git-file-path" });
-        pathEl.setAttr("title", file.filepath);
-        const actions = row.createDiv("git-file-actions");
-        if (file.status === "untracked" || file.status === "modified") {
-          const btn = actions.createEl("button", { text: "+", cls: "git-file-btn" });
-          btn.setAttr("title", "Stage file");
-          btn.addEventListener("click", async (e) => {
-            var _a2;
-            e.stopPropagation();
-            try {
-              await ((_a2 = this.plugin.gitManager) == null ? void 0 : _a2.stageFile(file.filepath));
-              new import_obsidian4.Notice(`Staged ${file.filepath}`);
-              await this.refresh();
-            } catch (err) {
-              new import_obsidian4.Notice("Stage failed: " + err.message);
-            }
-          });
-        } else if (file.status === "staged") {
-          const btn = actions.createEl("button", { text: "\u2212", cls: "git-file-btn" });
-          btn.setAttr("title", "Unstage file");
-          btn.addEventListener("click", async (e) => {
-            var _a2;
-            e.stopPropagation();
-            try {
-              await ((_a2 = this.plugin.gitManager) == null ? void 0 : _a2.unstageFile(file.filepath));
-              new import_obsidian4.Notice(`Unstaged ${file.filepath}`);
-              await this.refresh();
-            } catch (err) {
-              new import_obsidian4.Notice("Unstage failed: " + err.message);
-            }
-          });
+      const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
+      this.stagedCount = staged.length;
+      this.renderCollapsibleSection(
+        container,
+        "Staged",
+        staged,
+        "staged",
+        "\u2212",
+        "\u2212 all",
+        async (fp) => {
+          await this.plugin.gitManager.unstageFile(fp);
+          new import_obsidian4.Notice(`Unstaged ${fp}`);
+        },
+        async () => {
+          await this.plugin.gitManager.unstageAll();
+          new import_obsidian4.Notice("All files unstaged");
         }
-      }
+      );
+      this.renderCollapsibleSection(
+        container,
+        "Uncommitted Changes",
+        unstaged,
+        "unstaged",
+        "+",
+        "+ all",
+        async (fp) => {
+          await this.plugin.gitManager.stageFile(fp);
+          new import_obsidian4.Notice(`Staged ${fp}`);
+        },
+        async () => {
+          await this.plugin.gitManager.addAll();
+          new import_obsidian4.Notice("All changes staged");
+        }
+      );
     } catch (e) {
       log2.warn("GitSidebar", "Failed to get file status", e);
-      listContainer.empty();
+      container.empty();
       if (e.isPackIndexError || ((_a = e.message) == null ? void 0 : _a.includes("Pack index"))) {
-        const errContainer = listContainer.createDiv("git-uninit-container");
+        const errContainer = container.createDiv("git-uninit-container");
         errContainer.createEl("p", { text: "\u26A0\uFE0F Changes view temporarily unavailable", cls: "git-uninit-title" });
         errContainer.createEl("p", {
           text: 'isomorphic-git cannot read a pack index file in your repo. This happens with certain pack file formats. Try running "git repack -ad" in your repo to rebuild pack files, or use the command line for now.',
@@ -19580,9 +19741,66 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           await this.refresh();
         });
       } else {
-        const errContainer = listContainer.createDiv("git-uninit-container");
+        const errContainer = container.createDiv("git-uninit-container");
         errContainer.createEl("p", { text: "Error reading git status", cls: "git-uninit-title" });
         errContainer.createEl("p", { text: e.message || String(e), cls: "git-uninit-desc" });
+      }
+    }
+  }
+  renderCollapsibleSection(container, title, files, sectionClass, actionLabel, bulkLabel, onAction, onBulk) {
+    const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
+    const isCollapsed = files.length === 0;
+    section.setAttr("data-collapsed", String(isCollapsed));
+    const header = section.createDiv("git-status-section-header");
+    const toggle = header.createSpan({ cls: "git-section-toggle" });
+    toggle.setText(isCollapsed ? "\u25B8" : "\u25BE");
+    header.createSpan({ text: title, cls: "git-status-section-label" });
+    const countBadge = header.createSpan({
+      text: String(files.length),
+      cls: "git-status-section-count"
+    });
+    const bulkBtn = header.createEl("button", { text: bulkLabel, cls: "git-status-section-action" });
+    bulkBtn.setAttr("title", bulkLabel);
+    bulkBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await onBulk();
+        await this.refresh();
+      } catch (err) {
+        new import_obsidian4.Notice(`${bulkLabel} failed: ${err.message}`);
+      }
+    });
+    header.addEventListener("click", (e) => {
+      if (e.target === bulkBtn || bulkBtn.contains(e.target))
+        return;
+      const currentlyCollapsed = section.getAttr("data-collapsed") === "true";
+      section.setAttr("data-collapsed", String(!currentlyCollapsed));
+      toggle.setText(!currentlyCollapsed ? "\u25B8" : "\u25BE");
+    });
+    const list = section.createDiv("git-status-section-list");
+    if (files.length === 0) {
+      const emptyMsg = sectionClass === "staged" ? "No staged files" : "No uncommitted changes";
+      list.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
+    } else {
+      for (const filepath of files) {
+        const row = list.createDiv("git-file-row");
+        const iconClass = sectionClass === "staged" ? "git-status-staged" : "git-status-modified";
+        const iconText = sectionClass === "staged" ? "S" : "M";
+        row.createSpan({ text: iconText, cls: `git-status-icon ${iconClass}` });
+        const pathEl = row.createSpan({ text: filepath, cls: "git-file-path" });
+        pathEl.setAttr("title", filepath);
+        const actions = row.createDiv("git-file-actions");
+        const btn = actions.createEl("button", { text: actionLabel, cls: "git-file-btn" });
+        btn.setAttr("title", sectionClass === "staged" ? "Unstage file" : "Stage file");
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          try {
+            await onAction(filepath);
+            await this.refresh();
+          } catch (err) {
+            new import_obsidian4.Notice(`${actionLabel} failed: ${err.message}`);
+          }
+        });
       }
     }
   }
@@ -19868,6 +20086,7 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     const credentials = {
       username: this.settings.username,
       password: this.settings.password,
+      repoUrl: this.settings.repoUrl,
       author: {
         name: this.settings.author.name || "Obsidian Git User",
         email: this.settings.author.email || "user@example.com"
@@ -19956,6 +20175,7 @@ var GitSyncPlugin = class extends import_obsidian5.Plugin {
     this.gitManager.updateCredentials({
       username: this.settings.username,
       password: this.settings.password,
+      repoUrl: this.settings.repoUrl,
       author: {
         name: this.settings.author.name || "Obsidian Git Sync User",
         email: this.settings.author.email || "user@example.com"
@@ -20075,11 +20295,23 @@ var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian5.Setting(containerEl).setName("Password / Personal Access Token").setDesc("Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.").addText((text) => text.setPlaceholder("ghp_... or password").setValue(this.plugin.settings.password).onChange(async (value) => {
-      text.inputEl.type = "password";
-      this.plugin.settings.password = value;
-      await this.plugin.saveSettings();
-    }));
+    new import_obsidian5.Setting(containerEl).setName("Password / Personal Access Token").setDesc("Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.").addText((text) => {
+      const input = text.setPlaceholder("ghp_... or password").setValue(this.plugin.settings.password).onChange(async (value) => {
+        this.plugin.settings.password = value;
+        await this.plugin.saveSettings();
+      });
+      input.inputEl.type = "password";
+      return input;
+    }).addExtraButton((button) => {
+      button.setIcon("eye").setTooltip("Show/hide token").onClick(() => {
+        const setting = button.extraSettingsEl.closest(".setting-item");
+        const input = setting == null ? void 0 : setting.querySelector("input");
+        if (input) {
+          input.type = input.type === "password" ? "text" : "password";
+          button.setIcon(input.type === "password" ? "eye" : "eye-off");
+        }
+      });
+    });
     new import_obsidian5.Setting(containerEl).setName("Author Name").setDesc("Your name for Git commits").addText((text) => text.setPlaceholder("Your Name").setValue(this.plugin.settings.author.name).onChange(async (value) => {
       this.plugin.settings.author.name = value;
       await this.plugin.saveSettings();

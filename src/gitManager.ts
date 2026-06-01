@@ -127,6 +127,7 @@ export interface GitCommit {
 export interface GitCredentials {
     username: string;
     password: string;
+    repoUrl?: string;
     author: {
         name: string;
         email: string;
@@ -164,6 +165,32 @@ export class GitManager {
     /**
      * Initialize a new repository or check if one exists
      */
+    /**
+     * Ensure the 'origin' remote is configured with the given URL
+     */
+    async ensureRemote(repoUrl: string): Promise<void> {
+        try {
+            const remotes = await git.listRemotes({ fs: this.fs, dir: this.dir });
+            const hasOrigin = remotes.some((r: any) => r.remote === 'origin');
+            
+            if (!hasOrigin) {
+                log.info('GitManager', `Adding remote 'origin' -> ${repoUrl}`);
+                await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: repoUrl });
+            } else {
+                // Optionally update URL if it changed
+                const origin = remotes.find((r: any) => r.remote === 'origin');
+                if (origin && origin.url !== repoUrl) {
+                    log.info('GitManager', `Updating remote 'origin' URL: ${origin.url} -> ${repoUrl}`);
+                    await git.deleteRemote({ fs: this.fs, dir: this.dir, remote: 'origin' });
+                    await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: repoUrl });
+                }
+            }
+        } catch (error) {
+            log.error('GitManager', 'Failed to ensure remote', error);
+            throw error;
+        }
+    }
+
     async initializeRepo(repoUrl: string, branchName: string): Promise<boolean> {
         try {
             log.debug('GitManager', `Initializing repository: ${repoUrl}, branch: ${branchName}`);
@@ -171,34 +198,53 @@ export class GitManager {
             const isRepo = await this.isRepository();
             
             if (!isRepo) {
-                this.updateStatus('Cloning repository...');
-                log.info('GitManager', `Cloning repository from ${repoUrl} (branch: ${branchName})`);
-                
-                // Clone the repository
-                await git.clone({
-                    fs: this.fs,
-                    http: new GitHttpClient(this.credentials),
-                    dir: this.dir,
-                    url: repoUrl,
-                    ref: branchName,
-                    singleBranch: true,
-                    depth: 1,
-                    onAuth: () => {
-                        log.debug('GitManager', 'Authentication requested by remote');
-                        return {
-                            username: this.credentials.username,
-                            password: this.credentials.password
-                        };
-                    }
-                });
-                
-                this.updateStatus('Repository cloned');
-                log.info('GitManager', `Repository successfully cloned to ${this.dir}`);
-                return true;
+                // Try to clone first, but if remote is empty, fall back to local init
+                try {
+                    this.updateStatus('Cloning repository...');
+                    log.info('GitManager', `Cloning repository from ${repoUrl} (branch: ${branchName})`);
+                    
+                    await git.clone({
+                        fs: this.fs,
+                        http: new GitHttpClient(this.credentials),
+                        dir: this.dir,
+                        url: repoUrl,
+                        ref: branchName,
+                        singleBranch: true,
+                        depth: 1,
+                        onAuth: () => {
+                            log.debug('GitManager', 'Authentication requested by remote');
+                            return {
+                                username: this.credentials.username,
+                                password: this.credentials.password
+                            };
+                        }
+                    });
+                    
+                    this.updateStatus('Repository cloned');
+                    log.info('GitManager', `Repository successfully cloned to ${this.dir}`);
+                    return true;
+                } catch (cloneError: any) {
+                    // If clone fails because remote is empty, initialize locally instead
+                    log.warn('GitManager', `Clone failed, initializing locally: ${cloneError.message}`);
+                    
+                    this.updateStatus('Initializing local repository...');
+                    log.info('GitManager', `Initializing empty repo at ${this.dir}`);
+                    
+                    await git.init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+                    await this.ensureRemote(repoUrl);
+                    
+                    this.updateStatus('Local repository initialized');
+                    log.info('GitManager', `Local repo initialized, remote configured: ${repoUrl}`);
+                    return true;
+                }
             }
             
-            // If repository exists locally, validate the remote URL
-            // by attempting to list the remote refs
+            // If repository exists locally, ensure remote is configured
+            if (repoUrl) {
+                await this.ensureRemote(repoUrl);
+            }
+            
+            // Validate the remote URL by attempting to list the remote refs
             this.updateStatus('Validating repository...');
             log.debug('GitManager', `Validating remote repository URL: ${repoUrl}`);
             
@@ -246,6 +292,11 @@ export class GitManager {
         try {
             this.updateStatus('Pulling changes...');
             
+            // Ensure remote is configured before pulling
+            if (this.credentials.repoUrl) {
+                await this.ensureRemote(this.credentials.repoUrl);
+            }
+            
             await git.pull({
                 fs: this.fs,
                 http: new GitHttpClient(this.credentials),
@@ -253,6 +304,10 @@ export class GitManager {
                 ref: branchName,
                 singleBranch: true,
                 fastForwardOnly: true,
+                author: {
+                    name: this.credentials.author.name || 'Obsidian Git',
+                    email: this.credentials.author.email || 'obsidian@example.com'
+                },
                 onAuth: () => ({
                     username: this.credentials.username,
                     password: this.credentials.password
@@ -345,10 +400,15 @@ export class GitManager {
     /**
      * Push changes to the remote repository
      */
-    async push(branchName: string): Promise<void> {
+    async push(branchName: string, force: boolean = false): Promise<void> {
         try {
             this.updateStatus('Pushing changes...');
             log.debug('GitManager', `Pushing changes to remote branch: ${branchName}`);
+            
+            // Ensure remote is configured before pushing
+            if (this.credentials.repoUrl) {
+                await this.ensureRemote(this.credentials.repoUrl);
+            }
             
             await git.push({
                 fs: this.fs,
@@ -356,6 +416,7 @@ export class GitManager {
                 dir: this.dir,
                 remote: 'origin',
                 ref: branchName,
+                force,
                 onAuth: () => {
                     log.debug('GitManager', 'Authentication requested for push operation');
                     return {
@@ -367,9 +428,24 @@ export class GitManager {
             
             this.updateStatus('Push completed');
             log.info('GitManager', `Successfully pushed changes to remote branch: ${branchName}`);
-        } catch (error) {
+        } catch (error: any) {
             log.error('GitManager', `Failed to push changes to branch ${branchName}`, error);
             this.updateStatus('Push failed');
+            
+            // Check for common push errors and provide helpful messages
+            if (error.message?.includes('not a fast-forward') || error.message?.includes('rejected')) {
+                throw new Error(
+                    `Push rejected: The remote has commits that you don't have locally. ` +
+                    `Pull first to get the latest changes, then push again. ` +
+                    `If this is a first-time push to an empty repo, use Force Push.`
+                );
+            }
+            if (error.message?.includes('auth') || error.message?.includes('401') || error.message?.includes('403')) {
+                throw new Error(
+                    `Authentication failed. Check your token/username in the plugin settings. ` +
+                    `Make sure your PAT has 'Contents: Read and Write' permission.`
+                );
+            }
             throw error;
         }
     }
@@ -442,7 +518,7 @@ export class GitManager {
                 else if (workdir === 0) status = 'deleted';
                 else if (head === 1 && workdir === 2 && stage === 1) status = 'modified';
                 else if (head === 1 && workdir === 1 && stage === 2) status = 'staged';
-                else if (head === 1 && workdir === 2 && stage === 2) status = 'modified'; // staged + modified
+                else if (head === 1 && workdir === 2 && stage === 2) status = 'staged'; // staged + modified → show as staged
                 else status = 'modified';
                 
                 result.push({ filepath, status });
@@ -466,6 +542,38 @@ export class GitManager {
     }
 
     /**
+     * Get status groups: staged and unstaged file lists
+     * A file that is both staged AND modified appears only in staged.
+     */
+    async getStatusGroups(): Promise<{ staged: string[]; unstaged: string[] }> {
+        try {
+            const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+            const staged: string[] = [];
+            const unstaged: string[] = [];
+            
+            for (const row of matrix) {
+                const [filepath, head, workdir, stage] = row;
+                if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
+                
+                const hasStagedChanges = stage !== 1 && stage !== 0;
+                const hasWorkdirChanges = workdir !== 1;
+                
+                if (hasStagedChanges) {
+                    staged.push(filepath);
+                }
+                if (hasWorkdirChanges && !hasStagedChanges) {
+                    unstaged.push(filepath);
+                }
+            }
+            
+            return { staged, unstaged };
+        } catch (error: any) {
+            log.error('GitManager', 'Failed to get status groups', error);
+            throw error;
+        }
+    }
+
+    /**
      * Stage a single file
      */
     async stageFile(filepath: string): Promise<void> {
@@ -479,30 +587,75 @@ export class GitManager {
     }
 
     /**
-     * Unstage a single file (reset to HEAD)
+     * Unstage a single file (reset to HEAD, or remove from index for new files)
      */
     async unstageFile(filepath: string): Promise<void> {
         try {
             // Try resetIndex if available (newer isomorphic-git versions)
+            // IMPORTANT: do NOT pass ref: 'HEAD' explicitly — if HEAD doesn't exist
+            // (fresh repo, no commits), isomorphic-git throws when ref is explicit,
+            // but gracefully skips when ref is omitted (defaults to HEAD internally).
             if ((git as any).resetIndex) {
-                await (git as any).resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
+                await (git as any).resetIndex({ fs: this.fs, dir: this.dir, filepath });
                 log.debug('GitManager', `Unstaged file: ${filepath}`);
                 return;
             }
             
-            // Fallback: remove from staging by checking out from HEAD
-            // Read the file content from HEAD and write it back
-            const { blob } = await git.readBlob({
-                fs: this.fs,
-                dir: this.dir,
-                oid: 'HEAD',
-                filepath
-            });
-            await this.fs.promises.writeFile(this.dir + '/' + filepath, blob);
-            log.debug('GitManager', `Unstaged file (fallback): ${filepath}`);
+            // Fallback: check if file exists in HEAD first
+            try {
+                const { blob } = await git.readBlob({
+                    fs: this.fs,
+                    dir: this.dir,
+                    oid: 'HEAD',
+                    filepath
+                });
+                await this.fs.promises.writeFile(this.dir + '/' + filepath, blob);
+                log.debug('GitManager', `Unstaged file (HEAD fallback): ${filepath}`);
+            } catch (headErr: any) {
+                // File not in HEAD — it's a new file. Without resetIndex we can't
+                // properly remove it from the index. Log and skip.
+                log.warn('GitManager', `Cannot unstage new file ${filepath}: resetIndex not available and file not in HEAD`);
+                // Re-throw with a clearer message so UI can show it
+                throw new Error(`Cannot unstage new file "${filepath}". Please upgrade isomorphic-git or use git CLI.`);
+            }
         } catch (error: any) {
             log.error('GitManager', `Failed to unstage file: ${filepath}`, error);
-            throw new Error(`Cannot unstage ${filepath}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Unstage all staged files
+     */
+    async unstageAll(): Promise<void> {
+        try {
+            const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const row of matrix) {
+                const [filepath, head, workdir, stage] = row;
+                if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
+                
+                const hasStagedChanges = stage !== 1 && stage !== 0;
+                if (hasStagedChanges) {
+                    try {
+                        await this.unstageFile(filepath);
+                        successCount++;
+                    } catch (err: any) {
+                        failCount++;
+                        log.warn('GitManager', `Failed to unstage ${filepath}: ${err.message}`);
+                    }
+                }
+            }
+            
+            log.debug('GitManager', `Unstaged ${successCount} files, ${failCount} failed`);
+            if (failCount > 0 && successCount === 0) {
+                throw new Error(`Could not unstage ${failCount} file(s). resetIndex may not be available.`);
+            }
+        } catch (error: any) {
+            log.error('GitManager', 'Failed to unstage all files', error);
+            throw error;
         }
     }
 

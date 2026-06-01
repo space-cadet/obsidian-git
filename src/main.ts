@@ -264,6 +264,7 @@ export default class GitSyncPlugin extends Plugin {
 		const credentials: GitCredentials = {
 			username: this.settings.username,
 			password: this.settings.password,
+			repoUrl: this.settings.repoUrl,
 			author: {
 				name: this.settings.author.name || 'Obsidian Git User',
 				email: this.settings.author.email || 'user@example.com'
@@ -375,6 +376,7 @@ export default class GitSyncPlugin extends Plugin {
 		this.gitManager.updateCredentials({
 			username: this.settings.username,
 			password: this.settings.password,
+			repoUrl: this.settings.repoUrl,
 			author: {
 				name: this.settings.author.name || 'Obsidian Git Sync User',
 				email: this.settings.author.email || 'user@example.com'
@@ -544,14 +546,33 @@ class GitSyncSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName('Password / Personal Access Token')
 			.setDesc('Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.')
-			.addText(text => text
-				.setPlaceholder('ghp_... or password')
-				.setValue(this.plugin.settings.password)
-				.onChange(async (value: string) => {
-					text.inputEl.type = 'password';
-					this.plugin.settings.password = value;
-					await this.plugin.saveSettings();
-				}));
+			.addText(text => {
+				const input = text
+					.setPlaceholder('ghp_... or password')
+					.setValue(this.plugin.settings.password)
+					.onChange(async (value: string) => {
+						this.plugin.settings.password = value;
+						await this.plugin.saveSettings();
+					});
+				
+				// Force password type immediately
+				input.inputEl.type = 'password';
+				
+				return input;
+			})
+			.addExtraButton(button => {
+				button
+					.setIcon('eye')
+					.setTooltip('Show/hide token')
+					.onClick(() => {
+						const setting = button.extraSettingsEl.closest('.setting-item') as HTMLElement;
+						const input = setting?.querySelector('input') as HTMLInputElement;
+						if (input) {
+							input.type = input.type === 'password' ? 'text' : 'password';
+							button.setIcon(input.type === 'password' ? 'eye' : 'eye-off');
+						}
+					});
+			});
 
 		new Setting(containerEl)
 			.setName('Author Name')

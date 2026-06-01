@@ -11,8 +11,14 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
-| T6 | Git Sidebar UI | ✅ COMPLETE | HIGH | 2026-05-30 | 2026-05-31 | T3 | [Details](tasks/T6.md) |
-| T7 | Multi-Repo Support | 🆕 | MEDIUM | 2026-05-30 | - | T3 | [Details](tasks/T7.md) |
+| T30 | Remote Commits View | 🆕 PLANNED | MEDIUM | 2026-06-01 | T29 | [Details](tasks/T30.md) |
+| T7 | Multi-Repo Support | 🆕 | MEDIUM | 2026-05-30 | - | [Details](tasks/T7.md) |
+
+## Backlog / Pending Tasks
+
+| ID | Title | Status | Priority | Created | Details |
+|----|-------|--------|----------|---------|---------|
+| T31 | Branch Tree View | ⏳ BACKLOG | LOW | 2026-06-01 | [Details](tasks/T31.md) |
 
 ## Completed Tasks
 
