@@ -1,7 +1,32 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-05-31 18:00:00 IST*
+*Last Updated: 2026-06-01 10:51:00 IST*
+
+### 2026-06-01
+
+#### 09:06:00 IST - T29: v25 Commits tab redesign + CI workflow
+- Modified `src/gitManager.ts` - Added `getCommitFiles()` method: recursively diffs commit trees to find added/modified/deleted files for expandable commit view
+- Modified `src/gitManager.ts` - Added `getRemoteLog()` method: fetches `origin/main` (or configured branch) commits via `git.log({ ref: 'origin/branch' })`
+- Modified `src/gitManager.ts` - Added private `readTreeRecursive()` helper for tree traversal
+- Modified `src/views/GitSidebarView.ts` - Renamed "History" tab to "Commits"
+- Modified `src/views/GitSidebarView.ts` - Added `commitsViewMode` state ('local' | 'remote') with toggle bar UI
+- Modified `src/views/GitSidebarView.ts` - Made commits expandable: click to show changed files with +/−/● icons
+- Modified `src/views/GitSidebarView.ts` - Added `renderCommitDetail()` for lazy-loaded file change lists
+- Modified `styles.css` - Added `.git-commits-toggle-bar`, `.git-commits-toggle-btn`, `.git-commits-toggle-active` styles
+- Modified `styles.css` - Added `.git-commit-detail`, `.git-commit-file-row`, file status icon styles (+ green, − red, ● blue)
+- Modified `styles.css` - Added `.git-commit-remote` with accent left border and `.git-commit-remote-badge`
+- Created `README.md` - Comprehensive documentation: features, installation, setup, troubleshooting, changelog
+- Created `screenshots/sidebar-overview.jpg` - Full sidebar view for README
+- Created `screenshots/changes-tab.jpg` - Changes tab with staged/uncommitted files
+- Created `screenshots/commits-tab.jpg` - Commits tab with Local/Remote toggle and expandable files
+- Created `.github/workflows/build-release.yml` - GitHub Actions workflow: build, archive, upload artifact on push/PR
+- Created `.github/workflows/build-release.yml` - `dev-release` job: creates/updates `dev` pre-release on every push to main
+- Created `.github/workflows/build-release.yml` - `release` job: creates stable release on `v*` tags
+- Modified `pnpm-workspace.yaml` - Added `packages: ['.']` field for pnpm CI compatibility
+- Modified `README.md` - Updated installation instructions to reference GitHub Releases
+
+### 2026-05-31
 
 #### 18:15:00 IST - T29: v16 — Empty file read + History tab noise
 - Modified `src/adapters/ObsidianFsAdapter.ts` — `readFileImpl()`: Changed `if (arrayBuffer && arrayBuffer.byteLength > 0)` to `if (arrayBuffer != null)` — empty files (byteLength=0) ARE valid and readable by git.add()
@@ -88,8 +113,8 @@
 - Created `memory-bank/tasks/T4.md` — Auto-sync & Background task details
 - Created `memory-bank/tasks/T5.md` — Error Handling & Logging task details
 - Updated `memory-bank/tasks.md` — Expanded registry with 5 tasks (1 active, 4 completed)
-- Created `memory-bank/implementation-details/git-http-client.md` — requestUrl architecture documentation
-- Created `memory-bank/implementation-details/mobile-compatibility.md` — Mobile strategy and winston replacement docs
+- Updated `memory-bank/implementation-details/git-http-client.md` — requestUrl architecture documentation
+- Updated `memory-bank/implementation-details/mobile-compatibility.md` — Mobile strategy and winston replacement docs
 - Updated `memory-bank/activeContext.md` — Current focus on T3, completed tasks listed
 - Updated `memory-bank/progress.md` — Phase tracking with milestones
 - Updated `memory-bank/session_cache.md` — Evening session tracking

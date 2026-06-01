@@ -1,19 +1,19 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-05-31 01:38:00 IST*
+*Last Updated: 2026-06-01 10:51:00 IST*
 
 ## Current Session
-**Started**: 2026-05-31 00:17:00 IST
-**Ended**: 2026-05-31 01:38:00 IST
-**Focus Task**: T6: Git Sidebar UI — ✅ COMPLETED (Phase 2: ObsidianFsAdapter fix)
-**Session File**: `memory-bank/sessions/2026-05-31-0017.md`
-**Status**: ✅ CLOSED
+**Started**: 2026-06-01 09:06:00 IST
+**Ended**: 2026-06-01 10:51:00 IST
+**Focus Task**: T29: obsidian-git Plugin — v25 + CI workflow
+**Session File**: `memory-bank/sessions/2026-06-01-morning.md`
+**Status**: 🔄 ACTIVE (session split recommended at ~60%)
 
 ## Overview
-- Active: 0 | Paused: 0 | Completed: 6
+- Active: 1 | Paused: 0 | Completed: 6
 - Last Session: 2026-05-31 late night (T6 Phase 2 fix)
-- Current Period: closed
+- Current Period: morning
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED
@@ -21,28 +21,28 @@
 - T3: Mobile Compatibility — ✅ COMPLETED
 - T4: Auto-sync & Background — ✅ COMPLETED
 - T5: Error Handling & Logging — ✅ COMPLETED
-- T6: Git Sidebar UI — ✅ COMPLETED (Phase 1 + Phase 2: ObsidianFsAdapter fix)
-- T7: Multi-Repo Support — 🆕 ACTIVE (next session)
+- T6: Git Sidebar UI — ✅ COMPLETED
+- T29: obsidian-git Plugin — 🔄 IN PROGRESS (v25 shipped, CI working)
+- T30: Remote Commits View — ✅ COMPLETED (merged into v25)
+- T31: Branch Tree View — ⏳ BACKLOG
 
-## This Session Summary
-- **Problem**: Plugin couldn't detect existing .git repos because LightningFS creates a virtual filesystem
-- **Solution**: Built ObsidianFsAdapter — custom filesystem adapter delegating to `app.vault.adapter`
-- **Files**: Created `src/adapters/ObsidianFsAdapter.ts`, modified `main.ts`, `gitManager.ts`, `GitSidebarView.ts`, `package.json`
-- **Key fix**: `vaultPath` changed from vault display name to empty string `''` (vault root)
-- **Detection**: `detectRealGitRepo()` now tries `adapter.read()`, `adapter.stat()`, and `git.findRoot()`
-- **Build**: ✅ pass, ~280KB (smaller without LightningFS)
-- **Commits**: `5cc6b11`, `9577028`
-- **Delivered**: ZIP file sent via Telegram
+## Active Tasks
+### T29: obsidian-git Plugin
+**Status:** 🔄 **Priority:** HIGH
+**Started:** 2026-05-31 **Last:** 2026-06-01
+**Context**: v25 shipped with Commits tab redesign (expandable, remote toggle). CI workflow working. Dev releases auto-created on every push.
+**Files**: `src/gitManager.ts`, `src/views/GitSidebarView.ts`, `styles.css`, `README.md`, `.github/workflows/build-release.yml`
+**Progress**:
+1. ✅ v25: Commits tab redesign
+2. ✅ README + screenshots
+3. ✅ CI workflow (GitHub Actions)
+4. ✅ Dev releases on every push
+5. ⬜ Test on desktop/mobile
+6. ⬜ Tagged v1.0.0 release
 
-## Open Items for Next Session
-- **Desktop testing**: User will test on desktop tomorrow (2026-06-01)
-- **Android detection**: `adapter.stat()` may not work on mobile — need alternative or fallback
-- **T7: Multi-Repo Support** — next task to implement
-
-## Decisions Made
-- **Filesystem adapter**: Always use ObsidianFsAdapter over LightningFS for isomorphic-git inside Obsidian
-- **Path resolution**: Empty string `''` for vault root, never use vault display name as path
-- **Auto-init**: Sidebar and commands use `ensureGitManager()` to lazily initialize when repo detected
-
-## Context Usage
-Session ended at ~45% — healthy.
+## Session History (Last 5)
+1. `sessions/2026-06-01-morning.md` — v25 + CI workflow
+2. `sessions/2026-05-31-0017.md` — T6 Phase 2: ObsidianFsAdapter fix
+3. `sessions/2026-05-31-afternoon.md` — T29 v17-v24 development
+4. `sessions/2026-05-31-morning.md` — T29 initial development
+5. `sessions/2026-05-30-evening.md` — T1-T5 core features
