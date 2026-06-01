@@ -210,22 +210,29 @@ export function createGitEmitter(onProgress?: (phase: string, loaded: number, to
  * Create an onProgress callback that updates a persistent Notice.
  * Returns [callback, hideNotice] so caller can clean up on success/error.
  */
-export function createProgressNotice(initialMessage: string): [(event: any) => void, () => void] {
+export function createProgressNotice(initialMessage: string): [(event: any) => void, (text: string) => void, () => void] {
     let notice: Notice | null = new Notice(initialMessage, 0);
     let currentPhase = '';
 
     const onProgress = (event: any) => {
-        const { phase, loaded, total, lengthComputable } = event;
+        const { phase, loaded, total } = event;
         if (phase && phase !== currentPhase) {
             currentPhase = phase;
         }
         let msg = `${initialMessage} — ${phase || 'working'}`;
-        if (lengthComputable && total > 0) {
+        if (total > 0) {
             const pct = Math.round((loaded / total) * 100);
             msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
         } else if (loaded > 0) {
             msg += ` (${Math.round(loaded / 1024)}KB)`;
         }
+        if (notice) {
+            notice.setMessage(msg);
+        }
+    };
+
+    const onMessage = (text: string) => {
+        const msg = `${initialMessage} — ${text}`;
         if (notice) {
             notice.setMessage(msg);
         }
@@ -238,7 +245,7 @@ export function createProgressNotice(initialMessage: string): [(event: any) => v
         }
     };
 
-    return [onProgress, hideNotice];
+    return [onProgress, onMessage, hideNotice];
 }
 
 
@@ -580,7 +587,7 @@ export class GitManager {
                 return;
             }
 
-            const [onProgress, hideNotice] = this.app 
+            const [onProgress, onMessage, hideNotice] = this.app 
                 ? createProgressModal(this.app, 'Pulling from remote')
                 : createProgressNotice('Pulling from remote');
 
@@ -600,7 +607,8 @@ export class GitManager {
                         username: this.credentials.username,
                         password: this.credentials.password
                     }),
-                    onProgress
+                    onProgress,
+                    onMessage
                 });
 
                 hideNotice();
@@ -621,12 +629,48 @@ export class GitManager {
      * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
      */
     private async shallowFetchAndCheckout(branchName: string): Promise<void> {
-        const [onProgress, hideNotice] = this.app
+        const [onProgress, onMessage, hideNotice] = this.app
             ? createProgressModal(this.app, 'Fetching remote files')
             : createProgressNotice('Fetching remote files');
 
         try {
-            // Fetch only the branch tip with depth 1
+            // STRATEGY: Try git.clone first — it's more memory-efficient than fetch+checkout
+            // because clone handles the packfile streaming internally.
+            // We remove the existing .git directory (safe: no local commits means no local data).
+            try {
+                this.updateStatus('Cloning repository (memory-efficient)...');
+                log.info('GitManager', 'Attempting clone for memory efficiency');
+                
+                // Remove existing .git to allow clone
+                await this.fs.promises.rmdir(this.dir + '/.git', { recursive: true });
+                
+                await git.clone({
+                    fs: this.fs,
+                    http: new GitHttpClient(this.credentials),
+                    dir: this.dir,
+                    url: this.credentials.repoUrl || '',
+                    ref: branchName,
+                    singleBranch: true,
+                    depth: 1,
+                    onAuth: () => ({
+                        username: this.credentials.username,
+                        password: this.credentials.password
+                    }),
+                    onProgress,
+                    onMessage
+                });
+                
+                hideNotice();
+                this.updateStatus('Repository cloned');
+                log.info('GitManager', `Clone successful for ${branchName}`);
+                return;
+            } catch (cloneError: any) {
+                log.warn('GitManager', `Clone failed, falling back to fetch: ${cloneError.message}`);
+                // Continue to fallback...
+            }
+            
+            // FALLBACK: git.fetch + git.checkout
+            // Use onMessage for progress since git.fetch with custom HTTP doesn't emit onProgress
             await git.fetch({
                 fs: this.fs,
                 http: new GitHttpClient(this.credentials),
@@ -639,7 +683,7 @@ export class GitManager {
                     username: this.credentials.username,
                     password: this.credentials.password
                 }),
-                onProgress
+                onMessage
             });
 
             // Get the fetched commit OID
@@ -678,7 +722,7 @@ export class GitManager {
      * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
      */
     async cloneRepository(repoUrl: string, branchName: string, depth: number = 1): Promise<void> {
-        const [onProgress, hideNotice] = this.app
+        const [onProgress, onMessage, hideNotice] = this.app
             ? createProgressModal(this.app, `Cloning ${branchName}`)
             : createProgressNotice(`Cloning ${branchName}`);
 
@@ -698,7 +742,8 @@ export class GitManager {
                     username: this.credentials.username,
                     password: this.credentials.password
                 }),
-                onProgress
+                onProgress,
+                onMessage
             });
 
             hideNotice();
@@ -799,7 +844,7 @@ export class GitManager {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
             
-            const [onProgress, hn] = this.app
+            const [onProgress, onMessage, hn] = this.app
                 ? createProgressModal(this.app, 'Pushing to remote')
                 : createProgressNotice('Pushing to remote');
             hideNotice = hn;
@@ -818,7 +863,8 @@ export class GitManager {
                         password: this.credentials.password
                     };
                 },
-                onProgress
+                onProgress,
+                onMessage
             });
             
             hideNotice();

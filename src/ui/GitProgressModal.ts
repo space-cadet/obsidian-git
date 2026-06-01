@@ -10,21 +10,30 @@ interface ProgressPhase {
     detail?: string;
 }
 
+interface MessagePhase {
+    text: string;
+    timestamp: number;
+}
+
 export class GitProgressModal extends Modal {
     private phases: Map<string, ProgressPhase> = new Map();
+    private messages: MessagePhase[] = [];
     private container: HTMLElement;
     private headerEl: HTMLElement;
     private phasesEl: HTMLElement;
     private footerEl: HTMLElement;
     private operationName: string;
     private startTime: number;
-    private updateTimer: number | null = null;
     private isComplete: boolean = false;
+    private bytesLoaded: number = 0;
+    private lastUpdateTime: number = 0;
+    private transferRate: string = '';
 
     constructor(app: App, operationName: string) {
         super(app);
         this.operationName = operationName;
         this.startTime = Date.now();
+        this.lastUpdateTime = this.startTime;
     }
 
     onOpen() {
@@ -51,42 +60,35 @@ export class GitProgressModal extends Modal {
     }
 
     onClose() {
-        if (this.updateTimer) {
-            window.clearInterval(this.updateTimer);
-        }
         this.contentEl.empty();
     }
 
     /**
-     * Update progress from isomorphic-git onProgress event
+     * Update progress from isomorphic-git onProgress event (structured data)
      */
     updateProgress(event: any) {
-        const { phase, loaded, total, lengthComputable } = event;
+        const { phase, loaded, total } = event;
         
         if (!phase) return;
 
-        // Map isomorphic-git phases to display names
-        const phaseName = this.formatPhaseName(phase);
-        
-        let percent = 0;
-        if (lengthComputable && total > 0) {
-            percent = Math.round((loaded / total) * 100);
-        } else if (loaded > 0) {
-            percent = 100; // Indeterminate completion
+        // Update bytes loaded for rate calculation
+        if (loaded > this.bytesLoaded) {
+            this.bytesLoaded = loaded;
+            this.transferRate = this.calculateRate();
         }
 
-        // Calculate rate if we have loaded data
-        let rate = '';
-        const elapsed = (Date.now() - this.startTime) / 1000;
-        if (elapsed > 0 && loaded > 0) {
-            const bytesPerSec = loaded / elapsed;
-            if (bytesPerSec > 1024 * 1024) {
-                rate = `${(bytesPerSec / (1024 * 1024)).toFixed(2)} MiB/s`;
-            } else if (bytesPerSec > 1024) {
-                rate = `${(bytesPerSec / 1024).toFixed(2)} KiB/s`;
-            } else {
-                rate = `${Math.round(bytesPerSec)} B/s`;
-            }
+        const phaseName = this.formatPhaseName(phase);
+        let percent = 0;
+        if (total > 0) {
+            percent = Math.round((loaded / total) * 100);
+        } else if (loaded > 0) {
+            percent = 100;
+        }
+
+        // Update status text
+        const statusEl = this.headerEl.querySelector('.git-progress-status');
+        if (statusEl) {
+            statusEl.setText(`${phaseName}...`);
         }
 
         // Mark previous phases as completed
@@ -100,13 +102,11 @@ export class GitProgressModal extends Modal {
                     percent,
                     loaded,
                     total,
-                    rate,
-                    detail: lengthComputable ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
+                    rate: this.transferRate,
+                    detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
                 });
             } else if (!foundActive && p.status !== 'completed') {
                 this.phases.set(key, { ...p, status: 'completed', percent: 100 });
-            } else if (foundActive && p.status === 'pending') {
-                // Keep pending
             }
         }
 
@@ -118,12 +118,56 @@ export class GitProgressModal extends Modal {
                 percent,
                 loaded,
                 total,
-                rate,
-                detail: lengthComputable ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
+                rate: this.transferRate,
+                detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
             });
         }
 
         this.render();
+    }
+
+    /**
+     * Update from isomorphic-git onMessage event (text-based progress)
+     * This is the primary method for git.fetch and git.pull with custom HTTP clients
+     */
+    updateMessage(text: string) {
+        if (!text) return;
+
+        // Parse common git message patterns
+        const message = text.trim();
+        
+        // Update header status with latest message
+        const statusEl = this.headerEl.querySelector('.git-progress-status');
+        if (statusEl) {
+            statusEl.setText(message);
+        }
+
+        // Try to extract phase from message
+        const phaseName = this.inferPhaseFromMessage(message);
+        if (phaseName) {
+            // Update or create phase
+            const existing = this.phases.get(phaseName);
+            if (existing) {
+                this.phases.set(phaseName, {
+                    ...existing,
+                    status: 'active',
+                    detail: message
+                });
+            } else {
+                this.phases.set(phaseName, {
+                    name: phaseName,
+                    status: 'active',
+                    percent: 0,
+                    loaded: 0,
+                    total: 0,
+                    detail: message
+                });
+            }
+            this.render();
+        }
+
+        // Store message for log
+        this.messages.push({ text: message, timestamp: Date.now() });
     }
 
     /**
@@ -132,7 +176,6 @@ export class GitProgressModal extends Modal {
     complete(message?: string) {
         this.isComplete = true;
         
-        // Mark all phases as completed
         for (const [key, p] of this.phases) {
             this.phases.set(key, { ...p, status: 'completed', percent: 100 });
         }
@@ -147,7 +190,6 @@ export class GitProgressModal extends Modal {
             }
         }
 
-        // Auto-close after 2 seconds
         setTimeout(() => {
             this.close();
         }, 2000);
@@ -159,7 +201,6 @@ export class GitProgressModal extends Modal {
     error(errorMessage: string) {
         this.isComplete = true;
         
-        // Mark current active phase as error
         for (const [key, p] of this.phases) {
             if (p.status === 'active') {
                 this.phases.set(key, { ...p, status: 'error' });
@@ -186,11 +227,9 @@ export class GitProgressModal extends Modal {
             const phaseEl = this.phasesEl.createDiv('git-progress-phase');
             phaseEl.addClass(`git-progress-phase-${phase.status}`);
             
-            // Phase icon
             const iconEl = phaseEl.createDiv('git-progress-phase-icon');
             iconEl.setText(this.getStatusIcon(phase.status));
             
-            // Phase info
             const infoEl = phaseEl.createDiv('git-progress-phase-info');
             
             const nameEl = infoEl.createDiv('git-progress-phase-name');
@@ -204,7 +243,6 @@ export class GitProgressModal extends Modal {
                 detailEl.setText(parts.join(' | '));
             }
             
-            // Progress bar (for computable phases)
             if (phase.status === 'active' && phase.total > 0) {
                 const barContainer = phaseEl.createDiv('git-progress-bar-container');
                 const bar = barContainer.createDiv('git-progress-bar');
@@ -226,13 +264,59 @@ export class GitProgressModal extends Modal {
         const completedPhases = Array.from(this.phases.values()).filter(p => p.status === 'completed').length;
         
         this.footerEl.empty();
+        
+        const parts: string[] = [];
+        parts.push(`Elapsed: ${elapsed}s`);
+        if (this.transferRate) {
+            parts.push(this.transferRate);
+        }
+        parts.push(`${completedPhases}/${totalPhases} phases`);
+        
         this.footerEl.createSpan({
-            text: `Elapsed: ${elapsed}s | ${completedPhases}/${totalPhases} phases`
+            text: parts.join(' | ')
         });
     }
 
+    private calculateRate(): string {
+        const now = Date.now();
+        const timeDelta = (now - this.lastUpdateTime) / 1000;
+        if (timeDelta < 0.1) return this.transferRate; // Too soon, keep old rate
+        
+        const bytesDelta = this.bytesLoaded - (this.bytesLoaded > 0 ? this.bytesLoaded : 0);
+        const bytesPerSec = bytesDelta / timeDelta;
+        
+        this.lastUpdateTime = now;
+        
+        if (bytesPerSec > 1024 * 1024) {
+            return `${(bytesPerSec / (1024 * 1024)).toFixed(2)} MiB/s`;
+        } else if (bytesPerSec > 1024) {
+            return `${(bytesPerSec / 1024).toFixed(2)} KiB/s`;
+        } else if (bytesPerSec > 0) {
+            return `${Math.round(bytesPerSec)} B/s`;
+        }
+        return '';
+    }
+
+    private inferPhaseFromMessage(message: string): string | null {
+        const lower = message.toLowerCase();
+        
+        if (lower.includes('enumerating')) return 'Enumerating objects';
+        if (lower.includes('counting')) return 'Counting objects';
+        if (lower.includes('compressing')) return 'Compressing objects';
+        if (lower.includes('receiving')) return 'Receiving objects';
+        if (lower.includes('resolving deltas')) return 'Resolving deltas';
+        if (lower.includes('checking out')) return 'Checking out';
+        if (lower.includes('fetching') || lower.includes('download')) return 'Fetching';
+        if (lower.includes('writing')) return 'Writing objects';
+        if (lower.includes('packing')) return 'Packing objects';
+        if (lower.includes('updating')) return 'Updating references';
+        if (lower.includes('remote') || lower.includes('origin')) return 'Remote communication';
+        
+        // Default: use first 30 chars of message as phase name
+        return message.length > 30 ? message.substring(0, 30) + '...' : message;
+    }
+
     private formatPhaseName(phase: string): string {
-        // Map raw isomorphic-git phase names to human-friendly names
         const phaseMap: Record<string, string> = {
             'enumeratingObjects': 'Enumerating objects',
             'countingObjects': 'Counting objects',
@@ -273,9 +357,9 @@ export class GitProgressModal extends Modal {
 
 /**
  * Create a progress modal for git operations
- * Returns [onProgress callback, closeModal function]
+ * Returns [onProgress callback, onMessage callback, closeModal function]
  */
-export function createProgressModal(app: App, operationName: string): [(event: any) => void, () => void] {
+export function createProgressModal(app: App, operationName: string): [(event: any) => void, (text: string) => void, () => void] {
     const modal = new GitProgressModal(app, operationName);
     modal.open();
 
@@ -283,9 +367,13 @@ export function createProgressModal(app: App, operationName: string): [(event: a
         modal.updateProgress(event);
     };
 
+    const onMessage = (text: string) => {
+        modal.updateMessage(text);
+    };
+
     const closeModal = () => {
         modal.complete();
     };
 
-    return [onProgress, closeModal];
+    return [onProgress, onMessage, closeModal];
 }

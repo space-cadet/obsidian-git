@@ -18598,10 +18598,13 @@ function createProgressModal(app, operationName) {
   const onProgress = (event) => {
     modal.updateProgress(event);
   };
+  const onMessage = (text) => {
+    modal.updateMessage(text);
+  };
   const closeModal = () => {
     modal.complete();
   };
-  return [onProgress, closeModal];
+  return [onProgress, onMessage, closeModal];
 }
 var import_obsidian2, GitProgressModal;
 var init_GitProgressModal = __esm({
@@ -18611,10 +18614,14 @@ var init_GitProgressModal = __esm({
       constructor(app, operationName) {
         super(app);
         this.phases = /* @__PURE__ */ new Map();
-        this.updateTimer = null;
+        this.messages = [];
         this.isComplete = false;
+        this.bytesLoaded = 0;
+        this.lastUpdateTime = 0;
+        this.transferRate = "";
         this.operationName = operationName;
         this.startTime = Date.now();
+        this.lastUpdateTime = this.startTime;
       }
       onOpen() {
         const { contentEl } = this;
@@ -18631,36 +18638,29 @@ var init_GitProgressModal = __esm({
         this.updateFooter();
       }
       onClose() {
-        if (this.updateTimer) {
-          window.clearInterval(this.updateTimer);
-        }
         this.contentEl.empty();
       }
       /**
-       * Update progress from isomorphic-git onProgress event
+       * Update progress from isomorphic-git onProgress event (structured data)
        */
       updateProgress(event) {
-        const { phase, loaded, total, lengthComputable } = event;
+        const { phase, loaded, total } = event;
         if (!phase)
           return;
+        if (loaded > this.bytesLoaded) {
+          this.bytesLoaded = loaded;
+          this.transferRate = this.calculateRate();
+        }
         const phaseName = this.formatPhaseName(phase);
         let percent = 0;
-        if (lengthComputable && total > 0) {
+        if (total > 0) {
           percent = Math.round(loaded / total * 100);
         } else if (loaded > 0) {
           percent = 100;
         }
-        let rate = "";
-        const elapsed = (Date.now() - this.startTime) / 1e3;
-        if (elapsed > 0 && loaded > 0) {
-          const bytesPerSec = loaded / elapsed;
-          if (bytesPerSec > 1024 * 1024) {
-            rate = `${(bytesPerSec / (1024 * 1024)).toFixed(2)} MiB/s`;
-          } else if (bytesPerSec > 1024) {
-            rate = `${(bytesPerSec / 1024).toFixed(2)} KiB/s`;
-          } else {
-            rate = `${Math.round(bytesPerSec)} B/s`;
-          }
+        const statusEl = this.headerEl.querySelector(".git-progress-status");
+        if (statusEl) {
+          statusEl.setText(`${phaseName}...`);
         }
         let foundActive = false;
         for (const [key, p] of this.phases) {
@@ -18672,12 +18672,11 @@ var init_GitProgressModal = __esm({
               percent,
               loaded,
               total,
-              rate,
-              detail: lengthComputable ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
+              rate: this.transferRate,
+              detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
             });
           } else if (!foundActive && p.status !== "completed") {
             this.phases.set(key, { ...p, status: "completed", percent: 100 });
-          } else if (foundActive && p.status === "pending") {
           }
         }
         if (!this.phases.has(phaseName)) {
@@ -18687,11 +18686,46 @@ var init_GitProgressModal = __esm({
             percent,
             loaded,
             total,
-            rate,
-            detail: lengthComputable ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
+            rate: this.transferRate,
+            detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
           });
         }
         this.render();
+      }
+      /**
+       * Update from isomorphic-git onMessage event (text-based progress)
+       * This is the primary method for git.fetch and git.pull with custom HTTP clients
+       */
+      updateMessage(text) {
+        if (!text)
+          return;
+        const message = text.trim();
+        const statusEl = this.headerEl.querySelector(".git-progress-status");
+        if (statusEl) {
+          statusEl.setText(message);
+        }
+        const phaseName = this.inferPhaseFromMessage(message);
+        if (phaseName) {
+          const existing = this.phases.get(phaseName);
+          if (existing) {
+            this.phases.set(phaseName, {
+              ...existing,
+              status: "active",
+              detail: message
+            });
+          } else {
+            this.phases.set(phaseName, {
+              name: phaseName,
+              status: "active",
+              percent: 0,
+              loaded: 0,
+              total: 0,
+              detail: message
+            });
+          }
+          this.render();
+        }
+        this.messages.push({ text: message, timestamp: Date.now() });
       }
       /**
        * Mark operation as complete with optional message
@@ -18771,9 +18805,58 @@ var init_GitProgressModal = __esm({
         const totalPhases = this.phases.size;
         const completedPhases = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
         this.footerEl.empty();
+        const parts = [];
+        parts.push(`Elapsed: ${elapsed}s`);
+        if (this.transferRate) {
+          parts.push(this.transferRate);
+        }
+        parts.push(`${completedPhases}/${totalPhases} phases`);
         this.footerEl.createSpan({
-          text: `Elapsed: ${elapsed}s | ${completedPhases}/${totalPhases} phases`
+          text: parts.join(" | ")
         });
+      }
+      calculateRate() {
+        const now = Date.now();
+        const timeDelta = (now - this.lastUpdateTime) / 1e3;
+        if (timeDelta < 0.1)
+          return this.transferRate;
+        const bytesDelta = this.bytesLoaded - (this.bytesLoaded > 0 ? this.bytesLoaded : 0);
+        const bytesPerSec = bytesDelta / timeDelta;
+        this.lastUpdateTime = now;
+        if (bytesPerSec > 1024 * 1024) {
+          return `${(bytesPerSec / (1024 * 1024)).toFixed(2)} MiB/s`;
+        } else if (bytesPerSec > 1024) {
+          return `${(bytesPerSec / 1024).toFixed(2)} KiB/s`;
+        } else if (bytesPerSec > 0) {
+          return `${Math.round(bytesPerSec)} B/s`;
+        }
+        return "";
+      }
+      inferPhaseFromMessage(message) {
+        const lower2 = message.toLowerCase();
+        if (lower2.includes("enumerating"))
+          return "Enumerating objects";
+        if (lower2.includes("counting"))
+          return "Counting objects";
+        if (lower2.includes("compressing"))
+          return "Compressing objects";
+        if (lower2.includes("receiving"))
+          return "Receiving objects";
+        if (lower2.includes("resolving deltas"))
+          return "Resolving deltas";
+        if (lower2.includes("checking out"))
+          return "Checking out";
+        if (lower2.includes("fetching") || lower2.includes("download"))
+          return "Fetching";
+        if (lower2.includes("writing"))
+          return "Writing objects";
+        if (lower2.includes("packing"))
+          return "Packing objects";
+        if (lower2.includes("updating"))
+          return "Updating references";
+        if (lower2.includes("remote") || lower2.includes("origin"))
+          return "Remote communication";
+        return message.length > 30 ? message.substring(0, 30) + "..." : message;
       }
       formatPhaseName(phase) {
         const phaseMap = {
@@ -18841,17 +18924,23 @@ function createProgressNotice(initialMessage) {
   let notice = new import_obsidian3.Notice(initialMessage, 0);
   let currentPhase = "";
   const onProgress = (event) => {
-    const { phase, loaded, total, lengthComputable } = event;
+    const { phase, loaded, total } = event;
     if (phase && phase !== currentPhase) {
       currentPhase = phase;
     }
     let msg = `${initialMessage} \u2014 ${phase || "working"}`;
-    if (lengthComputable && total > 0) {
+    if (total > 0) {
       const pct = Math.round(loaded / total * 100);
       msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
     } else if (loaded > 0) {
       msg += ` (${Math.round(loaded / 1024)}KB)`;
     }
+    if (notice) {
+      notice.setMessage(msg);
+    }
+  };
+  const onMessage = (text) => {
+    const msg = `${initialMessage} \u2014 ${text}`;
     if (notice) {
       notice.setMessage(msg);
     }
@@ -18862,7 +18951,7 @@ function createProgressNotice(initialMessage) {
       notice = null;
     }
   };
-  return [onProgress, hideNotice];
+  return [onProgress, onMessage, hideNotice];
 }
 var import_obsidian3, GitHttpClient, GitProgressEmitter, GitManager;
 var init_gitManager = __esm({
@@ -19278,7 +19367,7 @@ var init_gitManager = __esm({
             await this.shallowFetchAndCheckout(branchName);
             return;
           }
-          const [onProgress, hideNotice] = this.app ? createProgressModal(this.app, "Pulling from remote") : createProgressNotice("Pulling from remote");
+          const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Pulling from remote") : createProgressNotice("Pulling from remote");
           try {
             await pull({
               fs: this.fs,
@@ -19295,7 +19384,8 @@ var init_gitManager = __esm({
                 username: this.credentials.username,
                 password: this.credentials.password
               }),
-              onProgress
+              onProgress,
+              onMessage
             });
             hideNotice();
             this.updateStatus("Pull completed");
@@ -19314,8 +19404,34 @@ var init_gitManager = __esm({
        * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
        */
       async shallowFetchAndCheckout(branchName) {
-        const [onProgress, hideNotice] = this.app ? createProgressModal(this.app, "Fetching remote files") : createProgressNotice("Fetching remote files");
+        const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Fetching remote files") : createProgressNotice("Fetching remote files");
         try {
+          try {
+            this.updateStatus("Cloning repository (memory-efficient)...");
+            log2.info("GitManager", "Attempting clone for memory efficiency");
+            await this.fs.promises.rmdir(this.dir + "/.git", { recursive: true });
+            await clone({
+              fs: this.fs,
+              http: new GitHttpClient(this.credentials),
+              dir: this.dir,
+              url: this.credentials.repoUrl || "",
+              ref: branchName,
+              singleBranch: true,
+              depth: 1,
+              onAuth: () => ({
+                username: this.credentials.username,
+                password: this.credentials.password
+              }),
+              onProgress,
+              onMessage
+            });
+            hideNotice();
+            this.updateStatus("Repository cloned");
+            log2.info("GitManager", `Clone successful for ${branchName}`);
+            return;
+          } catch (cloneError) {
+            log2.warn("GitManager", `Clone failed, falling back to fetch: ${cloneError.message}`);
+          }
           await fetch({
             fs: this.fs,
             http: new GitHttpClient(this.credentials),
@@ -19328,7 +19444,7 @@ var init_gitManager = __esm({
               username: this.credentials.username,
               password: this.credentials.password
             }),
-            onProgress
+            onMessage
           });
           const remoteRef = `refs/remotes/origin/${branchName}`;
           const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
@@ -19358,7 +19474,7 @@ var init_gitManager = __esm({
        * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
        */
       async cloneRepository(repoUrl, branchName, depth = 1) {
-        const [onProgress, hideNotice] = this.app ? createProgressModal(this.app, `Cloning ${branchName}`) : createProgressNotice(`Cloning ${branchName}`);
+        const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, `Cloning ${branchName}`) : createProgressNotice(`Cloning ${branchName}`);
         try {
           this.updateStatus("Cloning repository...");
           log2.info("GitManager", `Cloning ${repoUrl} (branch: ${branchName}, depth: ${depth})`);
@@ -19374,7 +19490,8 @@ var init_gitManager = __esm({
               username: this.credentials.username,
               password: this.credentials.password
             }),
-            onProgress
+            onProgress,
+            onMessage
           });
           hideNotice();
           this.updateStatus("Repository cloned");
@@ -19457,7 +19574,7 @@ var init_gitManager = __esm({
           if (this.credentials.repoUrl) {
             await this.ensureRemote(this.credentials.repoUrl);
           }
-          const [onProgress, hn] = this.app ? createProgressModal(this.app, "Pushing to remote") : createProgressNotice("Pushing to remote");
+          const [onProgress, onMessage, hn] = this.app ? createProgressModal(this.app, "Pushing to remote") : createProgressNotice("Pushing to remote");
           hideNotice = hn;
           await push({
             fs: this.fs,
@@ -19473,7 +19590,8 @@ var init_gitManager = __esm({
                 password: this.credentials.password
               };
             },
-            onProgress
+            onProgress,
+            onMessage
           });
           hideNotice();
           this.updateStatus("Push completed");
