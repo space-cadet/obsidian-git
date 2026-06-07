@@ -15,6 +15,7 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 | T30 | Remote Commits View | ✅ | MEDIUM | 2026-06-01 | T29 | [Details](tasks/T30.md) |
 | T31 | Branch Tree View | ⏳ BACKLOG | LOW | 2026-06-01 | T29 | [Details](tasks/T31.md) |
 | T32 | Mobile Crash Fix + Progress | ✅ | HIGH | 2026-06-01 | T29 | [Details](tasks/T32.md) |
+| T33 | Progress Modal + UI Fixes | ✅ | HIGH | 2026-06-02 | T29 | [Details](tasks/T33.md) |
 
 ## Completed Tasks
 

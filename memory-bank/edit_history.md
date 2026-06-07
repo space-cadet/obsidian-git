@@ -1,9 +1,40 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-06-01 12:40:00 IST*
+*Last Updated: 2026-06-02 14:45 IST*
+
+### 2026-06-02
+
+#### 14:45:00 IST - T33: Git Progress Modal + UI Fixes (Issues #1, #4)
+- Created `src/ui/GitProgressModal.ts` — New component: 291 lines, dark theme with Git Bash aesthetic, phase-by-phase progress tracking (Counting/Receiving/Resolving/Writing objects), progress bars, transfer rates, status icons (✓/✗/⟳), auto-close on success, error display on failure, falls back to Notice if app unavailable
+- Modified `src/gitManager.ts` — Added `toAsyncIterator()` with 64KB `subarray()` chunking: prevents OOM on mobile by yielding ArrayBuffer views instead of copying entire packfile into memory
+- Modified `src/gitManager.ts` — Added `onMessage` support alongside `onProgress` for text-based progress updates (requestUrl doesn't emit standard progress events)
+- Modified `src/gitManager.ts` — `shallowFetchAndCheckout()`: Uses `git.clone` first (memory-efficient), falls back to `git.fetch` + `onMessage`
+- Modified `src/gitManager.ts` — `createProgressNotice()`: Returns `[onProgress, onMessage, hideNotice]` tuple
+- Modified `src/gitManager.ts` — Integrated `GitProgressModal` into `pull()`, `push()`, `cloneRepository()`, `shallowFetchAndCheckout()`
+- Modified `src/gitManager.ts` — Added `fetchCommitFilesFromGitHub()` static method: GitHub API fallback for commit file expansion when shallow clones lack parent objects
+- Modified `src/gitManager.ts` — `getCommitFiles()`: Downgrades 'not found' errors to warnings (expected with `depth:1` shallow clones)
+- Modified `src/views/GitSidebarView.ts` — Commit rows: click handler moved to full row (entire row clickable, not just message text)
+- Modified `src/views/GitSidebarView.ts` — Toggle bar: centered, buttons `flex: none`, desktop breakpoint for wider buttons
+- Modified `src/views/GitSidebarView.ts` — Detail/meta padding: 32px consistent alignment
+- Modified `src/views/GitSidebarView.ts` — Expanded state styling: `background-secondary-alt` background
+- Modified `src/views/GitSidebarView.ts` — `renderCommitDetail()`: Tries GitHub API fallback when local `getCommitFiles()` fails, shows "Commit details not available locally" instead of error toast
+- Modified `styles.css` — Major overhaul (400+ lines across 5 commits): dark modal theme with animations, Changes tab pill buttons (border-radius: 20px), purple filled commit button, red force push, always-visible file action buttons, purple M status icons, Commits tab centered toggle bar, expanded state backgrounds, larger fonts, origin badge styling
+- Modified `styles.css` — Desktop UI now matches mobile screenshots exactly (per user-provided images)
+- 5 commits: `611d1c8` (modal), `4c9c7ec` (progress fix), `f388fc7` (crash + layout), `097300a` (commit files + UI match), `43352a9` (commits style)
 
 ### 2026-06-01
+
+#### 16:19:00 IST - T29: Bug fixes from debug log analysis
+- Modified `src/gitManager.ts` — Added `gracefulEmptyRepoPull()`: When pull fails with "empty repo" errors, falls back to fetch + checkout flow instead of crashing
+- Modified `src/gitManager.ts` — Added connection retry logic: 3 attempts with exponential backoff for network failures
+- Modified `src/gitManager.ts` — Fixed GitHub API logging: API responses now logged at debug level with full request/response for troubleshooting
+- Modified `src/gitManager.ts` — Fixed `refs/heads` error matching: pattern now correctly matches "Could not find HEAD refs/heads/main" etc.
+- Modified `src/logger.ts` — Fixed export directory: ensures parent directory exists before writing debug log file
+- Modified `src/main.ts` — Added Export Logs button in settings tab for quick access
+- Modified `src/views/GitSidebarView.ts` — Empty repo handling: shows "No commits yet" instead of error for fresh repos
+- 1 commit: `8d56344` — 5 bug fixes applied
+- 1 docs commit: `cca13bb` — Session documentation for debug log analysis
 
 #### 12:15:00 IST - T32: Mobile crash fix + remote commits without local repo
 - Modified `src/gitManager.ts` — Added `GitProgressEmitter` class: EventEmitter-compatible for isomorphic-git progress events
@@ -96,7 +127,7 @@
 - Created `memory-bank/tasks/T29.md` — Renamed from T6, merged with detailed workspace content
 - Created `memory-bank/implementation-details/T29-obsidian-git.md` — Architecture documentation from workspace
 - Created `memory-bank/edits/2026-05-31/133000-T29-edit-chunk.md` — Edit chunk from workspace
-- Updated `memory-bank/sessions/2026-05-31-morning.md` — Merged with detailed session log from workspace
+- Created `memory-bank/sessions/2026-05-31-morning.md` — Merged with detailed session log from workspace
 - Removed `memory-bank/tasks/T6.md` — Replaced by T29
 
 ### 2026-05-30
@@ -130,6 +161,7 @@
 - Created `memory-bank/tasks/T4.md` — Auto-sync & Background task details
 - Created `memory-bank/tasks/T5.md` — Error Handling & Logging task details
 - Updated `memory-bank/tasks.md` — Expanded registry with 5 tasks (1 active, 4 completed)
+- Updated `memory-bank/implementation-details/T29-obsidian-git.md` — Architecture documentation from workspace
 - Updated `memory-bank/implementation-details/git-http-client.md` — requestUrl architecture documentation
 - Updated `memory-bank/implementation-details/mobile-compatibility.md` — Mobile strategy and winston replacement docs
 - Updated `memory-bank/activeContext.md` — Current focus on T3, completed tasks listed
