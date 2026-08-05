@@ -6,6 +6,10 @@
  */
 
 import * as git from "isomorphic-git";
+import * as nodeFs from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 console.log("=== isomorphic-git Node.js Functionality Test ===");
 console.log("git version:", git.version());
@@ -19,7 +23,9 @@ class MemFS {
   }
 
   _path(p) {
-    return p.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "") || "/";
+    if (p == null) return "/";
+    const normalized = p.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
+    return normalized === "." || normalized === "" ? "/" : normalized;
   }
 
   async mkdir(p, opts) {
@@ -50,7 +56,7 @@ class MemFS {
   async stat(p, opts) {
     p = this._path(p);
     if (this.dirs.has(p)) {
-      return { isDirectory: () => true, isFile: () => false, isSymbolicLink: () => false, mode: 0o40755, size: 0 };
+      return { isDirectory: () => true, isFile: () => false, isSymbolicLink: () => false, mode: 0o40755, size: 0, mtimeMs: 0 };
     }
     const data = this.files.get(p);
     if (data === undefined) {
@@ -58,7 +64,7 @@ class MemFS {
       err.code = "ENOENT";
       throw err;
     }
-    return { isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false, mode: 0o100644, size: data.length };
+    return { isDirectory: () => false, isFile: () => true, isSymbolicLink: () => false, mode: 0o100644, size: data.length, mtimeMs: 0 };
   }
 
   async lstat(p, opts) {
@@ -114,8 +120,8 @@ class MemFS {
   }
 }
 
-const fs = new MemFS();
-const dir = "/test-repo";
+const fs = nodeFs;
+const dir = await mkdtemp(join(tmpdir(), "obsidian-git-isomorphic-"));
 let passed = 0;
 let failed = 0;
 
@@ -152,7 +158,7 @@ try {
 console.log("");
 console.log("Test 3: git.statusMatrix (after writing file)");
 try {
-  await fs.writeFile("/test-repo/hello.md", "# Hello World");
+  await fs.writeFile(join(dir, "hello.md"), "# Hello World");
   const matrix = await git.statusMatrix({ fs, dir });
   const helloEntry = matrix.find((r) => r[0] === "hello.md");
   report(
@@ -202,7 +208,7 @@ try {
   const commits = await git.log({ fs, dir });
   report("git.log", commits.length === 1, commits.length + " commits");
   if (commits.length > 0) {
-    report("  commit message", commits[0].commit.message === "Initial commit");
+    report("  commit message", commits[0].commit.message.trim() === "Initial commit");
     report("  commit author", commits[0].commit.author.name === "Test");
   }
 } catch (e) {
@@ -223,7 +229,7 @@ try {
 console.log("");
 console.log("Test 8: Second commit");
 try {
-  await fs.writeFile("/test-repo/world.md", "# World");
+  await fs.writeFile(join(dir, "world.md"), "# World");
   await git.add({ fs, dir, filepath: "world.md" });
   const sha = await git.commit({
     fs,
@@ -248,4 +254,5 @@ console.log("Passed:", passed);
 console.log("Failed:", failed);
 console.log(failed === 0 ? "✅ All tests passed" : "❌ Some tests failed");
 
+await rm(dir, { recursive: true, force: true });
 process.exit(failed > 0 ? 1 : 0);

@@ -7,6 +7,7 @@
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "archive": "node scripts/build-archive.mjs",
+    "test": "pnpm run build && node --test tests/*.test.mjs && node test-isomorphic-git.mjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [

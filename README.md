@@ -158,7 +158,7 @@ pnpm install
 pnpm run build
 
 # Dev mode with watch
-pnpm exec vite
+pnpm run dev
 
 # The build outputs:
 #   main.js     — bundled plugin

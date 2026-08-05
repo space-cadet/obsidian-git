@@ -41,6 +41,7 @@ const filesToInclude = [
   "main.js",
   "manifest.json",
   "versions.json",
+  "styles.css",
   "README.md",
 ];
 

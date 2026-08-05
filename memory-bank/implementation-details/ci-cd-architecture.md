@@ -1,7 +1,7 @@
 # CI/CD Architecture — obsidian-git Plugin
 
 *Created: 2026-06-01 10:51:00 IST*
-*Last Updated: 2026-06-01 10:51:00 IST*
+*Last Updated: 2026-08-05 00:20:03 IST*
 
 ## Overview
 
@@ -38,6 +38,7 @@ Runs on every trigger. Steps:
 - `main.js` — bundled plugin (~630KB)
 - `manifest.json` — plugin metadata
 - `versions.json` — version compatibility
+- `styles.css` — plugin styles
 - `README.md` — documentation
 - `dist/*.zip` — archive with all files in `obsidian-git-sync/` subdirectory
 
@@ -89,7 +90,7 @@ node scripts/build-archive.mjs
 Custom ZIP generator using only Node.js built-ins (no external dependencies):
 
 1. Reads `manifest.json` for plugin ID and version
-2. Includes: `main.js`, `manifest.json`, `versions.json`, `README.md`
+2. Includes: `main.js`, `manifest.json`, `versions.json`, `styles.css`, `README.md`
 3. Creates ZIP with files in `<plugin-id>/` subdirectory
 4. Output: `dist/<plugin-id>-v<version>.zip`
 
@@ -99,8 +100,19 @@ obsidian-git-sync/
   main.js
   manifest.json
   versions.json
+  styles.css
   README.md
 ```
+
+## Test Process
+
+`pnpm test` builds the production bundle, then runs the Node built-in test
+runner followed by an end-to-end `isomorphic-git` smoke test in a temporary
+repository. It verifies the
+release archive layout and manifest version, zero-copy response chunking,
+progress callbacks, persistent notice cleanup, and init/status/add/commit/log
+operations. `pnpm run build` remains the production TypeScript and esbuild
+verification step.
 
 This structure allows extraction directly into `.obsidian/plugins/`:
 ```bash

@@ -18907,9 +18907,37 @@ var gitManager_exports = {};
 __export(gitManager_exports, {
   GitManager: () => GitManager,
   GitProgressEmitter: () => GitProgressEmitter,
+  arrayBufferToAsyncIterable: () => arrayBufferToAsyncIterable,
   createGitEmitter: () => createGitEmitter,
-  createProgressNotice: () => createProgressNotice
+  createProgressNotice: () => createProgressNotice,
+  testRemoteConnection: () => testRemoteConnection
 });
+function arrayBufferToAsyncIterable(arrayBuffer, chunkSize = 65536) {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new RangeError("chunkSize must be a positive integer");
+  }
+  return {
+    [Symbol.asyncIterator]: async function* () {
+      const view = new Uint8Array(arrayBuffer);
+      for (let offset = 0; offset < view.length; offset += chunkSize) {
+        yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
+      }
+    }
+  };
+}
+async function testRemoteConnection(credentials) {
+  var _a;
+  const repoUrl = (_a = credentials.repoUrl) == null ? void 0 : _a.trim();
+  if (!repoUrl) {
+    throw new Error("Please enter a repository URL first");
+  }
+  log2.info("GitManager", `Testing read-only remote connection to ${repoUrl}`);
+  await listServerRefs({
+    http: new GitHttpClient({ ...credentials, repoUrl }),
+    url: repoUrl
+  });
+  log2.info("GitManager", "Remote connection test succeeded");
+}
 function createGitEmitter(onProgress) {
   const emitter = new GitProgressEmitter();
   if (onProgress) {
@@ -19039,14 +19067,7 @@ var init_gitManager = __esm({
        * Uses subarray() (view, not copy) to avoid additional memory allocation.
        */
       toAsyncIterator(arrayBuffer, chunkSize = 65536) {
-        return {
-          [Symbol.asyncIterator]: async function* () {
-            const view = new Uint8Array(arrayBuffer);
-            for (let offset = 0; offset < view.length; offset += chunkSize) {
-              yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
-            }
-          }
-        };
+        return arrayBufferToAsyncIterable(arrayBuffer, chunkSize);
       }
       getStatusMessage(status2) {
         const messages = {
@@ -21435,25 +21456,31 @@ var GitSyncSettingTab = class extends import_obsidian5.PluginSettingTab {
         }
       }
     }));
-    new import_obsidian5.Setting(containerEl).setName("Test Connection").setDesc("Test the connection to your Git repository").addButton((button) => button.setButtonText("Test").onClick(async () => {
+    new import_obsidian5.Setting(containerEl).setName("Test Connection").setDesc("Checks the remote URL and credentials without cloning, initializing, or changing this vault.").addButton((button) => button.setButtonText("Test").onClick(async () => {
+      button.setDisabled(true);
+      button.setButtonText("Testing\u2026");
       try {
         if (!this.plugin.settings.repoUrl) {
           new import_obsidian5.Notice("Please enter a repository URL first");
           return;
         }
-        await this.plugin.ensureGitManager();
-        if (!this.plugin.gitManager) {
-          new import_obsidian5.Notice("No git repository configured");
-          return;
-        }
-        new import_obsidian5.Notice("Testing connection...");
-        await this.plugin.gitManager.initializeRepo(
-          this.plugin.settings.repoUrl,
-          this.plugin.settings.branchName
-        );
-        new import_obsidian5.Notice("Connection successful!");
+        new import_obsidian5.Notice("Testing remote connection\u2026");
+        const { testRemoteConnection: testRemoteConnection2 } = await Promise.resolve().then(() => (init_gitManager(), gitManager_exports));
+        await testRemoteConnection2({
+          username: this.plugin.settings.username,
+          password: this.plugin.settings.password,
+          repoUrl: this.plugin.settings.repoUrl,
+          author: {
+            name: this.plugin.settings.author.name || "Obsidian Git User",
+            email: this.plugin.settings.author.email || "user@example.com"
+          }
+        });
+        new import_obsidian5.Notice("Remote connection successful. You can now clone it or initialize a local repository.");
       } catch (error) {
-        new import_obsidian5.Notice(`Connection test failed: ${error.message}`);
+        new import_obsidian5.Notice(`Remote connection test failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+      } finally {
+        button.setDisabled(false);
+        button.setButtonText("Test");
       }
     }));
     new import_obsidian5.Setting(containerEl).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {

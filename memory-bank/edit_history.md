@@ -1,7 +1,18 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-06-02 14:45 IST*
+*Last Updated: 2026-08-05 00:20:03 IST*
+
+### 2026-08-05
+
+#### 00:20:03 IST - T29: Release archive repair and automated verification
+- Modified `scripts/build-archive.mjs` - Added styles.css to the distributable plugin ZIP.
+- Modified `src/gitManager.ts` - Extracted the bounded, zero-copy ArrayBuffer iterator for direct automated verification.
+- Created `tests/archive.test.mjs` - Verifies the release ZIP contains all runtime files and the current manifest version.
+- Created `tests/git-manager.test.mjs` - Verifies chunking and progress callback behavior with a minimal Obsidian host stub.
+- Modified `test-isomorphic-git.mjs` - Runs end-to-end Git init, status, add, commit, log, and branch checks in a temporary repository.
+- Modified `package.json` and `README.md` - Added pnpm test and corrected the development watch command.
+- Updated T29 task, active context, session cache, and CI/CD implementation details - Recorded package and verification status; mobile acceptance remains open.
 
 ### 2026-06-02
 

@@ -109,14 +109,7 @@ class GitHttpClient {
    * Uses subarray() (view, not copy) to avoid additional memory allocation.
    */
   private toAsyncIterator(arrayBuffer: ArrayBuffer, chunkSize = 65536): AsyncIterable<Uint8Array> {
-    return {
-      [Symbol.asyncIterator]: async function* () {
-        const view = new Uint8Array(arrayBuffer);
-        for (let offset = 0; offset < view.length; offset += chunkSize) {
-          yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
-        }
-      },
-    };
+    return arrayBufferToAsyncIterable(arrayBuffer, chunkSize);
   }
 
   private getStatusMessage(status: number): string {
@@ -130,6 +123,53 @@ class GitHttpClient {
     };
     return messages[status] || 'Unknown';
   }
+}
+
+/**
+ * Yield an HTTP response body in bounded, zero-copy chunks.
+ *
+ * Exported so the mobile memory-safety boundary can be verified without an
+ * Obsidian runtime or a network request.
+ */
+export function arrayBufferToAsyncIterable(
+    arrayBuffer: ArrayBuffer,
+    chunkSize = 65536
+): AsyncIterable<Uint8Array> {
+    if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+        throw new RangeError('chunkSize must be a positive integer');
+    }
+
+    return {
+        [Symbol.asyncIterator]: async function* () {
+            const view = new Uint8Array(arrayBuffer);
+            for (let offset = 0; offset < view.length; offset += chunkSize) {
+                yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
+            }
+        },
+    };
+}
+
+/**
+ * Verify that a remote Git repository can be reached with the supplied
+ * credentials without touching the vault.  This intentionally uses Git's
+ * read-only ref-advertisement endpoint rather than clone, init, or fetch, so
+ * it is safe to use from the Settings screen before a local repository exists.
+ *
+ * A successful empty response is valid: newly created remote repositories have
+ * no refs yet, but their URL and credentials are still usable.
+ */
+export async function testRemoteConnection(credentials: GitCredentials): Promise<void> {
+    const repoUrl = credentials.repoUrl?.trim();
+    if (!repoUrl) {
+        throw new Error('Please enter a repository URL first');
+    }
+
+    log.info('GitManager', `Testing read-only remote connection to ${repoUrl}`);
+    await git.listServerRefs({
+        http: new GitHttpClient({ ...credentials, repoUrl }),
+        url: repoUrl,
+    });
+    log.info('GitManager', 'Remote connection test succeeded');
 }
 
 // Progress event emitter for isomorphic-git

@@ -1,15 +1,15 @@
 # Active Context
 
-*Last Updated: 2026-06-02 14:45 IST*
+*Last Updated: 2026-08-05 00:20:03 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 v29 shipped, issues #1/#4 fixed, pending mobile test + tests
+### T29: obsidian-git Plugin — 🔄 v29 shipped, release package and tests verified, pending mobile acceptance
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow functional. Progress modal fully operational. Desktop UI now matches mobile design. Commit file expansion works via GitHub API for shallow clones. Pending: mobile test, foldable Changes tab sections, tests.
-- **Next**: Test dev release on mobile (Android/iOS), implement foldable Changes tab sections, generate tests for GitProgressModal and GitManager
+- **Status**: Core sync workflow functional. The release archive now contains required styles, and production build plus Node test suite pass. Foldable Changes sections were already implemented in v24. Pending: mobile test and public release.
+- **Next**: Test the current dev release on Android/iOS, confirm the CI release archive, then tag v1.0.0.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -60,10 +60,9 @@
 
 ## Next Steps
 1. **Test v29 on mobile** — Verify progress modal, chunked fetch, shallow clone, commit file expansion
-2. **Foldable Changes tab sections** — Staged/Uncommitted chevrons don't work on desktop; need toggle functionality
-3. **Generate tests** — GitProgressModal, GitManager operations, chunked ArrayBuffer
-4. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
-5. **Plugin store submission prep** — manifest, README, release notes
+2. **Confirm the CI-generated dev ZIP** — Verify it contains styles.css
+3. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
+4. **Plugin store submission prep** — manifest, README, release notes
 
 ## System Status
 
@@ -94,6 +93,8 @@
 - **Chunked ArrayBuffer for mobile**: 64KB `subarray()` chunks in `toAsyncIterator()` prevents OOM ✅
 - **Desktop UI matches mobile**: Changes tab and Commits tab styled identically to mobile screenshots ✅
 - **Commit file GitHub fallback**: `fetchCommitFilesFromGitHub()` for shallow clones ✅
+- **Release archive contains styles**: styles.css is packaged and archive layout is tested ✅
+- **Test runner**: Node built-in test runner, with a bundled source test and Obsidian host stub ✅
 
 ## Decisions Pending
 
@@ -101,13 +102,11 @@
 - **SSH key authentication**: Currently only Basic Auth
 - **Conflict resolution UI**: For merge conflicts
 - **Mobile pack index**: LightningFS, wasm-git, or different library?
-- **Foldable Changes tab sections**: Need toggle/accordion logic for Staged/Uncommitted
-- **Test framework**: Vitest? Jest? Obsidian API mocking strategy?
+- **Mobile acceptance**: Need real-device validation of the current dev release
 
 ## Next Steps
 
 1. **Test v29 dev release on mobile** — Verify progress modal, chunked fetch, UI parity
-2. **Foldable Changes tab sections** — Implement chevron toggle for Staged/Uncommitted
-3. **Generate tests** — GitProgressModal, GitManager, chunking logic
-4. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
-5. **Plugin store submission prep** — manifest, README, release notes
+2. **Confirm the CI-generated dev ZIP** — Verify it contains styles.css
+3. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
+4. **Plugin store submission prep** — manifest, README, release notes

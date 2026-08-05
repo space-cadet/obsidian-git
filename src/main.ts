@@ -657,30 +657,35 @@ class GitSyncSettingTab extends PluginSettingTab {
 		// Add a button to test the connection
 		new Setting(containerEl)
 			.setName('Test Connection')
-			.setDesc('Test the connection to your Git repository')
+			.setDesc('Checks the remote URL and credentials without cloning, initializing, or changing this vault.')
 			.addButton(button => button
 				.setButtonText('Test')
 				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Testing…');
 					try {
 						if (!this.plugin.settings.repoUrl) {
 							new Notice('Please enter a repository URL first');
 							return;
 						}
 
-						await this.plugin.ensureGitManager();
-						if (!this.plugin.gitManager) {
-							new Notice('No git repository configured');
-							return;
-						}
-
-							new Notice('Testing connection...');
-							await this.plugin.gitManager!.initializeRepo(
-								this.plugin.settings.repoUrl,
-								this.plugin.settings.branchName
-							);
-							new Notice('Connection successful!');
-					} catch (error) {
-						new Notice(`Connection test failed: ${error.message}`);
+						new Notice('Testing remote connection…');
+						const { testRemoteConnection } = await import('./gitManager');
+						await testRemoteConnection({
+							username: this.plugin.settings.username,
+							password: this.plugin.settings.password,
+							repoUrl: this.plugin.settings.repoUrl,
+							author: {
+								name: this.plugin.settings.author.name || 'Obsidian Git User',
+								email: this.plugin.settings.author.email || 'user@example.com',
+							},
+						});
+						new Notice('Remote connection successful. You can now clone it or initialize a local repository.');
+					} catch (error: any) {
+						new Notice(`Remote connection test failed: ${error?.message || String(error)}`);
+					} finally {
+						button.setDisabled(false);
+						button.setButtonText('Test');
 					}
 				}));
 
