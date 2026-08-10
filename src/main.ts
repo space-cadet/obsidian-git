@@ -3,6 +3,8 @@ import { ObsidianFsAdapter } from './adapters/ObsidianFsAdapter';
 import { GitManager, GitCredentials } from './gitManager';
 import { log, LogLevel } from './logger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
+import { PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
+import { GIT_COMMIT_HASH } from './buildInfo';
 
 interface GitSyncSettings {
 	repoUrl: string;
@@ -16,6 +18,10 @@ interface GitSyncSettings {
 	autoSyncInterval: number; // in minutes, 0 means disabled
 	autoCommitMessage: string;
 	refreshInterval: number; // in seconds, 0 means disabled
+	checkForUpdates: boolean;
+	updateChannel: 'stable' | 'dev';
+	lastUpdateCheck: number;
+	autoUpdate: boolean;
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -30,6 +36,10 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	autoSyncInterval: 0,
 	autoCommitMessage: 'Vault backup: {{date}}',
 	refreshInterval: 60, // default 60 seconds
+	checkForUpdates: true,
+	updateChannel: 'stable',
+	lastUpdateCheck: 0,
+	autoUpdate: false,
 };
 
 export default class GitSyncPlugin extends Plugin {
@@ -39,6 +49,7 @@ export default class GitSyncPlugin extends Plugin {
 	gitManager: GitManager | null = null;
 	statusBarItem: HTMLElement | null = null;
 	isDesktop: boolean = false;
+	private updater: PluginUpdater | null = null;
 
 	async onload() {
 		await this.loadSettings();
@@ -90,6 +101,20 @@ export default class GitSyncPlugin extends Plugin {
 
 		// Add settings tab
 		this.addSettingTab(new GitSyncSettingTab(this.app, this));
+
+		// Initialize the cross-platform GitHub updater.
+		this.updater = new PluginUpdater(this.app, this.manifest.id);
+		this.addCommand({
+			id: 'git-sync-check-for-updates',
+			name: 'Check for plugin updates',
+			callback: () => this.checkForUpdates(true),
+		});
+		if (this.settings.checkForUpdates) {
+			const oneDay = 24 * 60 * 60 * 1000;
+			if (Date.now() - (this.settings.lastUpdateCheck || 0) > oneDay) {
+				void this.checkForUpdates(false);
+			}
+		}
 
 		// Register commands
 		this.addCommand({
@@ -210,6 +235,46 @@ export default class GitSyncPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.setupAutoSync(); // Reconfigure auto sync with new settings
+	}
+
+	async checkForUpdates(manual: boolean): Promise<void> {
+		if (!this.updater) return;
+
+		try {
+			const result = await this.updater.checkForUpdate(
+				this.manifest.version,
+				this.settings.updateChannel === 'dev',
+				GIT_COMMIT_HASH,
+			);
+			this.settings.lastUpdateCheck = Date.now();
+			await this.saveSettings();
+
+			if (!result.hasUpdate || !result.release) {
+				if (manual) {
+					new Notice(`✅ Git Sync is up to date (${result.currentVersion})`);
+				}
+				return;
+			}
+
+			if (this.settings.autoUpdate && !result.isPrerelease) {
+				new Notice(`📦 Downloading update ${result.latestVersion}…`);
+				const tempDir = await this.updater.downloadUpdate(result.release);
+				await this.updater.installUpdate(tempDir);
+				new Notice(`✅ Update ${result.latestVersion} installed. Reload Obsidian to apply.`);
+				return;
+			}
+
+			const modal = new UpdateAvailableModal(this.app, result, async () => {
+				const tempDir = await this.updater!.downloadUpdate(result.release!);
+				await this.updater!.installUpdate(tempDir);
+			});
+			modal.open();
+		} catch (error: any) {
+			log.error('GitSyncPlugin', 'Update check failed', error);
+			if (manual) {
+				new Notice(`❌ Update check failed: ${error?.message || String(error)}`);
+			}
+		}
 	}
 
 	setupAutoSync() {
@@ -651,8 +716,75 @@ class GitSyncSettingTab extends PluginSettingTab {
 								(leaf.view as GitSidebarView).updateRefreshInterval(numValue);
 							}
 						}
-					}
+						}
+					}));
+
+		containerEl.createEl('h3', { text: 'Plugin Updates' });
+		let updateVersionLabel: () => void = () => undefined;
+
+		new Setting(containerEl)
+			.setName('Check for updates on startup')
+			.setDesc('Check GitHub once per day for a newer Git Sync release.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.checkForUpdates)
+				.onChange(async value => {
+					this.plugin.settings.checkForUpdates = value;
+					await this.plugin.saveSettings();
 				}));
+
+		new Setting(containerEl)
+			.setName('Release channel')
+			.setDesc('Stable releases are tested builds. Dev builds contain the latest main-branch changes.')
+			.addDropdown(dropdown => dropdown
+				.addOption('stable', 'Stable')
+				.addOption('dev', 'Dev (pre-release)')
+				.setValue(this.plugin.settings.updateChannel)
+				.onChange(async value => {
+					this.plugin.settings.updateChannel = value as 'stable' | 'dev';
+					await this.plugin.saveSettings();
+					updateVersionLabel();
+				}));
+
+		new Setting(containerEl)
+			.setName('Auto-install stable updates')
+			.setDesc('Install stable updates without prompting. Dev updates always require confirmation.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoUpdate)
+				.onChange(async value => {
+					this.plugin.settings.autoUpdate = value;
+					await this.plugin.saveSettings();
+					if (value) new Notice('Auto-update enabled for stable releases.');
+				}));
+
+		const versionSetting = new Setting(containerEl)
+			.setName('Current plugin version')
+			.addButton(button => button
+				.setButtonText('Check Now')
+				.setCta()
+				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Checking…');
+					await this.plugin.checkForUpdates(true);
+					button.setButtonText('Check Now');
+					button.setDisabled(false);
+				}));
+		const displayedCommit = GIT_COMMIT_HASH !== 'unknown'
+			? GIT_COMMIT_HASH.slice(0, 7)
+			: 'unknown';
+		updateVersionLabel = () => {
+			versionSetting.setDesc(
+				`${this.plugin.manifest.version} (${this.plugin.settings.updateChannel} channel) — commit ${displayedCommit}`,
+			);
+			versionSetting.descEl.setAttr('title', `Full commit: ${GIT_COMMIT_HASH}`);
+		};
+		updateVersionLabel();
+
+		if (this.plugin.settings.lastUpdateCheck > 0) {
+			containerEl.createEl('p', {
+				text: `Last checked: ${new Date(this.plugin.settings.lastUpdateCheck).toLocaleString()}`,
+				cls: 'setting-item-description',
+			});
+		}
 
 		// Add a button to test the connection
 		new Setting(containerEl)

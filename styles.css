@@ -42,6 +42,19 @@
     color: var(--text-normal);
 }
 
+.updater-prerelease-warning {
+    color: var(--text-warning);
+}
+
+.updater-changelog {
+    max-height: 240px;
+    overflow: auto;
+    padding: 8px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-secondary);
+}
+
 .git-tab-btn {
     flex: 1;
     padding: 8px 4px;

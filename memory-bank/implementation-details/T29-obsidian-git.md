@@ -258,3 +258,45 @@ GitHub fine-grained PAT:
 - Obsidian API docs: https://docs.obsidian.md/
 - GitHub PAT docs: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
 - Pack index issue: https://github.com/isomorphic-git/isomorphic-git/issues/XXXX (TBD)
+
+## Auto-Updater and Release Artifacts (2026-08-10)
+
+### Runtime updater
+
+`src/updater/PluginUpdater.ts` checks `space-cadet/obsidian-git` through
+Obsidian's native `requestUrl` API and writes release assets through the vault
+adapter. Stable checks use the latest GitHub release; dev checks select the
+rolling `dev` pre-release. The settings UI supports daily startup checks,
+manual checks, stable auto-install, and confirmation before dev installation.
+
+The build embeds the full Git commit hash through `esbuild.config.mjs` and
+`src/buildInfo.ts`. Dev checks compare the local hash with `main` HEAD because
+the rolling dev manifest can remain at version `1.0.0`; version-only comparison
+would otherwise report a perpetual update.
+
+Installation backs up `main.js`, `manifest.json`, and `styles.css` under the
+plugin's `.backup` directory. A partial write restores the pre-install files,
+and a persisted backup can be restored through `PluginUpdater.rollback()`.
+The updater validates that the downloaded manifest belongs to the installed
+plugin before installation.
+
+### Release workflow and local archive
+
+`.github/workflows/build-release.yml` builds before both stable and dev release
+jobs and publishes the ZIP plus direct `main.js`, `manifest.json`, and
+`styles.css` assets. Direct assets are required for mobile-safe installation;
+the runtime does not depend on Node ZIP extraction.
+
+`pnpm run archive` creates the versioned ZIP and copies the unpacked package
+files (`main.js`, `manifest.json`, `versions.json`, `styles.css`, and
+`README.md`) directly into `dist/`. `tests/archive.test.mjs` verifies both the
+ZIP listing and the unpacked files, while `tests/updater.test.mjs` covers
+channel selection, commit matching, asset validation, plugin identity, and
+transactional rollback.
+
+### Verification and remaining gate
+
+Production build, 13 Node tests, 10 isomorphic-git smoke checks, archive
+validation, and `git diff --check` pass. Real Android/iOS acceptance remains
+open, and the v1.0.0 tag remains approval-gated until authentication and
+mobile release checks are complete.

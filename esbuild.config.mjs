@@ -1,6 +1,16 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { execFileSync } from "node:child_process";
+
+let gitCommitHash = "unknown";
+try {
+  gitCommitHash = execFileSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+} catch {
+  // Development archives can still be built from a source tree without Git.
+}
 
 const banner =
 `/*
@@ -43,6 +53,9 @@ const context = await esbuild.context({
   logLevel: "info",
   sourcemap: prod ? false : "inline",
   treeShaking: true,
+  define: {
+    __GIT_COMMIT_HASH__: JSON.stringify(gitCommitHash),
+  },
   outfile: "main.js",
 });
 

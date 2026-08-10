@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const archivePath = 'dist/obsidian-git-sync-v1.0.0.zip';
+const unpackedPluginPath = 'dist';
+const requiredFiles = ['README.md', 'main.js', 'manifest.json', 'styles.css', 'versions.json'];
 
 test('release archive contains every required plugin runtime file', () => {
   execFileSync(process.execPath, ['scripts/build-archive.mjs'], { stdio: 'pipe' });
@@ -13,13 +15,18 @@ test('release archive contains every required plugin runtime file', () => {
     .split('\n')
     .sort();
 
-  assert.deepEqual(listing, [
-    'obsidian-git-sync/README.md',
-    'obsidian-git-sync/main.js',
-    'obsidian-git-sync/manifest.json',
-    'obsidian-git-sync/styles.css',
-    'obsidian-git-sync/versions.json',
-  ]);
+  assert.deepEqual(listing, requiredFiles.map((file) => `obsidian-git-sync/${file}`).sort());
+});
+
+test('archive build copies the unpacked plugin files into dist', () => {
+  for (const file of requiredFiles) {
+    assert.equal(existsSync(`${unpackedPluginPath}/${file}`), true);
+    assert.equal(
+      readFileSync(`${unpackedPluginPath}/${file}`, 'utf8'),
+      readFileSync(file, 'utf8'),
+      `${file} should match the source build output`,
+    );
+  }
 });
 
 test('release archive contains the current manifest version', () => {

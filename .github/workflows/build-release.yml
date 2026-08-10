@@ -79,13 +79,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build plugin
+        run: pnpm run build
+
       - name: Build archive
         run: pnpm run archive
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            main.js
+            manifest.json
+            styles.css
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,6 +121,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build plugin
+        run: pnpm run build
+
       - name: Build archive
         run: pnpm run archive
 
@@ -127,7 +137,11 @@ jobs:
             - Commit: ${{ github.sha }}
             - Branch: ${{ github.ref_name }}
             - Timestamp: ${{ github.event.head_commit.timestamp }}
-          files: dist/*.zip
+          files: |
+            dist/*.zip
+            main.js
+            manifest.json
+            styles.css
           prerelease: true
           draft: false
           make_latest: false

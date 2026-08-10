@@ -16,6 +16,7 @@ A powerful Git synchronization plugin for [Obsidian](https://obsidian.md) that w
 - 🔐 **Token-based auth** — Personal Access Token (PAT) support for GitHub/GitLab
 - ⚡ **Force Push** — for first-time pushes or resolving diverged histories
 - 🔄 **Auto-refresh** — configurable sidebar refresh interval
+- ⬆️ **Auto-updates** — check stable or dev GitHub releases and install updates from Settings
 - 📝 **Custom commit messages** — or auto-generated timestamped messages
 - 🎨 **Native Obsidian UI** — matches your theme, no jarring external styles
 
@@ -50,6 +51,10 @@ Copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/obsidi
    - The username field is ignored for PATs — any value works
 4. Set your **author name & email** for commits
 5. (Optional) Set **auto-sync interval** — 0 = disabled
+
+### Plugin updates
+
+Git Sync checks its GitHub releases once per day when startup checks are enabled. In **Settings → Git Sync → Plugin Updates**, you can choose the stable channel, opt into dev releases, manually check with **Check Now**, or enable automatic installation for stable updates. Dev updates always ask for confirmation before installation.
 
 ---
 

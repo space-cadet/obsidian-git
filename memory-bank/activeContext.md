@@ -1,15 +1,27 @@
 # Active Context
 
-*Last Updated: 2026-08-05 00:20:03 IST*
+*Last Updated: 2026-08-10 23:19:04 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 v29 shipped, release package and tests verified, pending mobile acceptance
+### T29: obsidian-git Plugin — 🔄 updater and release artifacts verified, pending mobile acceptance
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow functional. The release archive now contains required styles, and production build plus Node test suite pass. Foldable Changes sections were already implemented in v24. Pending: mobile test and public release.
-- **Next**: Test the current dev release on Android/iOS, confirm the CI release archive, then tag v1.0.0.
+- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 13 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
+- **Next**: Test the current dev release on Android/iOS with a valid credential, confirm direct CI assets and ZIP, then tag v1.0.0 only with explicit authorization.
+
+### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
+- **Scope**: Separate authentication task covering secret-safe PAT diagnostics,
+  optional GitHub device flow, and Android/desktop authentication acceptance.
+- **Status**: T34a is active. The read-only remote Test Connection repair is
+  shipped; Android reaches GitHub but the supplied token was rejected with
+  HTTP 401 by GitHub itself. Do not record or reuse the exposed token.
+- **Children**: T34a PAT diagnostics (active); T34b GitHub device flow
+  (planned); T34c Android/desktop acceptance (planned).
+- **Boundary**: T29 remains release packaging/acceptance. Do not make a
+  v1.0.0 tag until authentication validation and remaining mobile acceptance
+  are complete.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -55,20 +67,25 @@
 - **v27**: Git progress modal with dark theme, phase-by-phase tracking
 - **v28**: Progress modal fix (onMessage + onProgress), mobile crash fix #2 (64KB chunking), commits tab layout, commit file GitHub fallback, desktop UI mobile match
 - **v29**: Commits tab style refinement (toggle bar, row spacing, bold text)
+- **T29 updater**: Stable/dev GitHub release checks, commit-hash identity, mobile-safe install, backup/rollback, direct release assets, and unpacked `dist/` output ✅
 - **README**: Full documentation with screenshots
 - **CI**: GitHub Actions workflow (build, archive, artifact, dev release, stable release)
 
 ## Next Steps
-1. **Test v29 on mobile** — Verify progress modal, chunked fetch, shallow clone, commit file expansion
-2. **Confirm the CI-generated dev ZIP** — Verify it contains styles.css
-3. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
-4. **Plugin store submission prep** — manifest, README, release notes
+1. **T34a: Add secret-safe authentication diagnostics** — distinguish invalid
+   GitHub token, repository access denial, and Git HTTPS rejection.
+2. **T34b decision** — Decide whether to implement GitHub device-flow sign-in.
+3. **T34c + T29: Test the current dev release on Android/iOS** — Verify a
+   valid remote credential, clone/pull/push, progress, and commit expansion.
+4. **Create tagged v1.0.0 release** only after mobile acceptance and explicit
+   authorization.
 
 ## System Status
 
 - **Plugin**: v1.0.0 (manifest), v29 internal dev, core features + sidebar + progress modal + crash fix + UI parity
 - **Build**: ~280KB, mobile-compatible, tsc + esbuild pass
 - **CI**: GitHub Actions working, dev releases on every push
+- **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current build identity is embedded as commit `22857f1`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
 - **Memory Bank**: T29 top-level, T1-T6 sub-tasks, T30/T32/T33 completed
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
@@ -82,6 +99,10 @@
 - **Refresh interval 0 = disabled**: No auto-refresh when set to 0 ✅
 - **Local-only mode**: Skip push/pull when no repo URL configured ✅
 - **PAT auth**: Any username works with fine-grained PATs ✅
+- **Connection test is read-only**: It must not require a local repository or
+  clone/initialize the vault ✅
+- **Authentication task separation**: T34 owns remote authentication; T29 owns
+  release packaging and release acceptance ✅
 - **No conditional UI hiding**: All buttons always visible, disabled when not applicable ✅
 - **Dev releases on every push**: `dev` tag auto-updated, pre-release, not latest ✅
 - **v1.0.0 as public release**: v26 was internal dev version ✅
@@ -95,11 +116,14 @@
 - **Commit file GitHub fallback**: `fetchCommitFilesFromGitHub()` for shallow clones ✅
 - **Release archive contains styles**: styles.css is packaged and archive layout is tested ✅
 - **Test runner**: Node built-in test runner, with a bundled source test and Obsidian host stub ✅
+- **Updater identity**: Rolling dev release checks compare embedded local commit hash with GitHub `main` HEAD ✅
+- **Archive output**: `pnpm run archive` creates the ZIP and copies plugin files directly into `dist/` ✅
 
 ## Decisions Pending
 
 - **T7 repo detection**: Auto-scan depth limit? Manual add only?
 - **SSH key authentication**: Currently only Basic Auth
+- **GitHub device flow**: Planned under T34b; requires a GitHub App decision
 - **Conflict resolution UI**: For merge conflicts
 - **Mobile pack index**: LightningFS, wasm-git, or different library?
 - **Mobile acceptance**: Need real-device validation of the current dev release

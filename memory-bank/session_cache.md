@@ -1,19 +1,19 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-05 00:20:03 IST*
+*Last Updated: 2026-08-10 23:19:04 IST*
 
 ## Current Session
-**Started**: 2026-06-02 14:43 IST
-**Ended**: 2026-06-02 14:45 IST
-**Focus Task**: T29: Memory bank update for June 01-02 work
-**Session File**: `memory-bank/sessions/2026-06-02-afternoon.md`
+**Started**: 2026-08-10 21:00 IST
+**Ended**: 2026-08-10 23:19 IST
+**Focus Task**: T29 plugin auto-updater, commit-aware dev releases, and direct dist artifacts
+**Session File**: `memory-bank/sessions/2026-08-10-night.md`
 **Status**: ✅ CLOSED
 
 ## Overview
-- Active: 1 | Paused: 0 | Completed: 2 (T29 progress, T33 complete)
-- Last Session: 2026-06-01 evening (bug fixes)
-- Current Period: afternoon
+- Active: 2 (T29, T34; T34a active) | Paused: 2 (T34b, T34c) | Completed: 2 (T29 progress, T33 complete)
+- Last Session: 2026-08-10 night (connection-test repair, updater implementation, archive output, auth task split)
+- Current Period: night
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED
@@ -27,12 +27,16 @@
 - T31: Branch Tree View — ⏳ BACKLOG
 - T32: Mobile Crash Fix + Progress — ✅ COMPLETED (v26)
 - T33: Progress Modal + UI Fixes — ✅ COMPLETED (v27-v29)
+- T34: Remote Authentication for Obsidian Git — 🔄 IN PROGRESS
+- T34a: PAT Validation and Repository-Access Diagnostics — 🔄 IN PROGRESS
+- T34b: GitHub Device-Flow Authentication — ⏸️ PLANNED
+- T34c: Android/Desktop Authentication Acceptance Tests — ⏸️ PLANNED
 
 ## Active Tasks
 ### T29: obsidian-git Plugin
 **Status:** 🔄 **Priority:** HIGH
 **Started:** 2026-05-31 **Last:** 2026-08-05
-**Context**: v29 shipped with progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback, release archive repair, and repeatable tests.
+**Context**: v29 shipped with progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback, release archive repair, repeatable tests, and the new custom updater/release artifact flow.
 **Files**: `src/gitManager.ts`, `scripts/build-archive.mjs`, `tests/`, `test-isomorphic-git.mjs`, `package.json`
 **Progress**:
 1. ✅ v25: Commits tab redesign
@@ -48,9 +52,22 @@
 11. ✅ Foldable Changes sections implementation verified
 12. ✅ Node automated tests and production build pass
 13. ⬜ Tagged v1.0.0 release after mobile acceptance
+14. ✅ Stable/dev auto-updater with commit-aware rolling dev detection
+15. ✅ Transactional install rollback and direct CI release assets
+16. ✅ Unpacked plugin files copied directly into `dist/`
+
+### T34: Remote Authentication for Obsidian Git
+**Status:** 🔄 **Priority:** HIGH
+**Started:** 2026-08-10 **Last:** 2026-08-10
+**Context**: Separate from T29 release work. The settings connection test is
+read-only and deployed; Android now reaches GitHub, but the supplied token was
+rejected with HTTP 401 by account, repository, and Git smart-HTTP endpoints.
+**Next:** Implement T34a diagnostics. The exposed token must not be reused or
+recorded.
 
 ## Session History (Last 5)
-1. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
+1. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
+2. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
 2. `sessions/2026-06-01-evening.md` — T29: Bug fixes from debug log analysis
 3. `sessions/2026-06-01-afternoon.md` — T32: Mobile crash fix + progress + API fallback + debug logs
 4. `sessions/2026-06-01-morning.md` — v25 + CI workflow

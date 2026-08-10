@@ -12,7 +12,7 @@
  *   node scripts/build-archive.mjs --name   # Creates obsidian-git-sync.zip (no version)
  */
 
-import { readFileSync, existsSync, mkdirSync, createWriteStream, statSync } from "fs";
+import { readFileSync, existsSync, mkdirSync, createWriteStream, statSync, copyFileSync, rmSync } from "fs";
 import { join, dirname, relative } from "path";
 import { fileURLToPath } from "url";
 
@@ -57,6 +57,17 @@ if (missing.length > 0) {
 const distDir = join(rootDir, "dist");
 if (!existsSync(distDir)) {
   mkdirSync(distDir, { recursive: true });
+}
+
+// Keep unpacked plugin files directly in dist alongside the ZIP. This is
+// useful for local testing and can be copied directly into a vault's plugin
+// directory.
+const legacyUnpackedPluginDir = join(distDir, id);
+if (existsSync(legacyUnpackedPluginDir)) {
+  rmSync(legacyUnpackedPluginDir, { recursive: true, force: true });
+}
+for (const file of filesToInclude) {
+  copyFileSync(join(rootDir, file), join(distDir, file));
 }
 
 // ============================================================================
@@ -225,6 +236,7 @@ output.on("finish", () => {
   const sizeKB = (stats.size / 1024).toFixed(1);
 
   console.log(`✅ Archive created: dist/${archiveName} (${sizeKB} KB)`);
+  console.log("✅ Plugin files copied: dist/");
   console.log(`   Plugin ID: ${id}`);
   console.log(`   Version:   ${version}`);
   console.log(`   Files:     ${filesToInclude.join(", ")}`);

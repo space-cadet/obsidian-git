@@ -1,7 +1,27 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-05 00:20:03 IST*
+*Last Updated: 2026-08-10 23:19:04 IST*
+
+### 2026-08-10
+
+#### 23:19:04 IST - T29: Plugin auto-updater and direct dist artifacts
+- Created `src/updater/PluginUpdater.ts` - Added stable/dev GitHub release checks, commit-hash matching, mobile-safe downloads, manifest validation, backup, transactional rollback, and update modal.
+- Created `src/buildInfo.ts` and modified `esbuild.config.mjs` - Embedded the full Git commit hash in production bundles for rolling dev release identity.
+- Modified `src/main.ts`, `styles.css`, and `README.md` - Added updater settings, manual/startup checks, channel/hash display, and user documentation.
+- Modified `.github/workflows/build-release.yml` - Published direct runtime assets alongside stable/dev ZIP releases.
+- Modified `scripts/build-archive.mjs` and `tests/archive.test.mjs` - Copied plugin files directly into `dist/` and verified the unpacked output.
+- Created `tests/updater.test.mjs` - Added channel, hash, asset validation, plugin identity, and rollback coverage.
+- Updated T29 task, implementation details, active context, progress, session cache, and session log - Recorded implementation, verification, and remaining mobile/authentication gates.
+
+### 2026-08-10
+
+#### 22:34:02 IST - T34: Remote authentication task split and session closeout
+- Created `tasks/T34.md` - Separate parent task for remote authentication, distinct from T29 release work.
+- Created `tasks/T34a.md`, `tasks/T34b.md`, and `tasks/T34c.md` - Defined PAT diagnostics, optional GitHub device flow, and cross-device acceptance boundaries.
+- Created `implementation-details/T34-remote-authentication.md` - Recorded the read-only connection-test architecture, Android evidence, and secret-safe diagnostic design.
+- Created `sessions/2026-08-10-night.md` - Closed the session with release evidence, Android findings, and deferred work.
+- Updated `tasks.md`, `activeContext.md`, `session_cache.md`, and `progress.md` - Registered T34, preserved T29's release-only scope, and set T34a as active.
 
 ### 2026-08-05
 
