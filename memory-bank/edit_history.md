@@ -1,7 +1,52 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-10 23:19:04 IST*
+*Last Updated: 2026-08-11 02:39:18 IST*
+
+### 2026-08-11
+
+#### 02:39:18 IST - T35a/T35c: Close architecture and credential-planning session
+- Updated `session_cache.md` - Marked the current session closed and preserved the next-session approval gate.
+- Updated `sessions/2026-08-11-early-morning.md` - Recorded the final closeout, deferred implementation boundary, and active next-session tasks.
+
+### 2026-08-11
+
+#### 02:31:07 IST - T35a/T34b: Record secure Git-credential storage plan
+- Modified `memory-bank/implementation-details/security-and-secrets.md` - Recorded Obsidian SecretStorage guidance, related credential methods, threat model, and implementation sequence.
+- Modified `memory-bank/tasks/T35a.md` - Added the SecretStorage, migration, just-in-time resolution, unsupported-platform, staging, redaction, and acceptance plan.
+- Modified `memory-bank/tasks/T34b.md` - Required device-flow credentials to use SecretStorage without a plaintext fallback.
+- Updated `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks.md`, and `memory-bank/session_cache.md` - Synchronized the active design decision and next approval gate.
+- Updated `memory-bank/sessions/2026-08-11-early-morning.md` - Appended the secure-storage follow-up and confirmed no production code or credential data changed.
+
+### 2026-08-11
+
+#### 02:20:28 IST - T35a/T35c: Complete read-only source audit
+- Modified `tasks/T35a.md` and `tasks/T35c.md` - Recorded evidence locations and acceptance gates for credential/staging and repository-state/destructive-operation risks.
+- Modified `tasks/T35.md` and `tasks.md` - Marked T35a/T35c active for audit/design while preserving the no-production-implementation boundary.
+- Modified `implementation-details/security-and-secrets.md` and `implementation-details/reliability-and-lifecycle.md` - Added current-source audit evidence and implementation sequencing notes.
+- Updated `activeContext.md`, `progress.md`, `session_cache.md`, and `sessions/2026-08-11-early-morning.md` - Recorded the audit results, passing baseline tests, and next approval gates.
+
+### 2026-08-11
+
+#### 02:14:36 IST - T35: Initialize missing Memory Bank support files
+- Created `memory-bank/protocols/` and `memory-bank/templates/` - Added the missing mb-core workflow protocols and reusable templates.
+- Created `memory-bank/changelog.md`, `memory-bank/errorLog.md`, `memory-bank/productContext.md`, `memory-bank/systemPatterns.md`, `memory-bank/techContext.md`, `memory-bank/.cursorrules`, and `memory-bank/README.md` - Added missing Memory Bank support files without replacing existing records.
+- Created `memory-bank/integrated-rules-v6.12.md` - Added the bundled Memory Bank rules file; its shipped v6.11 content remains queued for separate version review.
+- Modified `memory-bank/README.md` - Corrected mb-core's generated day/month-swapped initialization date.
+- Updated `memory-bank/activeContext.md`, `memory-bank/session_cache.md`, and `memory-bank/sessions/2026-08-11-early-morning.md` - Recorded the safe bootstrap and version-boundary note.
+- Recorded the missing `memory-bank/templates/commit_message_template.md` source warning - Left the template absent rather than creating an unverified replacement.
+
+### 2026-08-11
+
+#### 02:03:27 IST - T35/T34/T29: Architecture review recorded and hardening work decomposed
+- Created `tasks/T35.md` - Added the cross-cutting reliability, security, lifecycle, transport, updater, testing, and documentation hardening parent.
+- Created `tasks/T35a.md`, `tasks/T35b.md`, `tasks/T35c.md`, `tasks/T35d.md`, `tasks/T35e.md`, and `tasks/T35f.md` - Split the review findings into credential safety, operation coordination, initialization safety, mobile transport, updater integrity, and test/CI/documentation follow-ups.
+- Modified `tasks/T34a.md` - Added secret-safe logging, staging exclusions, and credential-freshness acceptance criteria.
+- Modified `tasks/T29.md` - Recorded the release impact and linked T35 without expanding T29 beyond release packaging and acceptance ownership.
+- Created `implementation-details/security-and-secrets.md` - Defined credential storage, redaction, and automatic staging boundaries.
+- Created `implementation-details/reliability-and-lifecycle.md` - Defined operation coordination, repository states, progress ownership, and unload behavior.
+- Modified `implementation-details/T34-remote-authentication.md`, `implementation-details/T29-obsidian-git.md`, `implementation-details/git-http-client.md`, `implementation-details/mobile-compatibility.md`, and `implementation-details/ci-cd-architecture.md` - Recorded durable review findings and ownership boundaries.
+- Updated `tasks.md`, `activeContext.md`, `progress.md`, `session_cache.md`, and `sessions/2026-08-11-early-morning.md` - Synchronized the new T35 task tree, current focus, release gate, and session record.
 
 ### 2026-08-10
 

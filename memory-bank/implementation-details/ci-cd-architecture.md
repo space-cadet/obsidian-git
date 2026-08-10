@@ -206,3 +206,19 @@ gh release view dev
 - `GITHUB_TOKEN` is auto-provided by GitHub Actions
 - No secrets stored in repository
 - PATs for git operations are user-configured in Obsidian settings (not in CI)
+
+## Architecture Review Update (2026-08-11)
+
+The workflow currently builds and archives the plugin but does not execute the
+full `pnpm test` suite in CI. T35f tracks adding the complete test command and
+integration coverage to pull requests and release jobs.
+
+T35e also tracks release-artifact identity checks. The source build, tracked
+`main.js`, ZIP contents, direct release assets, embedded commit hash, and
+manifest version should either be generated from one verified artifact or be
+compared explicitly so a stale checked-in bundle cannot be mistaken for the
+current source.
+
+Updater assets are executable plugin code. Release publishing should provide
+checksums or signed metadata, and the updater should verify those values before
+installation.

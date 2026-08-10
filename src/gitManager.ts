@@ -1,6 +1,12 @@
 import * as git from 'isomorphic-git';
 import { requestUrl, RequestUrlResponse, Notice } from 'obsidian';
 import { log } from './logger';
+import { filterAutomaticallyStagedPaths, normalizeRemoteUrl } from './security';
+import {
+    classifyRepositoryError,
+    RepositoryInitializationError,
+    repositoryFailureMessage,
+} from './repositoryState';
 
 /**
  * Git HTTP client using Obsidian's requestUrl API.
@@ -12,9 +18,10 @@ import { log } from './logger';
 class GitHttpClient {
   private credentials: GitCredentials;
 
-  constructor(credentials: GitCredentials) {
-    this.credentials = credentials;
-  }
+    constructor(credentials: GitCredentials) {
+        this.credentials = credentials;
+        log.setSensitiveValues([credentials.password]);
+    }
 
   async request(config: any, attempt: number = 1): Promise<any> {
     const maxAttempts = 3;
@@ -159,11 +166,12 @@ export function arrayBufferToAsyncIterable(
  * no refs yet, but their URL and credentials are still usable.
  */
 export async function testRemoteConnection(credentials: GitCredentials): Promise<void> {
-    const repoUrl = credentials.repoUrl?.trim();
+    const repoUrl = credentials.repoUrl ? normalizeRemoteUrl(credentials.repoUrl) : '';
     if (!repoUrl) {
         throw new Error('Please enter a repository URL first');
     }
 
+    log.setSensitiveValues([credentials.password]);
     log.info('GitManager', `Testing read-only remote connection to ${repoUrl}`);
     await git.listServerRefs({
         http: new GitHttpClient({ ...credentials, repoUrl }),
@@ -348,6 +356,7 @@ export class GitManager {
      */
     updateCredentials(credentials: GitCredentials): void {
         this.credentials = credentials;
+        log.setSensitiveValues([credentials.password]);
         log.debug('GitManager', 'Credentials updated');
     }
 
@@ -366,19 +375,20 @@ export class GitManager {
      */
     async ensureRemote(repoUrl: string): Promise<void> {
         try {
+            const remoteUrl = normalizeRemoteUrl(repoUrl);
             const remotes = await git.listRemotes({ fs: this.fs, dir: this.dir });
             const hasOrigin = remotes.some((r: any) => r.remote === 'origin');
             
             if (!hasOrigin) {
-                log.info('GitManager', `Adding remote 'origin' -> ${repoUrl}`);
-                await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: repoUrl });
+                log.info('GitManager', 'Adding remote origin');
+                await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: remoteUrl });
             } else {
                 // Optionally update URL if it changed
                 const origin = remotes.find((r: any) => r.remote === 'origin');
-                if (origin && origin.url !== repoUrl) {
-                    log.info('GitManager', `Updating remote 'origin' URL: ${origin.url} -> ${repoUrl}`);
+                if (origin && origin.url !== remoteUrl) {
+                    log.info('GitManager', 'Updating remote origin');
                     await git.deleteRemote({ fs: this.fs, dir: this.dir, remote: 'origin' });
-                    await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: repoUrl });
+                    await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: remoteUrl });
                 }
             }
         } catch (error) {
@@ -389,48 +399,63 @@ export class GitManager {
 
     async initializeRepo(repoUrl: string, branchName: string): Promise<boolean> {
         try {
-            log.debug('GitManager', `Initializing repository: ${repoUrl}, branch: ${branchName}`);
+            const remoteUrl = repoUrl ? normalizeRemoteUrl(repoUrl) : '';
+            log.debug('GitManager', `Initializing repository: ${remoteUrl || '(local only)'}, branch: ${branchName}`);
             // Check if .git directory exists
             const isRepo = await this.isRepository();
             
             if (!isRepo) {
-                // Try to clone first, but if remote is empty, fall back to local init
+                if (!remoteUrl) {
+                    await git.init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+                    this.updateStatus('Local repository initialized');
+                    return true;
+                }
+
+                // Only a verified empty remote may fall back to local initialization.
                 try {
-                    log.info('GitManager', `Cloning repository from ${repoUrl} (branch: ${branchName})`);
+                    log.info('GitManager', `Cloning repository (branch: ${branchName})`);
                     
-                    await this.cloneRepository(repoUrl, branchName, 1);
+                    await this.cloneRepository(remoteUrl, branchName, 1);
                     
                     this.updateStatus('Repository cloned');
                     log.info('GitManager', `Repository successfully cloned to ${this.dir}`);
                     return true;
                 } catch (cloneError: any) {
-                    // If clone fails because remote is empty, initialize locally instead
-                    log.warn('GitManager', `Clone failed, initializing locally: ${cloneError.message}`);
+                    const kind = classifyRepositoryError(cloneError);
+                    if (kind !== 'empty-remote') {
+                        log.warn('GitManager', `Clone refused local fallback (${kind})`);
+                        throw new RepositoryInitializationError(kind, repositoryFailureMessage(kind));
+                    }
+
+                    log.info('GitManager', 'Remote is empty; initializing a local repository');
                     
                     this.updateStatus('Initializing local repository...');
                     log.info('GitManager', `Initializing empty repo at ${this.dir}`);
                     
                     await git.init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-                    await this.ensureRemote(repoUrl);
+                    await this.ensureRemote(remoteUrl);
                     
                     this.updateStatus('Local repository initialized');
-                    log.info('GitManager', `Local repo initialized, remote configured: ${repoUrl}`);
+                    log.info('GitManager', 'Local repo initialized with remote configured');
                     return true;
                 }
             }
             
             // If repository exists locally, ensure remote is configured
-            if (repoUrl) {
-                await this.ensureRemote(repoUrl);
+            if (remoteUrl) {
+                await this.ensureRemote(remoteUrl);
+            } else {
+                this.updateStatus('Repository ready');
+                return true;
             }
             
             // Validate the remote URL by attempting to list the remote refs
             this.updateStatus('Validating repository...');
-            log.debug('GitManager', `Validating remote repository URL: ${repoUrl}`);
+            log.debug('GitManager', 'Validating remote repository URL');
             
             await git.listServerRefs({
                 http: new GitHttpClient(this.credentials),
-                url: repoUrl,
+                url: remoteUrl,
                 prefix: `refs/heads/${branchName}`,
                 onAuth: () => ({
                     username: this.credentials.username,
@@ -684,7 +709,7 @@ export class GitManager {
                 throw error;
             }
         } catch (error) {
-            console.error('Failed to pull changes:', error);
+            log.error('GitManager', 'Failed to pull changes', error as Error);
             this.updateStatus('Pull failed');
             throw error;
         }
@@ -908,7 +933,7 @@ export class GitManager {
             
             this.updateStatus('Changes added');
         } catch (error) {
-            console.error('Failed to add changes:', error);
+            log.error('GitManager', 'Failed to add changes', error as Error);
             this.updateStatus('Failed to add changes');
             throw error;
         }
@@ -925,11 +950,12 @@ export class GitManager {
             });
             
             // Filter for files that have changes
-            return statusMatrix
+            const changedFiles = statusMatrix
                 .filter(row => row[1] !== row[2] || row[1] !== row[3])
                 .map(row => row[0]);
+            return filterAutomaticallyStagedPaths(changedFiles);
         } catch (error) {
-            console.error('Failed to get changed files:', error);
+            log.error('GitManager', 'Failed to get changed files', error as Error);
             throw error;
         }
     }

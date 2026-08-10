@@ -7580,11 +7580,11 @@ var require_ignore = __commonJS({
 var require_lib2 = __commonJS({
   "node_modules/.pnpm/clean-git-ref@2.0.1/node_modules/clean-git-ref/lib/index.js"(exports, module2) {
     "use strict";
-    function escapeRegExp(string) {
+    function escapeRegExp2(string) {
       return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     }
     function replaceAll(str, search, replacement) {
-      search = search instanceof RegExp ? search : new RegExp(escapeRegExp(search), "g");
+      search = search instanceof RegExp ? search : new RegExp(escapeRegExp2(search), "g");
       return str.replace(search, replacement);
     }
     var CleanGitRef = {
@@ -18425,11 +18425,85 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
   }
 });
 
+// src/security.ts
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function redactSensitiveText(value, secrets = []) {
+  let result = String(value);
+  for (const secret of secrets) {
+    if (secret && secret.length >= 3) {
+      result = result.replace(new RegExp(escapeRegExp(secret), "g"), REDACTED);
+    }
+  }
+  result = result.replace(/(https?:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}@`);
+  result = result.replace(/(authorization\s*[:=]\s*)(?:basic|bearer)\s+[^\s,;]+/gi, `$1${REDACTED}`);
+  result = result.replace(/\bBasic\s+[A-Za-z0-9+/=]+/g, `Basic ${REDACTED}`);
+  result = result.replace(/\b(?:ghp|github_pat|glpat)-[A-Za-z0-9_-]+/g, REDACTED);
+  return result;
+}
+function redactSensitiveData(value, secrets = []) {
+  if (value === null || value === void 0)
+    return value;
+  if (typeof value === "string")
+    return redactSensitiveText(value, secrets);
+  if (typeof value !== "object")
+    return value;
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: redactSensitiveText(value.message, secrets),
+      stack: value.stack ? redactSensitiveText(value.stack, secrets) : void 0
+    };
+  }
+  if (Array.isArray(value))
+    return value.map((item) => redactSensitiveData(item, secrets));
+  const output = {};
+  for (const [key, item] of Object.entries(value)) {
+    output[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactSensitiveData(item, secrets);
+  }
+  return output;
+}
+function normalizeRemoteUrl(value) {
+  const url = value.trim();
+  if (/^[a-z][a-z\d+.-]*:\/\/[^\s/@]+@/i.test(url)) {
+    throw new Error("Repository URL must not contain embedded credentials");
+  }
+  return url;
+}
+function isProtectedSyncPath(filepath, pluginId = "obsidian-git-sync") {
+  const path = filepath.replace(/\\/g, "/").replace(/^\.\//, "");
+  const pluginPath = `.obsidian/plugins/${pluginId}`;
+  return path === pluginPath || path.startsWith(`${pluginPath}/`);
+}
+function filterAutomaticallyStagedPaths(paths) {
+  return paths.filter((filepath) => !isProtectedSyncPath(filepath));
+}
+var REDACTED, SENSITIVE_KEYS;
+var init_security = __esm({
+  "src/security.ts"() {
+    REDACTED = "[REDACTED]";
+    SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+      "authorization",
+      "password",
+      "passwd",
+      "pat",
+      "secret",
+      "token",
+      "credential",
+      "credentials",
+      "cookie",
+      "set-cookie"
+    ]);
+  }
+});
+
 // src/logger.ts
 var import_obsidian, LogLevel, Logger, log2;
 var init_logger = __esm({
   "src/logger.ts"() {
     import_obsidian = require("obsidian");
+    init_security();
     LogLevel = /* @__PURE__ */ ((LogLevel2) => {
       LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
       LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
@@ -18443,6 +18517,7 @@ var init_logger = __esm({
         this.showNotices = true;
         this.entries = [];
         this.maxEntries = 500;
+        this.sensitiveValues = [];
       }
       /**
        * Get the singleton instance of the logger
@@ -18529,33 +18604,42 @@ var init_logger = __esm({
       setShowNotices(show) {
         this.showNotices = show;
       }
+      setSensitiveValues(values) {
+        this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
+      }
       /**
        * Log a debug message
        */
       debug(context, message, data) {
-        this.pushEntry("debug", context, message, data);
+        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+        const safeData = redactSensitiveData(data, this.sensitiveValues);
+        this.pushEntry("debug", context, safeMessage, safeData);
         if (this.logLevel <= 0 /* DEBUG */) {
-          console.debug(`[Git Sync][${context}] ${message}`, data || "");
+          console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
         }
       }
       /**
        * Log an info message
        */
       info(context, message, data) {
-        this.pushEntry("info", context, message, data);
+        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+        const safeData = redactSensitiveData(data, this.sensitiveValues);
+        this.pushEntry("info", context, safeMessage, safeData);
         if (this.logLevel <= 1 /* INFO */) {
-          console.info(`[Git Sync][${context}] ${message}`, data || "");
+          console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
         }
       }
       /**
        * Log a warning message
        */
       warn(context, message, data) {
-        this.pushEntry("warn", context, message, data);
+        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+        const safeData = redactSensitiveData(data, this.sensitiveValues);
+        this.pushEntry("warn", context, safeMessage, safeData);
         if (this.logLevel <= 2 /* WARN */) {
-          console.warn(`[Git Sync][${context}] ${message}`, data || "");
+          console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
           if (this.showNotices) {
-            new import_obsidian.Notice(`[Warning] ${message}`);
+            new import_obsidian.Notice(`[Warning] ${safeMessage}`);
           }
         }
       }
@@ -18563,14 +18647,17 @@ var init_logger = __esm({
        * Log an error message
        */
       error(context, message, error) {
-        this.pushEntry("error", context, message, (error == null ? void 0 : error.message) || error);
+        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+        const safeError = redactSensitiveData(error, this.sensitiveValues);
+        const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : "";
+        this.pushEntry("error", context, safeMessage, safeError || errorText);
         if (this.logLevel <= 3 /* ERROR */) {
-          console.error(`[Git Sync][${context}] ${message}`, error || "");
-          if (error == null ? void 0 : error.stack) {
-            console.error(`[Git Sync][${context}] Stack trace:`, error.stack);
+          console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || "");
+          if (error && typeof safeError === "object" && safeError && "stack" in safeError) {
+            console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
           }
           if (this.showNotices) {
-            new import_obsidian.Notice(`[Error] ${message}${error ? `: ${error.message}` : ""}`);
+            new import_obsidian.Notice(`[Error] ${safeMessage}${errorText ? `: ${errorText}` : ""}`);
           }
         }
       }
@@ -18579,8 +18666,8 @@ var init_logger = __esm({
           timestamp: Date.now(),
           level,
           namespace,
-          message,
-          data
+          message: redactSensitiveText(message, this.sensitiveValues),
+          data: redactSensitiveData(data, this.sensitiveValues)
         });
         if (this.entries.length > this.maxEntries) {
           this.entries = this.entries.slice(-this.maxEntries);
@@ -18588,6 +18675,63 @@ var init_logger = __esm({
       }
     };
     log2 = Logger.getInstance();
+  }
+});
+
+// src/repositoryState.ts
+function errorDetails(error) {
+  var _a, _b, _c;
+  const value = error && typeof error === "object" ? error : {};
+  const data = value.data && typeof value.data === "object" ? value.data : {};
+  const message = error instanceof Error ? error.message : String(error);
+  const statusValue = (_c = (_b = (_a = data.statusCode) != null ? _a : data.status) != null ? _b : value.statusCode) != null ? _c : value.status;
+  const status2 = typeof statusValue === "number" ? statusValue : Number(statusValue);
+  return {
+    code: typeof value.code === "string" ? value.code : void 0,
+    message,
+    status: Number.isFinite(status2) ? status2 : void 0
+  };
+}
+function classifyRepositoryError(error) {
+  const { code, message, status: status2 } = errorDetails(error);
+  const text = message.toLowerCase();
+  if (code === "EmptyServerResponseError" || /empty response|no refs? found|no matching ref/.test(text)) {
+    return "empty-remote";
+  }
+  if (status2 === 401 || /401|unauthorized|authentication|invalid credential|bad credential/.test(text)) {
+    return "authentication";
+  }
+  if (status2 === 403 || status2 === 404 || /403|forbidden|permission denied|access denied/.test(text)) {
+    return "permission";
+  }
+  if (/invalid url|malformed url|bad url|not a valid url/.test(text))
+    return "invalid-url";
+  if (/econn|etimedout|timeout|network|socket|connection reset|fetch failed/.test(text)) {
+    return "network";
+  }
+  return "unknown";
+}
+function repositoryFailureMessage(kind) {
+  const messages = {
+    authentication: "Remote authentication failed. Check the saved credential.",
+    permission: "The remote repository denied access or was not found.",
+    "invalid-url": "The repository URL is invalid.",
+    network: "The remote repository could not be reached.",
+    "empty-remote": "The remote repository is empty.",
+    unknown: "The repository operation failed."
+  };
+  return messages[kind];
+}
+var RepositoryInitializationError;
+var init_repositoryState = __esm({
+  "src/repositoryState.ts"() {
+    RepositoryInitializationError = class extends Error {
+      constructor(kind, message) {
+        super(message);
+        this.name = "RepositoryInitializationError";
+        this.kind = kind;
+      }
+    };
   }
 });
 
@@ -18926,11 +19070,11 @@ function arrayBufferToAsyncIterable(arrayBuffer, chunkSize = 65536) {
   };
 }
 async function testRemoteConnection(credentials) {
-  var _a;
-  const repoUrl = (_a = credentials.repoUrl) == null ? void 0 : _a.trim();
+  const repoUrl = credentials.repoUrl ? normalizeRemoteUrl(credentials.repoUrl) : "";
   if (!repoUrl) {
     throw new Error("Please enter a repository URL first");
   }
+  log2.setSensitiveValues([credentials.password]);
   log2.info("GitManager", `Testing read-only remote connection to ${repoUrl}`);
   await listServerRefs({
     http: new GitHttpClient({ ...credentials, repoUrl }),
@@ -18987,10 +19131,13 @@ var init_gitManager = __esm({
     init_isomorphic_git();
     import_obsidian3 = require("obsidian");
     init_logger();
+    init_security();
+    init_repositoryState();
     init_GitProgressModal();
     GitHttpClient = class {
       constructor(credentials) {
         this.credentials = credentials;
+        log2.setSensitiveValues([credentials.password]);
       }
       async request(config, attempt = 1) {
         var _a, _b, _c, _d, _e;
@@ -19159,6 +19306,7 @@ var init_gitManager = __esm({
        */
       updateCredentials(credentials) {
         this.credentials = credentials;
+        log2.setSensitiveValues([credentials.password]);
         log2.debug("GitManager", "Credentials updated");
       }
       updateStatus(message) {
@@ -19175,17 +19323,18 @@ var init_gitManager = __esm({
        */
       async ensureRemote(repoUrl) {
         try {
+          const remoteUrl = normalizeRemoteUrl(repoUrl);
           const remotes = await listRemotes({ fs: this.fs, dir: this.dir });
           const hasOrigin = remotes.some((r) => r.remote === "origin");
           if (!hasOrigin) {
-            log2.info("GitManager", `Adding remote 'origin' -> ${repoUrl}`);
-            await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: repoUrl });
+            log2.info("GitManager", "Adding remote origin");
+            await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: remoteUrl });
           } else {
             const origin = remotes.find((r) => r.remote === "origin");
-            if (origin && origin.url !== repoUrl) {
-              log2.info("GitManager", `Updating remote 'origin' URL: ${origin.url} -> ${repoUrl}`);
+            if (origin && origin.url !== remoteUrl) {
+              log2.info("GitManager", "Updating remote origin");
               await deleteRemote({ fs: this.fs, dir: this.dir, remote: "origin" });
-              await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: repoUrl });
+              await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: remoteUrl });
             }
           }
         } catch (error) {
@@ -19195,34 +19344,48 @@ var init_gitManager = __esm({
       }
       async initializeRepo(repoUrl, branchName) {
         try {
-          log2.debug("GitManager", `Initializing repository: ${repoUrl}, branch: ${branchName}`);
+          const remoteUrl = repoUrl ? normalizeRemoteUrl(repoUrl) : "";
+          log2.debug("GitManager", `Initializing repository: ${remoteUrl || "(local only)"}, branch: ${branchName}`);
           const isRepo = await this.isRepository();
           if (!isRepo) {
+            if (!remoteUrl) {
+              await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+              this.updateStatus("Local repository initialized");
+              return true;
+            }
             try {
-              log2.info("GitManager", `Cloning repository from ${repoUrl} (branch: ${branchName})`);
-              await this.cloneRepository(repoUrl, branchName, 1);
+              log2.info("GitManager", `Cloning repository (branch: ${branchName})`);
+              await this.cloneRepository(remoteUrl, branchName, 1);
               this.updateStatus("Repository cloned");
               log2.info("GitManager", `Repository successfully cloned to ${this.dir}`);
               return true;
             } catch (cloneError) {
-              log2.warn("GitManager", `Clone failed, initializing locally: ${cloneError.message}`);
+              const kind = classifyRepositoryError(cloneError);
+              if (kind !== "empty-remote") {
+                log2.warn("GitManager", `Clone refused local fallback (${kind})`);
+                throw new RepositoryInitializationError(kind, repositoryFailureMessage(kind));
+              }
+              log2.info("GitManager", "Remote is empty; initializing a local repository");
               this.updateStatus("Initializing local repository...");
               log2.info("GitManager", `Initializing empty repo at ${this.dir}`);
               await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-              await this.ensureRemote(repoUrl);
+              await this.ensureRemote(remoteUrl);
               this.updateStatus("Local repository initialized");
-              log2.info("GitManager", `Local repo initialized, remote configured: ${repoUrl}`);
+              log2.info("GitManager", "Local repo initialized with remote configured");
               return true;
             }
           }
-          if (repoUrl) {
-            await this.ensureRemote(repoUrl);
+          if (remoteUrl) {
+            await this.ensureRemote(remoteUrl);
+          } else {
+            this.updateStatus("Repository ready");
+            return true;
           }
           this.updateStatus("Validating repository...");
-          log2.debug("GitManager", `Validating remote repository URL: ${repoUrl}`);
+          log2.debug("GitManager", "Validating remote repository URL");
           await listServerRefs({
             http: new GitHttpClient(this.credentials),
-            url: repoUrl,
+            url: remoteUrl,
             prefix: `refs/heads/${branchName}`,
             onAuth: () => ({
               username: this.credentials.username,
@@ -19442,7 +19605,7 @@ var init_gitManager = __esm({
             throw error;
           }
         } catch (error) {
-          console.error("Failed to pull changes:", error);
+          log2.error("GitManager", "Failed to pull changes", error);
           this.updateStatus("Pull failed");
           throw error;
         }
@@ -19618,7 +19781,7 @@ Try again with a faster connection or smaller repository.`
           }
           this.updateStatus("Changes added");
         } catch (error) {
-          console.error("Failed to add changes:", error);
+          log2.error("GitManager", "Failed to add changes", error);
           this.updateStatus("Failed to add changes");
           throw error;
         }
@@ -19632,9 +19795,10 @@ Try again with a faster connection or smaller repository.`
             fs: this.fs,
             dir: this.dir
           });
-          return statusMatrix2.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0]);
+          const changedFiles = statusMatrix2.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0]);
+          return filterAutomaticallyStagedPaths(changedFiles);
         } catch (error) {
-          console.error("Failed to get changed files:", error);
+          log2.error("GitManager", "Failed to get changed files", error);
           throw error;
         }
       }
@@ -21254,7 +21418,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "22857f1a4859b13346779d9c08f484a7fda81141" : "unknown";
+var GIT_COMMIT_HASH = true ? "f7fdc9701b38dbf3d94cd9bbf1ff1067a779d5b0" : "unknown";
 
 // src/main.ts
 var DEFAULT_SETTINGS = {
@@ -21511,7 +21675,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
       return this.gitManager;
     const vaultPath = ".";
     const hasRepo = await this.detectRealGitRepo();
-    if (!hasRepo) {
+    if (!hasRepo && requireRemote && !this.settings.repoUrl) {
       log2.warn("GitSyncPlugin", "No .git repo found in vault");
       return null;
     }
@@ -21529,7 +21693,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     };
     const statusEl = this.statusBarItem || void 0;
     this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
-    if (this.settings.repoUrl) {
+    if (this.settings.repoUrl || !hasRepo) {
       await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
     }
     return this.gitManager;

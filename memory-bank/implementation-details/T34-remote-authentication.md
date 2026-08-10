@@ -54,3 +54,12 @@ replacement for GitManager. It should obtain a GitHub App user token through a
 displayed verification code and browser approval, then feed the resulting token
 into the existing HTTPS Git credential path. It must provide cancellation,
 expiry/recovery, sign-out, and explicit at-rest-storage limitations.
+
+## T35 Security Follow-up
+
+The authentication boundary also requires secret-safe storage and staging
+behavior. The configured PAT/password must not be treated as ordinary vault
+content, must not be included in exported diagnostics, and must not be
+automatically staged through the plugin's broad sync path. These requirements
+are tracked in T34a and T35a, with the durable boundary recorded in
+`implementation-details/security-and-secrets.md`.

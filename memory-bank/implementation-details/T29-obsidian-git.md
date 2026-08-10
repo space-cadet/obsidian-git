@@ -300,3 +300,20 @@ Production build, 13 Node tests, 10 isomorphic-git smoke checks, archive
 validation, and `git diff --check` pass. Real Android/iOS acceptance remains
 open, and the v1.0.0 tag remains approval-gated until authentication and
 mobile release checks are complete.
+
+## Architecture Review Follow-up (2026-08-11)
+
+The original architecture remains the historical description of the current
+implementation. Cross-cutting hardening is now tracked separately under T35:
+
+- T35a: credential safety and Git staging boundaries
+- T35b: operation coordination and lifecycle safety
+- T35c: repository initialization and destructive-operation safety
+- T35d: mobile and remote transport reliability
+- T35e: updater integrity and release artifact consistency
+- T35f: test, CI, and documentation alignment
+
+T29 remains the release-package and acceptance owner; T34 remains the
+authentication owner. The new `security-and-secrets.md` and
+`reliability-and-lifecycle.md` documents hold the durable design boundaries
+that should guide implementation.

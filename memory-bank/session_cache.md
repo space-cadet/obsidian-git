@@ -1,19 +1,25 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-10 23:19:04 IST*
+*Last Updated: 2026-08-11 02:58:44 IST*
 
 ## Current Session
-**Started**: 2026-08-10 21:00 IST
-**Ended**: 2026-08-10 23:19 IST
-**Focus Task**: T29 plugin auto-updater, commit-aware dev releases, and direct dist artifacts
-**Session File**: `memory-bank/sessions/2026-08-10-night.md`
+**Started**: 2026-08-11 02:42 IST
+**Focus Task**: T35a/T35c KIRSS implementation slice
+**Session File**: `memory-bank/sessions/2026-08-11-follow-up.md`
 **Status**: ✅ CLOSED
 
+**Memory Bank Bootstrap**: mb-core selectively initialized the missing
+protocol, template, and support-file layer with existing files skipped. The
+bundled README timestamp was corrected after detecting a day/month formatting
+error; the bundled rules file was preserved for separate version review. The
+commit-message template remains absent because mb-core reported its bundled
+source file was missing.
+
 ## Overview
-- Active: 2 (T29, T34; T34a active) | Paused: 2 (T34b, T34c) | Completed: 2 (T29 progress, T33 complete)
+- Active: 3 parents (T29, T34, T35; T34a, T35a, T35c active) | Planned: 6 (T34b, T34c, T35b, T35d-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-08-10 night (connection-test repair, updater implementation, archive output, auth task split)
-- Current Period: night
+- Current Period: early morning
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED
@@ -31,6 +37,13 @@
 - T34a: PAT Validation and Repository-Access Diagnostics — 🔄 IN PROGRESS
 - T34b: GitHub Device-Flow Authentication — ⏸️ PLANNED
 - T34c: Android/Desktop Authentication Acceptance Tests — ⏸️ PLANNED
+- T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 IN PROGRESS
+- T35a: Credential Safety and Git Staging Boundaries — 🔄 IN PROGRESS (read-only audit complete)
+- T35b: Operation Coordination and Lifecycle Safety — ⏸️ PLANNED
+- T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (read-only audit complete)
+- T35d: Mobile and Remote Transport Reliability — ⏸️ PLANNED
+- T35e: Updater Integrity and Release Artifact Consistency — ⏸️ PLANNED
+- T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
 
 ## Active Tasks
 ### T29: obsidian-git Plugin
@@ -65,10 +78,21 @@ rejected with HTTP 401 by account, repository, and Git smart-HTTP endpoints.
 **Next:** Implement T34a diagnostics. The exposed token must not be reused or
 recorded.
 
+### T35: Plugin Reliability, Security, and Architecture Hardening
+**Status:** 🔄 **Priority:** HIGH
+**Started:** 2026-08-11 **Last:** 2026-08-11
+**Context**: Architecture review findings are recorded. The first KIRSS
+implementation slice now covers logger redaction, protected automatic staging,
+URL normalization, repository error classification, and local-only/fresh-vault
+initialization reachability. T35a-T35f still divide credential safety,
+lifecycle coordination, initialization safety, mobile transport, updater
+integrity, and CI/documentation alignment.
+**Next:** Implement the T35a `SecretStorage` migration and T35c protected
+replacement backup contract while preserving T29 and T34 ownership boundaries.
+
 ## Session History (Last 5)
-1. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
-2. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
-2. `sessions/2026-06-01-evening.md` — T29: Bug fixes from debug log analysis
-3. `sessions/2026-06-01-afternoon.md` — T32: Mobile crash fix + progress + API fallback + debug logs
-4. `sessions/2026-06-01-morning.md` — v25 + CI workflow
-5. `sessions/2026-05-31-0017.md` — T6 Phase 2: ObsidianFsAdapter fix
+1. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
+2. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
+3. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
+4. `sessions/2026-06-01-evening.md` — T29: Bug fixes from debug log analysis
+5. `sessions/2026-06-01-afternoon.md` — T32: Mobile crash fix + progress + API fallback + debug logs

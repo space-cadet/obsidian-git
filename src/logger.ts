@@ -4,6 +4,7 @@
  */
 
 import { Notice, normalizePath } from 'obsidian';
+import { redactSensitiveData, redactSensitiveText } from './security';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -26,6 +27,7 @@ export class Logger {
   private showNotices: boolean = true;
   private entries: LogEntry[] = [];
   private maxEntries: number = 500;
+  private sensitiveValues: string[] = [];
 
   private constructor() {}
 
@@ -125,13 +127,20 @@ export class Logger {
     this.showNotices = show;
   }
 
+  public setSensitiveValues(values: readonly unknown[]): void {
+    this.sensitiveValues = values
+      .filter((value): value is string => typeof value === 'string' && value.length >= 3);
+  }
+
   /**
    * Log a debug message
    */
   public debug(context: string, message: string, data?: any): void {
-    this.pushEntry('debug', context, message, data);
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry('debug', context, safeMessage, safeData);
     if (this.logLevel <= LogLevel.DEBUG) {
-      console.debug(`[Git Sync][${context}] ${message}`, data || '');
+      console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || '');
     }
   }
 
@@ -139,9 +148,11 @@ export class Logger {
    * Log an info message
    */
   public info(context: string, message: string, data?: any): void {
-    this.pushEntry('info', context, message, data);
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry('info', context, safeMessage, safeData);
     if (this.logLevel <= LogLevel.INFO) {
-      console.info(`[Git Sync][${context}] ${message}`, data || '');
+      console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || '');
     }
   }
 
@@ -149,11 +160,13 @@ export class Logger {
    * Log a warning message
    */
   public warn(context: string, message: string, data?: any): void {
-    this.pushEntry('warn', context, message, data);
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry('warn', context, safeMessage, safeData);
     if (this.logLevel <= LogLevel.WARN) {
-      console.warn(`[Git Sync][${context}] ${message}`, data || '');
+      console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || '');
       if (this.showNotices) {
-        new Notice(`[Warning] ${message}`);
+        new Notice(`[Warning] ${safeMessage}`);
       }
     }
   }
@@ -162,14 +175,17 @@ export class Logger {
    * Log an error message
    */
   public error(context: string, message: string, error?: Error): void {
-    this.pushEntry('error', context, message, error?.message || error);
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeError = redactSensitiveData(error, this.sensitiveValues);
+    const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : '';
+    this.pushEntry('error', context, safeMessage, safeError || errorText);
     if (this.logLevel <= LogLevel.ERROR) {
-      console.error(`[Git Sync][${context}] ${message}`, error || '');
-      if (error?.stack) {
-        console.error(`[Git Sync][${context}] Stack trace:`, error.stack);
+      console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || '');
+      if (error && typeof safeError === 'object' && safeError && 'stack' in safeError) {
+        console.error(`[Git Sync][${context}] Stack trace:`, (safeError as { stack?: string }).stack || '');
       }
       if (this.showNotices) {
-        new Notice(`[Error] ${message}${error ? `: ${error.message}` : ''}`);
+        new Notice(`[Error] ${safeMessage}${errorText ? `: ${errorText}` : ''}`);
       }
     }
   }
@@ -179,8 +195,8 @@ export class Logger {
       timestamp: Date.now(),
       level,
       namespace,
-      message,
-      data
+      message: redactSensitiveText(message, this.sensitiveValues),
+      data: redactSensitiveData(data, this.sensitiveValues),
     });
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(-this.maxEntries);

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-08-10 23:19:04 IST*
+*Last Updated: 2026-08-11 02:55:13 IST*
 
 ## Current Tasks
 
@@ -22,6 +22,30 @@
 - **Boundary**: T29 remains release packaging/acceptance. Do not make a
   v1.0.0 tag until authentication validation and remaining mobile acceptance
   are complete.
+
+### T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 Implementation active
+- **Scope**: Cross-cutting credential safety, operation coordination,
+  repository initialization safety, mobile transport, updater integrity, and
+  test/CI/documentation alignment.
+- **Children**: T35a and T35c are active; T35b and T35d-T35f remain planned.
+- **Status**: The first KIRSS implementation slice adds logger redaction,
+  protected automatic staging, URL normalization, repository-error
+  classification, and local-only/fresh-vault initialization reachability.
+  T35a SecretStorage migration and T35c backup protection remain open. T35 is
+  separate from T29 release ownership and T34 authentication ownership.
+- **Next**: Implement SecretStorage/SecretComponent migration and protected
+  replacement backups, then add integration coverage before mobile acceptance.
+
+### T35a Secure Credential Storage Plan — 🔄 Design recorded; implementation partial
+- Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;
+  settings will store only secret references after migration.
+- The current `isomorphic-git`/`requestUrl` transport cannot automatically use
+  native Git credential helpers, so `osxkeychain`, Git Credential Manager,
+  `libsecret`, and SSH agents remain related future options rather than
+  current dependencies.
+- Logger redaction, embedded-credential URL rejection, and automatic staging
+  exclusions are implemented. SecretStorage migration remains deferred pending
+  the unsupported-platform and legacy-cleanup implementation.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -77,8 +101,10 @@
 2. **T34b decision** — Decide whether to implement GitHub device-flow sign-in.
 3. **T34c + T29: Test the current dev release on Android/iOS** — Verify a
    valid remote credential, clone/pull/push, progress, and commit expansion.
-4. **Create tagged v1.0.0 release** only after mobile acceptance and explicit
-   authorization.
+4. **T35** — Address the recorded reliability, security, lifecycle, transport,
+   updater, and CI risks.
+5. **Create tagged v1.0.0 release** only after mobile acceptance, applicable
+   T35 hardening, and explicit authorization.
 
 ## System Status
 
@@ -87,7 +113,10 @@
 - **CI**: GitHub Actions working, dev releases on every push
 - **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current build identity is embedded as commit `22857f1`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
-- **Memory Bank**: T29 top-level, T1-T6 sub-tasks, T30/T32/T33 completed
+- **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35c active,
+  T35b/T35d-T35f planned,
+  T1-T6/T30/T32/T33 completed; mb-core protocols, templates, and missing
+  support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
 
 ## Decisions Made
@@ -118,6 +147,9 @@
 - **Test runner**: Node built-in test runner, with a bundled source test and Obsidian host stub ✅
 - **Updater identity**: Rolling dev release checks compare embedded local commit hash with GitHub `main` HEAD ✅
 - **Archive output**: `pnpm run archive` creates the ZIP and copies plugin files directly into `dist/` ✅
+- **Hardening task boundary**: T35 owns cross-cutting reliability/security
+  implementation; T29 owns release packaging/acceptance and T34 owns remote
+  authentication ✅
 
 ## Decisions Pending
 
@@ -127,6 +159,12 @@
 - **Conflict resolution UI**: For merge conflicts
 - **Mobile pack index**: LightningFS, wasm-git, or different library?
 - **Mobile acceptance**: Need real-device validation of the current dev release
+- **Credential storage**: T35a must choose and document the secure-storage
+  boundary and automatic staging exclusions.
+- **Operation coordination**: T35b must define the single-operation and
+  cancellation contract.
+- **Repository state machine**: T35c must define safe clone, empty-remote,
+  local-only, and replacement behavior.
 
 ## Next Steps
 

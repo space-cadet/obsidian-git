@@ -99,6 +99,21 @@ This supports both password and personal access token (PAT) authentication.
 - **No streaming**: `requestUrl` loads the entire response into memory. Large pack files could be an issue, but unlikely for typical vaults.
 - **Binary handling**: `arrayBuffer` must be used for pack files; `text` would corrupt binary data.
 
+## Architecture Review Update (2026-08-11)
+
+The current `arrayBufferToAsyncIterable()` helper yields bounded zero-copy
+views after `requestUrl()` has already materialized the complete response. It
+therefore reduces additional parser copies but does not provide true streaming
+or guarantee that large mobile responses will fit in memory.
+
+All GitHub REST fallback calls should use the same native transport boundary as
+Git smart HTTP. Browser `fetch()` is not an equivalent mobile-safe path.
+
+T35d owns the transport and mobile-support follow-up. Until a genuinely
+streaming transport or a different Git implementation is available, mobile
+repository-size limits and pack-index limitations must be documented as
+acceptance boundaries rather than treated as solved by chunking alone.
+
 ## References
 
 - `src/gitManager.ts` — GitHttpClient implementation

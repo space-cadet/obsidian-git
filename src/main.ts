@@ -329,7 +329,7 @@ export default class GitSyncPlugin extends Plugin {
 		const vaultPath = '.';
 		
 		const hasRepo = await this.detectRealGitRepo();
-		if (!hasRepo) {
+		if (!hasRepo && requireRemote && !this.settings.repoUrl) {
 			log.warn('GitSyncPlugin', 'No .git repo found in vault');
 			return null;
 		}
@@ -353,7 +353,7 @@ export default class GitSyncPlugin extends Plugin {
 
 		this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
 		
-		if (this.settings.repoUrl) {
+		if (this.settings.repoUrl || !hasRepo) {
 			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
 		}
 		

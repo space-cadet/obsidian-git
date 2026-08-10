@@ -120,3 +120,16 @@ banner: {
 - `src/logger.ts` — Simple Logger implementation
 - `memory-bank/tasks/T3.md` — Mobile compatibility task
 - GitHub issue: isomorphic-git/isomorphic-git#2263
+
+## Current Support Boundary (2026-08-11)
+
+The historical mobile bundle and basic Git flows were tested successfully, but
+large-repository support remains conditional. The native HTTP response is still
+fully buffered before the 64 KiB iterator yields views, and the mobile pack
+index strategy is not fully resolved. One GitHub commit-file fallback also uses
+browser `fetch()` and must be aligned with the native transport.
+
+T35d owns the follow-up. T29 mobile release acceptance must record actual
+Android/iOS results for clone, pull, push, progress, remote history, commit
+expansion, large responses, and pack-index behavior before the stable release
+gate closes.
