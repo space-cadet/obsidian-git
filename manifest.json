@@ -2,7 +2,7 @@
   "id": "obsidian-git-sync",
   "name": "Git Sync",
   "version": "1.0.0",
-  "minAppVersion": "0.15.0",
+  "minAppVersion": "1.11.4",
   "description": "Git synchronization plugin for Obsidian that works on desktop and mobile platforms",
   "author": "",
   "authorUrl": "",

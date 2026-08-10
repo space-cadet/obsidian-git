@@ -1,7 +1,7 @@
 # Security and Secrets Boundary
 
 *Created: 2026-08-11 02:03 IST*
-*Last Updated: 2026-08-11 02:55 IST*
+*Last Updated: 2026-08-11 03:12 IST*
 *Task: T35a, related to T34a*
 
 ## Purpose
@@ -11,11 +11,11 @@ password cannot be committed to the vault remote or exposed through logs.
 
 ## Current Risk
 
-The plugin stores the configured password/PAT with ordinary plugin settings,
-while the sync path stages changed vault files broadly. If the Obsidian plugin
-data file is tracked, a settings change can make the credential part of a Git
-commit. Logger-managed output now has a central redaction boundary; ordinary
-settings and direct UI error paths remain open.
+The first hardening slice now stores only a per-vault secret ID in ordinary
+plugin settings and excludes plugin-owned paths from automatic staging. The
+actual credential is resolved through Obsidian `SecretStorage` immediately
+before remote operations. Logger-managed output has a central redaction
+boundary; direct UI error text and broader lifecycle coordination remain open.
 
 ## Required Boundary
 
@@ -31,11 +31,10 @@ settings and direct UI error paths remain open.
 
 ## Storage Decision
 
-T35a must select and document the supported secret-storage mechanism. If the
-host does not provide a usable secure store on every supported platform, the
-remaining at-rest limitation must be shown explicitly in Settings and README.
-The fallback must still exclude credential-bearing settings from staging and
-must not pretend that ordinary vault data is encrypted.
+The plugin now requires Obsidian 1.11.4 or newer and uses `SecretStorage`.
+Hosts without a usable store receive an explicit error and remote operations
+are disabled; there is no plaintext fallback. `SecretStorage` is not claimed
+to protect against trusted plugins running in the same Obsidian process.
 
 ## External Guidance and Chosen Direction — 2026-08-11
 
@@ -77,19 +76,19 @@ malware running as the user.
 
 ## Implementation Plan
 
-1. Raise `manifest.json`'s minimum Obsidian version to the first supported
+1. [x] Raise `manifest.json`'s minimum Obsidian version to the first supported
    version that provides `SecretStorage`, or add explicit feature detection
    before retaining the older minimum. Do not silently fall back to plaintext
    `data.json` storage.
-2. Replace the password/PAT setting with a `SecretComponent`-backed secret
+2. [x] Replace the password/PAT setting with a `SecretStorage`-backed secret
    reference. Keep the Git username, remote URL, branch, author information,
    and provider metadata in ordinary settings because they are not secret
    values. Reject credentials embedded in remote URLs.
-3. Add one credential-resolution boundary that calls `getSecret()` just before
+3. [x] Add one credential-resolution boundary that calls `getSecret()` just before
    Test Connection, clone, pull, push, fetch, and GitHub API fallback work.
    Pass resolved values only to the operation that needs them, and ensure
    settings changes cannot leave long-lived operations using stale credentials.
-4. Add a one-time migration for existing plaintext settings. Require a
+4. [x] Add a one-time migration for existing plaintext settings. Require a
    successful secret-store write before removing the legacy password field,
    report only success/failure classifications, and stop creating new
    credential-bearing backups. Handle old rolling backups through an explicit,

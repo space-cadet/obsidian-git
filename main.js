@@ -20647,6 +20647,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           new import_obsidian4.Notice("No remote configured");
           return;
         }
+        await this.plugin.refreshGitCredentials();
         await this.plugin.gitManager.push(this.plugin.settings.branchName);
         new import_obsidian4.Notice("Pushed to remote");
         await this.refresh();
@@ -20669,6 +20670,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         );
         if (!confirmed)
           return;
+        await this.plugin.refreshGitCredentials();
         await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
         new import_obsidian4.Notice("Force pushed to remote");
         await this.refresh();
@@ -20686,6 +20688,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           new import_obsidian4.Notice("No remote configured");
           return;
         }
+        await this.plugin.refreshGitCredentials();
         await this.plugin.gitManager.pull(this.plugin.settings.branchName);
         new import_obsidian4.Notice("Pulled from remote");
         await this.refresh();
@@ -20982,7 +20985,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const { GitManager: GitManager2 } = await Promise.resolve().then(() => (init_gitManager(), gitManager_exports));
           commits = await GitManager2.fetchRemoteCommitsFromGitHub(
             this.plugin.settings.repoUrl,
-            this.plugin.settings.password,
+            await this.plugin.resolveGitPassword(),
             branch2,
             25
           );
@@ -21061,7 +21064,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         (_a = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _a.setText("Fetching from GitHub...");
         const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
           this.plugin.settings.repoUrl,
-          this.plugin.settings.password,
+          await this.plugin.resolveGitPassword(),
           oid
         );
         if (remoteFiles) {
@@ -21418,14 +21421,66 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "f7fdc9701b38dbf3d94cd9bbf1ff1067a779d5b0" : "unknown";
+var GIT_COMMIT_HASH = true ? "5591875c4734baa20be25fe81795386748a43c1f" : "unknown";
+
+// src/credentialStore.ts
+var MIN_SECRET_STORAGE_VERSION = "1.11.4";
+var UnsupportedCredentialStorageError = class extends Error {
+  constructor() {
+    super(`Secure credential storage requires Obsidian ${MIN_SECRET_STORAGE_VERSION} or newer.`);
+    this.name = "UnsupportedCredentialStorageError";
+  }
+};
+var MissingCredentialError = class extends Error {
+  constructor() {
+    super("No Git credential is stored. Enter a credential before using a remote.");
+    this.name = "MissingCredentialError";
+  }
+};
+function createSecretId(vaultName) {
+  let hash = 2166136261;
+  for (const character of vaultName || "default") {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `git-sync-password-${(hash >>> 0).toString(16)}`;
+}
+var CredentialStore = class {
+  constructor(storage, secretId) {
+    this.storage = storage;
+    this.secretId = secretId;
+  }
+  get() {
+    const secret = this.storage.getSecret(this.secretId);
+    if (!secret)
+      throw new MissingCredentialError();
+    return secret;
+  }
+  set(secret) {
+    this.storage.setSecret(this.secretId, secret);
+  }
+};
+async function migrateLegacySecret(store, legacySecret, persistSettings) {
+  if (!legacySecret)
+    return false;
+  store.set(legacySecret);
+  await persistSettings();
+  return true;
+}
+function credentialStoreFromApp(app, secretId) {
+  const storage = app == null ? void 0 : app.secretStorage;
+  if (!storage || typeof storage.getSecret !== "function" || typeof storage.setSecret !== "function") {
+    throw new UnsupportedCredentialStorageError();
+  }
+  return new CredentialStore(storage, secretId);
+}
 
 // src/main.ts
 var DEFAULT_SETTINGS = {
   repoUrl: "",
   branchName: "main",
   username: "",
-  password: "",
+  passwordSecretId: "",
   author: {
     name: "",
     email: ""
@@ -21447,9 +21502,14 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     this.statusBarItem = null;
     this.isDesktop = false;
     this.updater = null;
+    this.credentialStore = null;
+    this.credentialStorageError = null;
   }
   async onload() {
     await this.loadSettings();
+    if (this.credentialStorageError) {
+      new import_obsidian6.Notice(this.credentialStorageError.message);
+    }
     this.isDesktop = typeof window !== "undefined" && !!window.require && !!window.process;
     log2.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
     if (!this.isDesktop && typeof Buffer === "undefined") {
@@ -21515,6 +21575,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
             new import_obsidian6.Notice("No git repository found");
             return;
           }
+          await this.refreshGitCredentials();
           await this.gitManager.pull(this.settings.branchName);
           new import_obsidian6.Notice("Git pull completed successfully");
         } catch (error) {
@@ -21534,6 +21595,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
             new import_obsidian6.Notice("No git repository found");
             return;
           }
+          await this.refreshGitCredentials();
           await this.gitManager.push(this.settings.branchName);
           new import_obsidian6.Notice("Git push completed successfully");
         } catch (error) {
@@ -21593,11 +21655,60 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     this.clearAutoSync();
   }
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    var _a, _b;
+    const stored = await this.loadData() || {};
+    const legacyPassword = typeof stored.password === "string" ? stored.password : "";
+    const { password: _password, ...withoutPassword } = stored;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, withoutPassword);
+    if (!this.settings.passwordSecretId) {
+      this.settings.passwordSecretId = createSecretId(((_b = (_a = this.app.vault).getName) == null ? void 0 : _b.call(_a)) || "default");
+    }
+    try {
+      this.credentialStore = credentialStoreFromApp(this.app, this.settings.passwordSecretId);
+      if (await migrateLegacySecret(this.credentialStore, legacyPassword, async () => {
+        await this.saveData(this.settings);
+      })) {
+        log2.info("GitSyncPlugin", "Migrated the legacy Git credential to secure storage");
+      }
+    } catch (error) {
+      this.credentialStorageError = error instanceof Error ? error : new Error(String(error));
+      log2.warn("GitSyncPlugin", "Secure credential storage is unavailable; remote operations are disabled");
+    }
   }
   async saveSettings() {
     await this.saveData(this.settings);
     this.setupAutoSync();
+  }
+  requireCredentialStore() {
+    if (!this.credentialStore) {
+      this.credentialStore = credentialStoreFromApp(this.app, this.settings.passwordSecretId);
+      this.credentialStorageError = null;
+    }
+    return this.credentialStore;
+  }
+  async resolveGitPassword() {
+    if (!this.settings.repoUrl)
+      return "";
+    return this.requireCredentialStore().get();
+  }
+  async getGitCredentials() {
+    return {
+      username: this.settings.username,
+      password: await this.resolveGitPassword(),
+      repoUrl: this.settings.repoUrl,
+      author: {
+        name: this.settings.author.name || "Obsidian Git User",
+        email: this.settings.author.email || "user@example.com"
+      }
+    };
+  }
+  async refreshGitCredentials() {
+    if (this.gitManager)
+      this.gitManager.updateCredentials(await this.getGitCredentials());
+  }
+  async setGitCredential(value) {
+    this.requireCredentialStore().set(value);
+    await this.saveSettings();
   }
   async checkForUpdates(manual) {
     if (!this.updater)
@@ -21682,15 +21793,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     if (!this.settings.repoUrl && requireRemote) {
       return null;
     }
-    const credentials = {
-      username: this.settings.username,
-      password: this.settings.password,
-      repoUrl: this.settings.repoUrl,
-      author: {
-        name: this.settings.author.name || "Obsidian Git User",
-        email: this.settings.author.email || "user@example.com"
-      }
-    };
+    const credentials = await this.getGitCredentials();
     const statusEl = this.statusBarItem || void 0;
     this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
     if (this.settings.repoUrl || !hasRepo) {
@@ -21771,15 +21874,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     if (!this.gitManager) {
       throw new Error("No git repository found in vault");
     }
-    this.gitManager.updateCredentials({
-      username: this.settings.username,
-      password: this.settings.password,
-      repoUrl: this.settings.repoUrl,
-      author: {
-        name: this.settings.author.name || "Obsidian Git Sync User",
-        email: this.settings.author.email || "user@example.com"
-      }
-    });
+    await this.refreshGitCredentials();
     try {
       await this.gitManager.sync(
         this.settings.repoUrl,
@@ -21894,10 +21989,15 @@ var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian6.Setting(containerEl).setName("Password / Personal Access Token").setDesc("Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.").addText((text) => {
-      const input = text.setPlaceholder("ghp_... or password").setValue(this.plugin.settings.password).onChange(async (value) => {
-        this.plugin.settings.password = value;
-        await this.plugin.saveSettings();
+    new import_obsidian6.Setting(containerEl).setName("Password / Personal Access Token").setDesc("Stored in Obsidian secure storage. Leave blank to keep the current credential.").addText((text) => {
+      const input = text.setPlaceholder("Enter to add or replace credential").onChange(async (value) => {
+        try {
+          await this.plugin.setGitCredential(value);
+          new import_obsidian6.Notice(value ? "Credential stored securely" : "Stored credential cleared");
+        } catch (error) {
+          log2.error("GitSyncPlugin", "Failed to store Git credential", error);
+          new import_obsidian6.Notice((error == null ? void 0 : error.message) || "Secure credential storage is unavailable");
+        }
       });
       input.inputEl.type = "password";
       return input;
@@ -21991,14 +22091,9 @@ var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {
         }
         new import_obsidian6.Notice("Testing remote connection\u2026");
         const { testRemoteConnection: testRemoteConnection2 } = await Promise.resolve().then(() => (init_gitManager(), gitManager_exports));
+        const credentials = await this.plugin.getGitCredentials();
         await testRemoteConnection2({
-          username: this.plugin.settings.username,
-          password: this.plugin.settings.password,
-          repoUrl: this.plugin.settings.repoUrl,
-          author: {
-            name: this.plugin.settings.author.name || "Obsidian Git User",
-            email: this.plugin.settings.author.email || "user@example.com"
-          }
+          ...credentials
         });
         new import_obsidian6.Notice("Remote connection successful. You can now clone it or initialize a local repository.");
       } catch (error) {

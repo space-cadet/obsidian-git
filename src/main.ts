@@ -5,12 +5,18 @@ import { log, LogLevel } from './logger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
 import { PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
 import { GIT_COMMIT_HASH } from './buildInfo';
+import {
+	credentialStoreFromApp,
+	createSecretId,
+	CredentialStore,
+	migrateLegacySecret,
+} from './credentialStore';
 
 interface GitSyncSettings {
 	repoUrl: string;
 	branchName: string;
 	username: string;
-	password: string;
+	passwordSecretId: string;
 	author: {
 		name: string;
 		email: string;
@@ -28,7 +34,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	repoUrl: '',
 	branchName: 'main',
 	username: '',
-	password: '',
+	passwordSecretId: '',
 	author: {
 		name: '',
 		email: ''
@@ -50,9 +56,14 @@ export default class GitSyncPlugin extends Plugin {
 	statusBarItem: HTMLElement | null = null;
 	isDesktop: boolean = false;
 	private updater: PluginUpdater | null = null;
+	private credentialStore: CredentialStore | null = null;
+	private credentialStorageError: Error | null = null;
 
 	async onload() {
 		await this.loadSettings();
+		if (this.credentialStorageError) {
+			new Notice(this.credentialStorageError.message);
+		}
 
 		// Detect platform
 		this.isDesktop = typeof window !== 'undefined' && 
@@ -139,11 +150,12 @@ export default class GitSyncPlugin extends Plugin {
 				log.info('GitSyncPlugin', 'Pull triggered from command palette');
 				try {
 					await this.ensureGitManager();
-					if (!this.gitManager) {
-						new Notice('No git repository found');
-						return;
-					}
-					await this.gitManager.pull(this.settings.branchName);
+						if (!this.gitManager) {
+							new Notice('No git repository found');
+							return;
+						}
+						await this.refreshGitCredentials();
+						await this.gitManager.pull(this.settings.branchName);
 					new Notice('Git pull completed successfully');
 				} catch (error: any) {
 					log.error('GitSyncPlugin', 'Pull failed', error);
@@ -159,11 +171,12 @@ export default class GitSyncPlugin extends Plugin {
 				log.info('GitSyncPlugin', 'Push triggered from command palette');
 				try {
 					await this.ensureGitManager();
-					if (!this.gitManager) {
-						new Notice('No git repository found');
-						return;
-					}
-					await this.gitManager.push(this.settings.branchName);
+						if (!this.gitManager) {
+							new Notice('No git repository found');
+							return;
+						}
+						await this.refreshGitCredentials();
+						await this.gitManager.push(this.settings.branchName);
 					new Notice('Git push completed successfully');
 				} catch (error: any) {
 					log.error('GitSyncPlugin', 'Push failed', error);
@@ -229,12 +242,64 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const stored = (await this.loadData()) || {};
+		const legacyPassword = typeof stored.password === 'string' ? stored.password : '';
+		const { password: _password, ...withoutPassword } = stored;
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, withoutPassword);
+		if (!this.settings.passwordSecretId) {
+			this.settings.passwordSecretId = createSecretId(this.app.vault.getName?.() || 'default');
+		}
+
+		try {
+			this.credentialStore = credentialStoreFromApp(this.app, this.settings.passwordSecretId);
+			if (await migrateLegacySecret(this.credentialStore, legacyPassword, async () => {
+				await this.saveData(this.settings);
+			})) {
+				log.info('GitSyncPlugin', 'Migrated the legacy Git credential to secure storage');
+			}
+		} catch (error: any) {
+			this.credentialStorageError = error instanceof Error ? error : new Error(String(error));
+			log.warn('GitSyncPlugin', 'Secure credential storage is unavailable; remote operations are disabled');
+		}
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.setupAutoSync(); // Reconfigure auto sync with new settings
+	}
+
+	private requireCredentialStore(): CredentialStore {
+		if (!this.credentialStore) {
+			this.credentialStore = credentialStoreFromApp(this.app, this.settings.passwordSecretId);
+			this.credentialStorageError = null;
+		}
+		return this.credentialStore;
+	}
+
+	async resolveGitPassword(): Promise<string> {
+		if (!this.settings.repoUrl) return '';
+		return this.requireCredentialStore().get();
+	}
+
+	async getGitCredentials(): Promise<GitCredentials> {
+		return {
+			username: this.settings.username,
+			password: await this.resolveGitPassword(),
+			repoUrl: this.settings.repoUrl,
+			author: {
+				name: this.settings.author.name || 'Obsidian Git User',
+				email: this.settings.author.email || 'user@example.com',
+			},
+		};
+	}
+
+	async refreshGitCredentials(): Promise<void> {
+		if (this.gitManager) this.gitManager.updateCredentials(await this.getGitCredentials());
+	}
+
+	async setGitCredential(value: string): Promise<void> {
+		this.requireCredentialStore().set(value);
+		await this.saveSettings();
 	}
 
 	async checkForUpdates(manual: boolean): Promise<void> {
@@ -338,15 +403,7 @@ export default class GitSyncPlugin extends Plugin {
 			return null;
 		}
 
-		const credentials: GitCredentials = {
-			username: this.settings.username,
-			password: this.settings.password,
-			repoUrl: this.settings.repoUrl,
-			author: {
-				name: this.settings.author.name || 'Obsidian Git User',
-				email: this.settings.author.email || 'user@example.com'
-			}
-		};
+		const credentials = await this.getGitCredentials();
 
 		// Status bar is optional (may be null on mobile)
 		const statusEl = this.statusBarItem || undefined;
@@ -449,16 +506,8 @@ export default class GitSyncPlugin extends Plugin {
 			throw new Error('No git repository found in vault');
 		}
 		
-		// Update credentials in case they've changed in settings
-		this.gitManager.updateCredentials({
-			username: this.settings.username,
-			password: this.settings.password,
-			repoUrl: this.settings.repoUrl,
-			author: {
-				name: this.settings.author.name || 'Obsidian Git Sync User',
-				email: this.settings.author.email || 'user@example.com'
-			}
-		});
+		// Resolve the current secret immediately before the remote operation.
+		await this.refreshGitCredentials();
 	
 		// Perform the sync operation
 		try {
@@ -622,14 +671,18 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Password / Personal Access Token')
-			.setDesc('Git password, or GitHub/GitLab Personal Access Token (PAT). For PATs, any username works.')
+			.setDesc('Stored in Obsidian secure storage. Leave blank to keep the current credential.')
 			.addText(text => {
 				const input = text
-					.setPlaceholder('ghp_... or password')
-					.setValue(this.plugin.settings.password)
+					.setPlaceholder('Enter to add or replace credential')
 					.onChange(async (value: string) => {
-						this.plugin.settings.password = value;
-						await this.plugin.saveSettings();
+						try {
+							await this.plugin.setGitCredential(value);
+							new Notice(value ? 'Credential stored securely' : 'Stored credential cleared');
+						} catch (error: any) {
+							log.error('GitSyncPlugin', 'Failed to store Git credential', error);
+							new Notice(error?.message || 'Secure credential storage is unavailable');
+						}
 					});
 				
 				// Force password type immediately
@@ -802,16 +855,11 @@ class GitSyncSettingTab extends PluginSettingTab {
 						}
 
 						new Notice('Testing remote connection…');
-						const { testRemoteConnection } = await import('./gitManager');
-						await testRemoteConnection({
-							username: this.plugin.settings.username,
-							password: this.plugin.settings.password,
-							repoUrl: this.plugin.settings.repoUrl,
-							author: {
-								name: this.plugin.settings.author.name || 'Obsidian Git User',
-								email: this.plugin.settings.author.email || 'user@example.com',
-							},
-						});
+							const { testRemoteConnection } = await import('./gitManager');
+							const credentials = await this.plugin.getGitCredentials();
+							await testRemoteConnection({
+								...credentials,
+							});
 						new Notice('Remote connection successful. You can now clone it or initialize a local repository.');
 					} catch (error: any) {
 						new Notice(`Remote connection test failed: ${error?.message || String(error)}`);

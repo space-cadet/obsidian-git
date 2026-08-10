@@ -223,6 +223,7 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    await this.plugin.refreshGitCredentials();
                     await this.plugin.gitManager.push(this.plugin.settings.branchName);
                     new Notice('Pushed to remote');
                     await this.refresh();
@@ -256,6 +257,7 @@ export class GitSidebarView extends ItemView {
                     );
                     if (!confirmed) return;
                     
+                    await this.plugin.refreshGitCredentials();
                     await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
                     new Notice('Force pushed to remote');
                     await this.refresh();
@@ -280,6 +282,7 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    await this.plugin.refreshGitCredentials();
                     await this.plugin.gitManager.pull(this.plugin.settings.branchName);
                     new Notice('Pulled from remote');
                     await this.refresh();
@@ -666,7 +669,7 @@ export class GitSidebarView extends ItemView {
                     const { GitManager } = await import('../gitManager');
                     commits = await GitManager.fetchRemoteCommitsFromGitHub(
                         this.plugin.settings.repoUrl,
-                        this.plugin.settings.password,
+                        await this.plugin.resolveGitPassword(),
                         branch,
                         25
                     );
@@ -767,7 +770,7 @@ export class GitSidebarView extends ItemView {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
                 const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
                     this.plugin.settings.repoUrl,
-                    this.plugin.settings.password,
+                    await this.plugin.resolveGitPassword(),
                     oid
                 );
                 if (remoteFiles) {

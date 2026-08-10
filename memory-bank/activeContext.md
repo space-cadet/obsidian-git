@@ -36,16 +36,18 @@
 - **Next**: Implement SecretStorage/SecretComponent migration and protected
   replacement backups, then add integration coverage before mobile acceptance.
 
-### T35a Secure Credential Storage Plan — 🔄 Design recorded; implementation partial
+### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;
   settings will store only secret references after migration.
 - The current `isomorphic-git`/`requestUrl` transport cannot automatically use
   native Git credential helpers, so `osxkeychain`, Git Credential Manager,
   `libsecret`, and SSH agents remain related future options rather than
   current dependencies.
-- Logger redaction, embedded-credential URL rejection, and automatic staging
-  exclusions are implemented. SecretStorage migration remains deferred pending
-  the unsupported-platform and legacy-cleanup implementation.
+- Obsidian `SecretStorage` is now the credential boundary, with per-vault secret
+  IDs, legacy migration after successful writes, unsupported-host blocking, and
+  just-in-time resolution before remote operations.
+- Remaining T35a work is acceptance coverage for export files, mobile setup,
+  secret replacement/clearing, and the same-process plugin threat model.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback

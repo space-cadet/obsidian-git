@@ -82,9 +82,19 @@
 - Added focused regression coverage. Full verification passes: 19 Node tests,
   10 isomorphic-git checks, production build, archive validation, and
   `git diff --check`.
-- Remaining T35a/T35c work: SecretStorage/SecretComponent migration, raw UI
-  error-path cleanup, protected replacement backups, and fresh-vault/clone
-  integration coverage.
+- Remaining T35a/T35c work: raw UI error-path cleanup, protected replacement
+  backups, mobile/desktop acceptance, and fresh-vault/clone integration
+  coverage.
+
+### T35a SecretStorage Implementation (2026-08-11)
+
+- Added a minimal `CredentialStore` around Obsidian `app.secretStorage`.
+- Raised the minimum Obsidian version to 1.11.4 and added an explicit
+  unsupported-host policy with no plaintext fallback.
+- Added one-time legacy password migration, per-vault secret IDs, secure input
+  handling, and credential refresh before remote operations.
+- Added focused credential-store tests. Remaining work is mobile/desktop
+  acceptance, export inspection, and broader lifecycle hardening.
 
 ### T35a/T35c Read-only Audit (2026-08-11)
 

@@ -46,11 +46,20 @@ Copy `main.js`, `manifest.json`, and `styles.css` into `.obsidian/plugins/obsidi
 
 1. Open **Settings → Git Sync**
 2. Enter your **GitHub repository URL** (e.g. `https://github.com/username/vault.git`)
-3. Enter a **Personal Access Token** (PAT) as the password:
+3. Enter a **Personal Access Token** (PAT) in the credential field:
    - GitHub: Settings → Developer settings → Personal access tokens → Tokens (classic) → `repo` scope
    - The username field is ignored for PATs — any value works
+   - The credential is stored through Obsidian `SecretStorage`, not in the
+     plugin settings file. Leave the field blank to keep the current value.
 4. Set your **author name & email** for commits
 5. (Optional) Set **auto-sync interval** — 0 = disabled
+
+Secure credential storage requires Obsidian 1.11.4 or newer. Existing legacy
+credentials are migrated only after the host accepts a successful secure-store
+write; remote operations are disabled if secure storage is unavailable. The
+secret store protects the credential from ordinary plugin settings and vault
+sync, but it is not an isolation boundary against other trusted plugins in the
+same Obsidian process.
 
 ### Plugin updates
 
