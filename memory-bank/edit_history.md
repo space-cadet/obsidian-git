@@ -1,9 +1,18 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-12 13:59:20 IST*
+*Last Updated: 2026-08-12 15:59:54 IST*
 
 ### 2026-08-12
+
+#### 15:59:54 IST - T29/T35b/T35e: Record gitignore controls and acceptance follow-ups
+- Created `memory-bank/implementation-details/gitignore-controls.md` - Recorded hidden-dotfile editing, ignore actions, the small GitHub fixture, and the bulk-staging follow-up.
+- Created `memory-bank/sessions/2026-08-12-afternoon.md` - Recorded the session work, verification, shipped commit, and deferred Add all investigation.
+- Modified `memory-bank/tasks/T29.md` - Recorded `.gitignore` controls, `git-test-small`, and the first-ten-files bulk-stage issue.
+- Modified `memory-bank/tasks/T35b.md` - Recorded the bulk-stage limit as an operation/staging follow-up.
+- Modified `memory-bank/tasks/T35e.md` - Recorded the stable-channel 404, false up-to-date result, and generated-artifact identity evidence.
+- Modified `memory-bank/activeContext.md`, `memory-bank/progress.md`, `memory-bank/tasks.md`, and `memory-bank/session_cache.md` - Synchronized current context, progress, registry timestamp, and session closeout.
+- User approval: Explicit request to update Memory Bank, create/update task and implementation-detail records, commit, and push.
 
 #### 13:59:20 IST - T35b/T35c/T35d: Record limited resume and progress closeout
 - Modified `memory-bank/tasks/T35b.md` - Marked the implemented progress, cancellation, interrupted-clone retention, and retry evidence complete while retaining broader coordination gates.

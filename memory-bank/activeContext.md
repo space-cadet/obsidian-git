@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-08-12 13:59:20 IST*
+*Last Updated: 2026-08-12 15:59:54 IST*
 
 ## Current Tasks
 
@@ -73,6 +73,18 @@
   response-consumption telemetry rather than live wire transfer telemetry.
 - Protected replacement backups, shared operation coordination, and Android/
   desktop real-device acceptance remain open.
+
+### T29/T35b `.gitignore` Controls and Bulk-Stage Follow-up — 2026-08-12
+
+- Added sidebar and command-palette access to the hidden `.gitignore` file,
+  per-file ignore actions, and a folder/glob pattern editor.
+- Hidden-file reads and writes now use the vault adapter; an adapter-backed
+  editor modal handles the case where Obsidian omits `.gitignore` from its
+  indexed `TFile` list.
+- Created and verified the small private `space-cadet/git-test-small` fixture
+  for clone, edit, commit, push, and mobile acceptance checks.
+- Open issue for the next session: Changes-tab bulk Add all stages only the
+  first ten files in a larger change set. Cause is not yet established.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback

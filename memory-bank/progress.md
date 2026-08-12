@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-08-12 13:59:20 IST*
+*Last Updated: 2026-08-12 15:59:54 IST*
 
 ## Completed Phases
 
@@ -175,6 +175,17 @@
   build, 13 Node tests, 10 isomorphic-git checks, and `git diff --check`.
 - Remaining gate: valid-credential Android/iOS acceptance and explicit
   authorization before tagging v1.0.0.
+
+## T29/T35b: Gitignore Controls and Acceptance Fixture (2026-08-12)
+
+- Added direct hidden `.gitignore` editing through the sidebar, command
+  palette, and adapter-backed modal fallback.
+- Added per-file ignore actions and manual folder/glob pattern entry from the
+  Changes tab.
+- Created `space-cadet/git-test-small` as a minimal private remote fixture and
+  verified its shallow-clone pack is small.
+- Recorded a deferred bulk-staging issue: Changes-tab Add all stages only the
+  first ten files in a large change set.
 
 ## Architecture Review Release Impact (2026-08-11)
 

@@ -1,15 +1,15 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-12 13:59:20 IST*
+*Last Updated: 2026-08-12 15:59:54 IST*
 
 ## Current Session
-**Started**: 2026-08-12 11:27 IST
-**Focus Task**: T35b/T35d clone recovery and progress telemetry implementation
-**Session File**: `memory-bank/sessions/2026-08-12-startup-clone-fix.md`
+**Started**: 2026-08-12 14:30 IST
+**Focus Task**: T29/T35b gitignore controls and acceptance follow-up
+**Session File**: `memory-bank/sessions/2026-08-12-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T35b, T35c, T35d: Implement limited clone resume and progress telemetry
+**Session Title**: T29, T35b, T35e: Add hidden gitignore controls and record acceptance follow-ups
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -93,8 +93,8 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   ownership boundaries.
 
 ## Session History (Last 5)
-1. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
-2. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
-3. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
-4. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
-5. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
+1. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
+2. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+3. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+4. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
+5. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
