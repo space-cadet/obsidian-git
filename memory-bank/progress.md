@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-08-12 11:31:05 IST*
+*Last Updated: 2026-08-12 13:59:20 IST*
 
 ## Completed Phases
 
@@ -109,6 +109,31 @@
   build, archive validation, and `git diff --check`.
 - Remaining T35c gates are protected `.git` replacement backups, lifecycle
   coordination, and real-device acceptance.
+
+### T35b/T35d Clone Recovery and Progress Audit (2026-08-12, before implementation)
+
+- Recorded that interrupted clone is currently restart-only: the clone path can
+  remove `.git`, isomorphic-git cleans partial clone state on failure, and the
+  fallback writes visible vault files only during checkout.
+- Recorded that the current modal cannot provide trustworthy terminal-style
+  byte totals, transfer rates, ETAs, or file counts. `requestUrl` buffers the
+  full response, fallback fetch omits object progress, object counts are
+  mislabeled as bytes, and the rate calculation is zero-delta.
+- Added the separate `clone-resume-and-progress.md` design record with the
+  recovery choices, progress-field contract, ownership split, and acceptance
+  tests.
+- Implemented explicit init/fetch/checkout clone recovery, cancellation-aware
+  transport consumption, separate object/byte/file metrics, and the requested
+  statistics modal layout. A failed clone now retains initialized `.git` state
+  for retry.
+- Added checkout-level resume metadata: when fetch has completed, a retry can
+  skip HTTP entirely and resume checkout from the validated local commit.
+- `requestUrl` still buffers the complete response, so byte rate/ETA are
+  response-consumption metrics rather than live wire-level metrics. Protected
+  replacement backups, operation serialization, and real-device acceptance
+  remain open under T35b/T35c/T35d.
+- Verification passes: production build, full Node test suite, and 10
+  isomorphic-git compatibility checks.
 
 ### T35a/T35c Read-only Audit (2026-08-11)
 

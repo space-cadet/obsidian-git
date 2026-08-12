@@ -1,7 +1,47 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-12 11:31:05 IST*
+*Last Updated: 2026-08-12 13:59:20 IST*
+
+### 2026-08-12
+
+#### 13:59:20 IST - T35b/T35c/T35d: Record limited resume and progress closeout
+- Modified `memory-bank/tasks/T35b.md` - Marked the implemented progress, cancellation, interrupted-clone retention, and retry evidence complete while retaining broader coordination gates.
+- Modified `memory-bank/tasks/T35c.md` - Recorded explicit checkout recovery metadata and file-level retry without another remote request.
+- Modified `memory-bank/tasks/T35d.md` - Marked separate progress namespaces, object callbacks, and checkout instrumentation complete while retaining streaming-transport and device gates.
+- Modified `memory-bank/activeContext.md` - Recorded the implementation closeout, current test count, and remaining hardening work.
+- Modified `memory-bank/session_cache.md` - Added the requested session title and synchronized the current focus.
+- Modified `memory-bank/sessions/2026-08-12-startup-clone-fix.md` - Appended the session title, Memory Bank closeout, verification, and remaining gates.
+- Modified `memory-bank/tasks.md`, `memory-bank/tasks/T29.md`, `memory-bank/tasks/T35.md`, `memory-bank/progress.md`, and `memory-bank/implementation-details/clone-resume-and-progress.md` - Synchronized timestamps, release impact, and verification evidence.
+
+#### 13:25:00 IST - T35b/T35c/T35d: Implement resumable clone and progress statistics
+- Modified `src/gitManager.ts` - Replaced fresh/shallow `git.clone` with explicit init/fetch/checkout, retained partial `.git` state, corrected target-repository detection, added cancellation-aware HTTP/checkout progress, and wired separate transfer telemetry.
+- Modified `src/ui/GitProgressModal.ts` - Added object/data/file statistics, rate, ETA, phase cards, cancellation, completion/failure handling, and the mockup-aligned layout contract.
+- Modified `src/adapters/ObsidianFsAdapter.ts` - Added temporary worktree write-byte callbacks for checkout telemetry.
+- Modified `styles.css` - Added statistics cards, checkout rows, phase-card styling, and responsive modal layout.
+- Modified `tests/git-manager.test.mjs` and created `tests/adapter.test.mjs` - Added byte/cancellation, failed-clone retention, progress-unit, and adapter write telemetry coverage.
+- Updated T29/T35b/T35c/T35d and implementation-detail, progress, active-context, session-cache, and session records - Recorded the implementation boundary and remaining native transport/coordination limitations.
+
+#### 13:45:00 IST - T35b/T35c: Resume checkout without refetching
+- Modified `src/gitManager.ts` - Added checkout-pending metadata containing the fetched branch tip; retries validate the local commit, skip fetch, resume checkout, and clear the marker only after success.
+- Modified `tests/git-manager.test.mjs` - Added a completed-fetch checkout-resume regression test proving zero HTTP requests on retry.
+- Updated `memory-bank/implementation-details/clone-resume-and-progress.md`, T35b/T35c, progress, active context, and session cache - Recorded file-level resume behavior and its acceptance boundary.
+
+#### 13:13:05 IST - T35b/T35d: Record clone recovery and progress telemetry gaps
+- Modified `memory-bank/tasks/T29.md` - Added the release impact of resumable clone and trustworthy transfer-metrics requirements.
+- Modified `memory-bank/tasks/T35.md` - Added the new hardening evidence and focused implementation-detail link.
+- Modified `memory-bank/tasks/T35b.md` - Added clone recovery, cancellation, retry, and lifecycle acceptance criteria.
+- Modified `memory-bank/tasks/T35c.md` - Added partial `.git` preservation and interruption-safety requirements.
+- Modified `memory-bank/tasks/T35d.md` - Added separate byte, object, file, rate, ETA, and indeterminate-progress requirements.
+- Created `memory-bank/implementation-details/clone-resume-and-progress.md` - Recorded current evidence, recovery choices, metrics contract, ownership, and acceptance tests.
+- Modified `memory-bank/implementation-details/reliability-and-lifecycle.md` - Added the clone recovery and modal cancellation boundary.
+- Modified `memory-bank/implementation-details/git-http-client.md` - Clarified full-response buffering and progress telemetry limits.
+- Modified `memory-bank/activeContext.md` - Marked T35b/T35d active and recorded the design follow-up.
+- Modified `memory-bank/progress.md` - Recorded the clone/progress audit and open implementation boundary.
+- Modified `memory-bank/tasks.md` - Synchronized T35b/T35d statuses and registry counts.
+- Modified `memory-bank/session_cache.md` - Updated current focus and active-task registry.
+- Modified `memory-bank/sessions/2026-08-12-startup-clone-fix.md` - Appended the follow-up audit and documentation closeout.
+- Created `screenshots/progress-modal-stats-mockup.png` - Added a high-fidelity design mockup showing object, byte, rate, ETA, and file statistics.
 
 ### 2026-08-12
 

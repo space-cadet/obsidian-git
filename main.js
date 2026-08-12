@@ -18739,33 +18739,57 @@ var init_repositoryState = __esm({
 function createProgressModal(app, operationName) {
   const modal = new GitProgressModal(app, operationName);
   modal.open();
-  const onProgress = (event) => {
-    modal.updateProgress(event);
+  return {
+    onProgress: (event) => modal.updateProgress(event),
+    onMessage: (text) => modal.updateMessage(text),
+    onTransfer: (event) => modal.updateTransfer(event),
+    complete: (message) => modal.complete(message),
+    fail: (error) => modal.fail(error),
+    signal: modal.signal
   };
-  const onMessage = (text) => {
-    modal.updateMessage(text);
-  };
-  const closeModal = () => {
-    modal.complete();
-  };
-  return [onProgress, onMessage, closeModal];
 }
-var import_obsidian2, GitProgressModal;
+var import_obsidian2, PHASE_ORDER, GitProgressModal;
 var init_GitProgressModal = __esm({
   "src/ui/GitProgressModal.ts"() {
     import_obsidian2 = require("obsidian");
+    PHASE_ORDER = [
+      "Remote communication",
+      "Fetching",
+      "Receiving objects",
+      "Resolving deltas",
+      "Checking out"
+    ];
     GitProgressModal = class extends import_obsidian2.Modal {
       constructor(app, operationName) {
         super(app);
         this.phases = /* @__PURE__ */ new Map();
-        this.messages = [];
         this.isComplete = false;
+        this.abortController = new AbortController();
         this.bytesLoaded = 0;
-        this.lastUpdateTime = 0;
-        this.transferRate = "";
+        this.bytesTotal = 0;
+        this.bytesPerSecond = 0;
+        this.lastTransferLoaded = 0;
+        this.lastTransferTime = 0;
+        this.objectsLoaded = 0;
+        this.objectsTotal = 0;
+        this.filesWritten = 0;
+        this.filesTotal = 0;
+        this.bytesWritten = 0;
         this.operationName = operationName;
         this.startTime = Date.now();
-        this.lastUpdateTime = this.startTime;
+        this.lastTransferTime = this.startTime;
+        for (const name of PHASE_ORDER) {
+          this.phases.set(name, {
+            name,
+            status: "pending",
+            percent: 0,
+            loaded: 0,
+            total: 0
+          });
+        }
+      }
+      get signal() {
+        return this.abortController.signal;
       }
       onOpen() {
         const { contentEl } = this;
@@ -18777,265 +18801,281 @@ var init_GitProgressModal = __esm({
         titleEl.setText(this.operationName);
         const statusEl = this.headerEl.createDiv("git-progress-status");
         statusEl.setText("Initializing...");
+        this.statsEl = this.container.createDiv("git-progress-statistics");
         this.phasesEl = this.container.createDiv("git-progress-phases");
         this.footerEl = this.container.createDiv("git-progress-footer");
-        this.updateFooter();
+        this.render();
       }
       onClose() {
+        if (!this.isComplete) {
+          this.abortController.abort();
+        }
         this.contentEl.empty();
       }
-      /**
-       * Update progress from isomorphic-git onProgress event (structured data)
-       */
       updateProgress(event) {
-        const { phase, loaded, total } = event;
+        const payload = (event == null ? void 0 : event.payload) || event || {};
+        const phase = String(payload.phase || "");
         if (!phase)
           return;
-        if (loaded > this.bytesLoaded) {
-          this.bytesLoaded = loaded;
-          this.transferRate = this.calculateRate();
-        }
         const phaseName = this.formatPhaseName(phase);
-        let percent = 0;
-        if (total > 0) {
-          percent = Math.round(loaded / total * 100);
-        } else if (loaded > 0) {
-          percent = 100;
+        const loaded = Number(payload.loaded || 0);
+        const total = Number(payload.total || 0);
+        if (phaseName === "Checking out") {
+          this.updateCheckout({ loaded, total, bytesWritten: Number(payload.bytesWritten || 0) });
+        } else if (phaseName === "Receiving objects" || phaseName === "Resolving deltas") {
+          this.objectsLoaded = loaded;
+          this.objectsTotal = total;
         }
-        const statusEl = this.headerEl.querySelector(".git-progress-status");
-        if (statusEl) {
-          statusEl.setText(`${phaseName}...`);
-        }
-        let foundActive = false;
-        for (const [key, p] of this.phases) {
-          if (key === phaseName) {
-            foundActive = true;
-            this.phases.set(key, {
-              ...p,
-              status: "active",
-              percent,
-              loaded,
-              total,
-              rate: this.transferRate,
-              detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
-            });
-          } else if (!foundActive && p.status !== "completed") {
-            this.phases.set(key, { ...p, status: "completed", percent: 100 });
-          }
-        }
-        if (!this.phases.has(phaseName)) {
-          this.phases.set(phaseName, {
-            name: phaseName,
-            status: "active",
-            percent,
-            loaded,
-            total,
-            rate: this.transferRate,
-            detail: total > 0 ? `${this.formatBytes(loaded)} / ${this.formatBytes(total)}` : this.formatBytes(loaded)
-          });
-        }
+        this.activatePhase(phaseName, loaded, total);
         this.render();
       }
-      /**
-       * Update from isomorphic-git onMessage event (text-based progress)
-       * This is the primary method for git.fetch and git.pull with custom HTTP clients
-       */
+      updateTransfer(event) {
+        if (this.isComplete)
+          return;
+        const loaded = Math.max(0, Number(event.bytesLoaded || 0));
+        const total = Math.max(0, Number(event.bytesTotal || 0));
+        const now = Date.now();
+        const elapsedSeconds = (now - this.lastTransferTime) / 1e3;
+        const deltaBytes = loaded - this.lastTransferLoaded;
+        if (event.bytesPerSecond && event.bytesPerSecond > 0) {
+          this.bytesPerSecond = event.bytesPerSecond;
+        } else if (elapsedSeconds >= 0.05 && deltaBytes >= 0) {
+          this.bytesPerSecond = deltaBytes / elapsedSeconds;
+        }
+        this.bytesLoaded = Math.max(this.bytesLoaded, loaded);
+        this.bytesTotal = Math.max(this.bytesTotal, total);
+        this.lastTransferLoaded = loaded;
+        this.lastTransferTime = now;
+        this.activatePhase("Fetching", loaded, total);
+        this.render();
+      }
+      updateCheckout(event) {
+        this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
+        this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
+        this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
+        this.activatePhase("Checking out", this.filesWritten, this.filesTotal);
+        this.render();
+      }
       updateMessage(text) {
-        if (!text)
+        var _a;
+        if (!text || this.isComplete)
           return;
         const message = text.trim();
-        const statusEl = this.headerEl.querySelector(".git-progress-status");
-        if (statusEl) {
-          statusEl.setText(message);
-        }
+        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+        statusEl == null ? void 0 : statusEl.setText(message);
         const phaseName = this.inferPhaseFromMessage(message);
         if (phaseName) {
-          const existing = this.phases.get(phaseName);
-          if (existing) {
-            this.phases.set(phaseName, {
-              ...existing,
-              status: "active",
-              detail: message
-            });
-          } else {
-            this.phases.set(phaseName, {
-              name: phaseName,
-              status: "active",
-              percent: 0,
-              loaded: 0,
-              total: 0,
-              detail: message
-            });
-          }
+          this.activatePhase(phaseName);
           this.render();
         }
-        this.messages.push({ text: message, timestamp: Date.now() });
       }
-      /**
-       * Mark operation as complete with optional message
-       */
-      complete(message) {
+      complete(message = "Completed") {
+        var _a;
+        if (this.isComplete)
+          return;
         this.isComplete = true;
-        for (const [key, p] of this.phases) {
-          this.phases.set(key, { ...p, status: "completed", percent: 100 });
-        }
-        this.render();
-        if (this.headerEl) {
-          const statusEl = this.headerEl.querySelector(".git-progress-status");
-          if (statusEl) {
-            statusEl.setText(message || "Completed");
-            statusEl.addClass("git-progress-status-success");
-          }
-        }
-        setTimeout(() => {
-          this.close();
-        }, 2e3);
-      }
-      /**
-       * Mark operation as failed
-       */
-      error(errorMessage) {
-        this.isComplete = true;
-        for (const [key, p] of this.phases) {
-          if (p.status === "active") {
-            this.phases.set(key, { ...p, status: "error" });
+        for (const phase of this.phases.values()) {
+          if (phase.status === "active") {
+            phase.status = "completed";
+            phase.percent = 100;
           }
         }
         this.render();
-        if (this.headerEl) {
-          const statusEl = this.headerEl.querySelector(".git-progress-status");
-          if (statusEl) {
-            statusEl.setText(`Failed: ${errorMessage}`);
-            statusEl.addClass("git-progress-status-error");
+        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+        if (statusEl) {
+          statusEl.setText(message);
+          statusEl.addClass("git-progress-status-success");
+        }
+        setTimeout(() => this.close(), 2e3);
+      }
+      fail(error) {
+        var _a;
+        if (this.isComplete)
+          return;
+        this.isComplete = true;
+        for (const phase of this.phases.values()) {
+          if (phase.status === "active")
+            phase.status = "error";
+        }
+        this.render();
+        const message = error instanceof Error ? error.message : String(error);
+        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+        if (statusEl) {
+          statusEl.setText(`Failed: ${message}`);
+          statusEl.addClass("git-progress-status-error");
+        }
+      }
+      activatePhase(name, loaded = 0, total = 0) {
+        const phase = this.phases.get(name);
+        if (!phase)
+          return;
+        const index2 = PHASE_ORDER.indexOf(name);
+        for (let i = 0; i < index2; i++) {
+          const previous = this.phases.get(PHASE_ORDER[i]);
+          if (previous && previous.status !== "error") {
+            previous.status = "completed";
+            previous.percent = 100;
           }
         }
+        phase.status = "active";
+        phase.loaded = loaded;
+        phase.total = total;
+        phase.percent = total > 0 ? Math.min(100, Math.round(loaded / total * 100)) : 0;
+        phase.detail = this.phaseDetail(name, loaded, total);
       }
       render() {
-        if (!this.phasesEl)
+        if (!this.statsEl || !this.phasesEl)
           return;
+        this.renderStatistics();
+        this.renderPhases();
+        this.updateFooter();
+      }
+      renderStatistics() {
+        this.statsEl.empty();
+        const transferTitle = this.statsEl.createDiv("git-progress-section-title");
+        transferTitle.setText("Transfer statistics");
+        const transfer = this.statsEl.createDiv("git-progress-stat-card");
+        this.addStatRow(transfer, "Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
+        this.addStatRow(transfer, "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
+        this.addStatRow(transfer, "Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
+        this.addStatRow(transfer, "ETA", this.estimateRemaining());
+        const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
+        checkoutTitle.setText("Checkout progress");
+        const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
+        this.addStatRow(checkout2, "Files", this.countPair(this.filesWritten, this.filesTotal));
+        this.addStatRow(
+          checkout2,
+          "Written",
+          this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : "\u2014"
+        );
+      }
+      renderPhases() {
         this.phasesEl.empty();
-        for (const [key, phase] of this.phases) {
-          const phaseEl = this.phasesEl.createDiv("git-progress-phase");
+        const title = this.phasesEl.createDiv("git-progress-section-title");
+        title.setText("Clone phases");
+        const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
+        for (const phase of this.phases.values()) {
+          const phaseEl = phaseCard.createDiv("git-progress-phase");
           phaseEl.addClass(`git-progress-phase-${phase.status}`);
           const iconEl = phaseEl.createDiv("git-progress-phase-icon");
           iconEl.setText(this.getStatusIcon(phase.status));
           const infoEl = phaseEl.createDiv("git-progress-phase-info");
           const nameEl = infoEl.createDiv("git-progress-phase-name");
           nameEl.setText(phase.name);
-          if (phase.detail || phase.rate) {
-            const detailEl = infoEl.createDiv("git-progress-phase-detail");
-            const parts = [];
-            if (phase.detail)
-              parts.push(phase.detail);
-            if (phase.rate)
-              parts.push(phase.rate);
-            detailEl.setText(parts.join(" | "));
-          }
+          const detailEl = infoEl.createDiv("git-progress-phase-detail");
+          detailEl.setText(phase.detail || this.statusLabel(phase.status));
           if (phase.status === "active" && phase.total > 0) {
-            const barContainer = phaseEl.createDiv("git-progress-bar-container");
+            const barContainer = infoEl.createDiv("git-progress-bar-container");
             const bar = barContainer.createDiv("git-progress-bar");
-            const barFill = bar.createDiv("git-progress-bar-fill");
-            barFill.style.width = `${phase.percent}%`;
-            const barLabel = barContainer.createDiv("git-progress-bar-label");
-            barLabel.setText(`${phase.percent}%`);
+            const fill = bar.createDiv("git-progress-bar-fill");
+            fill.style.width = `${phase.percent}%`;
+            const label = barContainer.createDiv("git-progress-bar-label");
+            label.setText(`${phase.percent}%`);
           }
         }
-        this.updateFooter();
+      }
+      addStatRow(parent, label, value) {
+        const row = parent.createDiv("git-progress-stat-row");
+        const labelEl = row.createSpan("git-progress-stat-label");
+        labelEl.setText(label);
+        const valueEl = row.createSpan("git-progress-stat-value");
+        valueEl.setText(value);
       }
       updateFooter() {
         if (!this.footerEl)
           return;
         const elapsed = ((Date.now() - this.startTime) / 1e3).toFixed(1);
-        const totalPhases = this.phases.size;
-        const completedPhases = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
+        const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
+        const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
         this.footerEl.empty();
-        const parts = [];
-        parts.push(`Elapsed: ${elapsed}s`);
-        if (this.transferRate) {
-          parts.push(this.transferRate);
-        }
-        parts.push(`${completedPhases}/${totalPhases} phases`);
-        this.footerEl.createSpan({
-          text: parts.join(" | ")
-        });
+        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${PHASE_ORDER.length} phases` });
       }
-      calculateRate() {
-        const now = Date.now();
-        const timeDelta = (now - this.lastUpdateTime) / 1e3;
-        if (timeDelta < 0.1)
-          return this.transferRate;
-        const bytesDelta = this.bytesLoaded - (this.bytesLoaded > 0 ? this.bytesLoaded : 0);
-        const bytesPerSec = bytesDelta / timeDelta;
-        this.lastUpdateTime = now;
-        if (bytesPerSec > 1024 * 1024) {
-          return `${(bytesPerSec / (1024 * 1024)).toFixed(2)} MiB/s`;
-        } else if (bytesPerSec > 1024) {
-          return `${(bytesPerSec / 1024).toFixed(2)} KiB/s`;
-        } else if (bytesPerSec > 0) {
-          return `${Math.round(bytesPerSec)} B/s`;
+      countPair(loaded, total) {
+        if (loaded === 0 && total === 0)
+          return "\u2014";
+        return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"}`;
+      }
+      bytePair(loaded, total) {
+        if (loaded === 0 && total === 0)
+          return "\u2014";
+        return `${this.formatBytes(loaded)} / ${total > 0 ? this.formatBytes(total) : "?"}`;
+      }
+      estimateRemaining() {
+        if (this.bytesPerSecond <= 0 || this.bytesTotal <= 0 || this.bytesLoaded >= this.bytesTotal)
+          return "\u2014";
+        const seconds = Math.ceil((this.bytesTotal - this.bytesLoaded) / this.bytesPerSecond);
+        return `${seconds}s`;
+      }
+      phaseDetail(name, loaded, total) {
+        if (name === "Receiving objects" || name === "Resolving deltas") {
+          return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} objects`;
         }
-        return "";
+        if (name === "Checking out") {
+          return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} files`;
+        }
+        if (name === "Fetching" && total > 0)
+          return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
+        return this.statusLabel("active");
+      }
+      statusLabel(status2) {
+        switch (status2) {
+          case "completed":
+            return "Completed";
+          case "active":
+            return "In progress";
+          case "error":
+            return "Failed";
+          default:
+            return "Pending";
+        }
       }
       inferPhaseFromMessage(message) {
         const lower2 = message.toLowerCase();
-        if (lower2.includes("enumerating"))
-          return "Enumerating objects";
-        if (lower2.includes("counting"))
-          return "Counting objects";
-        if (lower2.includes("compressing"))
-          return "Compressing objects";
+        if (lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
+          return "Fetching";
         if (lower2.includes("receiving"))
           return "Receiving objects";
         if (lower2.includes("resolving deltas"))
           return "Resolving deltas";
-        if (lower2.includes("checking out"))
+        if (lower2.includes("checking out") || lower2.includes("writing files") || lower2.includes("updating workdir"))
           return "Checking out";
-        if (lower2.includes("fetching") || lower2.includes("download"))
+        if (lower2.includes("fetching") || lower2.includes("download") || lower2.includes("connecting"))
           return "Fetching";
-        if (lower2.includes("writing"))
-          return "Writing objects";
-        if (lower2.includes("packing"))
-          return "Packing objects";
-        if (lower2.includes("updating"))
-          return "Updating references";
-        if (lower2.includes("remote") || lower2.includes("origin"))
+        if (lower2.includes("remote") || lower2.includes("origin") || lower2.includes("preparing"))
           return "Remote communication";
-        return message.length > 30 ? message.substring(0, 30) + "..." : message;
+        return null;
       }
       formatPhaseName(phase) {
         const phaseMap = {
-          "enumeratingObjects": "Enumerating objects",
-          "countingObjects": "Counting objects",
-          "compressingObjects": "Compressing objects",
-          "receivingObjects": "Receiving objects",
-          "resolvingDeltas": "Resolving deltas",
-          "analyzing": "Analyzing",
-          "checkingOut": "Checking out",
-          "fetching": "Fetching",
-          "writingObjects": "Writing objects",
-          "packing": "Packing objects",
-          "sending": "Sending data",
-          "updatingReferences": "Updating references",
-          "waiting": "Waiting for remote"
+          enumeratingObjects: "Fetching",
+          countingObjects: "Fetching",
+          compressingObjects: "Fetching",
+          receivingObjects: "Receiving objects",
+          "Receiving objects": "Receiving objects",
+          resolvingDeltas: "Resolving deltas",
+          "Resolving deltas": "Resolving deltas",
+          "Updating workdir": "Checking out",
+          checkingOut: "Checking out",
+          fetching: "Fetching"
         };
         return phaseMap[phase] || phase;
       }
       formatBytes(bytes) {
-        if (bytes === 0)
+        if (!bytes)
           return "0 B";
-        const k = 1024;
-        const sizes = ["B", "KB", "MB", "GB"];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
+        const units = ["B", "KB", "MB", "GB"];
+        const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+        return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
+      }
+      formatRate(bytesPerSecond) {
+        return `${this.formatBytes(bytesPerSecond)}/s`;
       }
       getStatusIcon(status2) {
         switch (status2) {
-          case "pending":
-            return "\u25CB";
-          case "active":
-            return "\u25D0";
           case "completed":
             return "\u2713";
+          case "active":
+            return "\u25D0";
           case "error":
             return "\u2717";
           default:
@@ -19056,15 +19096,25 @@ __export(gitManager_exports, {
   createProgressNotice: () => createProgressNotice,
   testRemoteConnection: () => testRemoteConnection
 });
-function arrayBufferToAsyncIterable(arrayBuffer, chunkSize = 65536) {
+function arrayBufferToAsyncIterable(arrayBuffer, chunkSize = 65536, onChunk, signal) {
   if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
     throw new RangeError("chunkSize must be a positive integer");
   }
   return {
     [Symbol.asyncIterator]: async function* () {
       const view = new Uint8Array(arrayBuffer);
+      let bytesLoaded = 0;
+      onChunk == null ? void 0 : onChunk(0, view.length);
       for (let offset = 0; offset < view.length; offset += chunkSize) {
-        yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
+        if (signal == null ? void 0 : signal.aborted) {
+          const error = new Error("Git operation cancelled");
+          error.name = "AbortError";
+          throw error;
+        }
+        const end = Math.min(offset + chunkSize, view.length);
+        bytesLoaded = end;
+        onChunk == null ? void 0 : onChunk(bytesLoaded, view.length);
+        yield view.subarray(offset, end);
       }
     }
   };
@@ -19094,22 +19144,25 @@ function createGitEmitter(onProgress) {
 }
 function createProgressNotice(initialMessage) {
   let notice = new import_obsidian3.Notice(initialMessage, 0);
-  let currentPhase = "";
+  const abortController = new AbortController();
   const onProgress = (event) => {
     const { phase, loaded, total } = event;
-    if (phase && phase !== currentPhase) {
-      currentPhase = phase;
-    }
     let msg = `${initialMessage} \u2014 ${phase || "working"}`;
     if (total > 0) {
       const pct = Math.round(loaded / total * 100);
-      msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
+      msg += ` (${pct}%, ${loaded.toLocaleString()} / ${total.toLocaleString()} objects)`;
     } else if (loaded > 0) {
-      msg += ` (${Math.round(loaded / 1024)}KB)`;
+      msg += ` (${loaded.toLocaleString()} objects)`;
     }
     if (notice) {
       notice.setMessage(msg);
     }
+  };
+  const onTransfer = (event) => {
+    const loaded = formatProgressBytes(event.bytesLoaded);
+    const total = event.bytesTotal > 0 ? ` / ${formatProgressBytes(event.bytesTotal)}` : "";
+    if (notice)
+      notice.setMessage(`${initialMessage} \u2014 Data ${loaded}${total}`);
   };
   const onMessage = (text) => {
     const msg = `${initialMessage} \u2014 ${text}`;
@@ -19117,13 +19170,27 @@ function createProgressNotice(initialMessage) {
       notice.setMessage(msg);
     }
   };
-  const hideNotice = () => {
+  const complete = () => {
     if (notice) {
       notice.hide();
       notice = null;
     }
   };
-  return [onProgress, onMessage, hideNotice];
+  return {
+    onProgress,
+    onMessage,
+    onTransfer,
+    complete,
+    fail: complete,
+    signal: abortController.signal
+  };
+}
+function formatProgressBytes(bytes) {
+  if (!bytes)
+    return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+  return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
 }
 var import_obsidian3, GitHttpClient, GitProgressEmitter, GitManager;
 var init_gitManager = __esm({
@@ -19135,13 +19202,16 @@ var init_gitManager = __esm({
     init_repositoryState();
     init_GitProgressModal();
     GitHttpClient = class {
-      constructor(credentials) {
+      constructor(credentials, options = {}) {
         this.credentials = credentials;
+        this.signal = options.signal;
+        this.onTransfer = options.onTransfer;
         log2.setSensitiveValues([credentials.password]);
       }
       async request(config, attempt = 1) {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f, _g;
         const maxAttempts = 3;
+        this.throwIfAborted(config.signal);
         log2.debug("GitHttpClient", `Requesting: ${config.method || "GET"} ${config.url}`);
         const headers = {
           ...config.headers
@@ -19155,6 +19225,7 @@ var init_gitManager = __esm({
           body = await this.collectBody(config.body);
         }
         try {
+          this.throwIfAborted(config.signal);
           const response = await (0, import_obsidian3.requestUrl)({
             url: config.url,
             method: config.method || "GET",
@@ -19163,17 +19234,40 @@ var init_gitManager = __esm({
             throw: false
             // Don't throw on 4xx/5xx — let isomorphic-git handle Git errors
           });
+          this.throwIfAborted(config.signal);
           log2.debug("GitHttpClient", `Response status: ${response.status}`);
+          const total = ((_a = response.arrayBuffer) == null ? void 0 : _a.byteLength) || 0;
+          let lastLoaded = 0;
+          let lastTime = Date.now();
+          (_b = this.onTransfer) == null ? void 0 : _b.call(this, {
+            bytesLoaded: 0,
+            bytesTotal: total,
+            lengthComputable: total > 0
+          });
           return {
             url: config.url,
             method: config.method || "GET",
             statusCode: response.status,
             statusMessage: this.getStatusMessage(response.status),
-            body: this.toAsyncIterator(response.arrayBuffer),
+            body: this.toAsyncIterator(response.arrayBuffer, (bytesLoaded) => {
+              var _a2;
+              const now = Date.now();
+              const elapsedSeconds = (now - lastTime) / 1e3;
+              const deltaBytes = bytesLoaded - lastLoaded;
+              const bytesPerSecond = elapsedSeconds >= 0.05 && deltaBytes >= 0 ? deltaBytes / elapsedSeconds : void 0;
+              lastLoaded = bytesLoaded;
+              lastTime = now;
+              (_a2 = this.onTransfer) == null ? void 0 : _a2.call(this, {
+                bytesLoaded,
+                bytesTotal: total,
+                bytesPerSecond,
+                lengthComputable: total > 0
+              });
+            }, config.signal),
             headers: response.headers
           };
         } catch (error) {
-          const isRetryable = ((_a = error.message) == null ? void 0 : _a.includes("Connection reset")) || ((_b = error.message) == null ? void 0 : _b.includes("timeout")) || ((_c = error.message) == null ? void 0 : _c.includes("ETIMEDOUT")) || ((_d = error.message) == null ? void 0 : _d.includes("ECONNRESET")) || ((_e = error.message) == null ? void 0 : _e.includes("SocketException"));
+          const isRetryable = ((_c = error.message) == null ? void 0 : _c.includes("Connection reset")) || ((_d = error.message) == null ? void 0 : _d.includes("timeout")) || ((_e = error.message) == null ? void 0 : _e.includes("ETIMEDOUT")) || ((_f = error.message) == null ? void 0 : _f.includes("ECONNRESET")) || ((_g = error.message) == null ? void 0 : _g.includes("SocketException"));
           if (isRetryable && attempt < maxAttempts) {
             const delayMs = 1e3 * attempt;
             log2.warn("GitHttpClient", `Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
@@ -19181,6 +19275,14 @@ var init_gitManager = __esm({
             return this.request(config, attempt + 1);
           }
           log2.error("GitHttpClient", `Request failed: ${error.message}`, error);
+          throw error;
+        }
+      }
+      throwIfAborted(requestSignal) {
+        var _a;
+        if (((_a = this.signal) == null ? void 0 : _a.aborted) || (requestSignal == null ? void 0 : requestSignal.aborted)) {
+          const error = new Error("Git operation cancelled");
+          error.name = "AbortError";
           throw error;
         }
       }
@@ -19213,8 +19315,8 @@ var init_gitManager = __esm({
        * 
        * Uses subarray() (view, not copy) to avoid additional memory allocation.
        */
-      toAsyncIterator(arrayBuffer, chunkSize = 65536) {
-        return arrayBufferToAsyncIterable(arrayBuffer, chunkSize);
+      toAsyncIterator(arrayBuffer, onChunk, signal, chunkSize = 65536) {
+        return arrayBufferToAsyncIterable(arrayBuffer, chunkSize, onChunk, signal);
       }
       getStatusMessage(status2) {
         const messages = {
@@ -19315,6 +19417,28 @@ var init_gitManager = __esm({
         }
         log2.info("GitManager", message);
       }
+      createProgress(operationName) {
+        return this.app ? createProgressModal(this.app, operationName) : createProgressNotice(operationName);
+      }
+      createHttpClient(progress) {
+        return new GitHttpClient(this.credentials, {
+          signal: progress == null ? void 0 : progress.signal,
+          onTransfer: progress == null ? void 0 : progress.onTransfer
+        });
+      }
+      setWriteProgress(callback) {
+        var _a;
+        const setProgress = (_a = this.fs) == null ? void 0 : _a.setWriteProgress;
+        if (typeof setProgress === "function")
+          setProgress(callback);
+      }
+      assertProgressActive(progress) {
+        if (progress.signal.aborted) {
+          const error = new Error("Git operation cancelled");
+          error.name = "AbortError";
+          throw error;
+        }
+      }
       /**
        * Initialize a new repository or check if one exists
        */
@@ -19407,7 +19531,8 @@ var init_gitManager = __esm({
        */
       async isRepository() {
         try {
-          await findRoot({ fs: this.fs, filepath: "dummy.txt" });
+          const gitHead = this.dir === "." ? ".git/HEAD" : `${this.dir}/.git/HEAD`;
+          await this.fs.stat(gitHead);
           log2.debug("GitManager", `Local Git repository found`);
           return true;
         } catch (error) {
@@ -19539,7 +19664,8 @@ var init_gitManager = __esm({
         try {
           const commits = await log({ fs: this.fs, dir: this.dir, ref: "HEAD", depth: 1 });
           return commits.length > 0;
-        } catch (e) {
+        } catch (error) {
+          console.error("pending checkout validation failed", error);
           return false;
         }
       }
@@ -19553,13 +19679,18 @@ var init_gitManager = __esm({
           if (this.credentials.repoUrl) {
             await this.ensureRemote(this.credentials.repoUrl);
           }
+          if (this.credentials.repoUrl && await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1)) {
+            await this.shallowFetchAndCheckout(branchName);
+            return;
+          }
           const hasCommits = await this.hasLocalCommits();
           if (!hasCommits) {
             log2.info("GitManager", "No local commits \u2014 doing shallow fetch instead of pull");
             await this.shallowFetchAndCheckout(branchName);
             return;
           }
-          const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Pulling from remote") : createProgressNotice("Pulling from remote");
+          const progress = this.createProgress("Pulling from remote");
+          const { onProgress, onMessage } = progress;
           const pullStartTime = Date.now();
           let pullTimer = null;
           const startPullTimer = () => {
@@ -19567,7 +19698,7 @@ var init_gitManager = __esm({
               window.clearInterval(pullTimer);
             pullTimer = window.setInterval(() => {
               const elapsed = ((Date.now() - pullStartTime) / 1e3).toFixed(1);
-              onMessage == null ? void 0 : onMessage(`Downloading updates... (${elapsed}s elapsed)`);
+              onMessage(`Downloading updates... (${elapsed}s elapsed)`);
             }, 1e3);
           };
           const stopPullTimer = () => {
@@ -19580,7 +19711,7 @@ var init_gitManager = __esm({
             startPullTimer();
             await pull({
               fs: this.fs,
-              http: new GitHttpClient(this.credentials),
+              http: this.createHttpClient(progress),
               dir: this.dir,
               ref: branchName,
               singleBranch: true,
@@ -19597,11 +19728,11 @@ var init_gitManager = __esm({
               onMessage
             });
             stopPullTimer();
-            hideNotice();
+            progress.complete();
             this.updateStatus("Pull completed");
           } catch (error) {
             stopPullTimer();
-            hideNotice();
+            progress.fail(error);
             throw error;
           }
         } catch (error) {
@@ -19611,121 +19742,86 @@ var init_gitManager = __esm({
         }
       }
       /**
-       * Shallow fetch + checkout for empty repos.
-       * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
-       * 
-       * MEMORY-SAFE STRATEGY:
-       * 1. Try git.clone first — handles packfile streaming incrementally
-       * 2. Fallback to git.fetch + git.checkout with chunked ArrayBuffer processing
-       * 3. Show download progress timer (since isomorphic-git doesn't emit progress during HTTP)
-       * 4. Catch OOM and timeout errors with helpful messages
+       * Fetch and check out a shallow repository without using git.clone.
+       *
+       * isomorphic-git removes the git directory when git.clone fails. An
+       * explicit init + fetch + checkout sequence preserves the partial .git
+       * state, allowing a later Clone Remote retry to reuse it.
        */
       async shallowFetchAndCheckout(branchName) {
-        const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, "Fetching remote files") : createProgressNotice("Fetching remote files");
-        const startTime = Date.now();
+        const progress = this.createProgress("Fetching remote files");
+        const { onProgress, onMessage } = progress;
         let downloadTimer = null;
+        const startTime = Date.now();
         const startDownloadTimer = () => {
-          if (downloadTimer)
-            window.clearInterval(downloadTimer);
           downloadTimer = window.setInterval(() => {
             const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
-            onMessage == null ? void 0 : onMessage(`Downloading from server... (${elapsed}s elapsed)`);
+            onMessage(`Downloading from server... (${elapsed}s elapsed)`);
           }, 1e3);
         };
         const stopDownloadTimer = () => {
-          if (downloadTimer) {
+          if (downloadTimer !== null)
             window.clearInterval(downloadTimer);
-            downloadTimer = null;
-          }
+          downloadTimer = null;
         };
         try {
-          try {
-            this.updateStatus("Cloning repository (memory-efficient)...");
-            log2.info("GitManager", "Attempting clone for memory efficiency");
-            onMessage == null ? void 0 : onMessage("Preparing to clone...");
-            await this.fs.promises.rmdir(this.dir + "/.git", { recursive: true });
+          this.updateStatus("Preparing resumable fetch...");
+          onMessage("Preparing resumable fetch...");
+          await this.ensureResumableRepository(branchName);
+          onMessage("Connecting to remote...");
+          const resumeCheckout = this.credentials.repoUrl ? await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1) : false;
+          if (resumeCheckout) {
+            onMessage("Fetch already complete; resuming checkout...");
+          } else {
             startDownloadTimer();
-            await clone({
+            await fetch2({
               fs: this.fs,
-              http: new GitHttpClient(this.credentials),
+              http: this.createHttpClient(progress),
               dir: this.dir,
-              url: this.credentials.repoUrl || "",
+              remote: "origin",
               ref: branchName,
-              singleBranch: true,
               depth: 1,
+              singleBranch: true,
               onAuth: () => ({
                 username: this.credentials.username,
                 password: this.credentials.password
               }),
-              onProgress,
-              onMessage
+              onProgress: (event) => {
+                this.assertProgressActive(progress);
+                onProgress(event);
+              },
+              onMessage: (text) => {
+                this.assertProgressActive(progress);
+                onMessage(text);
+              }
             });
-            stopDownloadTimer();
-            hideNotice();
-            this.updateStatus("Repository cloned");
-            log2.info("GitManager", `Clone successful for ${branchName}`);
-            return;
-          } catch (cloneError) {
-            stopDownloadTimer();
-            log2.warn("GitManager", `Clone failed, falling back to fetch: ${cloneError.message}`);
-            onMessage == null ? void 0 : onMessage(`Clone unavailable, using fetch...`);
+            await this.markCheckoutPending(this.credentials.repoUrl || "", branchName, 1);
           }
-          onMessage == null ? void 0 : onMessage("Connecting to remote...");
-          startDownloadTimer();
-          await fetch2({
-            fs: this.fs,
-            http: new GitHttpClient(this.credentials),
-            dir: this.dir,
-            remote: "origin",
-            ref: branchName,
-            depth: 1,
-            singleBranch: true,
-            onAuth: () => ({
-              username: this.credentials.username,
-              password: this.credentials.password
-            }),
-            onMessage
-          });
           stopDownloadTimer();
-          onMessage == null ? void 0 : onMessage("Download complete, processing...");
-          const remoteRef = `refs/remotes/origin/${branchName}`;
-          const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
-          log2.info("GitManager", `Fetched branch tip: ${oid.slice(0, 7)}`);
-          await writeRef({
-            fs: this.fs,
-            dir: this.dir,
-            ref: `refs/heads/${branchName}`,
-            value: oid
-          });
-          onMessage == null ? void 0 : onMessage("Writing files to vault...");
-          await checkout({
-            fs: this.fs,
-            dir: this.dir,
-            ref: branchName,
-            force: true
-          });
-          hideNotice();
+          onMessage(resumeCheckout ? "Resuming checkout..." : "Download complete, processing objects...");
+          await this.checkoutFetchedBranch(branchName, progress, onMessage);
+          await this.clearPendingCheckout();
+          progress.complete();
           this.updateStatus("Repository fetched");
-          log2.info("GitManager", `Checked out ${branchName} at ${oid.slice(0, 7)}`);
         } catch (error) {
           stopDownloadTimer();
-          hideNotice();
+          progress.fail(error);
           const msg = error.message || String(error);
           if (msg.includes("Out Of Memory") || msg.includes("out of memory") || msg.includes("OOM") || msg.includes("allocation")) {
             log2.error("GitManager", "Memory exhausted during fetch \u2014 repo may be too large for mobile", error);
             throw new Error(
-              `Memory exhausted while downloading repository. The repository may be too large for your device.
+              `Memory exhausted while downloading repository. The partial Git state was retained for a retry.
 
 Suggestions:
-\u2022 Try on desktop first, then sync to mobile
-\u2022 Remove large files (images, videos) from the repo
-\u2022 Use a smaller vault or split into multiple repos`
+\u2022 Try on desktop first
+\u2022 Remove large files (images, videos)
+\u2022 Use a smaller repository`
             );
           }
           if (msg.includes("timeout") || msg.includes("ETIMEDOUT") || msg.includes("Connection reset")) {
             log2.error("GitManager", "Network timeout during fetch", error);
             throw new Error(
-              `Connection timed out while downloading. The repository may be too large or your connection too slow.
+              `Connection timed out while downloading. The partial Git state was retained for a retry.
 
 Try again with a faster connection or smaller repository.`
             );
@@ -19733,36 +19829,168 @@ Try again with a faster connection or smaller repository.`
           throw error;
         }
       }
+      async ensureResumableRepository(branchName) {
+        if (!await this.isRepository()) {
+          await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+        }
+        if (this.credentials.repoUrl)
+          await this.ensureRemote(this.credentials.repoUrl);
+      }
+      pendingCheckoutPath() {
+        return `${this.dir}/.git/obsidian-git-sync-checkout.json`;
+      }
       /**
-       * Clone a repository with progress tracking and shallow depth.
-       * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
+       * A marker is written only after fetch has produced a complete local ref.
+       * Validate both the ref and its commit object before skipping a retry.
+       */
+      async hasPendingCheckout(repoUrl, branchName, depth) {
+        try {
+          const fs = this.fs.promises || this.fs;
+          const raw = await fs.readFile(this.pendingCheckoutPath(), { encoding: "utf8" });
+          const state = JSON.parse(String(raw));
+          if (state.version !== 1 || state.repoUrl !== normalizeRemoteUrl(repoUrl) || state.branchName !== branchName || state.depth !== depth || !state.oid)
+            return false;
+          const remoteOid = await resolveRef({
+            fs: this.fs,
+            dir: this.dir,
+            ref: `refs/remotes/origin/${branchName}`
+          });
+          if (remoteOid !== state.oid)
+            return false;
+          await readCommit({ fs: this.fs, dir: this.dir, oid: state.oid });
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+      async markCheckoutPending(repoUrl, branchName, depth) {
+        const oid = await resolveRef({
+          fs: this.fs,
+          dir: this.dir,
+          ref: `refs/remotes/origin/${branchName}`
+        });
+        await readCommit({ fs: this.fs, dir: this.dir, oid });
+        const state = {
+          version: 1,
+          repoUrl: normalizeRemoteUrl(repoUrl),
+          branchName,
+          depth,
+          oid
+        };
+        const fs = this.fs.promises || this.fs;
+        await fs.writeFile(this.pendingCheckoutPath(), JSON.stringify(state), { encoding: "utf8" });
+      }
+      async clearPendingCheckout() {
+        try {
+          const fs = this.fs.promises || this.fs;
+          await fs.unlink(this.pendingCheckoutPath());
+        } catch (e) {
+        }
+      }
+      async checkoutFetchedBranch(branchName, progress, onMessage) {
+        const remoteRef = `refs/remotes/origin/${branchName}`;
+        const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+        log2.info("GitManager", `Fetched branch tip: ${oid.slice(0, 7)}`);
+        await writeRef({
+          fs: this.fs,
+          dir: this.dir,
+          ref: `refs/heads/${branchName}`,
+          value: oid,
+          force: true
+        });
+        onMessage("Writing files to vault...");
+        let bytesWritten = 0;
+        this.setWriteProgress((path, bytes) => {
+          if (path === ".git" || path.startsWith(".git/"))
+            return;
+          bytesWritten += bytes;
+          progress.onProgress({
+            phase: "Updating workdir",
+            loaded: 0,
+            total: 0,
+            bytesWritten
+          });
+        });
+        try {
+          await checkout({
+            fs: this.fs,
+            dir: this.dir,
+            ref: branchName,
+            force: true,
+            onProgress: (event) => {
+              this.assertProgressActive(progress);
+              progress.onProgress({ ...event, bytesWritten });
+            }
+          });
+        } finally {
+          this.setWriteProgress(void 0);
+        }
+        log2.info("GitManager", `Checked out ${branchName} at ${oid.slice(0, 7)}`);
+      }
+      /**
+       * Clone a repository with resumable progress tracking and shallow depth.
+       *
+       * This intentionally uses init + fetch + checkout instead of git.clone:
+       * isomorphic-git deletes its partial git directory when clone throws.
        */
       async cloneRepository(repoUrl, branchName, depth = 1) {
-        const [onProgress, onMessage, hideNotice] = this.app ? createProgressModal(this.app, `Cloning ${branchName}`) : createProgressNotice(`Cloning ${branchName}`);
+        const progress = this.createProgress(`Cloning ${branchName}`);
+        const { onProgress, onMessage } = progress;
+        const startTime = Date.now();
+        let cloneTimer = null;
         try {
-          this.updateStatus("Cloning repository...");
+          this.updateStatus("Preparing resumable clone...");
           log2.info("GitManager", `Cloning ${repoUrl} (branch: ${branchName}, depth: ${depth})`);
-          await clone({
-            fs: this.fs,
-            http: new GitHttpClient(this.credentials),
-            dir: this.dir,
-            url: repoUrl,
-            ref: branchName,
-            singleBranch: true,
-            depth,
-            onAuth: () => ({
-              username: this.credentials.username,
-              password: this.credentials.password
-            }),
-            onProgress,
-            onMessage
-          });
-          hideNotice();
+          onMessage("Preparing resumable clone...");
+          if (!await this.isRepository()) {
+            await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+          }
+          await this.ensureRemote(repoUrl);
+          const resumeCheckout = await this.hasPendingCheckout(repoUrl, branchName, depth);
+          if (resumeCheckout) {
+            onMessage("Fetch already complete; resuming checkout...");
+          } else {
+            if (typeof window !== "undefined") {
+              cloneTimer = window.setInterval(() => {
+                const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
+                onMessage(`Waiting for remote response... (${elapsed}s elapsed)`);
+              }, 1e3);
+            }
+            await fetch2({
+              fs: this.fs,
+              http: this.createHttpClient(progress),
+              dir: this.dir,
+              remote: "origin",
+              ref: branchName,
+              singleBranch: true,
+              depth,
+              onAuth: () => ({
+                username: this.credentials.username,
+                password: this.credentials.password
+              }),
+              onProgress: (event) => {
+                this.assertProgressActive(progress);
+                onProgress(event);
+              },
+              onMessage: (text) => {
+                this.assertProgressActive(progress);
+                onMessage(text);
+              }
+            });
+            await this.markCheckoutPending(repoUrl, branchName, depth);
+          }
+          onMessage(resumeCheckout ? "Resuming checkout..." : "Fetch complete; checking out files...");
+          await this.checkoutFetchedBranch(branchName, progress, onMessage);
+          await this.clearPendingCheckout();
+          progress.complete();
           this.updateStatus("Repository cloned");
           log2.info("GitManager", `Repository cloned successfully`);
         } catch (error) {
-          hideNotice();
+          progress.fail(error);
           throw error;
+        } finally {
+          if (cloneTimer !== null)
+            window.clearInterval(cloneTimer);
         }
       }
       /**
@@ -19832,18 +20060,18 @@ Try again with a faster connection or smaller repository.`
        */
       async push(branchName, force = false) {
         var _a, _b, _c, _d, _e;
-        let hideNotice = null;
+        let progress = null;
         try {
           this.updateStatus("Pushing changes...");
           log2.debug("GitManager", `Pushing changes to remote branch: ${branchName}`);
           if (this.credentials.repoUrl) {
             await this.ensureRemote(this.credentials.repoUrl);
           }
-          const [onProgress, onMessage, hn] = this.app ? createProgressModal(this.app, "Pushing to remote") : createProgressNotice("Pushing to remote");
-          hideNotice = hn;
+          progress = this.createProgress("Pushing to remote");
+          const { onProgress, onMessage } = progress;
           await push({
             fs: this.fs,
-            http: new GitHttpClient(this.credentials),
+            http: this.createHttpClient(progress),
             dir: this.dir,
             remote: "origin",
             ref: branchName,
@@ -19858,12 +20086,12 @@ Try again with a faster connection or smaller repository.`
             onProgress,
             onMessage
           });
-          hideNotice();
+          progress.complete();
           this.updateStatus("Push completed");
           log2.info("GitManager", `Successfully pushed changes to remote branch: ${branchName}`);
         } catch (error) {
-          if (hideNotice)
-            hideNotice();
+          if (progress)
+            progress.fail(error);
           log2.error("GitManager", `Failed to push changes to branch ${branchName}`, error);
           this.updateStatus("Push failed");
           if (((_a = error.message) == null ? void 0 : _a.includes("not a fast-forward")) || ((_b = error.message) == null ? void 0 : _b.includes("rejected"))) {
@@ -20312,6 +20540,10 @@ var ObsidianFsAdapter = class {
     this.adapter = adapter;
     this.dir = dir;
   }
+  /** Register a temporary worktree-write observer for checkout progress. */
+  setWriteProgress(callback) {
+    this.writeProgress = callback;
+  }
   /** Return the fs.promises-compatible API that isomorphic-git expects */
   get promises() {
     return {
@@ -20325,7 +20557,8 @@ var ObsidianFsAdapter = class {
       lstat: this.statImpl.bind(this),
       // Obsidian doesn't expose symlinks; treat as stat
       readlink: this.readlinkImpl.bind(this),
-      symlink: this.symlinkImpl.bind(this)
+      symlink: this.symlinkImpl.bind(this),
+      setWriteProgress: this.setWriteProgress.bind(this)
     };
   }
   /** Resolve a relative path against the vault root */
@@ -20387,15 +20620,21 @@ var ObsidianFsAdapter = class {
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
    */
   async writeFileImpl(filepath, data) {
+    var _a, _b, _c, _d;
     const path = this.resolve(filepath);
     if (typeof data === "string") {
       await this.adapter.write(path, data);
+      (_a = this.writeProgress) == null ? void 0 : _a.call(this, path, new TextEncoder().encode(data).byteLength);
     } else if (data instanceof Uint8Array) {
       await this.adapter.writeBinary(path, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+      (_b = this.writeProgress) == null ? void 0 : _b.call(this, path, data.byteLength);
     } else if (data instanceof ArrayBuffer) {
       await this.adapter.writeBinary(path, data);
+      (_c = this.writeProgress) == null ? void 0 : _c.call(this, path, data.byteLength);
     } else {
-      await this.adapter.write(path, String(data));
+      const text = String(data);
+      await this.adapter.write(path, text);
+      (_d = this.writeProgress) == null ? void 0 : _d.call(this, path, new TextEncoder().encode(text).byteLength);
     }
   }
   async mkdirImpl(filepath, _options) {
@@ -21423,7 +21662,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "0aa5673f3065fa9d1437ce0b99bc821fcf6a448a" : "unknown";
+var GIT_COMMIT_HASH = true ? "c4d30c6efd0cee87688a4290d42e0279b80e59e0" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";

@@ -1,7 +1,7 @@
 # Git HTTP Client Architecture
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-05-30 21:35:00 IST*
+*Last Updated: 2026-08-12 13:25:00 IST*
 
 ## Overview
 
@@ -68,7 +68,11 @@ Merges multiple Uint8Array chunks into a single ArrayBuffer. Needed because `req
 private toAsyncIterator(arrayBuffer: ArrayBuffer): AsyncIterable<Uint8Array>
 ```
 
-Converts an ArrayBuffer into an async iterable that yields a single Uint8Array. This is the reverse of `collectBody()` — isomorphic-git expects `body` as an async iterable.
+Converts an ArrayBuffer into an async iterable of bounded views and reports
+consumed-byte samples to the progress owner. This is the reverse of
+`collectBody()` — isomorphic-git expects `body` as an async iterable. The
+bounded views reduce parser-side copies after the response has arrived; they do
+not provide network streaming.
 
 **Usage:**
 ```javascript
@@ -98,6 +102,13 @@ This supports both password and personal access token (PAT) authentication.
 
 - **No streaming**: `requestUrl` loads the entire response into memory. Large pack files could be an issue, but unlikely for typical vaults.
 - **Binary handling**: `arrayBuffer` must be used for pack files; `text` would corrupt binary data.
+- **No live byte telemetry**: because the response is fully buffered, the
+  plugin cannot calculate transferred bytes, wire total, data rate, or ETA
+  during the request. `Content-Length`, when present, is only a best-effort
+  total and may describe an encoded response rather than Git object data.
+- **Progress namespaces must remain separate**: isomorphic-git reports object
+  counts during pack parsing; checkout requires a separate file count and byte
+  accounting source. These values must not be formatted interchangeably.
 
 ## Architecture Review Update (2026-08-11)
 
@@ -113,6 +124,24 @@ T35d owns the transport and mobile-support follow-up. Until a genuinely
 streaming transport or a different Git implementation is available, mobile
 repository-size limits and pack-index limitations must be documented as
 acceptance boundaries rather than treated as solved by chunking alone.
+
+## Progress Telemetry Follow-up — 2026-08-12 (pre-implementation audit)
+
+The pre-implementation shallow-fetch fallback passed `onMessage` but omitted
+`onProgress`, while the progress modal contained a zero-delta rate calculation.
+The transport and UI therefore needed a shared progress contract with distinct fields such as
+`bytesLoaded`, `bytesTotal`, `bytesPerSecond`, `objectsLoaded`,
+`objectsTotal`, `filesWritten`, and `filesTotal`. See
+`implementation-details/clone-resume-and-progress.md` for the bounded design
+and acceptance evidence.
+
+## Implementation Slice — 2026-08-12
+
+`GitHttpClient` now emits separate response-byte samples and accepts an
+`AbortSignal`. The progress modal derives rate and ETA only from those samples
+and a non-zero response total. This is intentionally described as
+response-consumption telemetry because `requestUrl` has already buffered the
+complete response before the iterator starts.
 
 ## References
 

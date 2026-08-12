@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-08-12 11:27:36 IST*
+*Last Updated: 2026-08-12 13:59:20 IST*
 
 ## Current Tasks
 
@@ -8,7 +8,7 @@
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 24 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
+- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 28 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
 - **Next**: Test the current dev release on Android/iOS with a valid credential, confirm direct CI assets and ZIP, then tag v1.0.0 only with explicit authorization.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
@@ -27,15 +27,16 @@
 - **Scope**: Cross-cutting credential safety, operation coordination,
   repository initialization safety, mobile transport, updater integrity, and
   test/CI/documentation alignment.
-- **Children**: T35a and T35c are active; T35b and T35d-T35f remain planned.
+- **Children**: T35a-T35d are active; T35e-T35f remain planned.
 - **Status**: The first KIRSS implementation slice adds logger redaction,
   protected automatic staging, URL normalization, repository-error
   classification, and safe repository initialization boundaries. T35a
   SecretStorage is implemented; T35c replacement backups and T35b lifecycle
   coordination remain open. T35 is separate from T29 release ownership and
   T34 authentication ownership.
-- **Next**: Add protected replacement backups and operation coordination, then
-  perform mobile acceptance.
+- **Next**: Add protected replacement backups and shared operation
+  coordination, then perform mobile acceptance of clone resume and progress
+  telemetry.
 
 ### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;
@@ -56,6 +57,22 @@
   auto-sync and normal sync require an existing local repository.
 - Regression coverage confirms normal sync does not contact a remote when no
   local repository exists.
+
+### T35b/T35d Clone Recovery and Progress Telemetry — 🔄 Implementation slice
+- Fresh and shallow clone now use explicit init/fetch/checkout, preserving
+  initialized `.git` state after fetch interruption for an explicit retry.
+- A completed fetch writes a checkout-pending marker; retry validates the local
+  commit, skips refetching, and resumes checkout, clearing the marker only on
+  success.
+- The modal now shows separate object counts, response data, rate, ETA, files,
+  written bytes, phase status, and elapsed time; object counts are no longer
+  formatted as data sizes.
+- Modal close requests cancellation through an AbortSignal checked by the
+  transport iterator, fetch callbacks, and checkout callbacks.
+- `requestUrl` still buffers full responses, so byte metrics are
+  response-consumption telemetry rather than live wire transfer telemetry.
+- Protected replacement backups, shared operation coordination, and Android/
+  desktop real-device acceptance remain open.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -123,8 +140,8 @@
 - **CI**: GitHub Actions working, dev releases on every push
 - **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current build identity is embedded as commit `22857f1`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
-- **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35c active,
-  T35b/T35d-T35f planned,
+- **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d active,
+  T35e/T35f planned,
   T1-T6/T30/T32/T33 completed; mb-core protocols, templates, and missing
   support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
@@ -147,9 +164,12 @@
 - **v1.0.0 as public release**: v26 was internal dev version ✅
 - **GitHub API fallback for remote commits**: Use GitHub REST API when local repo unavailable ✅
 - **Shallow fetch on empty repo**: `depth: 1` prevents mobile crash on large repos ✅
-- **Progress notices**: `createProgressNotice()` shows phase, %, KB transferred ✅
+- **Progress notices**: `createProgressNotice()` keeps object counts separate
+  from response bytes and supports cancellation ✅
 - **Debug log export**: `Logger.exportToFile()` writes markdown to vault ✅
-- **Git progress modal**: Dark-themed modal with phase tracking, auto-close, error display ✅
+- **Git progress modal**: Dark-themed modal with phase tracking, separate
+  object/data/file statistics, rate/ETA, cancellation, auto-close, and error
+  display ✅
 - **Chunked ArrayBuffer for mobile**: 64KB `subarray()` chunks in `toAsyncIterator()` prevents OOM ✅
 - **Desktop UI matches mobile**: Changes tab and Commits tab styled identically to mobile screenshots ✅
 - **Commit file GitHub fallback**: `fetchCommitFilesFromGitHub()` for shallow clones ✅

@@ -740,9 +740,10 @@
 .git-progress-container {
     display: flex;
     flex-direction: column;
-    min-width: 400px;
-    max-width: 500px;
-    font-family: var(--font-monospace);
+    width: min(520px, 92vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    font-family: var(--font-interface);
     font-size: 13px;
     line-height: 1.5;
 }
@@ -756,7 +757,7 @@
 
 .git-progress-title {
     font-weight: 600;
-    font-size: 15px;
+    font-size: 18px;
     color: var(--text-normal);
     margin-bottom: 4px;
 }
@@ -765,6 +766,53 @@
     font-size: 12px;
     color: var(--text-muted);
     font-style: italic;
+}
+
+/* Transfer and checkout statistics */
+.git-progress-statistics {
+    padding: 16px 20px 4px;
+}
+
+.git-progress-section-title {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 0 0 8px;
+}
+
+.git-progress-stat-card,
+.git-progress-phase-card {
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 14px;
+    background: var(--background-primary-alt);
+}
+
+.git-progress-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 42px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-progress-stat-row:last-child,
+.git-progress-phase:last-child {
+    border-bottom: none;
+}
+
+.git-progress-stat-label {
+    color: var(--text-normal);
+}
+
+.git-progress-stat-value {
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
 }
 
 .git-progress-status-success {
@@ -781,19 +829,19 @@
 
 /* Phases */
 .git-progress-phases {
-    padding: 12px 20px;
+    padding: 0 20px 4px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 300px;
-    overflow-y: auto;
+    max-height: none;
 }
 
 .git-progress-phase {
     display: flex;
     align-items: flex-start;
     gap: 10px;
-    padding: 6px 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
     border-radius: 4px;
     transition: background 0.15s;
 }
@@ -830,9 +878,6 @@
 
 .git-progress-phase-completed .git-progress-phase-name {
     color: var(--text-muted);
-    text-decoration: line-through;
-    text-decoration-thickness: 1px;
-    text-decoration-color: var(--text-faint);
 }
 
 .git-progress-phase-active .git-progress-phase-name {
@@ -847,6 +892,10 @@
 .git-progress-phase-detail {
     font-size: 11px;
     color: var(--text-muted);
+    font-family: var(--font-monospace);
+}
+
+.git-progress-phase-card .git-progress-phase-detail {
     font-family: var(--font-monospace);
 }
 
@@ -892,6 +941,24 @@
     color: var(--text-muted);
     text-align: center;
     font-family: var(--font-monospace);
+}
+
+@media (max-width: 520px) {
+    .git-progress-modal .modal-content {
+        width: 94vw;
+        max-width: 94vw;
+    }
+
+    .git-progress-container {
+        width: 100%;
+        max-height: 84vh;
+    }
+
+    .git-progress-statistics,
+    .git-progress-phases {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
 }
 
 /* Scrollbar for phases */

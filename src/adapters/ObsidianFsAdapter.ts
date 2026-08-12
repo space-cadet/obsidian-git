@@ -10,10 +10,16 @@ import { DataAdapter, ListedFiles, Stat } from 'obsidian';
 export class ObsidianFsAdapter {
     private adapter: DataAdapter;
     private dir: string;
+    private writeProgress?: (path: string, bytes: number) => void;
 
     constructor(adapter: DataAdapter, dir: string) {
         this.adapter = adapter;
         this.dir = dir;
+    }
+
+    /** Register a temporary worktree-write observer for checkout progress. */
+    setWriteProgress(callback?: (path: string, bytes: number) => void): void {
+        this.writeProgress = callback;
     }
 
     // Direct fs methods — isomorphic-git may call these directly (not just via promises)
@@ -41,6 +47,7 @@ export class ObsidianFsAdapter {
             lstat: this.statImpl.bind(this), // Obsidian doesn't expose symlinks; treat as stat
             readlink: this.readlinkImpl.bind(this),
             symlink: this.symlinkImpl.bind(this),
+            setWriteProgress: this.setWriteProgress.bind(this),
         };
     }
 
@@ -125,13 +132,18 @@ export class ObsidianFsAdapter {
 
         if (typeof data === 'string') {
             await this.adapter.write(path, data);
+            this.writeProgress?.(path, new TextEncoder().encode(data).byteLength);
         } else if (data instanceof Uint8Array) {
             await this.adapter.writeBinary(path, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
+            this.writeProgress?.(path, data.byteLength);
         } else if (data instanceof ArrayBuffer) {
             await this.adapter.writeBinary(path, data);
+            this.writeProgress?.(path, data.byteLength);
         } else {
             // Fallback: try string coercion
-            await this.adapter.write(path, String(data));
+            const text = String(data);
+            await this.adapter.write(path, text);
+            this.writeProgress?.(path, new TextEncoder().encode(text).byteLength);
         }
     }
 

@@ -17,14 +17,22 @@ import {
  */
 class GitHttpClient {
   private credentials: GitCredentials;
+  private signal?: AbortSignal;
+  private onTransfer?: (event: TransferProgressEvent) => void;
 
-    constructor(credentials: GitCredentials) {
+    constructor(credentials: GitCredentials, options: {
+      signal?: AbortSignal;
+      onTransfer?: (event: TransferProgressEvent) => void;
+    } = {}) {
         this.credentials = credentials;
+        this.signal = options.signal;
+        this.onTransfer = options.onTransfer;
         log.setSensitiveValues([credentials.password]);
     }
 
   async request(config: any, attempt: number = 1): Promise<any> {
     const maxAttempts = 3;
+    this.throwIfAborted(config.signal);
     log.debug('GitHttpClient', `Requesting: ${config.method || 'GET'} ${config.url}`);
 
     // Build headers with Basic Auth
@@ -44,6 +52,7 @@ class GitHttpClient {
     }
 
     try {
+      this.throwIfAborted(config.signal);
       const response: RequestUrlResponse = await requestUrl({
         url: config.url,
         method: config.method || 'GET',
@@ -52,7 +61,18 @@ class GitHttpClient {
         throw: false, // Don't throw on 4xx/5xx — let isomorphic-git handle Git errors
       });
 
+      this.throwIfAborted(config.signal);
+
       log.debug('GitHttpClient', `Response status: ${response.status}`);
+
+      const total = response.arrayBuffer?.byteLength || 0;
+      let lastLoaded = 0;
+      let lastTime = Date.now();
+      this.onTransfer?.({
+        bytesLoaded: 0,
+        bytesTotal: total,
+        lengthComputable: total > 0,
+      });
 
       // Convert Obsidian response to isomorphic-git expected format
       return {
@@ -60,7 +80,22 @@ class GitHttpClient {
         method: config.method || 'GET',
         statusCode: response.status,
         statusMessage: this.getStatusMessage(response.status),
-        body: this.toAsyncIterator(response.arrayBuffer),
+        body: this.toAsyncIterator(response.arrayBuffer, (bytesLoaded) => {
+          const now = Date.now();
+          const elapsedSeconds = (now - lastTime) / 1000;
+          const deltaBytes = bytesLoaded - lastLoaded;
+          const bytesPerSecond = elapsedSeconds >= 0.05 && deltaBytes >= 0
+            ? deltaBytes / elapsedSeconds
+            : undefined;
+          lastLoaded = bytesLoaded;
+          lastTime = now;
+          this.onTransfer?.({
+            bytesLoaded,
+            bytesTotal: total,
+            bytesPerSecond,
+            lengthComputable: total > 0,
+          });
+        }, config.signal),
         headers: response.headers,
       };
     } catch (error: any) {
@@ -78,6 +113,14 @@ class GitHttpClient {
       }
 
       log.error('GitHttpClient', `Request failed: ${error.message}`, error);
+      throw error;
+    }
+  }
+
+  private throwIfAborted(requestSignal?: AbortSignal): void {
+    if (this.signal?.aborted || requestSignal?.aborted) {
+      const error = new Error('Git operation cancelled');
+      error.name = 'AbortError';
       throw error;
     }
   }
@@ -115,8 +158,13 @@ class GitHttpClient {
    * 
    * Uses subarray() (view, not copy) to avoid additional memory allocation.
    */
-  private toAsyncIterator(arrayBuffer: ArrayBuffer, chunkSize = 65536): AsyncIterable<Uint8Array> {
-    return arrayBufferToAsyncIterable(arrayBuffer, chunkSize);
+  private toAsyncIterator(
+    arrayBuffer: ArrayBuffer,
+    onChunk?: (bytesLoaded: number) => void,
+    signal?: AbortSignal,
+    chunkSize = 65536,
+  ): AsyncIterable<Uint8Array> {
+    return arrayBufferToAsyncIterable(arrayBuffer, chunkSize, onChunk, signal);
   }
 
   private getStatusMessage(status: number): string {
@@ -140,7 +188,9 @@ class GitHttpClient {
  */
 export function arrayBufferToAsyncIterable(
     arrayBuffer: ArrayBuffer,
-    chunkSize = 65536
+    chunkSize = 65536,
+    onChunk?: (bytesLoaded: number, bytesTotal: number) => void,
+    signal?: AbortSignal,
 ): AsyncIterable<Uint8Array> {
     if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
         throw new RangeError('chunkSize must be a positive integer');
@@ -149,8 +199,18 @@ export function arrayBufferToAsyncIterable(
     return {
         [Symbol.asyncIterator]: async function* () {
             const view = new Uint8Array(arrayBuffer);
+            let bytesLoaded = 0;
+            onChunk?.(0, view.length);
             for (let offset = 0; offset < view.length; offset += chunkSize) {
-                yield view.subarray(offset, Math.min(offset + chunkSize, view.length));
+                if (signal?.aborted) {
+                    const error = new Error('Git operation cancelled');
+                    error.name = 'AbortError';
+                    throw error;
+                }
+                const end = Math.min(offset + chunkSize, view.length);
+                bytesLoaded = end;
+                onChunk?.(bytesLoaded, view.length);
+                yield view.subarray(offset, end);
             }
         },
     };
@@ -263,28 +323,31 @@ export function createGitEmitter(onProgress?: (phase: string, loaded: number, to
 }
 
 /**
- * Create an onProgress callback that updates a persistent Notice.
- * Returns [callback, hideNotice] so caller can clean up on success/error.
+ * Create a progress handle for environments where a modal is unavailable.
+ * Object counts, response bytes, and checkout items remain separate here too.
  */
-export function createProgressNotice(initialMessage: string): [(event: any) => void, (text: string) => void, () => void] {
+export function createProgressNotice(initialMessage: string): ProgressHandle {
     let notice: Notice | null = new Notice(initialMessage, 0);
-    let currentPhase = '';
+    const abortController = new AbortController();
 
     const onProgress = (event: any) => {
         const { phase, loaded, total } = event;
-        if (phase && phase !== currentPhase) {
-            currentPhase = phase;
-        }
         let msg = `${initialMessage} — ${phase || 'working'}`;
         if (total > 0) {
             const pct = Math.round((loaded / total) * 100);
-            msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
+            msg += ` (${pct}%, ${loaded.toLocaleString()} / ${total.toLocaleString()} objects)`;
         } else if (loaded > 0) {
-            msg += ` (${Math.round(loaded / 1024)}KB)`;
+            msg += ` (${loaded.toLocaleString()} objects)`;
         }
         if (notice) {
             notice.setMessage(msg);
         }
+    };
+
+    const onTransfer = (event: TransferProgressEvent) => {
+        const loaded = formatProgressBytes(event.bytesLoaded);
+        const total = event.bytesTotal > 0 ? ` / ${formatProgressBytes(event.bytesTotal)}` : '';
+        if (notice) notice.setMessage(`${initialMessage} — Data ${loaded}${total}`);
     };
 
     const onMessage = (text: string) => {
@@ -294,14 +357,28 @@ export function createProgressNotice(initialMessage: string): [(event: any) => v
         }
     };
 
-    const hideNotice = () => {
+    const complete = () => {
         if (notice) {
             notice.hide();
             notice = null;
         }
     };
 
-    return [onProgress, onMessage, hideNotice];
+    return {
+        onProgress,
+        onMessage,
+        onTransfer,
+        complete,
+        fail: complete,
+        signal: abortController.signal,
+    };
+}
+
+function formatProgressBytes(bytes: number): string {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const index = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+    return `${parseFloat((bytes / Math.pow(1024, index)).toFixed(2))} ${units[index]}`;
 }
 
 
@@ -324,7 +401,12 @@ export interface GitCommitFile {
     status: 'added' | 'modified' | 'deleted';
 }
 
-import { GitProgressModal, createProgressModal } from './ui/GitProgressModal';
+import {
+    GitProgressModal,
+    createProgressModal,
+    ProgressHandle,
+    TransferProgressEvent,
+} from './ui/GitProgressModal';
 
 export interface GitCredentials {
     username: string;
@@ -334,6 +416,14 @@ export interface GitCredentials {
         name: string;
         email: string;
     };
+}
+
+interface PendingCheckoutState {
+    version: 1;
+    repoUrl: string;
+    branchName: string;
+    depth: number;
+    oid: string;
 }
 
 export class GitManager {
@@ -365,6 +455,32 @@ export class GitManager {
             this.statusBarItem.setText(`Git: ${message}`);
         }
         log.info('GitManager', message);
+    }
+
+    private createProgress(operationName: string): ProgressHandle {
+        return this.app
+            ? createProgressModal(this.app, operationName)
+            : createProgressNotice(operationName);
+    }
+
+    private createHttpClient(progress?: ProgressHandle): GitHttpClient {
+        return new GitHttpClient(this.credentials, {
+            signal: progress?.signal,
+            onTransfer: progress?.onTransfer,
+        });
+    }
+
+    private setWriteProgress(callback?: (path: string, bytes: number) => void): void {
+        const setProgress = (this.fs as any)?.setWriteProgress;
+        if (typeof setProgress === 'function') setProgress(callback);
+    }
+
+    private assertProgressActive(progress: ProgressHandle): void {
+        if (progress.signal.aborted) {
+            const error = new Error('Git operation cancelled');
+            error.name = 'AbortError';
+            throw error;
+        }
     }
 
     /**
@@ -479,9 +595,12 @@ export class GitManager {
      */
     async isRepository(): Promise<boolean> {
         try {
-            // Use a dummy file path — findRoot expects a file, not a directory
-            // It will walk up the tree looking for .git
-            await git.findRoot({ fs: this.fs, filepath: 'dummy.txt' });
+            // Check the repository owned by this manager. Using findRoot with a
+            // relative dummy path can accidentally inspect the process cwd on
+            // desktop, which is often this plugin's own checkout rather than
+            // the vault being cloned.
+            const gitHead = this.dir === '.' ? '.git/HEAD' : `${this.dir}/.git/HEAD`;
+            await this.fs.stat(gitHead);
             log.debug('GitManager', `Local Git repository found`);
             return true;
         } catch (error) {
@@ -633,7 +752,8 @@ export class GitManager {
         try {
             const commits = await git.log({ fs: this.fs, dir: this.dir, ref: 'HEAD', depth: 1 });
             return commits.length > 0;
-        } catch {
+        } catch (error) {
+            console.error('pending checkout validation failed', error);
             return false;
         }
     }
@@ -651,6 +771,14 @@ export class GitManager {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
 
+            // A previous fetch may have completed before checkout was
+            // interrupted. Resume that checkout locally instead of fetching
+            // the same branch again.
+            if (this.credentials.repoUrl && await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1)) {
+                await this.shallowFetchAndCheckout(branchName);
+                return;
+            }
+
             // Check if local repo has any commits
             const hasCommits = await this.hasLocalCommits();
 
@@ -660,9 +788,8 @@ export class GitManager {
                 return;
             }
 
-            const [onProgress, onMessage, hideNotice] = this.app 
-                ? createProgressModal(this.app, 'Pulling from remote')
-                : createProgressNotice('Pulling from remote');
+            const progress = this.createProgress('Pulling from remote');
+            const { onProgress, onMessage } = progress;
 
             // Download timer — git.pull internally does a fetch, which doesn't emit progress during HTTP
             const pullStartTime = Date.now();
@@ -671,7 +798,7 @@ export class GitManager {
                 if (pullTimer) window.clearInterval(pullTimer);
                 pullTimer = window.setInterval(() => {
                     const elapsed = ((Date.now() - pullStartTime) / 1000).toFixed(1);
-                    onMessage?.(`Downloading updates... (${elapsed}s elapsed)`);
+                    onMessage(`Downloading updates... (${elapsed}s elapsed)`);
                 }, 1000);
             };
             const stopPullTimer = () => {
@@ -683,7 +810,7 @@ export class GitManager {
                 
                 await git.pull({
                     fs: this.fs,
-                    http: new GitHttpClient(this.credentials),
+                    http: this.createHttpClient(progress),
                     dir: this.dir,
                     ref: branchName,
                     singleBranch: true,
@@ -701,11 +828,11 @@ export class GitManager {
                 });
 
                 stopPullTimer();
-                hideNotice();
+                progress.complete();
                 this.updateStatus('Pull completed');
             } catch (error) {
                 stopPullTimer();
-                hideNotice();
+                progress.fail(error);
                 throw error;
             }
         } catch (error) {
@@ -716,199 +843,277 @@ export class GitManager {
     }
 
     /**
-     * Shallow fetch + checkout for empty repos.
-     * Only downloads the latest commit, avoiding full history (and memory crash on large repos).
-     * 
-     * MEMORY-SAFE STRATEGY:
-     * 1. Try git.clone first — handles packfile streaming incrementally
-     * 2. Fallback to git.fetch + git.checkout with chunked ArrayBuffer processing
-     * 3. Show download progress timer (since isomorphic-git doesn't emit progress during HTTP)
-     * 4. Catch OOM and timeout errors with helpful messages
+     * Fetch and check out a shallow repository without using git.clone.
+     *
+     * isomorphic-git removes the git directory when git.clone fails. An
+     * explicit init + fetch + checkout sequence preserves the partial .git
+     * state, allowing a later Clone Remote retry to reuse it.
      */
     private async shallowFetchAndCheckout(branchName: string): Promise<void> {
-        const [onProgress, onMessage, hideNotice] = this.app
-            ? createProgressModal(this.app, 'Fetching remote files')
-            : createProgressNotice('Fetching remote files');
-
-        // Start a download timer — isomorphic-git doesn't emit progress during HTTP download,
-        // so we show elapsed time to reassure the user something is happening
-        const startTime = Date.now();
+        const progress = this.createProgress('Fetching remote files');
+        const { onProgress, onMessage } = progress;
         let downloadTimer: number | null = null;
-        
+        const startTime = Date.now();
+
         const startDownloadTimer = () => {
-            if (downloadTimer) window.clearInterval(downloadTimer);
             downloadTimer = window.setInterval(() => {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-                onMessage?.(`Downloading from server... (${elapsed}s elapsed)`);
+                onMessage(`Downloading from server... (${elapsed}s elapsed)`);
             }, 1000);
         };
-
         const stopDownloadTimer = () => {
-            if (downloadTimer) {
-                window.clearInterval(downloadTimer);
-                downloadTimer = null;
-            }
+            if (downloadTimer !== null) window.clearInterval(downloadTimer);
+            downloadTimer = null;
         };
 
         try {
-            // ── STRATEGY 1: Try git.clone ──
-            // Clone handles packfile parsing incrementally and may use less peak memory
-            // than fetch+checkout separately. Safe to remove .git since no local commits exist.
-            try {
-                this.updateStatus('Cloning repository (memory-efficient)...');
-                log.info('GitManager', 'Attempting clone for memory efficiency');
-                onMessage?.('Preparing to clone...');
-                
-                // Remove existing .git to allow clone (no local commits = no data loss)
-                await this.fs.promises.rmdir(this.dir + '/.git', { recursive: true });
-                
+            this.updateStatus('Preparing resumable fetch...');
+            onMessage('Preparing resumable fetch...');
+            await this.ensureResumableRepository(branchName);
+            onMessage('Connecting to remote...');
+            const resumeCheckout = this.credentials.repoUrl
+                ? await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1)
+                : false;
+
+            if (resumeCheckout) {
+                onMessage('Fetch already complete; resuming checkout...');
+            } else {
                 startDownloadTimer();
-                
-                await git.clone({
+                await git.fetch({
                     fs: this.fs,
-                    http: new GitHttpClient(this.credentials),
+                    http: this.createHttpClient(progress),
                     dir: this.dir,
-                    url: this.credentials.repoUrl || '',
+                    remote: 'origin',
                     ref: branchName,
-                    singleBranch: true,
                     depth: 1,
+                    singleBranch: true,
                     onAuth: () => ({
                         username: this.credentials.username,
-                        password: this.credentials.password
+                        password: this.credentials.password,
                     }),
-                    onProgress,
-                    onMessage
+                    onProgress: (event: any) => {
+                        this.assertProgressActive(progress);
+                        onProgress(event);
+                    },
+                    onMessage: (text: string) => {
+                        this.assertProgressActive(progress);
+                        onMessage(text);
+                    },
                 });
-                
-                stopDownloadTimer();
-                hideNotice();
-                this.updateStatus('Repository cloned');
-                log.info('GitManager', `Clone successful for ${branchName}`);
-                return;
-            } catch (cloneError: any) {
-                stopDownloadTimer();
-                log.warn('GitManager', `Clone failed, falling back to fetch: ${cloneError.message}`);
-                onMessage?.(`Clone unavailable, using fetch...`);
-                // Continue to fallback...
+                await this.markCheckoutPending(this.credentials.repoUrl || '', branchName, 1);
             }
-            
-            // ── STRATEGY 2: git.fetch + git.checkout ──
-            // Use chunked ArrayBuffer processing (GitHttpClient.toAsyncIterator yields 64KB chunks)
-            // to reduce peak memory during packfile parsing.
-            onMessage?.('Connecting to remote...');
-            startDownloadTimer();
-            
-            await git.fetch({
-                fs: this.fs,
-                http: new GitHttpClient(this.credentials),
-                dir: this.dir,
-                remote: 'origin',
-                ref: branchName,
-                depth: 1,
-                singleBranch: true,
-                onAuth: () => ({
-                    username: this.credentials.username,
-                    password: this.credentials.password
-                }),
-                onMessage
-            });
-            
+
             stopDownloadTimer();
-            onMessage?.('Download complete, processing...');
-
-            // Get the fetched commit OID
-            const remoteRef = `refs/remotes/origin/${branchName}`;
-            const oid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
-
-            log.info('GitManager', `Fetched branch tip: ${oid.slice(0, 7)}`);
-
-            // Create local branch pointing to the same commit
-            await git.writeRef({
-                fs: this.fs,
-                dir: this.dir,
-                ref: `refs/heads/${branchName}`,
-                value: oid
-            });
-
-            // Checkout the branch (write files to working tree)
-            onMessage?.('Writing files to vault...');
-            await git.checkout({
-                fs: this.fs,
-                dir: this.dir,
-                ref: branchName,
-                force: true
-            });
-
-            hideNotice();
+            onMessage(resumeCheckout ? 'Resuming checkout...' : 'Download complete, processing objects...');
+            await this.checkoutFetchedBranch(branchName, progress, onMessage);
+            await this.clearPendingCheckout();
+            progress.complete();
             this.updateStatus('Repository fetched');
-            log.info('GitManager', `Checked out ${branchName} at ${oid.slice(0, 7)}`);
         } catch (error: any) {
             stopDownloadTimer();
-            hideNotice();
-            
-            // Provide helpful error messages for common failure modes
+            progress.fail(error);
             const msg = error.message || String(error);
-            
             if (msg.includes('Out Of Memory') || msg.includes('out of memory') || msg.includes('OOM') || msg.includes('allocation')) {
                 log.error('GitManager', 'Memory exhausted during fetch — repo may be too large for mobile', error);
                 throw new Error(
-                    `Memory exhausted while downloading repository. ` +
-                    `The repository may be too large for your device.\n\n` +
-                    `Suggestions:\n` +
-                    `• Try on desktop first, then sync to mobile\n` +
-                    `• Remove large files (images, videos) from the repo\n` +
-                    `• Use a smaller vault or split into multiple repos`
+                    `Memory exhausted while downloading repository. The partial Git state was retained for a retry.\n\n` +
+                    `Suggestions:\n• Try on desktop first\n• Remove large files (images, videos)\n• Use a smaller repository`,
                 );
             }
-            
             if (msg.includes('timeout') || msg.includes('ETIMEDOUT') || msg.includes('Connection reset')) {
                 log.error('GitManager', 'Network timeout during fetch', error);
                 throw new Error(
-                    `Connection timed out while downloading. ` +
-                    `The repository may be too large or your connection too slow.\n\n` +
-                    `Try again with a faster connection or smaller repository.`
+                    `Connection timed out while downloading. The partial Git state was retained for a retry.\n\n` +
+                    `Try again with a faster connection or smaller repository.`,
                 );
             }
-            
             throw error;
         }
     }
 
+    private async ensureResumableRepository(branchName: string): Promise<void> {
+        if (!(await this.isRepository())) {
+            await git.init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+        }
+        if (this.credentials.repoUrl) await this.ensureRemote(this.credentials.repoUrl);
+    }
+
+    private pendingCheckoutPath(): string {
+        return `${this.dir}/.git/obsidian-git-sync-checkout.json`;
+    }
+
     /**
-     * Clone a repository with progress tracking and shallow depth.
-     * Defaults to depth 1 to avoid downloading full history (prevents mobile crash on large repos).
+     * A marker is written only after fetch has produced a complete local ref.
+     * Validate both the ref and its commit object before skipping a retry.
+     */
+    private async hasPendingCheckout(repoUrl: string, branchName: string, depth: number): Promise<boolean> {
+        try {
+            const fs = this.fs.promises || this.fs;
+            const raw = await fs.readFile(this.pendingCheckoutPath(), { encoding: 'utf8' });
+            const state = JSON.parse(String(raw)) as Partial<PendingCheckoutState>;
+            if (
+                state.version !== 1
+                || state.repoUrl !== normalizeRemoteUrl(repoUrl)
+                || state.branchName !== branchName
+                || state.depth !== depth
+                || !state.oid
+            ) return false;
+
+            const remoteOid = await git.resolveRef({
+                fs: this.fs,
+                dir: this.dir,
+                ref: `refs/remotes/origin/${branchName}`,
+            });
+            if (remoteOid !== state.oid) return false;
+            await git.readCommit({ fs: this.fs, dir: this.dir, oid: state.oid });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private async markCheckoutPending(repoUrl: string, branchName: string, depth: number): Promise<void> {
+        const oid = await git.resolveRef({
+            fs: this.fs,
+            dir: this.dir,
+            ref: `refs/remotes/origin/${branchName}`,
+        });
+        await git.readCommit({ fs: this.fs, dir: this.dir, oid });
+        const state: PendingCheckoutState = {
+            version: 1,
+            repoUrl: normalizeRemoteUrl(repoUrl),
+            branchName,
+            depth,
+            oid,
+        };
+        const fs = this.fs.promises || this.fs;
+        await fs.writeFile(this.pendingCheckoutPath(), JSON.stringify(state), { encoding: 'utf8' });
+    }
+
+    private async clearPendingCheckout(): Promise<void> {
+        try {
+            const fs = this.fs.promises || this.fs;
+            await fs.unlink(this.pendingCheckoutPath());
+        } catch {
+            // Missing recovery metadata is already the desired final state.
+        }
+    }
+
+    private async checkoutFetchedBranch(
+        branchName: string,
+        progress: ProgressHandle,
+        onMessage: (text: string) => void,
+    ): Promise<void> {
+        const remoteRef = `refs/remotes/origin/${branchName}`;
+        const oid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+        log.info('GitManager', `Fetched branch tip: ${oid.slice(0, 7)}`);
+
+        await git.writeRef({
+            fs: this.fs,
+            dir: this.dir,
+            ref: `refs/heads/${branchName}`,
+            value: oid,
+            force: true,
+        });
+
+        onMessage('Writing files to vault...');
+        let bytesWritten = 0;
+        this.setWriteProgress((path, bytes) => {
+            if (path === '.git' || path.startsWith('.git/')) return;
+            bytesWritten += bytes;
+            progress.onProgress({
+                phase: 'Updating workdir',
+                loaded: 0,
+                total: 0,
+                bytesWritten,
+            });
+        });
+        try {
+            await git.checkout({
+                fs: this.fs,
+                dir: this.dir,
+                ref: branchName,
+                force: true,
+                onProgress: (event: any) => {
+                    this.assertProgressActive(progress);
+                    progress.onProgress({ ...event, bytesWritten });
+                },
+            });
+        } finally {
+            this.setWriteProgress(undefined);
+        }
+
+        log.info('GitManager', `Checked out ${branchName} at ${oid.slice(0, 7)}`);
+    }
+
+    /**
+     * Clone a repository with resumable progress tracking and shallow depth.
+     *
+     * This intentionally uses init + fetch + checkout instead of git.clone:
+     * isomorphic-git deletes its partial git directory when clone throws.
      */
     async cloneRepository(repoUrl: string, branchName: string, depth: number = 1): Promise<void> {
-        const [onProgress, onMessage, hideNotice] = this.app
-            ? createProgressModal(this.app, `Cloning ${branchName}`)
-            : createProgressNotice(`Cloning ${branchName}`);
+        const progress = this.createProgress(`Cloning ${branchName}`);
+        const { onProgress, onMessage } = progress;
+        const startTime = Date.now();
+        let cloneTimer: number | null = null;
 
         try {
-            this.updateStatus('Cloning repository...');
+            this.updateStatus('Preparing resumable clone...');
             log.info('GitManager', `Cloning ${repoUrl} (branch: ${branchName}, depth: ${depth})`);
+            onMessage('Preparing resumable clone...');
 
-            await git.clone({
-                fs: this.fs,
-                http: new GitHttpClient(this.credentials),
-                dir: this.dir,
-                url: repoUrl,
-                ref: branchName,
-                singleBranch: true,
-                depth,
-                onAuth: () => ({
-                    username: this.credentials.username,
-                    password: this.credentials.password
-                }),
-                onProgress,
-                onMessage
-            });
+            if (!(await this.isRepository())) {
+                await git.init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
+            }
+            await this.ensureRemote(repoUrl);
 
-            hideNotice();
+            const resumeCheckout = await this.hasPendingCheckout(repoUrl, branchName, depth);
+            if (resumeCheckout) {
+                onMessage('Fetch already complete; resuming checkout...');
+            } else {
+                if (typeof window !== 'undefined') {
+                    cloneTimer = window.setInterval(() => {
+                        const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                        onMessage(`Waiting for remote response... (${elapsed}s elapsed)`);
+                    }, 1000);
+                }
+
+                await git.fetch({
+                    fs: this.fs,
+                    http: this.createHttpClient(progress),
+                    dir: this.dir,
+                    remote: 'origin',
+                    ref: branchName,
+                    singleBranch: true,
+                    depth,
+                    onAuth: () => ({
+                        username: this.credentials.username,
+                        password: this.credentials.password
+                    }),
+                    onProgress: (event: any) => {
+                        this.assertProgressActive(progress);
+                        onProgress(event);
+                    },
+                    onMessage: (text: string) => {
+                        this.assertProgressActive(progress);
+                        onMessage(text);
+                    },
+                });
+                await this.markCheckoutPending(repoUrl, branchName, depth);
+            }
+
+            onMessage(resumeCheckout ? 'Resuming checkout...' : 'Fetch complete; checking out files...');
+            await this.checkoutFetchedBranch(branchName, progress, onMessage);
+            await this.clearPendingCheckout();
+            progress.complete();
             this.updateStatus('Repository cloned');
             log.info('GitManager', `Repository cloned successfully`);
         } catch (error) {
-            hideNotice();
+            progress.fail(error);
             throw error;
+        } finally {
+            if (cloneTimer !== null) window.clearInterval(cloneTimer);
         }
     }
 
@@ -992,7 +1197,7 @@ export class GitManager {
      * Push changes to the remote repository
      */
     async push(branchName: string, force: boolean = false): Promise<void> {
-        let hideNotice: (() => void) | null = null;
+        let progress: ProgressHandle | null = null;
         try {
             this.updateStatus('Pushing changes...');
             log.debug('GitManager', `Pushing changes to remote branch: ${branchName}`);
@@ -1002,14 +1207,12 @@ export class GitManager {
                 await this.ensureRemote(this.credentials.repoUrl);
             }
             
-            const [onProgress, onMessage, hn] = this.app
-                ? createProgressModal(this.app, 'Pushing to remote')
-                : createProgressNotice('Pushing to remote');
-            hideNotice = hn;
+            progress = this.createProgress('Pushing to remote');
+            const { onProgress, onMessage } = progress;
             
             await git.push({
                 fs: this.fs,
-                http: new GitHttpClient(this.credentials),
+                http: this.createHttpClient(progress),
                 dir: this.dir,
                 remote: 'origin',
                 ref: branchName,
@@ -1025,11 +1228,11 @@ export class GitManager {
                 onMessage
             });
             
-            hideNotice();
+            progress.complete();
             this.updateStatus('Push completed');
             log.info('GitManager', `Successfully pushed changes to remote branch: ${branchName}`);
         } catch (error: any) {
-            if (hideNotice) hideNotice();
+            if (progress) progress.fail(error);
             log.error('GitManager', `Failed to push changes to branch ${branchName}`, error);
             this.updateStatus('Push failed');
             

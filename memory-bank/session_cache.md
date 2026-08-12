@@ -1,13 +1,15 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-12 11:31:05 IST*
+*Last Updated: 2026-08-12 13:59:20 IST*
 
 ## Current Session
 **Started**: 2026-08-12 11:27 IST
-**Focus Task**: T35c startup clone regression fix
+**Focus Task**: T35b/T35d clone recovery and progress telemetry implementation
 **Session File**: `memory-bank/sessions/2026-08-12-startup-clone-fix.md`
 **Status**: ✅ CLOSED
+
+**Session Title**: T35b, T35c, T35d: Implement limited clone resume and progress telemetry
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -17,9 +19,9 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 3 parents (T29, T34, T35; T34a, T35a, T35c active) | Planned: 6 (T34b, T34c, T35b, T35d-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Active: 3 parents (T29, T34, T35; T34a, T35a, T35b, T35c, T35d active) | Planned: 4 (T34b, T34c, T35e-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-08-10 night (connection-test repair, updater implementation, archive output, auth task split)
-- Current Period: late morning
+- Current Period: afternoon
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED
@@ -39,9 +41,9 @@ source file was missing.
 - T34c: Android/Desktop Authentication Acceptance Tests — ⏸️ PLANNED
 - T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 IN PROGRESS
 - T35a: Credential Safety and Git Staging Boundaries — 🔄 IN PROGRESS (read-only audit complete)
-- T35b: Operation Coordination and Lifecycle Safety — ⏸️ PLANNED
+- T35b: Operation Coordination and Lifecycle Safety — 🔄 IN PROGRESS (resumable clone and cancellation slice implemented)
 - T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (read-only audit complete)
-- T35d: Mobile and Remote Transport Reliability — ⏸️ PLANNED
+- T35d: Mobile and Remote Transport Reliability — 🔄 IN PROGRESS (separate progress telemetry and modal stats implemented)
 - T35e: Updater Integrity and Release Artifact Consistency — ⏸️ PLANNED
 - T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
 
@@ -87,8 +89,8 @@ classification, and secure credential storage. The T35c startup fix now keeps
 manager creation, sidebar refresh, normal sync, and auto-sync non-mutating on a
 fresh vault; explicit Clone Remote remains the only initialization path.
 **Next:** Implement protected replacement backups and T35b operation
-coordination, then complete mobile acceptance while preserving T29 and T34
-ownership boundaries.
+  coordination, then complete mobile acceptance while preserving T29 and T34
+  ownership boundaries.
 
 ## Session History (Last 5)
 1. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix

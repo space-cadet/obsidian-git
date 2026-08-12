@@ -38,6 +38,42 @@ Each operation should have:
 - a single success/error/finally cleanup path;
 - a safe user-facing error classification.
 
+## Clone Recovery Boundary — 2026-08-12
+
+The current clone behavior is not resumable. The no-local-commit path removes
+`.git`, tries `git.clone`, and falls back to `git.fetch` plus
+`git.checkout`. The fallback does not write normal vault files until checkout
+begins. In addition, isomorphic-git removes its partial git directory when its
+clone operation fails. An interruption can therefore leave no visible files
+and no state that the next attempt can continue from.
+
+The implementation must choose and document one explicit contract:
+
+- preserve a partial `.git` state and resume/retry it safely;
+- retain a protected staging repository and recover it on the next attempt; or
+- deliberately discard partial state, but tell the user that the operation is
+  restart-only and never present the result as resumable.
+
+The preferred direction is a coordinator-owned recovery state with an
+operation ID, protected local state, explicit retry/resume, and no deletion of
+an existing `.git` until a validated replacement and rollback boundary exist.
+Visible worktree files may still appear only during checkout unless checkout
+is separately instrumented for incremental writes.
+
+The progress modal's close control must also be assigned explicit semantics.
+Closing the surface currently only removes its DOM content; it does not cancel
+the network request or Git operation. T35b owns this lifecycle contract, while
+T35c owns backup and destructive replacement rules.
+
+## Clone Recovery Implementation Slice — 2026-08-12
+
+Fresh and shallow clone now use an explicit init/fetch/checkout sequence. The
+operation preserves initialized `.git` state after a failed or cancelled fetch,
+and the progress modal's close signal is checked by the HTTP response iterator,
+fetch callbacks, and checkout callbacks. This establishes a bounded retry
+boundary but does not yet serialize all mutating entry points or provide
+durable operation metadata.
+
 ## Repository State Model
 
 The implementation should distinguish these states rather than treating every
@@ -107,3 +143,5 @@ mutations.
 - T34/T34a: authentication boundary
 - T35b: coordination and lifecycle
 - T35c: initialization and destructive-operation safety
+- T35d: mobile/remote transport and transfer telemetry
+- `implementation-details/clone-resume-and-progress.md`
