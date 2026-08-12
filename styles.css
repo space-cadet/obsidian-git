@@ -214,6 +214,19 @@
     width: 100%;
 }
 
+.git-ignore-editor-description {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.git-ignore-editor-textarea {
+    width: 100%;
+    min-height: 240px;
+    resize: vertical;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+}
+
 .git-ignore-modal-actions {
     display: flex;
     justify-content: flex-end;

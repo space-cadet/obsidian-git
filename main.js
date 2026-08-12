@@ -21723,7 +21723,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "4668dc5472098f9517538d9cfaa80331888abd59" : "unknown";
+var GIT_COMMIT_HASH = true ? "117f6961ddb4d90ef8b278a9c93e827d149b8d9f" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";
@@ -22097,9 +22097,17 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
    * dotfiles in the file explorer. Create it on demand for new repositories.
    */
   async openGitIgnore() {
-    const file = await this.ensureGitIgnoreFile();
-    const leaf = this.app.workspace.getLeaf("tab");
-    await leaf.openFile(file);
+    const content = await this.readGitIgnore();
+    const file = this.app.vault.getFileByPath(".gitignore");
+    if (file) {
+      const leaf = this.app.workspace.getLeaf("tab");
+      await leaf.openFile(file);
+      return;
+    }
+    new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
+      await this.app.vault.adapter.write(".gitignore", updatedContent);
+      new import_obsidian6.Notice("Saved .gitignore");
+    }).open();
   }
   /**
    * Add a Git ignore pattern without requiring the user to navigate to the
@@ -22110,23 +22118,22 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     if (!normalizedPattern || normalizedPattern.startsWith("#")) {
       throw new Error("Enter a non-empty ignore pattern");
     }
-    const file = await this.ensureGitIgnoreFile();
-    const current = await this.app.vault.read(file);
+    const current = await this.readGitIgnore();
     const lines = current.split(/\r?\n/);
     if (lines.includes(normalizedPattern))
       return false;
     const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-    await this.app.vault.modify(file, `${current}${separator}${normalizedPattern}
+    await this.app.vault.adapter.write(".gitignore", `${current}${separator}${normalizedPattern}
 `);
     return true;
   }
-  async ensureGitIgnoreFile() {
-    let file = this.app.vault.getFileByPath(".gitignore");
-    if (!file) {
-      file = await this.app.vault.create(".gitignore", "");
+  async readGitIgnore() {
+    const adapter = this.app.vault.adapter;
+    if (!await adapter.exists(".gitignore")) {
+      await adapter.write(".gitignore", "");
       new import_obsidian6.Notice("Created .gitignore");
     }
-    return file;
+    return adapter.read(".gitignore");
   }
   async ensureGitManager(requireRemote = false) {
     if (this.gitManager)
@@ -22315,6 +22322,48 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     modal.titleEl.setText("Git Sync Diagnostics");
     modal.contentEl.createEl("pre", { text: message, cls: "git-diagnostics" });
     modal.open();
+  }
+};
+var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
+  constructor(app, initialContent, onSave) {
+    super(app);
+    this.initialContent = initialContent;
+    this.onSave = onSave;
+  }
+  onOpen() {
+    this.titleEl.setText("Edit .gitignore");
+    this.contentEl.createEl("p", {
+      text: "Obsidian hides dotfiles from its file index, so this editor writes directly to the vault.",
+      cls: "git-ignore-editor-description"
+    });
+    const editor = new import_obsidian6.TextAreaComponent(this.contentEl).setValue(this.initialContent);
+    editor.inputEl.addClass("git-ignore-editor-textarea");
+    editor.inputEl.rows = 16;
+    const actions = this.contentEl.createDiv("git-ignore-modal-actions");
+    new import_obsidian6.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => this.close());
+    const saveButton = new import_obsidian6.ButtonComponent(actions).setButtonText("Save").setClass("git-btn-primary");
+    saveButton.onClick(async () => {
+      saveButton.setDisabled(true);
+      saveButton.setButtonText("Saving\u2026");
+      try {
+        await this.onSave(editor.getValue());
+        this.close();
+      } catch (error) {
+        new import_obsidian6.Notice(`Could not save .gitignore: ${(error == null ? void 0 : error.message) || String(error)}`);
+        saveButton.setDisabled(false);
+        saveButton.setButtonText("Save");
+      }
+    });
+    this.openEditorWhenReady(editor);
+  }
+  openEditorWhenReady(editor) {
+    window.setTimeout(() => {
+      editor.inputEl.focus();
+      editor.inputEl.setSelectionRange(0, 0);
+    }, 0);
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 };
 var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {

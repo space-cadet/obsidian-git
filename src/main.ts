@@ -1,4 +1,14 @@
-import { App, Plugin, PluginSettingTab, Setting, Notice, Modal, WorkspaceLeaf } from 'obsidian';
+import {
+	App,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	Notice,
+	Modal,
+	WorkspaceLeaf,
+	ButtonComponent,
+	TextAreaComponent,
+} from 'obsidian';
 import { ObsidianFsAdapter } from './adapters/ObsidianFsAdapter';
 import { GitManager, GitCredentials } from './gitManager';
 import { log, LogLevel } from './logger';
@@ -402,10 +412,22 @@ export default class GitSyncPlugin extends Plugin {
 	 * dotfiles in the file explorer. Create it on demand for new repositories.
 	 */
 	async openGitIgnore(): Promise<void> {
-		const file = await this.ensureGitIgnoreFile();
+		const content = await this.readGitIgnore();
+		const file = this.app.vault.getFileByPath('.gitignore');
 
-		const leaf = this.app.workspace.getLeaf('tab');
-		await leaf.openFile(file);
+		if (file) {
+			const leaf = this.app.workspace.getLeaf('tab');
+			await leaf.openFile(file);
+			return;
+		}
+
+		// Obsidian may intentionally omit dotfiles from its indexed TFile list.
+		// Keep editing available through a small adapter-backed editor instead
+		// of trying to create a second .gitignore.
+		new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
+			await this.app.vault.adapter.write('.gitignore', updatedContent);
+			new Notice('Saved .gitignore');
+		}).open();
 	}
 
 	/**
@@ -418,23 +440,22 @@ export default class GitSyncPlugin extends Plugin {
 			throw new Error('Enter a non-empty ignore pattern');
 		}
 
-		const file = await this.ensureGitIgnoreFile();
-		const current = await this.app.vault.read(file);
+		const current = await this.readGitIgnore();
 		const lines = current.split(/\r?\n/);
 		if (lines.includes(normalizedPattern)) return false;
 
 		const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-		await this.app.vault.modify(file, `${current}${separator}${normalizedPattern}\n`);
+		await this.app.vault.adapter.write('.gitignore', `${current}${separator}${normalizedPattern}\n`);
 		return true;
 	}
 
-	private async ensureGitIgnoreFile() {
-		let file = this.app.vault.getFileByPath('.gitignore');
-		if (!file) {
-			file = await this.app.vault.create('.gitignore', '');
+	private async readGitIgnore(): Promise<string> {
+		const adapter = this.app.vault.adapter;
+		if (!(await adapter.exists('.gitignore'))) {
+			await adapter.write('.gitignore', '');
 			new Notice('Created .gitignore');
 		}
-		return file;
+		return adapter.read('.gitignore');
 	}
 
 	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
@@ -669,6 +690,65 @@ export default class GitSyncPlugin extends Plugin {
 		modal.titleEl.setText('Git Sync Diagnostics');
 		modal.contentEl.createEl('pre', { text: message, cls: 'git-diagnostics' });
 		modal.open();
+	}
+}
+
+class GitIgnoreEditorModal extends Modal {
+	constructor(
+		app: App,
+		private readonly initialContent: string,
+		private readonly onSave: (content: string) => Promise<void>,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.titleEl.setText('Edit .gitignore');
+
+		this.contentEl.createEl('p', {
+			text: 'Obsidian hides dotfiles from its file index, so this editor writes directly to the vault.',
+			cls: 'git-ignore-editor-description',
+		});
+
+		const editor = new TextAreaComponent(this.contentEl)
+			.setValue(this.initialContent);
+		editor.inputEl.addClass('git-ignore-editor-textarea');
+		editor.inputEl.rows = 16;
+
+		const actions = this.contentEl.createDiv('git-ignore-modal-actions');
+		new ButtonComponent(actions)
+			.setButtonText('Cancel')
+			.setClass('git-btn-ghost')
+			.onClick(() => this.close());
+
+		const saveButton = new ButtonComponent(actions)
+			.setButtonText('Save')
+			.setClass('git-btn-primary');
+		saveButton.onClick(async () => {
+			saveButton.setDisabled(true);
+			saveButton.setButtonText('Saving…');
+			try {
+				await this.onSave(editor.getValue());
+				this.close();
+			} catch (error: any) {
+				new Notice(`Could not save .gitignore: ${error?.message || String(error)}`);
+				saveButton.setDisabled(false);
+				saveButton.setButtonText('Save');
+			}
+		});
+
+		this.openEditorWhenReady(editor);
+	}
+
+	private openEditorWhenReady(editor: TextAreaComponent): void {
+		window.setTimeout(() => {
+			editor.inputEl.focus();
+			editor.inputEl.setSelectionRange(0, 0);
+		}, 0);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
 
