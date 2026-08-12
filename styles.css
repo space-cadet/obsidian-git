@@ -190,6 +190,37 @@
     height: 100%;
 }
 
+.git-status-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+}
+
+.git-status-toolbar-label {
+    color: var(--text-muted);
+    font-size: var(--font-smaller);
+}
+
+.git-ignore-modal-description {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.git-ignore-modal-input {
+    width: 100%;
+}
+
+.git-ignore-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
 .git-status-section {
     border-bottom: 1px solid var(--background-modifier-border);
 }
@@ -616,6 +647,14 @@
 }
 
 .git-footer-message-row {
+    width: 100%;
+}
+
+.git-footer-file-row {
+    width: 100%;
+}
+
+.git-footer-file-row button {
     width: 100%;
 }
 

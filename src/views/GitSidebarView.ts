@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice, ButtonComponent } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitManager, GitFileStatus, GitCommit } from '../gitManager';
 import { log, LogEntry } from '../logger';
@@ -175,6 +175,21 @@ export class GitSidebarView extends ItemView {
             placeholder: 'Commit message...',
             value: this.commitMessageInput?.value || ''
         });
+
+        // Obsidian hides dotfiles from the file explorer, so expose the
+        // repository ignore file directly from the Git sidebar.
+        const gitIgnoreRow = container.createDiv('git-footer-file-row');
+        new ButtonComponent(gitIgnoreRow)
+            .setButtonText('Edit .gitignore')
+            .setTooltip('Open or create .gitignore')
+            .setClass('git-btn-ghost')
+            .onClick(async () => {
+                try {
+                    await this.plugin.openGitIgnore();
+                } catch (e: any) {
+                    new Notice('Could not open .gitignore: ' + e.message);
+                }
+            });
 
         // 2. Action buttons row
         const btnRow = container.createDiv('git-footer-buttons-row');
@@ -480,6 +495,17 @@ export class GitSidebarView extends ItemView {
             const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
             this.stagedCount = staged.length;
 
+            const ignoreToolbar = container.createDiv('git-status-toolbar');
+            ignoreToolbar.createSpan({
+                text: 'Ignore rules',
+                cls: 'git-status-toolbar-label'
+            });
+            new ButtonComponent(ignoreToolbar)
+                .setButtonText('Add pattern')
+                .setTooltip('Add a file or folder pattern to .gitignore')
+                .setClass('git-btn-ghost')
+                .onClick(() => this.openIgnorePatternModal());
+
             // ── Staged section ── (always show, default collapsed if empty)
             this.renderCollapsibleSection(container, 'Staged', staged, 'staged', '−', '− all',
                 async (fp) => {
@@ -601,6 +627,25 @@ export class GitSidebarView extends ItemView {
                 pathEl.setAttr('title', filepath);
 
                 const actions = row.createDiv('git-file-actions');
+
+                if (filepath !== '.gitignore') {
+                    const ignoreBtn = actions.createEl('button', { text: '⊘', cls: 'git-file-btn' });
+                    ignoreBtn.setAttr('title', `Add /${filepath} to .gitignore`);
+                    ignoreBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        try {
+                            const pattern = `/${filepath.replace(/^\/+/, '')}`;
+                            const added = await this.plugin.addGitIgnorePattern(pattern);
+                            new Notice(added
+                                ? `Added ${pattern} to .gitignore`
+                                : `${pattern} is already in .gitignore`);
+                            await this.refresh();
+                        } catch (err: any) {
+                            new Notice(`Could not update .gitignore: ${err.message}`);
+                        }
+                    });
+                }
+
                 const btn = actions.createEl('button', { text: actionLabel, cls: 'git-file-btn' });
                 btn.setAttr('title', sectionClass === 'staged' ? 'Unstage file' : 'Stage file');
                 btn.addEventListener('click', async (e) => {
@@ -614,6 +659,51 @@ export class GitSidebarView extends ItemView {
                 });
             }
         }
+    }
+
+    private openIgnorePatternModal(): void {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Add .gitignore pattern');
+
+        const description = modal.contentEl.createEl('p', {
+            text: 'Enter a Git ignore pattern. Examples: attachments/ or temp/**',
+            cls: 'git-ignore-modal-description'
+        });
+        description.setAttr('aria-live', 'polite');
+
+        const input = new TextComponent(modal.contentEl)
+            .setPlaceholder('attachments/');
+        input.inputEl.addClass('git-ignore-modal-input');
+
+        const actions = modal.contentEl.createDiv('git-ignore-modal-actions');
+        new ButtonComponent(actions)
+            .setButtonText('Cancel')
+            .setClass('git-btn-ghost')
+            .onClick(() => modal.close());
+        const addButton = new ButtonComponent(actions)
+            .setButtonText('Add pattern')
+            .setClass('git-btn-primary');
+
+        const submit = async () => {
+            try {
+                const pattern = input.getValue().trim();
+                const added = await this.plugin.addGitIgnorePattern(pattern);
+                modal.close();
+                new Notice(added
+                    ? `Added ${pattern} to .gitignore`
+                    : `${pattern} is already in .gitignore`);
+                await this.refresh();
+            } catch (e: any) {
+                new Notice(`Could not update .gitignore: ${e.message}`);
+            }
+        };
+
+        addButton.onClick(submit);
+        input.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') void submit();
+        });
+        modal.open();
+        window.setTimeout(() => input.inputEl.focus(), 0);
     }
 
     private async renderCommitsTab(): Promise<void> {

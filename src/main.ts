@@ -222,6 +222,14 @@ export default class GitSyncPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: 'git-sync-open-gitignore',
+			name: 'Open .gitignore',
+			callback: async () => {
+				await this.openGitIgnore();
+			}
+		});
+
+		this.addCommand({
 			id: 'git-sync-export-logs',
 			name: 'Export debug logs',
 			callback: async () => {
@@ -387,6 +395,46 @@ export default class GitSyncPlugin extends Plugin {
 		} else {
 			new Notice('Failed to open Git sidebar');
 		}
+	}
+
+	/**
+	 * Open the repository's .gitignore even though Obsidian does not expose
+	 * dotfiles in the file explorer. Create it on demand for new repositories.
+	 */
+	async openGitIgnore(): Promise<void> {
+		const file = await this.ensureGitIgnoreFile();
+
+		const leaf = this.app.workspace.getLeaf('tab');
+		await leaf.openFile(file);
+	}
+
+	/**
+	 * Add a Git ignore pattern without requiring the user to navigate to the
+	 * hidden .gitignore file manually.
+	 */
+	async addGitIgnorePattern(pattern: string): Promise<boolean> {
+		const normalizedPattern = pattern.trim();
+		if (!normalizedPattern || normalizedPattern.startsWith('#')) {
+			throw new Error('Enter a non-empty ignore pattern');
+		}
+
+		const file = await this.ensureGitIgnoreFile();
+		const current = await this.app.vault.read(file);
+		const lines = current.split(/\r?\n/);
+		if (lines.includes(normalizedPattern)) return false;
+
+		const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
+		await this.app.vault.modify(file, `${current}${separator}${normalizedPattern}\n`);
+		return true;
+	}
+
+	private async ensureGitIgnoreFile() {
+		let file = this.app.vault.getFileByPath('.gitignore');
+		if (!file) {
+			file = await this.app.vault.create('.gitignore', '');
+			new Notice('Created .gitignore');
+		}
+		return file;
 	}
 
 	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
