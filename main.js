@@ -20250,7 +20250,9 @@ Try again with a faster connection or smaller repository.`
       async sync(repoUrl, branchName, commitMessage) {
         try {
           log2.info("GitManager", `Starting sync operation with repo: ${repoUrl || "(local only)"}, branch: ${branchName}`);
-          await this.initializeRepo(repoUrl, branchName);
+          if (!await this.isRepository()) {
+            throw new Error("No local git repository found. Initialize or clone the vault first.");
+          }
           if (repoUrl) {
             log2.debug("GitManager", "Pulling latest changes before committing");
             await this.pull(branchName);
@@ -20705,16 +20707,16 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     if (!this.plugin.gitManager) {
       await this.plugin.ensureGitManager();
     }
-    const initialized = !!this.plugin.gitManager;
-    if (initialized) {
-      this.hasRemote = !!this.plugin.settings.repoUrl;
-      this.isLocalOnly = !this.hasRemote;
-    }
     let hasReal = false;
     try {
       hasReal = await this.plugin.detectRealGitRepo();
     } catch (e) {
       log2.warn("GitSidebar", "detectRealGitRepo failed", e);
+    }
+    const initialized = hasReal;
+    if (this.plugin.gitManager) {
+      this.hasRemote = !!this.plugin.settings.repoUrl;
+      this.isLocalOnly = !this.hasRemote;
     }
     let branch2 = "unknown";
     let ahead = 0;
@@ -20779,7 +20781,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       if (this.plugin.settings.repoUrl) {
         new import_obsidian4.ButtonComponent(btnRow2).setButtonText("Clone Remote").setTooltip("Clone from configured remote URL").setClass("git-btn-secondary").onClick(async () => {
           try {
-            await this.plugin.syncVault();
+            await this.plugin.syncVault(true);
             new import_obsidian4.Notice("Remote cloned");
             await this.refresh();
           } catch (e) {
@@ -20810,7 +20812,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     if (this.plugin.settings.repoUrl) {
       new import_obsidian4.ButtonComponent(btnRow).setButtonText("Clone Remote").setTooltip("Clone from configured remote URL").setClass("git-btn-secondary").onClick(async () => {
         try {
-          await this.plugin.syncVault();
+          await this.plugin.syncVault(true);
           new import_obsidian4.Notice("Remote cloned");
           await this.refresh();
         } catch (e) {
@@ -21421,7 +21423,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "5591875c4734baa20be25fe81795386748a43c1f" : "unknown";
+var GIT_COMMIT_HASH = true ? "0aa5673f3065fa9d1437ce0b99bc821fcf6a448a" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";
@@ -21691,10 +21693,10 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
       return "";
     return this.requireCredentialStore().get();
   }
-  async getGitCredentials() {
+  async getGitCredentials(resolveSecret = true) {
     return {
       username: this.settings.username,
-      password: await this.resolveGitPassword(),
+      password: resolveSecret ? await this.resolveGitPassword() : "",
       repoUrl: this.settings.repoUrl,
       author: {
         name: this.settings.author.name || "Obsidian Git User",
@@ -21752,6 +21754,8 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
       const intervalMs = this.settings.autoSyncInterval * 60 * 1e3;
       this.intervalId = window.setInterval(async () => {
         try {
+          if (!await this.detectRealGitRepo())
+            return;
           await this.syncVault();
           console.log("Auto sync completed");
         } catch (error) {
@@ -21793,12 +21797,9 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     if (!this.settings.repoUrl && requireRemote) {
       return null;
     }
-    const credentials = await this.getGitCredentials();
+    const credentials = await this.getGitCredentials(false);
     const statusEl = this.statusBarItem || void 0;
     this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
-    if (this.settings.repoUrl || !hasRepo) {
-      await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
-    }
     return this.gitManager;
   }
   /**
@@ -21865,7 +21866,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     }
     return false;
   }
-  async syncVault() {
+  async syncVault(initializeRepository = false) {
     const commitMessage = this.settings.autoCommitMessage.replace(
       "{{date}}",
       (/* @__PURE__ */ new Date()).toLocaleString()
@@ -21875,6 +21876,11 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
       throw new Error("No git repository found in vault");
     }
     await this.refreshGitCredentials();
+    if (initializeRepository) {
+      await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+    } else if (!await this.detectRealGitRepo()) {
+      throw new Error("No local git repository found. Use Clone Remote or Initialize New Repo first.");
+    }
     try {
       await this.gitManager.sync(
         this.settings.repoUrl,

@@ -1477,8 +1477,9 @@ export class GitManager {
         try {
             log.info('GitManager', `Starting sync operation with repo: ${repoUrl || '(local only)'}, branch: ${branchName}`);
             
-            // Initialize or check repository
-            await this.initializeRepo(repoUrl, branchName);
+            if (!(await this.isRepository())) {
+                throw new Error('No local git repository found. Initialize or clone the vault first.');
+            }
             
             // Pull changes first (only if remote URL is set)
             if (repoUrl) {

@@ -56,6 +56,7 @@ buildSync({
 });
 
 const {
+  GitManager,
   GitProgressEmitter,
   arrayBufferToAsyncIterable,
   createGitEmitter,
@@ -146,5 +147,33 @@ test('testRemoteConnection uses a read-only remote ref advertisement without a l
   assert.match(calls[0].url, /\/info\/refs\?service=git-upload-pack$/);
   assert.equal(calls[0].headers.Authorization, `Basic ${Buffer.from('token-user:secret-token').toString('base64')}`);
   assert.equal(calls[0].body, undefined);
+  requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
+});
+
+test('sync does not initialize or clone a missing local repository', async () => {
+  let remoteCalls = 0;
+  requestUrlImpl = async () => {
+    remoteCalls += 1;
+    throw new Error('remote should not be contacted');
+  };
+
+  const missingRepositoryFs = {
+    stat: async () => { throw new Error('ENOENT'); },
+    lstat: async () => { throw new Error('ENOENT'); },
+    readdir: async () => { throw new Error('ENOENT'); },
+    readFile: async () => { throw new Error('ENOENT'); },
+  };
+  const manager = new GitManager(missingRepositoryFs, '.', {
+    repoUrl: 'https://example.test/owner/repository.git',
+    username: 'token-user',
+    password: 'secret-token',
+    author: { name: 'Test User', email: 'test@example.test' },
+  });
+
+  await assert.rejects(
+    manager.sync('https://example.test/owner/repository.git', 'main', 'test'),
+    /No local git repository found/,
+  );
+  assert.equal(remoteCalls, 0);
   requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
 });

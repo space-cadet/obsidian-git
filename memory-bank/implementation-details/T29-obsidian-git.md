@@ -158,7 +158,8 @@ Plugin.onload()
 Sidebar opens
   → GitSidebarView.onOpen()
     → this.plugin.ensureGitManager() (lazy init)
-    → refresh() → renderStatusTab()
+    → refresh() → detectRealGitRepo() → renderStatusTab()
+    → no clone/init side effect
 
 ensureGitManager()
   → if (!gitManager) create new GitManager(vaultPath, adapter, logger, onAuth)
@@ -167,13 +168,19 @@ ensureGitManager()
 
 ### Sync Flow
 ```
-User clicks Sync / Auto-sync fires
+User clicks Sync / Auto-sync fires (only when a local repo exists)
   → GitManager.sync()
+    → require existing local repository
     → if (repoUrl) git.pull()
     → git.add('*')
     → git.commit('sync: ...')
     → if (repoUrl) git.push()
   → GitSidebarView.refresh() (update UI)
+
+User clicks Clone Remote
+  → syncVault(true)
+    → GitManager.initializeRepo()
+    → clone or verified-empty-remote initialization
 ```
 
 ### Status Detection Flow

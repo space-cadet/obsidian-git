@@ -1,12 +1,12 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-11 03:14:00 IST*
+*Last Updated: 2026-08-12 11:31:05 IST*
 
 ## Current Session
-**Started**: 2026-08-11 03:05 IST
-**Focus Task**: T35a minimal SecretStorage implementation
-**Session File**: `memory-bank/sessions/2026-08-11-secure-storage.md`
+**Started**: 2026-08-12 11:27 IST
+**Focus Task**: T35c startup clone regression fix
+**Session File**: `memory-bank/sessions/2026-08-12-startup-clone-fix.md`
 **Status**: ✅ CLOSED
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
@@ -19,7 +19,7 @@ source file was missing.
 ## Overview
 - Active: 3 parents (T29, T34, T35; T34a, T35a, T35c active) | Planned: 6 (T34b, T34c, T35b, T35d-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-08-10 night (connection-test repair, updater implementation, archive output, auth task split)
-- Current Period: early morning
+- Current Period: late morning
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED
@@ -81,18 +81,18 @@ recorded.
 ### T35: Plugin Reliability, Security, and Architecture Hardening
 **Status:** 🔄 **Priority:** HIGH
 **Started:** 2026-08-11 **Last:** 2026-08-11
-**Context**: Architecture review findings are recorded. The first KIRSS
-implementation slice now covers logger redaction, protected automatic staging,
-URL normalization, repository error classification, and local-only/fresh-vault
-initialization reachability. T35a-T35f still divide credential safety,
-lifecycle coordination, initialization safety, mobile transport, updater
-integrity, and CI/documentation alignment.
-**Next:** Implement the T35a `SecretStorage` migration and T35c protected
-replacement backup contract while preserving T29 and T34 ownership boundaries.
+**Context**: The first KIRSS implementation slice covers logger redaction,
+protected automatic staging, URL normalization, repository error
+classification, and secure credential storage. The T35c startup fix now keeps
+manager creation, sidebar refresh, normal sync, and auto-sync non-mutating on a
+fresh vault; explicit Clone Remote remains the only initialization path.
+**Next:** Implement protected replacement backups and T35b operation
+coordination, then complete mobile acceptance while preserving T29 and T34
+ownership boundaries.
 
 ## Session History (Last 5)
-1. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
-2. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
-3. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33
-4. `sessions/2026-06-01-evening.md` — T29: Bug fixes from debug log analysis
-5. `sessions/2026-06-01-afternoon.md` — T32: Mobile crash fix + progress + API fallback + debug logs
+1. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+2. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+3. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
+4. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
+5. `sessions/2026-06-02-afternoon.md` — Memory bank update for T33

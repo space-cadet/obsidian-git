@@ -281,10 +281,10 @@ export default class GitSyncPlugin extends Plugin {
 		return this.requireCredentialStore().get();
 	}
 
-	async getGitCredentials(): Promise<GitCredentials> {
+	async getGitCredentials(resolveSecret = true): Promise<GitCredentials> {
 		return {
 			username: this.settings.username,
-			password: await this.resolveGitPassword(),
+			password: resolveSecret ? await this.resolveGitPassword() : '',
 			repoUrl: this.settings.repoUrl,
 			author: {
 				name: this.settings.author.name || 'Obsidian Git User',
@@ -351,6 +351,7 @@ export default class GitSyncPlugin extends Plugin {
 			const intervalMs = this.settings.autoSyncInterval * 60 * 1000;
 			this.intervalId = window.setInterval(async () => {
 				try {
+					if (!(await this.detectRealGitRepo())) return;
 					await this.syncVault();
 					console.log('Auto sync completed');
 				} catch (error) {
@@ -403,16 +404,12 @@ export default class GitSyncPlugin extends Plugin {
 			return null;
 		}
 
-		const credentials = await this.getGitCredentials();
+		const credentials = await this.getGitCredentials(false);
 
 		// Status bar is optional (may be null on mobile)
 		const statusEl = this.statusBarItem || undefined;
 
 		this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
-		
-		if (this.settings.repoUrl || !hasRepo) {
-			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
-		}
 		
 		return this.gitManager;
 	}
@@ -493,7 +490,7 @@ export default class GitSyncPlugin extends Plugin {
 		return false;
 	}
 
-	async syncVault() {
+	async syncVault(initializeRepository = false) {
 		// Format commit message with date
 		const commitMessage = this.settings.autoCommitMessage.replace(
 			'{{date}}', 
@@ -506,8 +503,14 @@ export default class GitSyncPlugin extends Plugin {
 			throw new Error('No git repository found in vault');
 		}
 		
-		// Resolve the current secret immediately before the remote operation.
+		// Resolve the current secret immediately before initialization or sync.
 		await this.refreshGitCredentials();
+
+		if (initializeRepository) {
+			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+		} else if (!(await this.detectRealGitRepo())) {
+			throw new Error('No local git repository found. Use Clone Remote or Initialize New Repo first.');
+		}
 	
 		// Perform the sync operation
 		try {

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-08-11 02:55:13 IST*
+*Last Updated: 2026-08-12 11:27:36 IST*
 
 ## Current Tasks
 
@@ -8,7 +8,7 @@
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 13 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
+- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 24 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
 - **Next**: Test the current dev release on Android/iOS with a valid credential, confirm direct CI assets and ZIP, then tag v1.0.0 only with explicit authorization.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
@@ -30,11 +30,12 @@
 - **Children**: T35a and T35c are active; T35b and T35d-T35f remain planned.
 - **Status**: The first KIRSS implementation slice adds logger redaction,
   protected automatic staging, URL normalization, repository-error
-  classification, and local-only/fresh-vault initialization reachability.
-  T35a SecretStorage migration and T35c backup protection remain open. T35 is
-  separate from T29 release ownership and T34 authentication ownership.
-- **Next**: Implement SecretStorage/SecretComponent migration and protected
-  replacement backups, then add integration coverage before mobile acceptance.
+  classification, and safe repository initialization boundaries. T35a
+  SecretStorage is implemented; T35c replacement backups and T35b lifecycle
+  coordination remain open. T35 is separate from T29 release ownership and
+  T34 authentication ownership.
+- **Next**: Add protected replacement backups and operation coordination, then
+  perform mobile acceptance.
 
 ### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;
@@ -48,6 +49,13 @@
   just-in-time resolution before remote operations.
 - Remaining T35a work is acceptance coverage for export files, mobile setup,
   secret replacement/clearing, and the same-process plugin threat model.
+
+### T35c Startup Clone Safety — 🔄 Fix implemented
+- Sidebar refresh and manager creation are now read-only.
+- Only explicit Clone Remote actions may initialize or clone a fresh vault;
+  auto-sync and normal sync require an existing local repository.
+- Regression coverage confirms normal sync does not contact a remote when no
+  local repository exists.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback

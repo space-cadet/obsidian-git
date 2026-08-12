@@ -93,11 +93,13 @@ owner. A failure must never pass through the success completion function.
 - `src/main.ts:366-370` and the independent operation entry points have no
   shared state precondition or in-flight operation guard.
 
-The first T35c slice now reaches `initializeRepo()` for fresh-vault and
-local-only paths and classifies clone failures before deciding whether local
-initialization is allowed. Existing `.git` replacement protection and the
-shared operation coordinator remain open; T35b is still the follow-on task for
-coordinating concurrent mutations.
+The first T35c slice classifies clone failures before deciding whether local
+initialization is allowed. The August 12 startup fix makes manager creation and
+sidebar refresh read-only: only an explicit Clone Remote action may call
+`initializeRepo()`, and normal sync refuses to run without a local repository.
+Existing `.git` replacement protection and the shared operation coordinator
+remain open; T35b is still the follow-on task for coordinating concurrent
+mutations.
 
 ## Related Tasks
 

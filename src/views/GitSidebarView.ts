@@ -309,19 +309,19 @@ export class GitSidebarView extends ItemView {
             await this.plugin.ensureGitManager();
         }
         
-        // Update initialization state
-        const initialized = !!this.plugin.gitManager;
-        if (initialized) {
-            this.hasRemote = !!this.plugin.settings.repoUrl;
-            this.isLocalOnly = !this.hasRemote;
-        }
-
         // Check if real repo exists (for header and UI state)
         let hasReal = false;
         try {
             hasReal = await this.plugin.detectRealGitRepo();
         } catch (e) {
             log.warn('GitSidebar', 'detectRealGitRepo failed', e);
+        }
+
+        // Manager creation is read-only; repository state determines initialization.
+        const initialized = hasReal;
+        if (this.plugin.gitManager) {
+            this.hasRemote = !!this.plugin.settings.repoUrl;
+            this.isLocalOnly = !this.hasRemote;
         }
 
         // Try to get git info for header
@@ -410,7 +410,7 @@ export class GitSidebarView extends ItemView {
                     .setClass('git-btn-secondary')
                     .onClick(async () => {
                         try {
-                            await this.plugin.syncVault();
+                            await this.plugin.syncVault(true);
                             new Notice('Remote cloned');
                             await this.refresh();
                         } catch (e: any) {
@@ -456,7 +456,7 @@ export class GitSidebarView extends ItemView {
                 .setClass('git-btn-secondary')
                 .onClick(async () => {
                     try {
-                        await this.plugin.syncVault();
+                        await this.plugin.syncVault(true);
                         new Notice('Remote cloned');
                         await this.refresh();
                     } catch (e: any) {

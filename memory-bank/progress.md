@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-08-11 02:55:13 IST*
+*Last Updated: 2026-08-12 11:31:05 IST*
 
 ## Completed Phases
 
@@ -95,6 +95,20 @@
   handling, and credential refresh before remote operations.
 - Added focused credential-store tests. Remaining work is mobile/desktop
   acceptance, export inspection, and broader lifecycle hardening.
+
+### T35c Startup Clone Regression Fix (2026-08-12)
+
+- Made manager creation and passive sidebar refresh read-only; loading the
+  plugin no longer starts a clone on a fresh vault.
+- Restricted repository initialization and cloning to explicit Clone Remote
+  actions. Normal sync and auto-sync now require an existing local `.git`
+  directory.
+- Added regression coverage proving normal sync does not contact a remote when
+  no local repository exists.
+- Verification passes: 24 Node tests, 10 isomorphic-git checks, production
+  build, archive validation, and `git diff --check`.
+- Remaining T35c gates are protected `.git` replacement backups, lifecycle
+  coordination, and real-device acceptance.
 
 ### T35a/T35c Read-only Audit (2026-08-11)
 

@@ -1,7 +1,16 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-11 02:39:18 IST*
+*Last Updated: 2026-08-12 11:31:05 IST*
+
+### 2026-08-12
+
+#### 11:31:05 IST - T35c: Prevent startup cloning and harden repository initialization
+- Modified `src/main.ts` - Made manager creation and passive sidebar refresh read-only; prevented auto-sync and normal sync from initializing a missing repository.
+- Modified `src/gitManager.ts` - Required an existing local repository for normal sync.
+- Modified `src/views/GitSidebarView.ts` - Reserved initialization for explicit Clone Remote actions.
+- Modified `tests/git-manager.test.mjs` - Added regression coverage proving normal sync does not contact a remote without `.git`.
+- Updated `memory-bank/tasks/T35c.md`, `memory-bank/activeContext.md`, `memory-bank/progress.md`, and `memory-bank/session_cache.md` - Recorded the fix, verification, remaining safety gates, and session handoff.
 
 ### 2026-08-11
 
