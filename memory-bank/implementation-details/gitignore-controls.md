@@ -1,7 +1,7 @@
 # Gitignore Controls and Hidden Dotfile Editing
 
 *Created: 2026-08-12 15:59:54 IST*
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:05:58 IST*
 *Tasks: T29, T35b*
 
 ## Purpose
@@ -11,10 +11,12 @@ show dotfiles in its file explorer.
 
 ## Delivered Behavior
 
-- The sidebar exposes an Edit `.gitignore` action and the command palette has
-  an Open `.gitignore` command.
-- Each changed file has an ignore action that adds a root-anchored pattern.
-- Add pattern accepts folder and glob rules such as `attachments/` and
+- The sidebar exposes Edit `.gitignore` and ignored-pattern management through
+  the Changes tab's `More` menu; the command palette still has an Open
+  `.gitignore` command.
+- Each changed file keeps a compact `…` menu with an ignore action that adds a
+  root-anchored pattern, plus an Edit `.gitignore` action.
+- The pattern editor accepts folder and glob rules such as `attachments/` and
   `temp/**`.
 - Duplicate patterns are ignored.
 - Hidden-file reads and writes use `vault.adapter`, because the Obsidian vault
@@ -35,11 +37,13 @@ used for clone, edit, commit, push, and mobile acceptance checks. The older
 `space-cadet/git-test` repository is not a minimal fixture and contains
 historical configuration data.
 
-## Open Follow-up
+## UI Follow-up
 
-The Changes tab bulk Add all action currently stages only the first ten files
-in a large change set. This is recorded for a separate implementation session;
-the cause and fix are not yet established.
+The bulk Add all limit has been investigated and fixed in the current source:
+the sidebar passes its visible unstaged file list to the manager, the manager
+continues through the full list, and the UI reports the actual staged and
+failed counts. The remaining acceptance gate is a real Obsidian run with a
+large change set.
 
 ## Related Files
 

@@ -1,6 +1,25 @@
 # Project Progress
 
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:05:58 IST*
+
+## T29: Sidebar UX and bulk staging follow-up (2026-08-18)
+
+- Fixed the Changes-tab bulk staging regression by passing the visible
+  unstaged list into `GitManager.addAll()`, continuing through individual
+  failures, and reporting the actual result.
+- Implemented the approved compact Changes layout: commit count button,
+  Pull, Push, and More; commit message entry is now a modal.
+- Moved `.gitignore` editing, ignored-pattern management, force push, and
+  per-file ignore into on-demand menus.
+- Hid the Changes action footer on Commits and Log so those tabs use the full
+  available height.
+- Added Log actions for export, clear, and copy details.
+- Added approved visual references:
+  `memory-bank/assets/ui-mockups/sidebar-changes-approved.png`,
+  `sidebar-commits-approved.png`, and `sidebar-log-approved.png`.
+- Verification passes: production build, archive, 29 Node tests, 10
+  isomorphic-git checks, and `git diff --check`. Real Obsidian desktop/mobile
+  acceptance remains a separate gate.
 
 ## Completed Phases
 

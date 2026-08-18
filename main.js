@@ -18534,6 +18534,10 @@ var init_logger = __esm({
       getEntries() {
         return this.entries;
       }
+      /** Clear the in-memory activity log shown in the sidebar. */
+      clear() {
+        this.entries = [];
+      }
       /**
        * Export logs to a markdown file in the vault
        */
@@ -20746,7 +20750,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.refreshInterval = null;
-    this.commitMessageInput = null;
     this.stagedCount = 0;
     this.activeTab = "status";
     this.commitsViewMode = "local";
@@ -20841,6 +20844,21 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       text: initialized ? branch2 : hasRealRepo ? "local" : "No repo",
       cls: "git-branch-name" + (initialized ? "" : " git-branch-uninit")
     });
+    const refreshBtn = branchRow.createEl("button", {
+      text: "\u21BB",
+      cls: "git-header-refresh",
+      attr: { title: "Refresh git status", "aria-label": "Refresh git status" }
+    });
+    refreshBtn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      refreshBtn.disabled = true;
+      try {
+        await this.refresh();
+      } finally {
+        if (refreshBtn.isConnected)
+          refreshBtn.disabled = false;
+      }
+    });
     const statusRow = this.headerContainer.createDiv("git-header-status");
     if (!initialized) {
       if (!hasRealRepo) {
@@ -20861,48 +20879,17 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   // ─── Footer ───
   renderFooter(container) {
-    var _a;
     container.empty();
     container.addClass("git-sidebar-footer");
-    const msgRow = container.createDiv("git-footer-message-row");
-    this.commitMessageInput = msgRow.createEl("input", {
-      type: "text",
-      cls: "git-footer-message-input",
-      placeholder: "Commit message...",
-      value: ((_a = this.commitMessageInput) == null ? void 0 : _a.value) || ""
-    });
-    const gitIgnoreRow = container.createDiv("git-footer-file-row");
-    new import_obsidian4.ButtonComponent(gitIgnoreRow).setButtonText("Edit .gitignore").setTooltip("Open or create .gitignore").setClass("git-btn-ghost").onClick(async () => {
-      try {
-        await this.plugin.openGitIgnore();
-      } catch (e) {
-        new import_obsidian4.Notice("Could not open .gitignore: " + e.message);
-      }
-    });
+    if (this.activeTab !== "status") {
+      container.addClass("git-sidebar-footer-hidden");
+      return;
+    }
+    container.removeClass("git-sidebar-footer-hidden");
     const btnRow = container.createDiv("git-footer-buttons-row");
-    const commitBtn = new import_obsidian4.ButtonComponent(btnRow).setButtonText("Commit").setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
-    commitBtn.onClick(async () => {
-      var _a2, _b;
-      try {
-        if (!this.plugin.gitManager) {
-          new import_obsidian4.Notice("Git not initialized");
-          return;
-        }
-        if (this.stagedCount === 0) {
-          new import_obsidian4.Notice("No staged files to commit");
-          return;
-        }
-        const message = ((_b = (_a2 = this.commitMessageInput) == null ? void 0 : _a2.value) == null ? void 0 : _b.trim()) || this.plugin.settings.autoCommitMessage.replace("{{date}}", (/* @__PURE__ */ new Date()).toLocaleString()) || "Update from Obsidian";
-        await this.plugin.gitManager.commit(message);
-        new import_obsidian4.Notice("Changes committed");
-        if (this.commitMessageInput)
-          this.commitMessageInput.value = "";
-        await this.refresh();
-      } catch (e) {
-        new import_obsidian4.Notice("Commit failed: " + e.message);
-      }
-    });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2191").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+    const commitBtn = new import_obsidian4.ButtonComponent(btnRow).setButtonText(`Commit (${this.stagedCount})`).setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
+    commitBtn.onClick(() => this.openCommitModal());
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Push").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian4.Notice("Git not initialized");
@@ -20920,30 +20907,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         new import_obsidian4.Notice("Push failed: " + e.message);
       }
     });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2191\u2191").setTooltip(this.hasRemote ? "Force push (overwrites remote history)" : "No remote configured").setClass("git-btn-danger").setDisabled(!this.hasRemote).onClick(async () => {
-      try {
-        if (!this.plugin.gitManager) {
-          new import_obsidian4.Notice("Git not initialized");
-          return;
-        }
-        if (!this.hasRemote) {
-          new import_obsidian4.Notice("No remote configured");
-          return;
-        }
-        const confirmed = window.confirm(
-          "Force push will overwrite remote history.\n\nOnly use this for first-time pushes or when you know the remote is safe to overwrite.\n\nContinue?"
-        );
-        if (!confirmed)
-          return;
-        await this.plugin.refreshGitCredentials();
-        await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
-        new import_obsidian4.Notice("Force pushed to remote");
-        await this.refresh();
-      } catch (e) {
-        new import_obsidian4.Notice("Force push failed: " + e.message);
-      }
-    });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u2193").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Pull").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian4.Notice("Git not initialized");
@@ -20961,9 +20925,82 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         new import_obsidian4.Notice("Pull failed: " + e.message);
       }
     });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("\u21BB").setTooltip("Refresh git status").setClass("git-btn-ghost").onClick(async () => {
-      await this.refresh();
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("More").setTooltip("More Git actions").setClass("git-btn-ghost").onClick((event) => this.openMoreMenu(event));
+  }
+  openCommitModal() {
+    if (!this.plugin.gitManager || this.stagedCount === 0) {
+      new import_obsidian4.Notice("Stage at least one file before committing");
+      return;
+    }
+    const modal = new import_obsidian4.Modal(this.app);
+    const defaultMessage = this.plugin.settings.autoCommitMessage.replace("{{date}}", (/* @__PURE__ */ new Date()).toLocaleString()) || "Update from Obsidian";
+    modal.titleEl.setText(`Commit ${this.stagedCount} staged file${this.stagedCount === 1 ? "" : "s"}`);
+    modal.contentEl.createEl("p", {
+      text: "Add a message so you can recognize this change later.",
+      cls: "git-commit-modal-description"
     });
+    const input = new import_obsidian4.TextComponent(modal.contentEl).setPlaceholder(defaultMessage);
+    input.inputEl.addClass("git-commit-modal-input");
+    const actions = modal.contentEl.createDiv("git-ignore-modal-actions");
+    new import_obsidian4.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => modal.close());
+    const commitButton = new import_obsidian4.ButtonComponent(actions).setButtonText("Commit").setClass("git-btn-primary");
+    const commit2 = async () => {
+      if (!this.plugin.gitManager)
+        return;
+      commitButton.setDisabled(true).setButtonText("Committing\u2026");
+      try {
+        await this.plugin.gitManager.commit(input.getValue().trim() || defaultMessage);
+        modal.close();
+        new import_obsidian4.Notice("Changes committed");
+        await this.refresh();
+      } catch (e) {
+        commitButton.setDisabled(false).setButtonText("Commit");
+        new import_obsidian4.Notice("Commit failed: " + e.message);
+      }
+    };
+    commitButton.onClick(commit2);
+    input.inputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter")
+        void commit2();
+    });
+    modal.open();
+    window.setTimeout(() => input.inputEl.focus(), 0);
+  }
+  openMoreMenu(event) {
+    const menu = new import_obsidian4.Menu();
+    menu.addItem((item) => item.setTitle("Edit .gitignore").setIcon("file-edit").onClick(async () => {
+      try {
+        await this.plugin.openGitIgnore();
+      } catch (e) {
+        new import_obsidian4.Notice("Could not open .gitignore: " + e.message);
+      }
+    }));
+    menu.addItem((item) => item.setTitle("Manage ignored patterns").setIcon("list-filter").onClick(() => this.openIgnorePatternModal()));
+    menu.addSeparator();
+    menu.addItem((item) => item.setTitle("Force push").setIcon("upload").onClick(() => void this.forcePush()));
+    menu.showAtMouseEvent(event);
+  }
+  async forcePush() {
+    if (!this.plugin.gitManager) {
+      new import_obsidian4.Notice("Git not initialized");
+      return;
+    }
+    if (!this.hasRemote) {
+      new import_obsidian4.Notice("No remote configured");
+      return;
+    }
+    if (!window.confirm(
+      "Force push will overwrite remote history.\n\nOnly use this for first-time pushes or when you know the remote is safe to overwrite.\n\nContinue?"
+    ))
+      return;
+    try {
+      await this.plugin.refreshGitCredentials();
+      await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
+      new import_obsidian4.Notice("Force pushed to remote");
+      await this.refresh();
+    } catch (e) {
+      new import_obsidian4.Notice("Force push failed: " + e.message);
+    }
   }
   // ─── Main refresh ───
   async refresh() {
@@ -21010,6 +21047,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.contentContainer.empty();
     if (!initialized) {
       await this.renderUninitializedContent(hasReal);
+      const footerEl2 = this.containerEl.querySelector(".git-sidebar-footer");
+      if (footerEl2)
+        this.renderFooter(footerEl2);
       return;
     }
     switch (this.activeTab) {
@@ -21103,19 +21143,13 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
       const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
       this.stagedCount = staged.length;
-      const ignoreToolbar = container.createDiv("git-status-toolbar");
-      ignoreToolbar.createSpan({
-        text: "Ignore rules",
-        cls: "git-status-toolbar-label"
-      });
-      new import_obsidian4.ButtonComponent(ignoreToolbar).setButtonText("Add pattern").setTooltip("Add a file or folder pattern to .gitignore").setClass("git-btn-ghost").onClick(() => this.openIgnorePatternModal());
       this.renderCollapsibleSection(
         container,
         "Staged",
         staged,
         "staged",
         "\u2212",
-        "\u2212 all",
+        "Unstage all",
         async (fp) => {
           await this.plugin.gitManager.unstageFile(fp);
           new import_obsidian4.Notice(`Unstaged ${fp}`);
@@ -21131,7 +21165,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         unstaged,
         "unstaged",
         "+",
-        "+ all",
+        "Stage all",
         async (fp) => {
           await this.plugin.gitManager.stageFile(fp);
           new import_obsidian4.Notice(`Staged ${fp}`);
@@ -21182,6 +21216,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       cls: "git-status-section-count"
     });
     const bulkBtn = header.createEl("button", { text: bulkLabel, cls: "git-status-section-action" });
+    bulkBtn.disabled = files.length === 0;
     bulkBtn.setAttr("title", bulkLabel);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -21223,21 +21258,33 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         const pathEl = row.createSpan({ text: filepath, cls: "git-file-path" });
         pathEl.setAttr("title", filepath);
         const actions = row.createDiv("git-file-actions");
-        if (filepath !== ".gitignore") {
-          const ignoreBtn = actions.createEl("button", { text: "\u2298", cls: "git-file-btn" });
-          ignoreBtn.setAttr("title", `Add /${filepath} to .gitignore`);
-          ignoreBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
+        const moreBtn = actions.createEl("button", { text: "\u2026", cls: "git-file-btn" });
+        moreBtn.setAttr("title", "More file actions");
+        moreBtn.setAttr("aria-label", `More actions for ${filepath}`);
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const menu = new import_obsidian4.Menu();
+          if (filepath !== ".gitignore") {
+            menu.addItem((item) => item.setTitle("Ignore this file").setIcon("file-minus").onClick(async () => {
+              try {
+                const pattern = `/${filepath.replace(/^\/+/, "")}`;
+                const added = await this.plugin.addGitIgnorePattern(pattern);
+                new import_obsidian4.Notice(added ? `Added ${pattern} to .gitignore` : `${pattern} is already in .gitignore`);
+                await this.refresh();
+              } catch (err) {
+                new import_obsidian4.Notice(`Could not update .gitignore: ${err.message}`);
+              }
+            }));
+          }
+          menu.addItem((item) => item.setTitle("Edit .gitignore").setIcon("file-edit").onClick(async () => {
             try {
-              const pattern = `/${filepath.replace(/^\/+/, "")}`;
-              const added = await this.plugin.addGitIgnorePattern(pattern);
-              new import_obsidian4.Notice(added ? `Added ${pattern} to .gitignore` : `${pattern} is already in .gitignore`);
-              await this.refresh();
+              await this.plugin.openGitIgnore();
             } catch (err) {
-              new import_obsidian4.Notice(`Could not update .gitignore: ${err.message}`);
+              new import_obsidian4.Notice("Could not open .gitignore: " + err.message);
             }
-          });
-        }
+          }));
+          menu.showAtMouseEvent(e);
+        });
         const btn = actions.createEl("button", { text: actionLabel, cls: "git-file-btn" });
         btn.setAttr("title", sectionClass === "staged" ? "Unstage file" : "Stage file");
         btn.addEventListener("click", async (e) => {
@@ -21448,6 +21495,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   async renderLogTab() {
     const listContainer = this.contentContainer.createDiv("git-log-list");
+    const toolbar = listContainer.createDiv("git-log-toolbar");
+    toolbar.createSpan({ text: "Activity", cls: "git-log-toolbar-title" });
+    new import_obsidian4.ButtonComponent(toolbar).setButtonText("More").setTooltip("Log actions").setClass("git-btn-ghost").onClick((event) => this.openLogMenu(event));
     const entries = log2.getEntries();
     if (entries.length === 0) {
       listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
@@ -21473,6 +21523,39 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         detail.setText(typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data).slice(0, 200));
       }
     }
+  }
+  openLogMenu(event) {
+    const menu = new import_obsidian4.Menu();
+    menu.addItem((item) => item.setTitle("Export log").setIcon("download").onClick(async () => {
+      try {
+        const path = await log2.exportToFile(this.app.vault);
+        new import_obsidian4.Notice(`Log exported to ${path}`);
+      } catch (e) {
+        new import_obsidian4.Notice("Could not export log: " + e.message);
+      }
+    }));
+    menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(() => {
+      log2.clear();
+      new import_obsidian4.Notice("Activity log cleared");
+      this.contentContainer.empty();
+      void this.renderLogTab();
+    }));
+    menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
+      const entries = [...log2.getEntries()].reverse().slice(0, 50);
+      const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
+        const time = new Date(entry.timestamp).toISOString();
+        const data = entry.data ? `
+${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "";
+        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+      }).join("\n");
+      try {
+        await navigator.clipboard.writeText(details);
+        new import_obsidian4.Notice("Log details copied");
+      } catch (e) {
+        new import_obsidian4.Notice("Could not copy log details: " + e.message);
+      }
+    }));
+    menu.showAtMouseEvent(event);
   }
   // ─── Helpers ───
   truncateMessage(msg, maxLen = 40) {
@@ -21765,7 +21848,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "77999725cdaac1f79cb78bc760594405f2fad3dc" : "unknown";
+var GIT_COMMIT_HASH = true ? "be4ab44fc47554a74ce4efe5cec0c4b69b37a9c5" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";

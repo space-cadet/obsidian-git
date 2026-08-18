@@ -48,6 +48,11 @@ export class Logger {
     return this.entries;
   }
 
+  /** Clear the in-memory activity log shown in the sidebar. */
+  public clear(): void {
+    this.entries = [];
+  }
+
   /**
    * Export logs to a markdown file in the vault
    */

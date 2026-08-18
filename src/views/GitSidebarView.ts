@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitManager, GitFileStatus, GitCommit } from '../gitManager';
 import { log, LogEntry } from '../logger';
@@ -13,7 +13,6 @@ export class GitSidebarView extends ItemView {
     private headerContainer: HTMLElement;
     private tabsContainer: HTMLElement;
     private refreshInterval: number | null = null;
-    private commitMessageInput: HTMLInputElement | null = null;
     private stagedCount: number = 0;
     private activeTab: SidebarTab = 'status';
     private commitsViewMode: 'local' | 'remote' = 'local';
@@ -141,6 +140,20 @@ export class GitSidebarView extends ItemView {
             text: initialized ? branch : (hasRealRepo ? 'local' : 'No repo'), 
             cls: 'git-branch-name' + (initialized ? '' : ' git-branch-uninit') 
         });
+        const refreshBtn = branchRow.createEl('button', {
+            text: '↻',
+            cls: 'git-header-refresh',
+            attr: { title: 'Refresh git status', 'aria-label': 'Refresh git status' }
+        });
+        refreshBtn.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            refreshBtn.disabled = true;
+            try {
+                await this.refresh();
+            } finally {
+                if (refreshBtn.isConnected) refreshBtn.disabled = false;
+            }
+        });
         
         const statusRow = this.headerContainer.createDiv('git-header-status');
         if (!initialized) {
@@ -166,65 +179,23 @@ export class GitSidebarView extends ItemView {
     private renderFooter(container: HTMLElement): void {
         container.empty();
         container.addClass('git-sidebar-footer');
+        if (this.activeTab !== 'status') {
+            container.addClass('git-sidebar-footer-hidden');
+            return;
+        }
+        container.removeClass('git-sidebar-footer-hidden');
 
-        // 1. Commit message input
-        const msgRow = container.createDiv('git-footer-message-row');
-        this.commitMessageInput = msgRow.createEl('input', {
-            type: 'text',
-            cls: 'git-footer-message-input',
-            placeholder: 'Commit message...',
-            value: this.commitMessageInput?.value || ''
-        });
-
-        // Obsidian hides dotfiles from the file explorer, so expose the
-        // repository ignore file directly from the Git sidebar.
-        const gitIgnoreRow = container.createDiv('git-footer-file-row');
-        new ButtonComponent(gitIgnoreRow)
-            .setButtonText('Edit .gitignore')
-            .setTooltip('Open or create .gitignore')
-            .setClass('git-btn-ghost')
-            .onClick(async () => {
-                try {
-                    await this.plugin.openGitIgnore();
-                } catch (e: any) {
-                    new Notice('Could not open .gitignore: ' + e.message);
-                }
-            });
-
-        // 2. Action buttons row
         const btnRow = container.createDiv('git-footer-buttons-row');
 
-        // Commit button — always visible
         const commitBtn = new ButtonComponent(btnRow)
-            .setButtonText('Commit')
+            .setButtonText(`Commit (${this.stagedCount})`)
             .setTooltip(this.stagedCount > 0 ? 'Commit staged changes' : 'No staged files to commit')
             .setClass('git-btn-primary')
             .setDisabled(this.stagedCount === 0);
-        commitBtn.onClick(async () => {
-            try {
-                if (!this.plugin.gitManager) {
-                    new Notice('Git not initialized');
-                    return;
-                }
-                if (this.stagedCount === 0) {
-                    new Notice('No staged files to commit');
-                    return;
-                }
-                const message = this.commitMessageInput?.value?.trim()
-                    || this.plugin.settings.autoCommitMessage.replace('{{date}}', new Date().toLocaleString())
-                    || 'Update from Obsidian';
-                await this.plugin.gitManager.commit(message);
-                new Notice('Changes committed');
-                if (this.commitMessageInput) this.commitMessageInput.value = '';
-                await this.refresh();
-            } catch (e: any) {
-                new Notice('Commit failed: ' + e.message);
-            }
-        });
+        commitBtn.onClick(() => this.openCommitModal());
 
-        // Push button — always visible, disabled if no remote
         new ButtonComponent(btnRow)
-            .setButtonText('↑')
+            .setButtonText('Push')
             .setTooltip(this.hasRemote ? 'Push to remote' : 'No remote configured — set repo URL in settings')
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
@@ -247,43 +218,9 @@ export class GitSidebarView extends ItemView {
                 }
             });
 
-        // Force Push button — always visible, disabled if no remote
-        // Use this for first-time pushes to an empty repo or when histories diverge
-        new ButtonComponent(btnRow)
-            .setButtonText('↑↑')
-            .setTooltip(this.hasRemote ? 'Force push (overwrites remote history)' : 'No remote configured')
-            .setClass('git-btn-danger')
-            .setDisabled(!this.hasRemote)
-            .onClick(async () => {
-                try {
-                    if (!this.plugin.gitManager) {
-                        new Notice('Git not initialized');
-                        return;
-                    }
-                    if (!this.hasRemote) {
-                        new Notice('No remote configured');
-                        return;
-                    }
-                    // Confirm before force push
-                    const confirmed = window.confirm(
-                        'Force push will overwrite remote history.\n\n' +
-                        'Only use this for first-time pushes or when you know the remote is safe to overwrite.\n\n' +
-                        'Continue?'
-                    );
-                    if (!confirmed) return;
-                    
-                    await this.plugin.refreshGitCredentials();
-                    await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
-                    new Notice('Force pushed to remote');
-                    await this.refresh();
-                } catch (e: any) {
-                    new Notice('Force push failed: ' + e.message);
-                }
-            });
-
         // Pull button — always visible, disabled if no remote
         new ButtonComponent(btnRow)
-            .setButtonText('↓')
+            .setButtonText('Pull')
             .setTooltip(this.hasRemote ? 'Pull from remote' : 'No remote configured — set repo URL in settings')
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
@@ -306,14 +243,108 @@ export class GitSidebarView extends ItemView {
                 }
             });
 
-        // Refresh button — always visible
         new ButtonComponent(btnRow)
-            .setButtonText('↻')
-            .setTooltip('Refresh git status')
+            .setButtonText('More')
+            .setTooltip('More Git actions')
             .setClass('git-btn-ghost')
-            .onClick(async () => {
+            .onClick((event) => this.openMoreMenu(event));
+    }
+
+    private openCommitModal(): void {
+        if (!this.plugin.gitManager || this.stagedCount === 0) {
+            new Notice('Stage at least one file before committing');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        const defaultMessage = this.plugin.settings.autoCommitMessage
+            .replace('{{date}}', new Date().toLocaleString()) || 'Update from Obsidian';
+        modal.titleEl.setText(`Commit ${this.stagedCount} staged file${this.stagedCount === 1 ? '' : 's'}`);
+        modal.contentEl.createEl('p', {
+            text: 'Add a message so you can recognize this change later.',
+            cls: 'git-commit-modal-description'
+        });
+        const input = new TextComponent(modal.contentEl)
+            .setPlaceholder(defaultMessage);
+        input.inputEl.addClass('git-commit-modal-input');
+
+        const actions = modal.contentEl.createDiv('git-ignore-modal-actions');
+        new ButtonComponent(actions)
+            .setButtonText('Cancel')
+            .setClass('git-btn-ghost')
+            .onClick(() => modal.close());
+        const commitButton = new ButtonComponent(actions)
+            .setButtonText('Commit')
+            .setClass('git-btn-primary');
+
+        const commit = async () => {
+            if (!this.plugin.gitManager) return;
+            commitButton.setDisabled(true).setButtonText('Committing…');
+            try {
+                await this.plugin.gitManager.commit(input.getValue().trim() || defaultMessage);
+                modal.close();
+                new Notice('Changes committed');
                 await this.refresh();
-            });
+            } catch (e: any) {
+                commitButton.setDisabled(false).setButtonText('Commit');
+                new Notice('Commit failed: ' + e.message);
+            }
+        };
+        commitButton.onClick(commit);
+        input.inputEl.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') void commit();
+        });
+        modal.open();
+        window.setTimeout(() => input.inputEl.focus(), 0);
+    }
+
+    private openMoreMenu(event: MouseEvent): void {
+        const menu = new Menu();
+        menu.addItem((item) => item
+            .setTitle('Edit .gitignore')
+            .setIcon('file-edit')
+            .onClick(async () => {
+                try {
+                    await this.plugin.openGitIgnore();
+                } catch (e: any) {
+                    new Notice('Could not open .gitignore: ' + e.message);
+                }
+            }));
+        menu.addItem((item) => item
+            .setTitle('Manage ignored patterns')
+            .setIcon('list-filter')
+            .onClick(() => this.openIgnorePatternModal()));
+        menu.addSeparator();
+        menu.addItem((item) => item
+            .setTitle('Force push')
+            .setIcon('upload')
+            .onClick(() => void this.forcePush()));
+        menu.showAtMouseEvent(event);
+    }
+
+    private async forcePush(): Promise<void> {
+        if (!this.plugin.gitManager) {
+            new Notice('Git not initialized');
+            return;
+        }
+        if (!this.hasRemote) {
+            new Notice('No remote configured');
+            return;
+        }
+        if (!window.confirm(
+            'Force push will overwrite remote history.\n\n' +
+            'Only use this for first-time pushes or when you know the remote is safe to overwrite.\n\n' +
+            'Continue?'
+        )) return;
+
+        try {
+            await this.plugin.refreshGitCredentials();
+            await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
+            new Notice('Force pushed to remote');
+            await this.refresh();
+        } catch (e: any) {
+            new Notice('Force push failed: ' + e.message);
+        }
     }
 
     // ─── Main refresh ───
@@ -378,6 +409,8 @@ export class GitSidebarView extends ItemView {
 
         if (!initialized) {
             await this.renderUninitializedContent(hasReal);
+            const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
+            if (footerEl) this.renderFooter(footerEl);
             return;
         }
 
@@ -506,19 +539,8 @@ export class GitSidebarView extends ItemView {
             const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
             this.stagedCount = staged.length;
 
-            const ignoreToolbar = container.createDiv('git-status-toolbar');
-            ignoreToolbar.createSpan({
-                text: 'Ignore rules',
-                cls: 'git-status-toolbar-label'
-            });
-            new ButtonComponent(ignoreToolbar)
-                .setButtonText('Add pattern')
-                .setTooltip('Add a file or folder pattern to .gitignore')
-                .setClass('git-btn-ghost')
-                .onClick(() => this.openIgnorePatternModal());
-
             // ── Staged section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Staged', staged, 'staged', '−', '− all',
+            this.renderCollapsibleSection(container, 'Staged', staged, 'staged', '−', 'Unstage all',
                 async (fp) => {
                     await this.plugin.gitManager!.unstageFile(fp);
                     new Notice(`Unstaged ${fp}`);
@@ -530,7 +552,7 @@ export class GitSidebarView extends ItemView {
             );
 
             // ── Uncommitted section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', '+', '+ all',
+            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', '+', 'Stage all',
                 async (fp) => {
                     await this.plugin.gitManager!.stageFile(fp);
                     new Notice(`Staged ${fp}`);
@@ -608,6 +630,7 @@ export class GitSidebarView extends ItemView {
         
         // Bulk action button (always visible)
         const bulkBtn = header.createEl('button', { text: bulkLabel, cls: 'git-status-section-action' }) as HTMLButtonElement;
+        bulkBtn.disabled = files.length === 0;
         bulkBtn.setAttr('title', bulkLabel);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -657,23 +680,41 @@ export class GitSidebarView extends ItemView {
 
                 const actions = row.createDiv('git-file-actions');
 
-                if (filepath !== '.gitignore') {
-                    const ignoreBtn = actions.createEl('button', { text: '⊘', cls: 'git-file-btn' });
-                    ignoreBtn.setAttr('title', `Add /${filepath} to .gitignore`);
-                    ignoreBtn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        try {
-                            const pattern = `/${filepath.replace(/^\/+/, '')}`;
-                            const added = await this.plugin.addGitIgnorePattern(pattern);
-                            new Notice(added
-                                ? `Added ${pattern} to .gitignore`
-                                : `${pattern} is already in .gitignore`);
-                            await this.refresh();
-                        } catch (err: any) {
-                            new Notice(`Could not update .gitignore: ${err.message}`);
-                        }
-                    });
-                }
+                const moreBtn = actions.createEl('button', { text: '…', cls: 'git-file-btn' });
+                moreBtn.setAttr('title', 'More file actions');
+                moreBtn.setAttr('aria-label', `More actions for ${filepath}`);
+                moreBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const menu = new Menu();
+                    if (filepath !== '.gitignore') {
+                        menu.addItem((item) => item
+                            .setTitle('Ignore this file')
+                            .setIcon('file-minus')
+                            .onClick(async () => {
+                                try {
+                                    const pattern = `/${filepath.replace(/^\/+/, '')}`;
+                                    const added = await this.plugin.addGitIgnorePattern(pattern);
+                                    new Notice(added
+                                        ? `Added ${pattern} to .gitignore`
+                                        : `${pattern} is already in .gitignore`);
+                                    await this.refresh();
+                                } catch (err: any) {
+                                    new Notice(`Could not update .gitignore: ${err.message}`);
+                                }
+                            }));
+                    }
+                    menu.addItem((item) => item
+                        .setTitle('Edit .gitignore')
+                        .setIcon('file-edit')
+                        .onClick(async () => {
+                            try {
+                                await this.plugin.openGitIgnore();
+                            } catch (err: any) {
+                                new Notice('Could not open .gitignore: ' + err.message);
+                            }
+                        }));
+                    menu.showAtMouseEvent(e);
+                });
 
                 const btn = actions.createEl('button', { text: actionLabel, cls: 'git-file-btn' });
                 btn.setAttr('title', sectionClass === 'staged' ? 'Unstage file' : 'Stage file');
@@ -938,6 +979,14 @@ export class GitSidebarView extends ItemView {
 
     private async renderLogTab(): Promise<void> {
         const listContainer = this.contentContainer.createDiv('git-log-list');
+
+        const toolbar = listContainer.createDiv('git-log-toolbar');
+        toolbar.createSpan({ text: 'Activity', cls: 'git-log-toolbar-title' });
+        new ButtonComponent(toolbar)
+            .setButtonText('More')
+            .setTooltip('Log actions')
+            .setClass('git-btn-ghost')
+            .onClick((event) => this.openLogMenu(event));
         
         const entries = log.getEntries();
         
@@ -971,6 +1020,50 @@ export class GitSidebarView extends ItemView {
                 detail.setText(typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data).slice(0, 200));
             }
         }
+    }
+
+    private openLogMenu(event: MouseEvent): void {
+        const menu = new Menu();
+        menu.addItem((item) => item
+            .setTitle('Export log')
+            .setIcon('download')
+            .onClick(async () => {
+                try {
+                    const path = await log.exportToFile(this.app.vault);
+                    new Notice(`Log exported to ${path}`);
+                } catch (e: any) {
+                    new Notice('Could not export log: ' + e.message);
+                }
+            }));
+        menu.addItem((item) => item
+            .setTitle('Clear log')
+            .setIcon('trash-2')
+            .onClick(() => {
+                log.clear();
+                new Notice('Activity log cleared');
+                this.contentContainer.empty();
+                void this.renderLogTab();
+            }));
+        menu.addItem((item) => item
+            .setTitle('Copy details')
+            .setIcon('copy')
+            .onClick(async () => {
+                const entries = [...log.getEntries()].reverse().slice(0, 50);
+                const details = entries.length === 0
+                    ? 'No activity yet'
+                    : entries.map((entry) => {
+                        const time = new Date(entry.timestamp).toISOString();
+                        const data = entry.data ? `\n${typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data)}` : '';
+                        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+                    }).join('\n');
+                try {
+                    await navigator.clipboard.writeText(details);
+                    new Notice('Log details copied');
+                } catch (e: any) {
+                    new Notice('Could not copy log details: ' + e.message);
+                }
+            }));
+        menu.showAtMouseEvent(event);
     }
 
     // ─── Helpers ───

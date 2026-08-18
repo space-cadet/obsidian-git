@@ -1,15 +1,15 @@
 # Active Context
 
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:05:58 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 updater and release artifacts verified, pending mobile acceptance
+### T29: obsidian-git Plugin — 🔄 sidebar UX implementation in progress, mobile acceptance pending
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow and custom auto-updater are functional. Stable/dev release checks, commit-aware rolling dev detection, transactional installation rollback, direct CI assets, and unpacked `dist/` output are implemented. Production build, 28 Node tests, 10 isomorphic-git checks, and archive validation pass. Pending: authentication-backed mobile acceptance and public release.
-- **Next**: Test the current dev release on Android/iOS with a valid credential, confirm direct CI assets and ZIP, then tag v1.0.0 only with explicit authorization.
+- **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab sidebar direction are implemented in source. The current UI slice moves commit entry and secondary controls behind menus, hides the action footer on Commits and Log, and adds log actions. Production build, archive, 29 Node tests, 10 isomorphic-git checks, and `git diff --check` pass. Authentication-backed mobile acceptance and public release remain separate gates.
+- **Next**: Verify the sidebar in Obsidian with a large change set, confirm the three tab layouts on desktop and mobile, then continue the existing mobile/release gates.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
 - **Scope**: Separate authentication task covering secret-safe PAT diagnostics,
@@ -74,7 +74,7 @@
 - Protected replacement backups, shared operation coordination, and Android/
   desktop real-device acceptance remain open.
 
-### T29/T35b `.gitignore` Controls and Bulk-Stage Follow-up — 2026-08-12
+### T29/T35b `.gitignore` Controls, Bulk Staging, and Sidebar UX — 2026-08-18
 
 - Added sidebar and command-palette access to the hidden `.gitignore` file,
   per-file ignore actions, and a folder/glob pattern editor.
@@ -83,8 +83,13 @@
   indexed `TFile` list.
 - Created and verified the small private `space-cadet/git-test-small` fixture
   for clone, edit, commit, push, and mobile acceptance checks.
-- Open issue for the next session: Changes-tab bulk Add all stages only the
-  first ten files in a larger change set. Cause is not yet established.
+- Fixed the visible bulk staging regression: Add all now receives the complete
+  visible file list, continues after individual failures, and reports counts.
+- Approved the sidebar layout represented by the three mockups in
+  `memory-bank/assets/ui-mockups/`.
+- The Changes footer is now action-only and tab-specific. Commit message entry,
+  `.gitignore` controls, force push, per-file ignore, and log utilities are
+  available on demand through modals or `More` menus.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -171,7 +176,11 @@
   clone/initialize the vault ✅
 - **Authentication task separation**: T34 owns remote authentication; T29 owns
   release packaging and release acceptance ✅
-- **No conditional UI hiding**: All buttons always visible, disabled when not applicable ✅
+- **Sidebar controls are contextual**: Changes owns the commit/sync footer;
+  Commits and Log use the full height ✅
+- **Commit message is on demand**: It opens in a modal from `Commit (N)` ✅
+- **Secondary controls are grouped**: `.gitignore`, force push, ignore, and
+  log utilities are available from `More` menus ✅
 - **Dev releases on every push**: `dev` tag auto-updated, pre-release, not latest ✅
 - **v1.0.0 as public release**: v26 was internal dev version ✅
 - **GitHub API fallback for remote commits**: Use GitHub REST API when local repo unavailable ✅

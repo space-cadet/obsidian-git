@@ -83,6 +83,27 @@ interface FsAdapter {
 
 Three-tab sidebar view for Obsidian's right sidebar.
 
+#### Approved sidebar interaction model (2026-08-18)
+
+- Changes is the only tab with the bottom action bar. It contains `Commit
+  (N)`, `Pull`, `Push`, and `More`.
+- The commit message is entered in a modal opened by `Commit (N)`.
+- `.gitignore` editing, ignored-pattern management, and force push are in the
+  Changes tab's `More` menu.
+- Each changed file keeps its stage/unstage button visible. Ignore and other
+  secondary actions are in a per-file `…` menu.
+- Commits and Log hide the Changes action bar so their lists can use the full
+  sidebar height.
+- Refresh is in the branch header and therefore remains available regardless
+  of the selected tab.
+- Log actions are grouped under `More`: export, clear, and copy details.
+
+The approved visual references are stored at:
+
+- `memory-bank/assets/ui-mockups/sidebar-changes-approved.png`
+- `memory-bank/assets/ui-mockups/sidebar-commits-approved.png`
+- `memory-bank/assets/ui-mockups/sidebar-log-approved.png`
+
 **View type:** `VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view'`
 
 **Tabs:**

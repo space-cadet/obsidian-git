@@ -97,6 +97,30 @@
     font-size: var(--font-ui-small);
 }
 
+.git-header-refresh {
+    margin-left: auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.git-header-refresh:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.git-header-refresh:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
 .git-branch-dot {
     color: var(--interactive-accent);
     font-size: 10px;
@@ -309,6 +333,11 @@
     color: var(--text-on-accent);
 }
 
+.git-status-section-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 /* Collapsed state */
 .git-status-section[data-collapsed="true"] .git-status-section-list {
     display: none;
@@ -392,6 +421,27 @@
 /* Commit log */
 .git-log-list {
     padding: 4px 0;
+}
+
+.git-log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+}
+
+.git-log-toolbar-title {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: 600;
+}
+
+.git-log-toolbar button {
+    padding: 4px 10px;
+    min-height: 28px;
 }
 
 /* Commits toggle bar */
@@ -657,6 +707,19 @@
     border-top: 1px solid var(--background-modifier-border);
     background: var(--background-secondary);
     flex-shrink: 0;
+}
+
+.git-sidebar-footer-hidden {
+    display: none;
+}
+
+.git-commit-modal-description {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.git-commit-modal-input {
+    width: 100%;
 }
 
 .git-footer-message-row {

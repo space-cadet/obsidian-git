@@ -1,15 +1,15 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:05:58 IST*
 
 ## Current Session
-**Started**: 2026-08-12 14:30 IST
-**Focus Task**: T29/T35b gitignore controls and acceptance follow-up
-**Session File**: `memory-bank/sessions/2026-08-12-afternoon.md`
+**Started**: 2026-08-18 13:05 IST
+**Focus Task**: T29 approved sidebar UX implementation and bulk staging follow-up
+**Session File**: `memory-bank/sessions/2026-08-18-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29, T35b, T35e: Add hidden gitignore controls and record acceptance follow-ups
+**Session Title**: T29: Implement approved contextual sidebar actions and record UI decisions
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -20,7 +20,7 @@ source file was missing.
 
 ## Overview
 - Active: 3 parents (T29, T34, T35; T34a, T35a, T35b, T35c, T35d active) | Planned: 4 (T34b, T34c, T35e-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
-- Last Session: 2026-08-10 night (connection-test repair, updater implementation, archive output, auth task split)
+- Last Session: 2026-08-12 afternoon (gitignore controls and bulk-staging follow-up)
 - Current Period: afternoon
 
 ## Task Registry
