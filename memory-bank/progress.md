@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-08-18 13:05:58 IST*
+*Last Updated: 2026-08-18 13:32:46 IST*
 
 ## T29: Sidebar UX and bulk staging follow-up (2026-08-18)
 
@@ -20,6 +20,8 @@
 - Verification passes: production build, archive, 29 Node tests, 10
   isomorphic-git checks, and `git diff --check`. Real Obsidian desktop/mobile
   acceptance remains a separate gate.
+- Published as `4292bf9` to `origin/main`. The next session starts with real
+  Obsidian acceptance of the three tab layouts.
 
 ## Completed Phases
 

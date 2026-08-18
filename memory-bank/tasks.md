@@ -1,7 +1,7 @@
 # Memory Bank — Obsidian Git Sync Plugin
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:32:46 IST*
 
 ## Overview
 
@@ -11,7 +11,7 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
-| T29 | obsidian-git Plugin — updater and release acceptance | 🔄 | HIGH | 2026-05-31 | T1-T6 | [Details](tasks/T29.md) |
+| T29 | obsidian-git Plugin — sidebar UX published; release acceptance | 🔄 | HIGH | 2026-05-31 | T1-T6 | [Details](tasks/T29.md) |
 | T30 | Remote Commits View | ✅ | MEDIUM | 2026-06-01 | T29 | [Details](tasks/T30.md) |
 | T31 | Branch Tree View | ⏳ BACKLOG | LOW | 2026-06-01 | T29 | [Details](tasks/T31.md) |
 | T32 | Mobile Crash Fix + Progress | ✅ | HIGH | 2026-06-01 | T29 | [Details](tasks/T32.md) |

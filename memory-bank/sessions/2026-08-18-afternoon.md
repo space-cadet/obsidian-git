@@ -46,3 +46,16 @@ separate gate.
 
 ✅ CLOSED — UI implementation and repository-level verification are complete;
 real Obsidian desktop/mobile acceptance remains open.
+
+## Session Closeout — 2026-08-18 13:32:46 IST
+
+**Session Title**: T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+
+- Confirmed the implementation and approved mockups are recorded in the
+  Memory Bank.
+- Confirmed production build, archive, 29 Node tests, 10 isomorphic-git
+  checks, and `git diff --check` passed.
+- Confirmed commit `4292bf9` was pushed to `origin/main` and the worktree is
+  clean.
+- Handoff: begin the next session with real Obsidian desktop/mobile acceptance
+  of the Changes, Commits, and Log layouts.

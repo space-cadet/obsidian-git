@@ -1,7 +1,36 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-12 15:59:54 IST*
+*Last Updated: 2026-08-18 13:32:46 IST*
+
+---
+
+## 2026-08-18
+
+#### 13:32:46 IST - T29: Close out contextual sidebar UX session
+- Modified `memory-bank/tasks/T29.md` - Corrected the historical bulk-stage wording, recorded the published commit, generated the session title, and recorded the next-session acceptance handoff.
+- Modified `memory-bank/activeContext.md` - Marked the sidebar UX as published while retaining mobile, authentication, and release gates.
+- Modified `memory-bank/progress.md` - Recorded the published commit and next session entry point.
+- Modified `memory-bank/tasks.md` - Updated the T29 registry title and timestamp.
+- Modified `memory-bank/session_cache.md` - Recorded the closeout title, pushed commit, and recent session history.
+- Modified `memory-bank/sessions/2026-08-18-afternoon.md` - Appended the final verification, push evidence, and next-session handoff.
+- Modified `memory-bank/changelog.md` - Recorded the session closeout and publication evidence.
+- Modified `memory-bank/edit_history.md` - Added the closeout entries for the generated edit-history view.
+
+#### 13:05:58 IST - T29: Record approved sidebar UX and mockups
+- Modified `memory-bank/tasks/T29.md` - Recorded the approved contextual sidebar actions, explicit bulk labels, mockup paths, and implementation follow-up.
+- Modified `memory-bank/implementation-details/T29-obsidian-git.md` - Added the approved three-tab interaction model.
+- Modified `memory-bank/implementation-details/gitignore-controls.md` - Updated the control locations and closed the old first-ten-files wording.
+- Modified `memory-bank/activeContext.md` - Synchronized the active UI work and next verification gate.
+- Modified `memory-bank/progress.md` - Recorded the sidebar UX implementation and verification gate.
+- Modified `memory-bank/session_cache.md` - Started the dated UI implementation session.
+- Created `memory-bank/sessions/2026-08-18-afternoon.md` - Recorded the approved UI implementation session.
+- Created `memory-bank/assets/ui-mockups/sidebar-changes-approved.png` - Added the approved Changes mockup.
+- Created `memory-bank/assets/ui-mockups/sidebar-commits-approved.png` - Added the approved Commits mockup.
+- Created `memory-bank/assets/ui-mockups/sidebar-log-approved.png` - Added the approved Log mockup.
+- Modified `src/views/GitSidebarView.ts` - Implemented the contextual footer, commit modal, action menus, header refresh, tab-specific layout, and Log utilities.
+- Modified `src/logger.ts` - Added in-memory activity-log clearing.
+- Modified `styles.css` - Added the approved contextual sidebar styles.
 
 ### 2026-08-12
 

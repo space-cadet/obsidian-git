@@ -1,14 +1,14 @@
 # Active Context
 
-*Last Updated: 2026-08-18 13:05:58 IST*
+*Last Updated: 2026-08-18 13:32:46 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 sidebar UX implementation in progress, mobile acceptance pending
+### T29: obsidian-git Plugin — 🔄 sidebar UX published, mobile acceptance pending
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab sidebar direction are implemented in source. The current UI slice moves commit entry and secondary controls behind menus, hides the action footer on Commits and Log, and adds log actions. Production build, archive, 29 Node tests, 10 isomorphic-git checks, and `git diff --check` pass. Authentication-backed mobile acceptance and public release remain separate gates.
+- **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab sidebar direction are implemented and published in commit `4292bf9`. The UI slice moves commit entry and secondary controls behind menus, hides the action footer on Commits and Log, and adds log actions. Production build, archive, 29 Node tests, 10 isomorphic-git checks, and `git diff --check` pass. Authentication-backed mobile acceptance and public release remain separate gates.
 - **Next**: Verify the sidebar in Obsidian with a large change set, confirm the three tab layouts on desktop and mobile, then continue the existing mobile/release gates.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active

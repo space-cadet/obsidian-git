@@ -1,15 +1,21 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-18 13:05:58 IST*
+*Last Updated: 2026-08-18 13:32:46 IST*
 
 ## Current Session
 **Started**: 2026-08-18 13:05 IST
-**Focus Task**: T29 approved sidebar UX implementation and bulk staging follow-up
+**Focus Task**: T29 session closeout and next-session handoff
 **Session File**: `memory-bank/sessions/2026-08-18-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29: Implement approved contextual sidebar actions and record UI decisions
+**Session Title**: T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+
+**Closeout Commit**: `4292bf9` pushed to `origin/main`
+
+**Next Session**: Begin with real Obsidian desktop/mobile acceptance of the
+three sidebar layouts, then continue the existing authentication and release
+gates.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -92,9 +98,10 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   coordination, then complete mobile acceptance while preserving T29 and T34
   ownership boundaries.
 
-## Session History (Last 5)
-1. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
-2. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
-3. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
-4. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
-5. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
+## Session History (Recent)
+1. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+2. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
+3. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+4. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+5. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
+6. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
