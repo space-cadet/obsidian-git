@@ -387,6 +387,12 @@ export interface GitFileStatus {
     status: 'modified' | 'added' | 'deleted' | 'untracked' | 'staged' | 'conflict';
 }
 
+export interface BulkStageResult {
+    requested: number;
+    staged: string[];
+    failed: Array<{ filepath: string; message: string }>;
+}
+
 export interface GitCommit {
     oid: string;
     message: string;
@@ -1120,23 +1126,42 @@ export class GitManager {
     /**
      * Add all changes to staging
      */
-    async addAll(): Promise<void> {
+    async addAll(files?: readonly string[]): Promise<BulkStageResult> {
         try {
-            this.updateStatus('Adding changes...');
-            
-            // Get all files in the directory
-            const files = await this.getChangedFiles();
-            
-            // Add each file to staging
-            for (const file of files) {
-                await git.add({
-                    fs: this.fs,
-                    dir: this.dir,
-                    filepath: file
-                });
+            // When the sidebar supplies a list, use exactly what the user saw.
+            // The sync path has no rendered list, so it discovers the files here.
+            const filesToStage = files
+                ? filterAutomaticallyStagedPaths([...new Set(files)])
+                : await this.getChangedFiles();
+            const staged: string[] = [];
+            const failed: Array<{ filepath: string; message: string }> = [];
+
+            this.updateStatus(filesToStage.length > 0
+                ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? '' : 's'}...`
+                : 'No changes to add');
+
+            // Keep going if one file cannot be staged. A single bad file must
+            // not make the user lose the progress made on all the other files.
+            for (const file of filesToStage) {
+                try {
+                    await git.add({
+                        fs: this.fs,
+                        dir: this.dir,
+                        filepath: file
+                    });
+                    staged.push(file);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    failed.push({ filepath: file, message });
+                    log.error('GitManager', `Failed to stage ${file}`, error as Error);
+                }
             }
-            
-            this.updateStatus('Changes added');
+
+            const result = { requested: filesToStage.length, staged, failed };
+            this.updateStatus(failed.length > 0
+                ? `Staged ${staged.length}; ${failed.length} failed`
+                : `Staged ${staged.length} change${staged.length === 1 ? '' : 's'}`);
+            return result;
         } catch (error) {
             log.error('GitManager', 'Failed to add changes', error as Error);
             this.updateStatus('Failed to add changes');
@@ -1698,8 +1723,14 @@ export class GitManager {
             if (changedFiles.length > 0) {
                 log.debug('GitManager', `Changed files: ${changedFiles.join(', ')}`);
                 
-                // Add all changes
-                await this.addAll();
+                // Add the same snapshot that was checked above. If one file
+                // fails, do not commit a partial automatic sync.
+                const stageResult = await this.addAll(changedFiles);
+                if (stageResult.failed.length > 0) {
+                    throw new Error(
+                        `Could not stage ${stageResult.failed.length} of ${stageResult.requested} changed file(s).`
+                    );
+                }
                 
                 // Commit changes
                 await this.commit(commitMessage);

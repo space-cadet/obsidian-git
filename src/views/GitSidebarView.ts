@@ -362,6 +362,17 @@ export class GitSidebarView extends ItemView {
         // Update header with hasReal status
         this.renderHeader(branch, ahead, behind, initialized, hasReal);
 
+        // Keep the footer's Commit button accurate even when the user is on
+        // Commits or Log rather than the Changes tab.
+        this.stagedCount = 0;
+        if (initialized && this.plugin.gitManager) {
+            try {
+                this.stagedCount = (await this.plugin.gitManager.getStatusGroups()).staged.length;
+            } catch (e) {
+                log.warn('GitSidebar', 'Failed to refresh staged-file count', e);
+            }
+        }
+
         // Render tab content
         this.contentContainer.empty();
 
@@ -525,8 +536,16 @@ export class GitSidebarView extends ItemView {
                     new Notice(`Staged ${fp}`);
                 },
                 async () => {
-                    await this.plugin.gitManager!.addAll();
-                    new Notice('All changes staged');
+                    const result = await this.plugin.gitManager!.addAll(unstaged);
+                    if (result.failed.length > 0) {
+                        const firstFailure = result.failed[0];
+                        new Notice(
+                            `Staged ${result.staged.length} of ${result.requested} files. ` +
+                            `${result.failed.length} failed (first: ${firstFailure.filepath}).`
+                        );
+                    } else {
+                        new Notice(`Staged ${result.staged.length} file${result.staged.length === 1 ? '' : 's'}.`);
+                    }
                 }
             );
 
@@ -588,15 +607,25 @@ export class GitSidebarView extends ItemView {
         });
         
         // Bulk action button (always visible)
-        const bulkBtn = header.createEl('button', { text: bulkLabel, cls: 'git-status-section-action' });
+        const bulkBtn = header.createEl('button', { text: bulkLabel, cls: 'git-status-section-action' }) as HTMLButtonElement;
         bulkBtn.setAttr('title', bulkLabel);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
+            if (bulkBtn.disabled) return;
+            bulkBtn.disabled = true;
+            bulkBtn.textContent = 'Working…';
+            bulkBtn.setAttr('aria-busy', 'true');
             try {
                 await onBulk();
                 await this.refresh();
             } catch (err: any) {
                 new Notice(`${bulkLabel} failed: ${err.message}`);
+            } finally {
+                if (bulkBtn.isConnected) {
+                    bulkBtn.disabled = false;
+                    bulkBtn.textContent = bulkLabel;
+                    bulkBtn.removeAttribute('aria-busy');
+                }
             }
         });
 

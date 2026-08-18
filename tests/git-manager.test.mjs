@@ -208,6 +208,33 @@ test('sync does not initialize or clone a missing local repository', async () =>
   requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
 });
 
+test('addAll stages more than ten changed files', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-add-all-'));
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    for (let index = 1; index <= 25; index += 1) {
+      await fsPromises.writeFile(join(stageDirectory, `changed-${String(index).padStart(2, '0')}.md`), `file ${index}\n`);
+    }
+
+    const manager = new GitManager(fsPromises, stageDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    const result = await manager.addAll();
+    assert.equal(result.requested, 25);
+    assert.equal(result.staged.length, 25);
+    assert.deepEqual(result.failed, []);
+
+    const matrix = await git.statusMatrix({ fs: fsPromises, dir: stageDirectory });
+    assert.equal(matrix.filter(([, , , stage]) => stage !== 0 && stage !== 1).length, 25);
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
 test('clone retains initialized partial git state when the remote fails', async () => {
   const cloneDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-resume-'));
   requestUrlImpl = async () => {

@@ -19996,18 +19996,29 @@ Try again with a faster connection or smaller repository.`
       /**
        * Add all changes to staging
        */
-      async addAll() {
+      async addAll(files) {
         try {
-          this.updateStatus("Adding changes...");
-          const files = await this.getChangedFiles();
-          for (const file of files) {
-            await add({
-              fs: this.fs,
-              dir: this.dir,
-              filepath: file
-            });
+          const filesToStage = files ? filterAutomaticallyStagedPaths([...new Set(files)]) : await this.getChangedFiles();
+          const staged = [];
+          const failed = [];
+          this.updateStatus(filesToStage.length > 0 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? "" : "s"}...` : "No changes to add");
+          for (const file of filesToStage) {
+            try {
+              await add({
+                fs: this.fs,
+                dir: this.dir,
+                filepath: file
+              });
+              staged.push(file);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              failed.push({ filepath: file, message });
+              log2.error("GitManager", `Failed to stage ${file}`, error);
+            }
           }
-          this.updateStatus("Changes added");
+          const result = { requested: filesToStage.length, staged, failed };
+          this.updateStatus(failed.length > 0 ? `Staged ${staged.length}; ${failed.length} failed` : `Staged ${staged.length} change${staged.length === 1 ? "" : "s"}`);
+          return result;
         } catch (error) {
           log2.error("GitManager", "Failed to add changes", error);
           this.updateStatus("Failed to add changes");
@@ -20490,7 +20501,12 @@ Try again with a faster connection or smaller repository.`
           log2.info("GitManager", `Found ${changedFiles.length} changed files`);
           if (changedFiles.length > 0) {
             log2.debug("GitManager", `Changed files: ${changedFiles.join(", ")}`);
-            await this.addAll();
+            const stageResult = await this.addAll(changedFiles);
+            if (stageResult.failed.length > 0) {
+              throw new Error(
+                `Could not stage ${stageResult.failed.length} of ${stageResult.requested} changed file(s).`
+              );
+            }
             await this.commit(commitMessage);
             if (repoUrl) {
               await this.push(branchName);
@@ -20983,6 +20999,14 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       branch2 = "No repo";
     }
     this.renderHeader(branch2, ahead, behind, initialized, hasReal);
+    this.stagedCount = 0;
+    if (initialized && this.plugin.gitManager) {
+      try {
+        this.stagedCount = (await this.plugin.gitManager.getStatusGroups()).staged.length;
+      } catch (e) {
+        log2.warn("GitSidebar", "Failed to refresh staged-file count", e);
+      }
+    }
     this.contentContainer.empty();
     if (!initialized) {
       await this.renderUninitializedContent(hasReal);
@@ -21113,8 +21137,15 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           new import_obsidian4.Notice(`Staged ${fp}`);
         },
         async () => {
-          await this.plugin.gitManager.addAll();
-          new import_obsidian4.Notice("All changes staged");
+          const result = await this.plugin.gitManager.addAll(unstaged);
+          if (result.failed.length > 0) {
+            const firstFailure = result.failed[0];
+            new import_obsidian4.Notice(
+              `Staged ${result.staged.length} of ${result.requested} files. ${result.failed.length} failed (first: ${firstFailure.filepath}).`
+            );
+          } else {
+            new import_obsidian4.Notice(`Staged ${result.staged.length} file${result.staged.length === 1 ? "" : "s"}.`);
+          }
         }
       );
     } catch (e) {
@@ -21154,11 +21185,22 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     bulkBtn.setAttr("title", bulkLabel);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
+      if (bulkBtn.disabled)
+        return;
+      bulkBtn.disabled = true;
+      bulkBtn.textContent = "Working\u2026";
+      bulkBtn.setAttr("aria-busy", "true");
       try {
         await onBulk();
         await this.refresh();
       } catch (err) {
         new import_obsidian4.Notice(`${bulkLabel} failed: ${err.message}`);
+      } finally {
+        if (bulkBtn.isConnected) {
+          bulkBtn.disabled = false;
+          bulkBtn.textContent = bulkLabel;
+          bulkBtn.removeAttribute("aria-busy");
+        }
       }
     });
     header.addEventListener("click", (e) => {
@@ -21723,7 +21765,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "117f6961ddb4d90ef8b278a9c93e827d149b8d9f" : "unknown";
+var GIT_COMMIT_HASH = true ? "77999725cdaac1f79cb78bc760594405f2fad3dc" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";
