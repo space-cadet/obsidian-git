@@ -132,6 +132,16 @@ function branchFromRelease(release: ReleaseInfo): string {
 	return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : 'main';
 }
 
+function releaseLabel(release: ReleaseInfo): string {
+	const version = release.tag_name.replace(/^v/, '');
+	if (!release.prerelease) return `Stable · ${version}`;
+	if (release.tag_name === 'dev') return 'Dev · main';
+	if (release.tag_name.startsWith('latest-dev-')) {
+		return `Dev · ${branchFromRelease(release)}`;
+	}
+	return `Dev · ${version}`;
+}
+
 /** Extract the immutable source identity recorded in an automated release. */
 function commitInfoFromRelease(release: ReleaseInfo): CommitInfo | null {
 	const sha = release.body?.match(/\*\*Commit:\*\*\s*`([^`]+)`/)?.[1];
@@ -305,13 +315,20 @@ export class PluginUpdater {
 		}
 	}
 
-	/** Return the published dev build for each available branch. */
+	/** Return every published stable and development build. */
 	async listAvailableBuilds(): Promise<AvailableBuild[]> {
-		const releases = await fetchJson(
-			`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&_cb=${Date.now()}`,
-		) as ReleaseInfo[];
+		const releases: ReleaseInfo[] = [];
+		let page = 1;
+		while (true) {
+			const pageReleases = await fetchJson(
+				`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}&_cb=${Date.now()}`,
+			) as ReleaseInfo[];
+			if (!Array.isArray(pageReleases) || pageReleases.length === 0) break;
+			releases.push(...pageReleases);
+			if (pageReleases.length < 100) break;
+			page += 1;
+		}
 		return (releases ?? [])
-			.filter((release) => release.prerelease && release.tag_name.startsWith('latest-dev'))
 			.map((release) => {
 				const commitInfo = commitInfoFromRelease(release);
 				return {
@@ -482,7 +499,7 @@ export class UpdateAvailableModal extends Modal {
 	}
 }
 
-/** Modal for selecting a published dev build from any branch. */
+/** Modal for selecting any published stable or development build. */
 export class AvailableBuildsModal extends Modal {
 	private builds: AvailableBuild[] = [];
 
@@ -497,15 +514,15 @@ export class AvailableBuildsModal extends Modal {
 	async onOpen() {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl('h2', { text: 'Available dev builds' });
-		contentEl.createEl('p', { text: 'Choose a published branch build to download and install.' });
+		contentEl.createEl('h2', { text: 'Available builds' });
+		contentEl.createEl('p', { text: 'Choose any published stable or development build to download and install.' });
 		const status = contentEl.createEl('p', { text: 'Loading builds…' });
 
 		try {
 			this.builds = await this.updater.listAvailableBuilds();
 			status.remove();
 			if (this.builds.length === 0) {
-				contentEl.createEl('p', { text: 'No branch builds are currently available.' });
+				contentEl.createEl('p', { text: 'No published builds are currently available.' });
 				return;
 			}
 
@@ -514,7 +531,7 @@ export class AvailableBuildsModal extends Modal {
 					? new Date(build.committedAt).toLocaleString()
 					: new Date(build.release.published_at).toLocaleString();
 				new Setting(contentEl)
-					.setName(build.branch)
+					.setName(releaseLabel(build.release))
 					.setDesc(`${build.release.name} · ${build.commitHash?.slice(0, 7) ?? 'commit unavailable'} · ${timestamp}`)
 					.addButton((button) => button.setButtonText('Install').onClick(async () => {
 						button.setDisabled(true);

@@ -159,22 +159,42 @@ test('stable channel reports a GitHub error instead of saying it is up to date',
 
 test('listAvailableBuilds exposes branch and release commit metadata', async () => {
   requestUrlImpl = async ({ url }) => {
-    assert.match(url, /releases\?per_page=100&_cb=/);
-    return jsonResponse([{
-      tag_name: 'latest-dev-feature-ui',
-      name: 'Feature UI build',
-      body: '**Commit:** `abcdef1234567890`\n**Built at:** 2026-09-02T00:00:00Z',
-      prerelease: true,
-      published_at: '2026-09-02T00:00:00Z',
-      assets: [],
-    }]);
+    assert.match(url, /releases\?per_page=100&page=1&_cb=/);
+    return jsonResponse([
+      {
+        tag_name: 'v1.0.0',
+        name: 'Stable build',
+        body: '',
+        prerelease: false,
+        published_at: '2026-09-01T00:00:00Z',
+        assets: [],
+      },
+      {
+        tag_name: 'dev',
+        name: 'Main dev build',
+        body: '**Commit:** `1234567890abcdef`\n**Built at:** 2026-09-02T00:00:00Z',
+        prerelease: true,
+        published_at: '2026-09-02T00:00:00Z',
+        assets: [],
+      },
+      {
+        tag_name: 'latest-dev-feature-ui',
+        name: 'Feature UI build',
+        body: '**Commit:** `abcdef1234567890`\n**Built at:** 2026-09-02T00:00:00Z',
+        prerelease: true,
+        published_at: '2026-09-02T00:00:00Z',
+        assets: [],
+      },
+    ]);
   };
 
   const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
   const builds = await updater.listAvailableBuilds();
-  assert.equal(builds.length, 1);
-  assert.equal(builds[0].branch, 'feature-ui');
-  assert.equal(builds[0].commitHash, 'abcdef1234567890');
+  assert.equal(builds.length, 3);
+  assert.equal(builds[0].branch, 'main');
+  assert.equal(builds[1].commitHash, '1234567890abcdef');
+  assert.equal(builds[2].branch, 'feature-ui');
+  assert.equal(builds[2].commitHash, 'abcdef1234567890');
 });
 
 test('downloadUpdate requires direct release assets and validates plugin identity', async () => {

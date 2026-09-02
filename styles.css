@@ -1884,6 +1884,45 @@
     }
 }
 
+/* Compact typography correction: keep the mockup hierarchy without making
+   ordinary sidebar rows read like headings. */
+.git-tab-btn,
+.git-header-branch,
+.git-header-status,
+.git-status-section-header,
+.git-status-section-label,
+.git-status-section-count,
+.git-status-section-action,
+.git-file-path,
+.git-commits-toggle-btn,
+.git-commit-date,
+.git-commit-meta,
+.git-commit-file-row,
+.git-log-entry,
+.git-footer-buttons-row button {
+    font-size: var(--font-ui-small) !important;
+}
+
+.git-branch-name {
+    font-size: 18px;
+}
+
+.git-status-icon {
+    font-size: 16px;
+}
+
+.git-commit-summary .git-commit-message {
+    font-size: 17px;
+}
+
+.git-commit-toggle {
+    font-size: 20px;
+}
+
+.git-commit-file-icon {
+    font-size: 20px;
+}
+
 /* ============================================
    Git Progress Modal — Git Bash Dark Theme
    ============================================ */

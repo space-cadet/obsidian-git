@@ -18,7 +18,8 @@ transactional install and rollback behavior where it is stronger.
 - The current build branch is embedded alongside its commit hash. Dev checks
   prefer a matching `latest-dev-<branch>` release and fall back to the rolling
   main build.
-- Settings can browse and install published branch builds.
+- Settings can browse and install every published stable, rolling-dev, and
+  branch-specific development build.
 - A feature-branch workflow publishes direct plugin assets and a ZIP using the
   same `latest-dev-<branch>` naming convention.
 
@@ -37,3 +38,10 @@ transactional install and rollback behavior where it is stronger.
 - Confirm manual and automatic install reload the running plugin correctly.
 - Add checksum or signed metadata verification before install.
 - Clean temporary update directories after every failed download path.
+
+## Sidebar typography follow-up — 2026-09-02
+
+The final mockup override block had promoted ordinary sidebar content to medium
+or 20–24px text. Tabs, status text, file paths, commit metadata, log rows, and
+footer controls now use the compact Obsidian small UI scale, with only branch
+and commit titles retaining a modest visual hierarchy.

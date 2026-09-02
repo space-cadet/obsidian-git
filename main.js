@@ -21741,6 +21741,17 @@ function branchFromRelease(release) {
   const prefix = "latest-dev-";
   return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : "main";
 }
+function releaseLabel(release) {
+  const version2 = release.tag_name.replace(/^v/, "");
+  if (!release.prerelease)
+    return `Stable \xB7 ${version2}`;
+  if (release.tag_name === "dev")
+    return "Dev \xB7 main";
+  if (release.tag_name.startsWith("latest-dev-")) {
+    return `Dev \xB7 ${branchFromRelease(release)}`;
+  }
+  return `Dev \xB7 ${version2}`;
+}
 function commitInfoFromRelease(release) {
   var _a, _b, _c, _d, _e, _f;
   const sha = (_b = (_a = release.body) == null ? void 0 : _a.match(/\*\*Commit:\*\*\s*`([^`]+)`/)) == null ? void 0 : _b[1];
@@ -21877,12 +21888,22 @@ var PluginUpdater = class {
       };
     }
   }
-  /** Return the published dev build for each available branch. */
+  /** Return every published stable and development build. */
   async listAvailableBuilds() {
-    const releases = await fetchJson(
-      `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&_cb=${Date.now()}`
-    );
-    return (releases != null ? releases : []).filter((release) => release.prerelease && release.tag_name.startsWith("latest-dev")).map((release) => {
+    const releases = [];
+    let page = 1;
+    while (true) {
+      const pageReleases = await fetchJson(
+        `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}&_cb=${Date.now()}`
+      );
+      if (!Array.isArray(pageReleases) || pageReleases.length === 0)
+        break;
+      releases.push(...pageReleases);
+      if (pageReleases.length < 100)
+        break;
+      page += 1;
+    }
+    return (releases != null ? releases : []).map((release) => {
       var _a;
       const commitInfo = commitInfoFromRelease(release);
       return {
@@ -22045,19 +22066,19 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
     var _a, _b;
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Available dev builds" });
-    contentEl.createEl("p", { text: "Choose a published branch build to download and install." });
+    contentEl.createEl("h2", { text: "Available builds" });
+    contentEl.createEl("p", { text: "Choose any published stable or development build to download and install." });
     const status2 = contentEl.createEl("p", { text: "Loading builds\u2026" });
     try {
       this.builds = await this.updater.listAvailableBuilds();
       status2.remove();
       if (this.builds.length === 0) {
-        contentEl.createEl("p", { text: "No branch builds are currently available." });
+        contentEl.createEl("p", { text: "No published builds are currently available." });
         return;
       }
       for (const build of this.builds) {
         const timestamp = build.committedAt ? new Date(build.committedAt).toLocaleString() : new Date(build.release.published_at).toLocaleString();
-        new import_obsidian5.Setting(contentEl).setName(build.branch).setDesc(`${build.release.name} \xB7 ${(_b = (_a = build.commitHash) == null ? void 0 : _a.slice(0, 7)) != null ? _b : "commit unavailable"} \xB7 ${timestamp}`).addButton((button) => button.setButtonText("Install").onClick(async () => {
+        new import_obsidian5.Setting(contentEl).setName(releaseLabel(build.release)).setDesc(`${build.release.name} \xB7 ${(_b = (_a = build.commitHash) == null ? void 0 : _a.slice(0, 7)) != null ? _b : "commit unavailable"} \xB7 ${timestamp}`).addButton((button) => button.setButtonText("Install").onClick(async () => {
           button.setDisabled(true);
           button.setButtonText("Installing\u2026");
           try {
@@ -22082,7 +22103,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "4dae04cf08df5fa42de9beaaf36d6894778c2499" : "unknown";
+var GIT_COMMIT_HASH = true ? "7d9e5b03a1d8d8889fc1a26cb44d76a8152af081" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -22837,7 +22858,7 @@ var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {
       if (value)
         new import_obsidian6.Notice("Auto-update enabled for stable releases.");
     }));
-    new import_obsidian6.Setting(containerEl).setName("Available branch builds").setDesc("Browse and install published development builds from any branch.").addButton((button) => button.setButtonText("Browse builds").onClick(() => this.plugin.showAvailableBuilds()));
+    new import_obsidian6.Setting(containerEl).setName("Available builds").setDesc("Browse and install any published stable or development build.").addButton((button) => button.setButtonText("Browse builds").onClick(() => this.plugin.showAvailableBuilds()));
     const versionSetting = new import_obsidian6.Setting(containerEl).setName("Current plugin version").addButton((button) => button.setButtonText("Check Now").setCta().onClick(async () => {
       button.setDisabled(true);
       button.setButtonText("Checking\u2026");

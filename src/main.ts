@@ -961,8 +961,8 @@ class GitSyncSettingTab extends PluginSettingTab {
 					}));
 
 		new Setting(containerEl)
-			.setName('Available branch builds')
-			.setDesc('Browse and install published development builds from any branch.')
+			.setName('Available builds')
+			.setDesc('Browse and install any published stable or development build.')
 			.addButton(button => button
 				.setButtonText('Browse builds')
 				.onClick(() => this.plugin.showAvailableBuilds()));
