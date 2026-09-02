@@ -42,7 +42,7 @@ buildSync({
   logLevel: 'silent',
 });
 
-const { PluginUpdater, compareVersions, commitInfoFromRelease, releaseLabel } = await import(bundlePath);
+const { PluginUpdater, compareVersions, commitInfoFromRelease, releaseLabel, withTimeout } = await import(bundlePath);
 
 test.after(() => {
   Module._load = originalLoad;
@@ -53,7 +53,7 @@ function jsonResponse(value) {
   return { status: 200, text: JSON.stringify(value) };
 }
 
-function createAdapter(initialFiles = {}) {
+function createAdapter(initialFiles = {}, listedFolders = []) {
   const files = new Map(Object.entries(initialFiles));
   const removedDirectories = [];
   let failNextPluginWrite = false;
@@ -74,6 +74,7 @@ function createAdapter(initialFiles = {}) {
       }
       files.set(path, data);
     },
+    async list() { return { files: [], folders: listedFolders }; },
     async remove(path) { files.delete(path); },
     async rmdir(path) {
       removedDirectories.push(path);
@@ -135,6 +136,13 @@ test('compareVersions handles stable versions and rolling dev tags', () => {
   assert.equal(compareVersions('1.2.0', '1.1.9') > 0, true);
   assert.equal(compareVersions('dev', '1.0.0') > 0, true);
   assert.equal(compareVersions('dev', 'dev'), 0);
+});
+
+test('withTimeout rejects a stalled updater operation', async () => {
+  await assert.rejects(
+    withTimeout(new Promise(() => {}), 5, 'simulated updater timeout'),
+    /simulated updater timeout/,
+  );
 });
 
 test('release metadata keeps optional commit subjects and hides full SHAs from labels', () => {
@@ -380,6 +388,34 @@ test('downloadUpdate extracts the published ZIP when direct assets are unavailab
   assert.equal(await adapter.read(`${tempDir}/main.js`), 'updated main');
   assert.equal(await adapter.read(`${tempDir}/manifest.json`), '{"id":"obsidian-git-sync","version":"1.1.0"}');
   assert.equal(await adapter.read(`${tempDir}/styles.css`), 'updated css');
+});
+
+test('downloadUpdate removes stale temporary folders before starting', async () => {
+  const pluginDir = '.obsidian/plugins/obsidian-git-sync';
+  const staleDir = `${pluginDir}/.update-tmp-123`;
+  const adapter = createAdapter({ [`${staleDir}/main.js`]: 'stale' }, [staleDir]);
+  requestUrlImpl = async ({ url }) => {
+    const filename = url.split('/').pop();
+    if (filename === 'manifest.json') return jsonResponse({ id: 'obsidian-git-sync', version: '1.1.0' });
+    return { status: 200, text: `updated ${filename}` };
+  };
+
+  const updater = new PluginUpdater(createApp(adapter), 'obsidian-git-sync');
+  await updater.downloadUpdate({
+    tag_name: 'v1.1.0',
+    name: 'v1.1.0',
+    body: '',
+    prerelease: false,
+    published_at: '',
+    html_url: '',
+    assets: ['main.js', 'manifest.json', 'styles.css'].map((name) => ({
+      name,
+      browser_download_url: `https://example.test/${name}`,
+    })),
+  });
+
+  assert.equal(await adapter.exists(`${staleDir}/main.js`), false);
+  assert.deepEqual(adapter.removedDirectories, [staleDir]);
 });
 
 test('installUpdate restores every original file after a partial write failure', async () => {

@@ -54,6 +54,7 @@ export interface UpdateCheckResult {
 const GITHUB_REPO = 'space-cadet/obsidian-git';
 const RELEASE_FILES = ['main.js', 'manifest.json', 'styles.css'];
 const BACKUP_STATE_FILE = 'state.json';
+const UPDATE_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * Compare the numeric portions of two plugin versions. Rolling development
@@ -79,12 +80,34 @@ export function compareVersions(version1: string, version2: string): number {
 	return 0;
 }
 
+export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+	let timeoutId: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			operation,
+			new Promise<T>((_, reject) => {
+				timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+			}),
+		]);
+	} finally {
+		if (timeoutId !== undefined) clearTimeout(timeoutId);
+	}
+}
+
+async function requestUpdate(url: string, label: string): Promise<any> {
+	return withTimeout(
+		requestUrl({
+			url,
+			method: 'GET',
+			headers: { 'User-Agent': 'obsidian-git-sync-updater' },
+		}),
+		UPDATE_REQUEST_TIMEOUT_MS,
+		`Timed out downloading ${label}. Check your network connection and try again.`,
+	);
+}
+
 async function fetchJson(url: string): Promise<any> {
-	const response = await requestUrl({
-		url,
-		method: 'GET',
-		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
-	});
+	const response = await requestUpdate(url, 'the update information');
 	if (response.status < 200 || response.status >= 300) {
 		let message = `HTTP ${response.status}`;
 		try {
@@ -116,24 +139,20 @@ async function fetchLatestCommit(branch = 'main'): Promise<CommitInfo | null> {
 	}
 }
 
-async function downloadFile(app: App, url: string, destination: string): Promise<void> {
-	const response = await requestUrl({
-		url,
-		method: 'GET',
-		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
-	});
+async function downloadFile(app: App, url: string, destination: string, label: string): Promise<void> {
+	const response = await requestUpdate(url, label);
 	if (response.status < 200 || response.status >= 300) {
 		throw new Error(`Download failed: HTTP ${response.status}`);
 	}
-	await app.vault.adapter.write(destination, response.text);
+	await withTimeout(
+		app.vault.adapter.write(destination, response.text),
+		UPDATE_REQUEST_TIMEOUT_MS,
+		`Timed out writing ${label}. Check that the vault storage is available and try again.`,
+	);
 }
 
-async function downloadBinary(url: string): Promise<Uint8Array> {
-	const response = await requestUrl({
-		url,
-		method: 'GET',
-		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
-	});
+async function downloadBinary(url: string, label: string): Promise<Uint8Array> {
+	const response = await requestUpdate(url, label);
 	if (response.status < 200 || response.status >= 300) {
 		throw new Error(`Download failed: HTTP ${response.status}`);
 	}
@@ -290,11 +309,19 @@ export class PluginUpdater {
 	}
 
 	private async readFile(path: string): Promise<string> {
-		return this.app.vault.adapter.read(path);
+		return withTimeout(
+			this.app.vault.adapter.read(path),
+			UPDATE_REQUEST_TIMEOUT_MS,
+			`Timed out reading ${path}. Check that the vault storage is available and try again.`,
+		);
 	}
 
 	private async writeFile(path: string, data: string): Promise<void> {
-		await this.app.vault.adapter.write(path, data);
+		await withTimeout(
+			this.app.vault.adapter.write(path, data),
+			UPDATE_REQUEST_TIMEOUT_MS,
+			`Timed out writing ${path}. Check that the vault storage is available and try again.`,
+		);
 	}
 
 	private async removeFile(path: string): Promise<void> {
@@ -312,6 +339,28 @@ export class PluginUpdater {
 			} catch {
 				// Temporary update files are best-effort cleanup only.
 			}
+		}
+	}
+
+	/** Remove temporary directories left by an interrupted earlier update. */
+	private async cleanupStaleUpdateDirectories(): Promise<void> {
+		const adapter = this.app.vault.adapter as any;
+		if (typeof adapter.list !== 'function') return;
+
+		try {
+			const listed = await adapter.list(this.pluginDir);
+			const prefix = `${this.pluginDir}/`;
+			for (const folder of listed?.folders ?? []) {
+				const normalized = String(folder).replace(/\\/g, '/');
+				const name = normalized.startsWith(prefix) ? normalized.slice(prefix.length) : normalized;
+				if (/^\.update-tmp-\d+$/.test(name)) {
+					this.log('info', 'Removing stale updater folder:', normalized);
+					await this.removeDirectory(normalized.startsWith(prefix) ? normalized : `${this.pluginDir}/${name}`);
+				}
+			}
+		} catch (error) {
+			// Cleanup should never prevent a new update from being attempted.
+			this.log('debug', 'Could not inspect stale updater folders:', error);
 		}
 	}
 
@@ -437,13 +486,16 @@ export class PluginUpdater {
 	async downloadUpdate(release: ReleaseInfo): Promise<string> {
 		const tempDir = `${this.pluginDir}/.update-tmp-${Date.now()}`;
 		try {
+			await this.cleanupStaleUpdateDirectories();
 			await this.ensureDir(tempDir);
 
 			const assets = release.assets ?? [];
 			const directAssets = RELEASE_FILES.map((filename) => assets.find((asset) => asset.name === filename));
 			if (directAssets.every((asset): asset is ReleaseAsset => Boolean(asset))) {
 				for (let index = 0; index < RELEASE_FILES.length; index += 1) {
-					await downloadFile(this.app, directAssets[index].browser_download_url, `${tempDir}/${RELEASE_FILES[index]}`);
+					const filename = RELEASE_FILES[index];
+					this.log('info', 'Downloading update asset:', filename);
+					await downloadFile(this.app, directAssets[index].browser_download_url, `${tempDir}/${filename}`, filename);
 				}
 			} else {
 				const archive = assets.find((asset) => /\.zip$/i.test(asset.name));
@@ -451,7 +503,8 @@ export class PluginUpdater {
 					const missing = RELEASE_FILES.filter((_, index) => !directAssets[index]).join(', ');
 					throw new Error(`Release has no installable plugin assets (missing ${missing}). Publish direct plugin assets or a ZIP archive.`);
 				}
-				const archiveBytes = await downloadBinary(archive.browser_download_url);
+				this.log('info', 'Downloading update archive:', archive.name);
+				const archiveBytes = await downloadBinary(archive.browser_download_url, archive.name);
 				for (const filename of RELEASE_FILES) {
 					const contents = await readZipEntry(archiveBytes, filename);
 					if (!contents) throw new Error(`Release archive is missing ${filename}.`);
