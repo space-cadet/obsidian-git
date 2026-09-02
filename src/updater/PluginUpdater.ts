@@ -144,13 +144,14 @@ function releaseLabel(release: ReleaseInfo): string {
 
 /** Extract the immutable source identity recorded in an automated release. */
 function commitInfoFromRelease(release: ReleaseInfo): CommitInfo | null {
-	const sha = release.body?.match(/\*\*Commit:\*\*\s*`([^`]+)`/)?.[1];
+	const sha = release.body?.match(/^\s*(?:-\s*)?(?:\*\*)?Commit:(?:\*\*)?\s*`?([^`\s]+)`?\s*$/im)?.[1];
 	if (!sha) return null;
+	const builtAt = release.body?.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Built at|Timestamp):(?:\*\*)?\s*(.+)\s*$/im)?.[1]?.trim();
 	return {
 		sha,
 		message: release.name || `Published ${release.tag_name}`,
 		authorName: 'GitHub Actions',
-		committedAt: release.body?.match(/\*\*Built at:\*\*\s*(.+)/)?.[1]?.trim() ?? release.published_at,
+		committedAt: builtAt ?? release.published_at,
 	};
 }
 
@@ -263,7 +264,7 @@ export class PluginUpdater {
 
 			const latestVersion = release.tag_name.replace(/^v/, '');
 			const latestCommit = includePrerelease
-				? commitInfoFromRelease(release)
+				? commitInfoFromRelease(release) ?? await fetchLatestCommit(branchFromRelease(release))
 				: await fetchLatestCommit('main');
 			this.log('info', 'latestCommit:', latestCommit?.sha?.slice(0, 7));
 			let commitMatch = false;
@@ -285,8 +286,8 @@ export class PluginUpdater {
 				}
 			}
 
-			// Rolling dev releases reuse one tag, so the release commit is the
-			// authoritative update signal when it is available.
+			// Rolling dev releases reuse one tag, so compare the recorded release
+			// commit, or the branch head when older metadata has no commit line.
 			const hasUpdate =
 				includePrerelease && currentCommitHash
 					? latestCommit ? !commitMatch : false

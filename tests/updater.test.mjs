@@ -112,6 +112,57 @@ test('dev channel selects the rolling dev release and suppresses matching commit
   assert.equal(result.release.tag_name, 'dev');
 });
 
+test('dev channel detects a fresh main build using the release workflow format', async () => {
+  requestUrlImpl = async ({ url }) => {
+    if (url.includes('/releases?')) {
+      return jsonResponse([{
+        tag_name: 'dev',
+        name: 'Dev Build (fedcba9876543210)',
+        body: 'Latest development build from `main`.\n- Commit: fedcba9876543210\n- Branch: main\n- Timestamp: 2026-09-02T00:00:00Z',
+        prerelease: true,
+        published_at: '2026-09-02T00:00:00Z',
+        assets: [],
+      }]);
+    }
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
+  const result = await updater.checkForUpdate('1.0.0', true, '0123456-local-build');
+  assert.equal(result.hasUpdate, true);
+  assert.equal(result.commitMatch, false);
+  assert.equal(result.latestCommit.sha, 'fedcba9876543210');
+  assert.equal(result.latestCommit.committedAt, '2026-09-02T00:00:00Z');
+});
+
+test('dev channel falls back to the branch head when release metadata is incomplete', async () => {
+  requestUrlImpl = async ({ url }) => {
+    if (url.includes('/releases?')) {
+      return jsonResponse([{
+        tag_name: 'dev',
+        name: 'Older-format dev build',
+        body: 'Latest development build from `main`.',
+        prerelease: true,
+        published_at: '2026-09-02T00:00:00Z',
+        assets: [],
+      }]);
+    }
+    if (url.includes('/commits/main')) {
+      return jsonResponse({
+        sha: 'fedcba9876543210',
+        commit: { message: 'Fresh main build', author: { name: 'Build Bot', date: '2026-09-02T00:00:00Z' } },
+      });
+    }
+    throw new Error(`unexpected URL ${url}`);
+  };
+
+  const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
+  const result = await updater.checkForUpdate('dev', true, '0123456-local-build');
+  assert.equal(result.hasUpdate, true);
+  assert.equal(result.latestCommit.sha, 'fedcba9876543210');
+  assert.equal(result.latestCommit.message, 'Fresh main build');
+});
+
 test('stable channel compares the latest stable release', async () => {
   requestUrlImpl = async ({ url }) => {
     assert.match(url, /\/releases\/latest\?_cb=/);

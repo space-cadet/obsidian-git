@@ -134,9 +134,9 @@ jobs:
           name: Dev Build (${{ github.sha }})
           body: |
             Latest development build from `main`.
-            - Commit: ${{ github.sha }}
+            **Commit:** `${{ github.sha }}`
             - Branch: ${{ github.ref_name }}
-            - Timestamp: ${{ github.event.head_commit.timestamp }}
+            **Built at:** ${{ github.event.head_commit.timestamp }}
           files: |
             dist/*.zip
             main.js

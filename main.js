@@ -21753,15 +21753,16 @@ function releaseLabel(release) {
   return `Dev \xB7 ${version2}`;
 }
 function commitInfoFromRelease(release) {
-  var _a, _b, _c, _d, _e, _f;
-  const sha = (_b = (_a = release.body) == null ? void 0 : _a.match(/\*\*Commit:\*\*\s*`([^`]+)`/)) == null ? void 0 : _b[1];
+  var _a, _b, _c, _d, _e;
+  const sha = (_b = (_a = release.body) == null ? void 0 : _a.match(/^\s*(?:-\s*)?(?:\*\*)?Commit:(?:\*\*)?\s*`?([^`\s]+)`?\s*$/im)) == null ? void 0 : _b[1];
   if (!sha)
     return null;
+  const builtAt = (_e = (_d = (_c = release.body) == null ? void 0 : _c.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Built at|Timestamp):(?:\*\*)?\s*(.+)\s*$/im)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim();
   return {
     sha,
     message: release.name || `Published ${release.tag_name}`,
     authorName: "GitHub Actions",
-    committedAt: (_f = (_e = (_d = (_c = release.body) == null ? void 0 : _c.match(/\*\*Built at:\*\*\s*(.+)/)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim()) != null ? _f : release.published_at
+    committedAt: builtAt != null ? builtAt : release.published_at
   };
 }
 var PluginUpdater = class {
@@ -21832,7 +21833,7 @@ var PluginUpdater = class {
   }
   /** Check GitHub for a stable or development update. */
   async checkForUpdate(currentVersion, includePrerelease, currentCommitHash, currentBranch2) {
-    var _a;
+    var _a, _b;
     this.log("info", "checkForUpdate:", {
       currentVersion,
       includePrerelease,
@@ -21845,8 +21846,8 @@ var PluginUpdater = class {
         return { hasUpdate: false, currentVersion, latestVersion: currentVersion, release: null, isPrerelease: false };
       }
       const latestVersion = release.tag_name.replace(/^v/, "");
-      const latestCommit = includePrerelease ? commitInfoFromRelease(release) : await fetchLatestCommit("main");
-      this.log("info", "latestCommit:", (_a = latestCommit == null ? void 0 : latestCommit.sha) == null ? void 0 : _a.slice(0, 7));
+      const latestCommit = includePrerelease ? (_a = commitInfoFromRelease(release)) != null ? _a : await fetchLatestCommit(branchFromRelease(release)) : await fetchLatestCommit("main");
+      this.log("info", "latestCommit:", (_b = latestCommit == null ? void 0 : latestCommit.sha) == null ? void 0 : _b.slice(0, 7));
       let commitMatch = false;
       if (includePrerelease && currentCommitHash && latestCommit) {
         const shortLocal = currentCommitHash.slice(0, 7).toLowerCase();
@@ -22103,7 +22104,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "d962f44db5e9b6b7d9c3da2aafcd8bb77ad89097" : "unknown";
+var GIT_COMMIT_HASH = true ? "3f269e4e6cda81e29ab2d5b6ca1cf844d1bce653" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
