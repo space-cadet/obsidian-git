@@ -7968,7 +7968,7 @@ __export(isomorphic_git_exports, {
   expandOid: () => expandOid,
   expandRef: () => expandRef,
   fastForward: () => fastForward,
-  fetch: () => fetch2,
+  fetch: () => fetch,
   findMergeBase: () => findMergeBase,
   findRoot: () => findRoot,
   getConfig: () => getConfig,
@@ -11925,7 +11925,7 @@ async function fastForward({
     throw err;
   }
 }
-async function fetch2({
+async function fetch({
   fs,
   http,
   onProgress,
@@ -18374,7 +18374,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       expandOid,
       expandRef,
       fastForward,
-      fetch: fetch2,
+      fetch,
       findMergeBase,
       findRoot,
       getRemoteInfo,
@@ -19214,6 +19214,22 @@ function formatProgressBytes(bytes) {
   const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
 }
+function isTransientMissingPath(error) {
+  var _a, _b;
+  const value = error;
+  const message = String((_b = (_a = value == null ? void 0 : value.message) != null ? _a : error) != null ? _b : "");
+  return (value == null ? void 0 : value.code) === "ENOENT" || /\bENOENT\b|no such file or directory/i.test(message);
+}
+function parseGitHubRepositoryUrl(repoUrl) {
+  const value = repoUrl.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
+  const httpsMatch = value.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (httpsMatch)
+    return { owner: httpsMatch[1], repo: httpsMatch[2] };
+  const sshMatch = value.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (sshMatch)
+    return { owner: sshMatch[1], repo: sshMatch[2] };
+  return null;
+}
 var import_obsidian3, GitHttpClient, GitProgressEmitter, GitManager;
 var init_gitManager = __esm({
   "src/gitManager.ts"() {
@@ -19600,16 +19616,12 @@ var init_gitManager = __esm({
        */
       static async fetchRemoteCommitsFromGitHub(repoUrl, password, branchName, maxCount = 20) {
         try {
-          let match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-          if (!match) {
-            match = repoUrl.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-          }
-          if (!match) {
+          const repository = parseGitHubRepositoryUrl(repoUrl);
+          if (!repository) {
             log2.warn("GitManager", "Cannot fetch remote commits: not a GitHub repo URL");
             return [];
           }
-          const owner = match[1];
-          const repo = match[2];
+          const { owner, repo } = repository;
           const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branchName)}&per_page=${maxCount}`;
           log2.debug("GitManager", `Fetching commits via GitHub API: ${apiUrl}`);
           const headers = {
@@ -19796,7 +19808,7 @@ var init_gitManager = __esm({
             onMessage("Fetch already complete; resuming checkout...");
           } else {
             startDownloadTimer();
-            await fetch2({
+            await fetch({
               fs: this.fs,
               http: this.createHttpClient(progress),
               dir: this.dir,
@@ -19978,7 +19990,7 @@ Try again with a faster connection or smaller repository.`
                 onMessage(`Waiting for remote response... (${elapsed}s elapsed)`);
               }, 1e3);
             }
-            await fetch2({
+            await fetch({
               fs: this.fs,
               http: this.createHttpClient(progress),
               dir: this.dir,
@@ -20223,7 +20235,21 @@ Try again with a faster connection or smaller repository.`
         return { ...repositoryStatus, ...fileStatus };
       }
       async readStatusSnapshot() {
-        const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+        let matrix = null;
+        let lastError;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+            break;
+          } catch (error) {
+            lastError = error;
+            if (!isTransientMissingPath(error) || attempt === 2)
+              throw error;
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        }
+        if (!matrix)
+          throw lastError instanceof Error ? lastError : new Error("Unable to read repository status");
         const detailedStatus = [];
         const staged = [];
         const unstaged = [];
@@ -20377,27 +20403,27 @@ Try again with a faster connection or smaller repository.`
        */
       static async fetchCommitFilesFromGitHub(repoUrl, token, ref) {
         try {
-          const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/);
-          if (!match) {
+          const repository = parseGitHubRepositoryUrl(repoUrl);
+          if (!repository) {
             log2.warn("GitManager", "Cannot fetch commit files: not a GitHub URL", repoUrl);
             return null;
           }
-          const [, owner, repo] = match;
+          const { owner, repo } = repository;
           const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`;
           log2.debug("GitManager", `Fetching commit files from GitHub API: ${apiUrl}`);
           const headers = {
-            "Accept": "application/vnd.github.v3+json",
-            "User-Agent": "obsidian-git-sync"
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28"
           };
           if (token) {
-            headers["Authorization"] = `token ${token}`;
+            headers["Authorization"] = `Bearer ${token}`;
           }
-          const response = await fetch(apiUrl, { headers });
-          if (!response.ok) {
-            log2.warn("GitManager", `GitHub API commit fetch returned ${response.status}`, await response.text());
+          const response = await (0, import_obsidian3.requestUrl)({ url: apiUrl, method: "GET", headers, throw: false });
+          if (response.status !== 200) {
+            log2.warn("GitManager", `GitHub API commit fetch returned ${response.status}`, response.text);
             return null;
           }
-          const data = await response.json();
+          const data = JSON.parse(response.text);
           if (!data.files || !Array.isArray(data.files)) {
             log2.warn("GitManager", "GitHub API commit response missing files", data);
             return null;
@@ -21109,7 +21135,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         log2.warn("GitSidebar", "detectRealGitRepo failed", e);
       }
       this.hasRealRepo = hasReal;
-      this.sidebarSnapshot = null;
+      if (!hasReal)
+        this.sidebarSnapshot = null;
       if (hasReal && this.plugin.gitManager) {
         try {
           this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
@@ -21461,6 +21488,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       this.commitsViewMode = "remote";
       await this.refresh({ readRepository: false });
     });
+    const loading = this.commitsViewMode === "remote" ? listContainer.createEl("p", { text: "Loading remote commits\u2026", cls: "git-empty-state" }) : null;
     try {
       let branch2 = this.plugin.settings.branchName || "main";
       let commits = [];
@@ -21475,32 +21503,26 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         branch2 = await this.plugin.gitManager.getCurrentBranch();
         commits = await this.plugin.gitManager.getLog(25);
       } else {
-        if (this.plugin.gitManager) {
-          try {
-            branch2 = await this.plugin.gitManager.getCurrentBranch();
-          } catch (e) {
+        const remoteUrl = this.plugin.settings.repoUrl;
+        const cached = ((_a = this.remoteCommitsCache) == null ? void 0 : _a.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
+        if (cached && cached.length > 0) {
+          commits = cached;
+        } else {
+          const password = await this.plugin.resolveGitPassword();
+          commits = await GitManager.fetchRemoteCommitsFromGitHub(remoteUrl, password, branch2, 25);
+          if (commits.length === 0 && this.plugin.gitManager) {
+            commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
           }
         }
-        const cached = ((_a = this.remoteCommitsCache) == null ? void 0 : _a.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
-        if (cached) {
-          commits = cached;
-        } else if (this.plugin.gitManager) {
-          commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
-        }
-        if (commits.length === 0 && this.plugin.settings.repoUrl) {
-          log2.debug("GitSidebar", "No local gitManager or origin refs, trying GitHub API");
-          const { GitManager: GitManager2 } = await Promise.resolve().then(() => (init_gitManager(), gitManager_exports));
-          commits = await GitManager2.fetchRemoteCommitsFromGitHub(
-            this.plugin.settings.repoUrl,
-            await this.plugin.resolveGitPassword(),
-            branch2,
-            25
-          );
-        }
         if (this.isCurrentRender(generation)) {
-          this.remoteCommitsCache = { repoUrl: this.plugin.settings.repoUrl, branch: branch2, commits };
+          if (commits.length > 0) {
+            this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
+          } else {
+            this.invalidateRemoteCommitsCache();
+          }
         }
       }
+      loading == null ? void 0 : loading.remove();
       if (!this.isCurrentRender(generation))
         return;
       if (commits.length === 0) {
@@ -21568,6 +21590,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         }
       }
     } catch (e) {
+      loading == null ? void 0 : loading.remove();
       log2.debug("GitSidebar", "Failed to get commit log", e);
       const msg = e.message || String(e);
       if (msg.includes("Could not find") || msg.includes("refs/head") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
@@ -22285,7 +22308,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "1389297d5223fc6f897558e5fb983066f7ef8906" : "unknown";
+var GIT_COMMIT_HASH = true ? "6aa7550da669c25efe8a0437af329a528de8bd20" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

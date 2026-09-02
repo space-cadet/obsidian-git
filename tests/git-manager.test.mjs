@@ -180,6 +180,60 @@ test('testRemoteConnection uses a read-only remote ref advertisement without a l
   requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
 });
 
+test('remote GitHub history accepts common repository URL variants', async () => {
+  requestUrlImpl = async ({ url }) => {
+    assert.match(url, /api\.github\.com\/repos\/space-cadet\/obsidian-git\/commits\?sha=main&per_page=5$/);
+    return {
+      status: 200,
+      text: JSON.stringify([{
+        sha: '0123456789abcdef0123456789abcdef01234567',
+        commit: {
+          message: 'Remote commit',
+          author: { name: 'Remote Author', date: '2026-09-02T00:00:00Z' },
+        },
+      }]),
+    };
+  };
+
+  const commits = await GitManager.fetchRemoteCommitsFromGitHub(
+    'https://github.com/space-cadet/obsidian-git.git/',
+    '',
+    'main',
+    5,
+  );
+  assert.equal(commits.length, 1);
+  assert.equal(commits[0].message, 'Remote commit');
+  assert.equal(commits[0].remote, true);
+  requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
+});
+
+test('remote GitHub commit details use the native requestUrl transport', async () => {
+  requestUrlImpl = async ({ url, headers }) => {
+    assert.match(url, /api\.github\.com\/repos\/space-cadet\/obsidian-git\/commits\/0123456/);
+    assert.equal(headers.Authorization, 'Bearer secret-token');
+    return {
+      status: 200,
+      text: JSON.stringify({
+        files: [
+          { filename: 'notes/added.md', status: 'added' },
+          { filename: 'notes/old.md', status: 'removed' },
+        ],
+      }),
+    };
+  };
+
+  const files = await GitManager.fetchCommitFilesFromGitHub(
+    'https://github.com/space-cadet/obsidian-git/',
+    'secret-token',
+    '0123456789abcdef',
+  );
+  assert.deepEqual(files, [
+    { filepath: 'notes/added.md', status: 'added' },
+    { filepath: 'notes/old.md', status: 'deleted' },
+  ]);
+  requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
+});
+
 test('sync does not initialize or clone a missing local repository', async () => {
   let remoteCalls = 0;
   requestUrlImpl = async () => {

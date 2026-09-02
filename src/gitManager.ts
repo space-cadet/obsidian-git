@@ -402,6 +402,22 @@ export interface GitCommit {
     files?: { filepath: string; status: 'added' | 'modified' | 'deleted' }[];
 }
 
+function isTransientMissingPath(error: unknown): boolean {
+    const value = error as { code?: unknown; message?: unknown } | null;
+    const message = String(value?.message ?? error ?? '');
+    return value?.code === 'ENOENT' || /\bENOENT\b|no such file or directory/i.test(message);
+}
+
+function parseGitHubRepositoryUrl(repoUrl: string): { owner: string; repo: string } | null {
+    const value = repoUrl.trim().replace(/[?#].*$/, '').replace(/\/+$/, '');
+    const httpsMatch = value.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+    if (httpsMatch) return { owner: httpsMatch[1], repo: httpsMatch[2] };
+
+    const sshMatch = value.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+    if (sshMatch) return { owner: sshMatch[1], repo: sshMatch[2] };
+    return null;
+}
+
 export interface GitSidebarStatusSnapshot {
     branch: string;
     ahead: number;
@@ -667,18 +683,13 @@ export class GitManager {
         maxCount: number = 20
     ): Promise<GitCommit[]> {
         try {
-            // Parse owner/repo from URL
-            let match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-            if (!match) {
-                match = repoUrl.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-            }
-            if (!match) {
+            const repository = parseGitHubRepositoryUrl(repoUrl);
+            if (!repository) {
                 log.warn('GitManager', 'Cannot fetch remote commits: not a GitHub repo URL');
                 return [];
             }
 
-            const owner = match[1];
-            const repo = match[2];
+            const { owner, repo } = repository;
             const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branchName)}&per_page=${maxCount}`;
 
             log.debug('GitManager', `Fetching commits via GitHub API: ${apiUrl}`);
@@ -1384,7 +1395,19 @@ export class GitManager {
     }
 
     private async readStatusSnapshot(): Promise<Pick<GitSidebarStatusSnapshot, 'detailedStatus' | 'staged' | 'unstaged'>> {
-        const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+        let matrix: any[] | null = null;
+        let lastError: unknown;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            try {
+                matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+                break;
+            } catch (error) {
+                lastError = error;
+                if (!isTransientMissingPath(error) || attempt === 2) throw error;
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+        }
+        if (!matrix) throw lastError instanceof Error ? lastError : new Error('Unable to read repository status');
         const detailedStatus: GitFileStatus[] = [];
         const staged: string[] = [];
         const unstaged: string[] = [];
@@ -1561,31 +1584,31 @@ export class GitManager {
         ref: string
     ): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted' }[] | null> {
         try {
-            const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/);
-            if (!match) {
+            const repository = parseGitHubRepositoryUrl(repoUrl);
+            if (!repository) {
                 log.warn('GitManager', 'Cannot fetch commit files: not a GitHub URL', repoUrl);
                 return null;
             }
-            const [, owner, repo] = match;
+            const { owner, repo } = repository;
             const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`;
             
             log.debug('GitManager', `Fetching commit files from GitHub API: ${apiUrl}`);
             
             const headers: Record<string, string> = {
-                'Accept': 'application/vnd.github.v3+json',
-                'User-Agent': 'obsidian-git-sync'
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
             };
             if (token) {
-                headers['Authorization'] = `token ${token}`;
+                headers['Authorization'] = `Bearer ${token}`;
             }
-            
-            const response = await fetch(apiUrl, { headers });
-            if (!response.ok) {
-                log.warn('GitManager', `GitHub API commit fetch returned ${response.status}`, await response.text());
+
+            const response = await requestUrl({ url: apiUrl, method: 'GET', headers, throw: false });
+            if (response.status !== 200) {
+                log.warn('GitManager', `GitHub API commit fetch returned ${response.status}`, response.text);
                 return null;
             }
-            
-            const data = await response.json();
+
+            const data = JSON.parse(response.text);
             if (!data.files || !Array.isArray(data.files)) {
                 log.warn('GitManager', 'GitHub API commit response missing files', data);
                 return null;

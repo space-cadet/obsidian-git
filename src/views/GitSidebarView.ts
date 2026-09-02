@@ -433,7 +433,7 @@ export class GitSidebarView extends ItemView {
                 log.warn('GitSidebar', 'detectRealGitRepo failed', e);
             }
             this.hasRealRepo = hasReal;
-            this.sidebarSnapshot = null;
+            if (!hasReal) this.sidebarSnapshot = null;
 
             if (hasReal && this.plugin.gitManager) {
                 try {
@@ -442,6 +442,9 @@ export class GitSidebarView extends ItemView {
                     // part of the same immutable view model.
                     this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
                 } catch (e) {
+                    // Keep the last successful view during a transient mobile
+                    // filesystem/index failure instead of making local changes
+                    // disappear while the next refresh is in flight.
                     log.warn('GitSidebar', 'Failed to read repository snapshot', e);
                 }
             }
@@ -888,6 +891,10 @@ export class GitSidebarView extends ItemView {
             await this.refresh({ readRepository: false });
         });
 
+        const loading = this.commitsViewMode === 'remote'
+            ? listContainer.createEl('p', { text: 'Loading remote commits…', cls: 'git-empty-state' })
+            : null;
+
         try {
             let branch = this.plugin.settings.branchName || 'main';
             let commits: GitCommit[] = [];
@@ -904,38 +911,34 @@ export class GitSidebarView extends ItemView {
                 branch = await this.plugin.gitManager.getCurrentBranch();
                 commits = await this.plugin.gitManager.getLog(25);
             } else {
-                // Remote commits: try gitManager first, then fall back to GitHub API
-                if (this.plugin.gitManager) {
-                    try {
-                        branch = await this.plugin.gitManager.getCurrentBranch();
-                    } catch (e) {
-                        // use settings branch
-                    }
-                }
+                // Remote history is independent of local repository health.
+                // Use the configured branch and query GitHub first so stale or
+                // damaged origin refs cannot hide the actual remote history.
+                const remoteUrl = this.plugin.settings.repoUrl;
                 const cached = this.remoteCommitsCache?.repoUrl === this.plugin.settings.repoUrl
                     && this.remoteCommitsCache.branch === branch
                     ? this.remoteCommitsCache.commits
                     : null;
-                if (cached) {
+                if (cached && cached.length > 0) {
                     commits = cached;
-                } else if (this.plugin.gitManager) {
-                    commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
-                }
-                // If no commits from gitManager (or no gitManager), try direct GitHub API
-                if (commits.length === 0 && this.plugin.settings.repoUrl) {
-                    log.debug('GitSidebar', 'No local gitManager or origin refs, trying GitHub API');
-                    const { GitManager } = await import('../gitManager');
-                    commits = await GitManager.fetchRemoteCommitsFromGitHub(
-                        this.plugin.settings.repoUrl,
-                        await this.plugin.resolveGitPassword(),
-                        branch,
-                        25
-                    );
+                } else {
+                    const password = await this.plugin.resolveGitPassword();
+                    commits = await GitManager.fetchRemoteCommitsFromGitHub(remoteUrl, password, branch, 25);
+                    if (commits.length === 0 && this.plugin.gitManager) {
+                        // Non-GitHub remotes still use their fetched origin ref.
+                        commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                    }
                 }
                 if (this.isCurrentRender(generation)) {
-                    this.remoteCommitsCache = { repoUrl: this.plugin.settings.repoUrl, branch, commits };
+                    if (commits.length > 0) {
+                        this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
+                    } else {
+                        this.invalidateRemoteCommitsCache();
+                    }
                 }
             }
+
+            loading?.remove();
 
             if (!this.isCurrentRender(generation)) return;
 
@@ -1015,6 +1018,7 @@ export class GitSidebarView extends ItemView {
                 }
             }
         } catch (e: any) {
+            loading?.remove();
             log.debug('GitSidebar', 'Failed to get commit log', e);
             const msg = e.message || String(e);
             if (msg.includes('Could not find') || msg.includes('refs/head') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
