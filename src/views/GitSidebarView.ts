@@ -147,43 +147,65 @@ export class GitSidebarView extends ItemView {
 
     private renderHeader(branch: string, ahead: number, behind: number, initialized: boolean, hasRealRepo: boolean): void {
         this.headerContainer.empty();
-        
+        this.headerContainer.addClass('git-repository-header');
+        this.headerContainer.addClass(`git-header-${this.activeTab}`);
+
         const branchRow = this.headerContainer.createDiv('git-header-branch');
-        branchRow.createSpan({ text: '●', cls: 'git-branch-dot' });
-        branchRow.createSpan({ 
-            text: initialized ? branch : (hasRealRepo ? 'local' : 'No repo'), 
-            cls: 'git-branch-name' + (initialized ? '' : ' git-branch-uninit') 
+        const branchIcon = branchRow.createSpan({ cls: 'git-branch-icon', attr: { 'aria-hidden': 'true' } });
+        setIcon(branchIcon, 'git-branch');
+        branchRow.createSpan({
+            text: initialized ? branch : (hasRealRepo ? 'local' : 'No repo'),
+            cls: 'git-branch-name' + (initialized ? '' : ' git-branch-uninit')
         });
-        const refreshBtn = branchRow.createEl('button', {
+
+        const headerAction = branchRow.createEl('button', {
             cls: 'git-header-refresh',
             attr: { title: 'Refresh git status', 'aria-label': 'Refresh git status' }
         });
-        setIcon(refreshBtn, 'refresh-cw');
-        refreshBtn.addEventListener('click', async (event) => {
-            event.stopPropagation();
-            refreshBtn.disabled = true;
-            try {
-                await this.refresh();
-            } finally {
-                if (refreshBtn.isConnected) refreshBtn.disabled = false;
-            }
-        });
-        
+        if (this.activeTab === 'log') {
+            setIcon(headerAction, 'more-horizontal');
+            headerAction.setAttr('title', 'Log actions');
+            headerAction.setAttr('aria-label', 'Log actions');
+            headerAction.addEventListener('click', (event) => this.openLogMenu(event));
+        } else if (this.activeTab === 'commits') {
+            setIcon(headerAction, 'chevron-down');
+            headerAction.setAttr('title', 'Refresh commit history');
+            headerAction.setAttr('aria-label', 'Refresh commit history');
+            headerAction.addEventListener('click', () => void this.refresh());
+        } else {
+            setIcon(headerAction, 'refresh-cw');
+            headerAction.addEventListener('click', async (event) => {
+                event.stopPropagation();
+                headerAction.disabled = true;
+                try {
+                    await this.refresh();
+                } finally {
+                    if (headerAction.isConnected) headerAction.disabled = false;
+                }
+            });
+        }
+
         const statusRow = this.headerContainer.createDiv('git-header-status');
+        const statusIcon = statusRow.createSpan({ cls: 'git-header-status-icon', attr: { 'aria-hidden': 'true' } });
         if (!initialized) {
-            if (!hasRealRepo) {
-                statusRow.createSpan({ text: 'No git repository — initialize to create', cls: 'git-header-hint' });
-            } else {
-                statusRow.createSpan({ text: 'Git repo detected — initialize to sync', cls: 'git-header-hint' });
-            }
+            setIcon(statusIcon, 'circle-alert');
+            statusRow.createSpan({
+                text: !hasRealRepo
+                    ? 'No git repository — initialize to create'
+                    : 'Git repo detected — initialize to sync',
+                cls: 'git-header-hint'
+            });
         } else if (this.isLocalOnly) {
+            setIcon(statusIcon, 'circle-alert');
             statusRow.createSpan({ text: 'Local only — no remote', cls: 'git-local-only' });
         } else if (ahead > 0 || behind > 0) {
-            statusRow.createSpan({ 
-                text: `⬆ ${ahead} ⬇ ${behind}`, 
-                cls: 'git-ahead-behind' + (ahead > 0 ? ' git-ahead' : '') + (behind > 0 ? ' git-behind' : '') 
+            setIcon(statusIcon, 'arrow-up-down');
+            statusRow.createSpan({
+                text: `⬆ ${ahead} ⬇ ${behind}`,
+                cls: 'git-ahead-behind' + (ahead > 0 ? ' git-ahead' : '') + (behind > 0 ? ' git-behind' : '')
             });
         } else {
+            setIcon(statusIcon, 'circle-check');
             statusRow.createSpan({ text: 'Up to date', cls: 'git-up-to-date' });
         }
     }
@@ -203,38 +225,16 @@ export class GitSidebarView extends ItemView {
 
         const commitBtn = new ButtonComponent(btnRow)
             .setButtonText(`Commit (${this.stagedCount})`)
+            .setIcon('git-commit')
             .setTooltip(this.stagedCount > 0 ? 'Commit staged changes' : 'No staged files to commit')
             .setClass('git-btn-primary')
             .setDisabled(this.stagedCount === 0);
         commitBtn.onClick(() => this.openCommitModal());
 
-        new ButtonComponent(btnRow)
-            .setButtonText('Push')
-            .setTooltip(this.hasRemote ? 'Push to remote' : 'No remote configured — set repo URL in settings')
-            .setClass('git-btn-secondary')
-            .setDisabled(!this.hasRemote)
-            .onClick(async () => {
-                try {
-                    if (!this.plugin.gitManager) {
-                        new Notice('Git not initialized');
-                        return;
-                    }
-                    if (!this.hasRemote) {
-                        new Notice('No remote configured');
-                        return;
-                    }
-                    await this.plugin.refreshGitCredentials();
-                    await this.plugin.gitManager.push(this.plugin.settings.branchName);
-                    new Notice('Pushed to remote');
-                    await this.refresh();
-                } catch (e: any) {
-                    new Notice('Push failed: ' + e.message);
-                }
-            });
-
-        // Pull button — always visible, disabled if no remote
+        // Pull is displayed before Push to match the approved action hierarchy.
         new ButtonComponent(btnRow)
             .setButtonText('Pull')
+            .setIcon('download')
             .setTooltip(this.hasRemote ? 'Pull from remote' : 'No remote configured — set repo URL in settings')
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
@@ -258,7 +258,33 @@ export class GitSidebarView extends ItemView {
             });
 
         new ButtonComponent(btnRow)
+            .setButtonText('Push')
+            .setIcon('upload')
+            .setTooltip(this.hasRemote ? 'Push to remote' : 'No remote configured — set repo URL in settings')
+            .setClass('git-btn-secondary')
+            .setDisabled(!this.hasRemote)
+            .onClick(async () => {
+                try {
+                    if (!this.plugin.gitManager) {
+                        new Notice('Git not initialized');
+                        return;
+                    }
+                    if (!this.hasRemote) {
+                        new Notice('No remote configured');
+                        return;
+                    }
+                    await this.plugin.refreshGitCredentials();
+                    await this.plugin.gitManager.push(this.plugin.settings.branchName);
+                    new Notice('Pushed to remote');
+                    await this.refresh();
+                } catch (e: any) {
+                    new Notice('Push failed: ' + e.message);
+                }
+            });
+
+        new ButtonComponent(btnRow)
             .setButtonText('More')
+            .setIcon('more-horizontal')
             .setTooltip('More Git actions')
             .setClass('git-btn-ghost')
             .onClick((event) => this.openMoreMenu(event));
@@ -551,10 +577,14 @@ export class GitSidebarView extends ItemView {
             }
 
             const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
+            const detailedStatus = await this.plugin.gitManager.getDetailedStatus();
+            const statusByPath = new Map(
+                detailedStatus.map((file) => [file.filepath, file.status] as const)
+            );
             this.stagedCount = staged.length;
 
             // ── Staged section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Staged', staged, 'staged', '−', 'Unstage all',
+            this.renderCollapsibleSection(container, 'Staged', staged, 'staged', 'Unstage all', statusByPath,
                 async (fp) => {
                     await this.plugin.gitManager!.unstageFile(fp);
                     new Notice(`Unstaged ${fp}`);
@@ -566,7 +596,7 @@ export class GitSidebarView extends ItemView {
             );
 
             // ── Uncommitted section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', '+', 'Stage all',
+            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', 'Stage all', statusByPath,
                 async (fp) => {
                     await this.plugin.gitManager!.stageFile(fp);
                     new Notice(`Staged ${fp}`);
@@ -617,8 +647,8 @@ export class GitSidebarView extends ItemView {
         title: string,
         files: string[],
         sectionClass: string,
-        actionLabel: string,
         bulkLabel: string,
+        statusByPath: Map<string, GitFileStatus['status']>,
         onAction: (filepath: string) => Promise<void>,
         onBulk: () => Promise<void>
     ): void {
@@ -647,9 +677,11 @@ export class GitSidebarView extends ItemView {
         });
         
         // Bulk action button (always visible)
-        const bulkBtn = header.createEl('button', { text: bulkLabel, cls: 'git-status-section-action' }) as HTMLButtonElement;
+        const bulkBtn = header.createEl('button', { cls: 'git-status-section-action' }) as HTMLButtonElement;
+        setIcon(bulkBtn, sectionClass === 'staged' ? 'minus' : 'plus');
         bulkBtn.disabled = files.length === 0;
         bulkBtn.setAttr('title', bulkLabel);
+        bulkBtn.setAttr('aria-label', bulkLabel);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (bulkBtn.disabled) return;
@@ -664,7 +696,8 @@ export class GitSidebarView extends ItemView {
             } finally {
                 if (bulkBtn.isConnected) {
                     bulkBtn.disabled = false;
-                    bulkBtn.textContent = bulkLabel;
+                    bulkBtn.empty();
+                    setIcon(bulkBtn, sectionClass === 'staged' ? 'minus' : 'plus');
                     bulkBtn.removeAttribute('aria-busy');
                 }
             }
@@ -690,16 +723,37 @@ export class GitSidebarView extends ItemView {
             for (const filepath of files) {
                 const row = list.createDiv('git-file-row');
 
-                const iconClass = sectionClass === 'staged' ? 'git-status-staged' : 'git-status-modified';
-                const iconText = sectionClass === 'staged' ? 'S' : 'M';
-                row.createSpan({ text: iconText, cls: `git-status-icon ${iconClass}` });
+                const stageBtn = row.createEl('button', {
+                    cls: 'git-file-stage-toggle',
+                    attr: {
+                        type: 'button',
+                        title: sectionClass === 'staged' ? 'Unstage file' : 'Stage file',
+                        'aria-label': `${sectionClass === 'staged' ? 'Unstage' : 'Stage'} ${filepath}`
+                    }
+                });
+                setIcon(stageBtn, sectionClass === 'staged' ? 'square-check' : 'square');
+                stageBtn.addClass(sectionClass === 'staged' ? 'git-file-stage-checked' : 'git-file-stage-empty');
+
+                const status = statusByPath.get(filepath);
+                const statusLabel = status === 'deleted'
+                    ? 'D'
+                    : status === 'added' || status === 'untracked'
+                        ? 'A'
+                        : 'M';
+                const statusClass = status === 'deleted'
+                    ? 'git-status-deleted'
+                    : status === 'modified' || status === 'staged'
+                        ? 'git-status-modified'
+                        : 'git-status-added';
+                row.createSpan({ text: statusLabel, cls: `git-status-icon ${statusClass}` });
 
                 const pathEl = row.createSpan({ text: filepath, cls: 'git-file-path' });
                 pathEl.setAttr('title', filepath);
 
                 const actions = row.createDiv('git-file-actions');
 
-                const moreBtn = actions.createEl('button', { text: '…', cls: 'git-file-btn' });
+                const moreBtn = actions.createEl('button', { cls: 'git-file-btn' });
+                setIcon(moreBtn, 'more-horizontal');
                 moreBtn.setAttr('title', 'More file actions');
                 moreBtn.setAttr('aria-label', `More actions for ${filepath}`);
                 moreBtn.addEventListener('click', (e) => {
@@ -735,16 +789,13 @@ export class GitSidebarView extends ItemView {
                     menu.showAtMouseEvent(e);
                 });
 
-                const btn = actions.createEl('button', { text: actionLabel, cls: 'git-file-btn' });
-                btn.setAttr('title', sectionClass === 'staged' ? 'Unstage file' : 'Stage file');
-                btn.setAttr('aria-label', `${sectionClass === 'staged' ? 'Unstage' : 'Stage'} ${filepath}`);
-                btn.addEventListener('click', async (e) => {
+                stageBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
                         await onAction(filepath);
                         await this.refresh();
                     } catch (err: any) {
-                        new Notice(`${actionLabel} failed: ${err.message}`);
+                        new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
                     }
                 });
             }
@@ -877,23 +928,31 @@ export class GitSidebarView extends ItemView {
                 row.setAttr('aria-expanded', String(isExpanded));
 
                 const mainRow = row.createDiv('git-commit-main');
+                const timeline = mainRow.createSpan({
+                    cls: 'git-commit-timeline',
+                    attr: { 'aria-hidden': 'true' }
+                });
+                const timelineDot = timeline.createSpan({ cls: 'git-commit-timeline-dot' });
+                if (isExpanded) timelineDot.addClass('git-commit-timeline-dot-active');
 
-                const toggle = mainRow.createSpan({ cls: 'git-commit-toggle' });
-                toggle.setText(isExpanded ? '▾' : '▸');
-
-                const hash = mainRow.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
-                hash.setAttr('title', commit.oid);
-
-                const msg = mainRow.createSpan({ text: this.truncateMessage(commit.message), cls: 'git-commit-message' });
+                const body = mainRow.createDiv('git-commit-body');
+                const summary = body.createDiv('git-commit-summary');
+                const msg = summary.createSpan({
+                    text: this.truncateMessage(commit.message),
+                    cls: 'git-commit-message'
+                });
                 msg.setAttr('title', commit.message);
+                summary.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
 
-                if (this.commitsViewMode === 'remote') {
-                    mainRow.createSpan({ text: 'origin', cls: 'git-commit-remote-badge' });
-                }
-
-                const meta = mainRow.createDiv('git-commit-meta');
+                const meta = body.createDiv('git-commit-meta');
+                const hash = meta.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
+                hash.setAttr('title', commit.oid);
                 meta.createSpan({ text: commit.author, cls: 'git-commit-author' });
-                meta.createSpan({ text: this.formatDate(commit.date), cls: 'git-commit-date' });
+                if (this.commitsViewMode === 'remote') {
+                    meta.createSpan({ text: 'origin', cls: 'git-commit-remote-badge' });
+                }
+                const toggle = meta.createSpan({ cls: 'git-commit-toggle', attr: { 'aria-hidden': 'true' } });
+                toggle.setText(isExpanded ? '⌄' : '›');
 
                 // Click ANYWHERE on the row to expand/collapse — not just the padded mainRow area
                 row.addEventListener('click', async (e) => {
@@ -906,14 +965,16 @@ export class GitSidebarView extends ItemView {
                         this.expandedCommitOids.delete(commit.oid);
                         row.setAttr('data-expanded', 'false');
                         row.setAttr('aria-expanded', 'false');
-                        toggle.setText('▸');
+                        toggle.setText('›');
+                        timelineDot.removeClass('git-commit-timeline-dot-active');
                         const detailEl = row.querySelector('.git-commit-detail');
                         if (detailEl) detailEl.remove();
                     } else {
                         this.expandedCommitOids.add(commit.oid);
                         row.setAttr('data-expanded', 'true');
                         row.setAttr('aria-expanded', 'true');
-                        toggle.setText('▾');
+                        toggle.setText('⌄');
+                        timelineDot.addClass('git-commit-timeline-dot-active');
                         await this.renderCommitDetail(row, commit.oid);
                     }
                 });
@@ -1008,11 +1069,6 @@ export class GitSidebarView extends ItemView {
 
         const toolbar = listContainer.createDiv('git-log-toolbar');
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
-        new ButtonComponent(toolbar)
-            .setButtonText('More')
-            .setTooltip('Log actions')
-            .setClass('git-btn-ghost')
-            .onClick((event) => this.openLogMenu(event));
         
         const entries = log.getEntries();
         
@@ -1026,8 +1082,8 @@ export class GitSidebarView extends ItemView {
         for (const entry of recent) {
             const row = listContainer.createDiv('git-log-entry');
             
-            const time = row.createSpan({ 
-                text: this.formatDate(new Date(entry.timestamp)), 
+            const time = row.createSpan({
+                text: this.formatLogTime(new Date(entry.timestamp)),
                 cls: 'git-log-time' 
             });
             
@@ -1036,10 +1092,11 @@ export class GitSidebarView extends ItemView {
                 cls: 'git-log-level git-log-' + entry.level 
             });
             
-            row.createSpan({ 
-                text: `[${entry.namespace}] ${entry.message}`, 
+            const message = row.createSpan({
+                text: entry.message,
                 cls: 'git-log-message' 
             });
+            message.setAttr('title', `[${entry.namespace}] ${entry.message}`);
             
             if (entry.data) {
                 const detail = row.createDiv('git-log-detail');
@@ -1111,5 +1168,14 @@ export class GitSidebarView extends ItemView {
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 7) return `${diffDays}d ago`;
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    private formatLogTime(date: Date): string {
+        return date.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
     }
 }

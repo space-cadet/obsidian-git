@@ -20852,42 +20852,61 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   // ─── Header ───
   renderHeader(branch2, ahead, behind, initialized, hasRealRepo) {
     this.headerContainer.empty();
+    this.headerContainer.addClass("git-repository-header");
+    this.headerContainer.addClass(`git-header-${this.activeTab}`);
     const branchRow = this.headerContainer.createDiv("git-header-branch");
-    branchRow.createSpan({ text: "\u25CF", cls: "git-branch-dot" });
+    const branchIcon = branchRow.createSpan({ cls: "git-branch-icon", attr: { "aria-hidden": "true" } });
+    (0, import_obsidian4.setIcon)(branchIcon, "git-branch");
     branchRow.createSpan({
       text: initialized ? branch2 : hasRealRepo ? "local" : "No repo",
       cls: "git-branch-name" + (initialized ? "" : " git-branch-uninit")
     });
-    const refreshBtn = branchRow.createEl("button", {
+    const headerAction = branchRow.createEl("button", {
       cls: "git-header-refresh",
       attr: { title: "Refresh git status", "aria-label": "Refresh git status" }
     });
-    (0, import_obsidian4.setIcon)(refreshBtn, "refresh-cw");
-    refreshBtn.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      refreshBtn.disabled = true;
-      try {
-        await this.refresh();
-      } finally {
-        if (refreshBtn.isConnected)
-          refreshBtn.disabled = false;
-      }
-    });
+    if (this.activeTab === "log") {
+      (0, import_obsidian4.setIcon)(headerAction, "more-horizontal");
+      headerAction.setAttr("title", "Log actions");
+      headerAction.setAttr("aria-label", "Log actions");
+      headerAction.addEventListener("click", (event) => this.openLogMenu(event));
+    } else if (this.activeTab === "commits") {
+      (0, import_obsidian4.setIcon)(headerAction, "chevron-down");
+      headerAction.setAttr("title", "Refresh commit history");
+      headerAction.setAttr("aria-label", "Refresh commit history");
+      headerAction.addEventListener("click", () => void this.refresh());
+    } else {
+      (0, import_obsidian4.setIcon)(headerAction, "refresh-cw");
+      headerAction.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        headerAction.disabled = true;
+        try {
+          await this.refresh();
+        } finally {
+          if (headerAction.isConnected)
+            headerAction.disabled = false;
+        }
+      });
+    }
     const statusRow = this.headerContainer.createDiv("git-header-status");
+    const statusIcon = statusRow.createSpan({ cls: "git-header-status-icon", attr: { "aria-hidden": "true" } });
     if (!initialized) {
-      if (!hasRealRepo) {
-        statusRow.createSpan({ text: "No git repository \u2014 initialize to create", cls: "git-header-hint" });
-      } else {
-        statusRow.createSpan({ text: "Git repo detected \u2014 initialize to sync", cls: "git-header-hint" });
-      }
+      (0, import_obsidian4.setIcon)(statusIcon, "circle-alert");
+      statusRow.createSpan({
+        text: !hasRealRepo ? "No git repository \u2014 initialize to create" : "Git repo detected \u2014 initialize to sync",
+        cls: "git-header-hint"
+      });
     } else if (this.isLocalOnly) {
+      (0, import_obsidian4.setIcon)(statusIcon, "circle-alert");
       statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
     } else if (ahead > 0 || behind > 0) {
+      (0, import_obsidian4.setIcon)(statusIcon, "arrow-up-down");
       statusRow.createSpan({
         text: `\u2B06 ${ahead} \u2B07 ${behind}`,
         cls: "git-ahead-behind" + (ahead > 0 ? " git-ahead" : "") + (behind > 0 ? " git-behind" : "")
       });
     } else {
+      (0, import_obsidian4.setIcon)(statusIcon, "circle-check");
       statusRow.createSpan({ text: "Up to date", cls: "git-up-to-date" });
     }
   }
@@ -20901,27 +20920,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
     container.removeClass("git-sidebar-footer-hidden");
     const btnRow = container.createDiv("git-footer-buttons-row");
-    const commitBtn = new import_obsidian4.ButtonComponent(btnRow).setButtonText(`Commit (${this.stagedCount})`).setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
+    const commitBtn = new import_obsidian4.ButtonComponent(btnRow).setButtonText(`Commit (${this.stagedCount})`).setIcon("git-commit").setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
     commitBtn.onClick(() => this.openCommitModal());
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Push").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
-      try {
-        if (!this.plugin.gitManager) {
-          new import_obsidian4.Notice("Git not initialized");
-          return;
-        }
-        if (!this.hasRemote) {
-          new import_obsidian4.Notice("No remote configured");
-          return;
-        }
-        await this.plugin.refreshGitCredentials();
-        await this.plugin.gitManager.push(this.plugin.settings.branchName);
-        new import_obsidian4.Notice("Pushed to remote");
-        await this.refresh();
-      } catch (e) {
-        new import_obsidian4.Notice("Push failed: " + e.message);
-      }
-    });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Pull").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Pull").setIcon("download").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian4.Notice("Git not initialized");
@@ -20939,7 +20940,25 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         new import_obsidian4.Notice("Pull failed: " + e.message);
       }
     });
-    new import_obsidian4.ButtonComponent(btnRow).setButtonText("More").setTooltip("More Git actions").setClass("git-btn-ghost").onClick((event) => this.openMoreMenu(event));
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("Push").setIcon("upload").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+      try {
+        if (!this.plugin.gitManager) {
+          new import_obsidian4.Notice("Git not initialized");
+          return;
+        }
+        if (!this.hasRemote) {
+          new import_obsidian4.Notice("No remote configured");
+          return;
+        }
+        await this.plugin.refreshGitCredentials();
+        await this.plugin.gitManager.push(this.plugin.settings.branchName);
+        new import_obsidian4.Notice("Pushed to remote");
+        await this.refresh();
+      } catch (e) {
+        new import_obsidian4.Notice("Push failed: " + e.message);
+      }
+    });
+    new import_obsidian4.ButtonComponent(btnRow).setButtonText("More").setIcon("more-horizontal").setTooltip("More Git actions").setClass("git-btn-ghost").onClick((event) => this.openMoreMenu(event));
   }
   openCommitModal() {
     if (!this.plugin.gitManager || this.stagedCount === 0) {
@@ -21156,14 +21175,18 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         return;
       }
       const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
+      const detailedStatus = await this.plugin.gitManager.getDetailedStatus();
+      const statusByPath = new Map(
+        detailedStatus.map((file) => [file.filepath, file.status])
+      );
       this.stagedCount = staged.length;
       this.renderCollapsibleSection(
         container,
         "Staged",
         staged,
         "staged",
-        "\u2212",
         "Unstage all",
+        statusByPath,
         async (fp) => {
           await this.plugin.gitManager.unstageFile(fp);
           new import_obsidian4.Notice(`Unstaged ${fp}`);
@@ -21178,8 +21201,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         "Uncommitted Changes",
         unstaged,
         "unstaged",
-        "+",
         "Stage all",
+        statusByPath,
         async (fp) => {
           await this.plugin.gitManager.stageFile(fp);
           new import_obsidian4.Notice(`Staged ${fp}`);
@@ -21217,7 +21240,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     }
   }
-  renderCollapsibleSection(container, title, files, sectionClass, actionLabel, bulkLabel, onAction, onBulk) {
+  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk) {
     const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
     const isCollapsed = files.length === 0;
     section.setAttr("data-collapsed", String(isCollapsed));
@@ -21233,9 +21256,11 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       text: String(files.length),
       cls: "git-status-section-count"
     });
-    const bulkBtn = header.createEl("button", { text: bulkLabel, cls: "git-status-section-action" });
+    const bulkBtn = header.createEl("button", { cls: "git-status-section-action" });
+    (0, import_obsidian4.setIcon)(bulkBtn, sectionClass === "staged" ? "minus" : "plus");
     bulkBtn.disabled = files.length === 0;
     bulkBtn.setAttr("title", bulkLabel);
+    bulkBtn.setAttr("aria-label", bulkLabel);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (bulkBtn.disabled)
@@ -21251,7 +21276,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       } finally {
         if (bulkBtn.isConnected) {
           bulkBtn.disabled = false;
-          bulkBtn.textContent = bulkLabel;
+          bulkBtn.empty();
+          (0, import_obsidian4.setIcon)(bulkBtn, sectionClass === "staged" ? "minus" : "plus");
           bulkBtn.removeAttribute("aria-busy");
         }
       }
@@ -21271,13 +21297,25 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     } else {
       for (const filepath of files) {
         const row = list.createDiv("git-file-row");
-        const iconClass = sectionClass === "staged" ? "git-status-staged" : "git-status-modified";
-        const iconText = sectionClass === "staged" ? "S" : "M";
-        row.createSpan({ text: iconText, cls: `git-status-icon ${iconClass}` });
+        const stageBtn = row.createEl("button", {
+          cls: "git-file-stage-toggle",
+          attr: {
+            type: "button",
+            title: sectionClass === "staged" ? "Unstage file" : "Stage file",
+            "aria-label": `${sectionClass === "staged" ? "Unstage" : "Stage"} ${filepath}`
+          }
+        });
+        (0, import_obsidian4.setIcon)(stageBtn, sectionClass === "staged" ? "square-check" : "square");
+        stageBtn.addClass(sectionClass === "staged" ? "git-file-stage-checked" : "git-file-stage-empty");
+        const status2 = statusByPath.get(filepath);
+        const statusLabel = status2 === "deleted" ? "D" : status2 === "added" || status2 === "untracked" ? "A" : "M";
+        const statusClass = status2 === "deleted" ? "git-status-deleted" : status2 === "modified" || status2 === "staged" ? "git-status-modified" : "git-status-added";
+        row.createSpan({ text: statusLabel, cls: `git-status-icon ${statusClass}` });
         const pathEl = row.createSpan({ text: filepath, cls: "git-file-path" });
         pathEl.setAttr("title", filepath);
         const actions = row.createDiv("git-file-actions");
-        const moreBtn = actions.createEl("button", { text: "\u2026", cls: "git-file-btn" });
+        const moreBtn = actions.createEl("button", { cls: "git-file-btn" });
+        (0, import_obsidian4.setIcon)(moreBtn, "more-horizontal");
         moreBtn.setAttr("title", "More file actions");
         moreBtn.setAttr("aria-label", `More actions for ${filepath}`);
         moreBtn.addEventListener("click", (e) => {
@@ -21304,16 +21342,13 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           }));
           menu.showAtMouseEvent(e);
         });
-        const btn = actions.createEl("button", { text: actionLabel, cls: "git-file-btn" });
-        btn.setAttr("title", sectionClass === "staged" ? "Unstage file" : "Stage file");
-        btn.setAttr("aria-label", `${sectionClass === "staged" ? "Unstage" : "Stage"} ${filepath}`);
-        btn.addEventListener("click", async (e) => {
+        stageBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           try {
             await onAction(filepath);
             await this.refresh();
           } catch (err) {
-            new import_obsidian4.Notice(`${actionLabel} failed: ${err.message}`);
+            new import_obsidian4.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
           }
         });
       }
@@ -21417,18 +21452,30 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         row.setAttr("role", "article");
         row.setAttr("aria-expanded", String(isExpanded));
         const mainRow = row.createDiv("git-commit-main");
-        const toggle = mainRow.createSpan({ cls: "git-commit-toggle" });
-        toggle.setText(isExpanded ? "\u25BE" : "\u25B8");
-        const hash = mainRow.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
-        hash.setAttr("title", commit2.oid);
-        const msg = mainRow.createSpan({ text: this.truncateMessage(commit2.message), cls: "git-commit-message" });
+        const timeline = mainRow.createSpan({
+          cls: "git-commit-timeline",
+          attr: { "aria-hidden": "true" }
+        });
+        const timelineDot = timeline.createSpan({ cls: "git-commit-timeline-dot" });
+        if (isExpanded)
+          timelineDot.addClass("git-commit-timeline-dot-active");
+        const body = mainRow.createDiv("git-commit-body");
+        const summary = body.createDiv("git-commit-summary");
+        const msg = summary.createSpan({
+          text: this.truncateMessage(commit2.message),
+          cls: "git-commit-message"
+        });
         msg.setAttr("title", commit2.message);
-        if (this.commitsViewMode === "remote") {
-          mainRow.createSpan({ text: "origin", cls: "git-commit-remote-badge" });
-        }
-        const meta = mainRow.createDiv("git-commit-meta");
+        summary.createSpan({ text: this.formatDate(commit2.date), cls: "git-commit-date" });
+        const meta = body.createDiv("git-commit-meta");
+        const hash = meta.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
+        hash.setAttr("title", commit2.oid);
         meta.createSpan({ text: commit2.author, cls: "git-commit-author" });
-        meta.createSpan({ text: this.formatDate(commit2.date), cls: "git-commit-date" });
+        if (this.commitsViewMode === "remote") {
+          meta.createSpan({ text: "origin", cls: "git-commit-remote-badge" });
+        }
+        const toggle = meta.createSpan({ cls: "git-commit-toggle", attr: { "aria-hidden": "true" } });
+        toggle.setText(isExpanded ? "\u2304" : "\u203A");
         row.addEventListener("click", async (e) => {
           const target = e.target;
           if (target.closest("a") || target.closest("button"))
@@ -21438,7 +21485,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
             this.expandedCommitOids.delete(commit2.oid);
             row.setAttr("data-expanded", "false");
             row.setAttr("aria-expanded", "false");
-            toggle.setText("\u25B8");
+            toggle.setText("\u203A");
+            timelineDot.removeClass("git-commit-timeline-dot-active");
             const detailEl = row.querySelector(".git-commit-detail");
             if (detailEl)
               detailEl.remove();
@@ -21446,7 +21494,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
             this.expandedCommitOids.add(commit2.oid);
             row.setAttr("data-expanded", "true");
             row.setAttr("aria-expanded", "true");
-            toggle.setText("\u25BE");
+            toggle.setText("\u2304");
+            timelineDot.addClass("git-commit-timeline-dot-active");
             await this.renderCommitDetail(row, commit2.oid);
           }
         });
@@ -21523,7 +21572,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
-    new import_obsidian4.ButtonComponent(toolbar).setButtonText("More").setTooltip("Log actions").setClass("git-btn-ghost").onClick((event) => this.openLogMenu(event));
     const entries = log2.getEntries();
     if (entries.length === 0) {
       listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
@@ -21533,17 +21581,18 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     for (const entry of recent) {
       const row = listContainer.createDiv("git-log-entry");
       const time = row.createSpan({
-        text: this.formatDate(new Date(entry.timestamp)),
+        text: this.formatLogTime(new Date(entry.timestamp)),
         cls: "git-log-time"
       });
       const level = row.createSpan({
         text: entry.level.toUpperCase(),
         cls: "git-log-level git-log-" + entry.level
       });
-      row.createSpan({
-        text: `[${entry.namespace}] ${entry.message}`,
+      const message = row.createSpan({
+        text: entry.message,
         cls: "git-log-message"
       });
+      message.setAttr("title", `[${entry.namespace}] ${entry.message}`);
       if (entry.data) {
         const detail = row.createDiv("git-log-detail");
         detail.setText(typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data).slice(0, 200));
@@ -21603,6 +21652,14 @@ ${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "
     if (diffDays < 7)
       return `${diffDays}d ago`;
     return date.toLocaleDateString(void 0, { month: "short", day: "numeric" });
+  }
+  formatLogTime(date) {
+    return date.toLocaleTimeString(void 0, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    });
   }
 };
 
@@ -21874,7 +21931,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "ed8014c1ceba82b355e2a8b197c87431d4331848" : "unknown";
+var GIT_COMMIT_HASH = true ? "b8b8903f5a2bfd0e86a0850f28fb8306133ef0c6" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";

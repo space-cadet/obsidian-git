@@ -1,7 +1,7 @@
 # Session 2026-09-02 - Afternoon
 
 *Created: 2026-09-02 14:11:31 IST*
-*Last Updated: 2026-09-02 14:42:28 IST*
+*Last Updated: 2026-09-02 15:21:22 IST*
 
 ## Focus Task
 
@@ -19,7 +19,7 @@ T29a: Implement the full sidebar UI redesign presentation pass
 2. ✅ Confirmed that a coherent visual redesign is preferable to incremental
    CSS adjustment.
 3. ✅ Created the task and implementation plan.
-4. ✅ Implemented the redesigned presentation at source level.
+4. ✅ Implemented the mockup-matching presentation at source level.
 5. ⬜ Verify the result in real Obsidian.
 
 ## Context and Working State
@@ -30,8 +30,9 @@ redesign will preserve behavior and replace the presentation as a coordinated
 sidebar pass. T33 remains completed; T29a owns the new visual work.
 
 The source-level implementation is complete in `src/views/GitSidebarView.ts`
-and `styles.css`. Real Obsidian visual acceptance remains separate and
-pending.
+and `styles.css`. It now uses mockup-style file controls, commit timeline
+cards, activity rows, and per-view header actions. Real Obsidian visual
+acceptance remains separate and pending.
 
 ## Critical Files
 

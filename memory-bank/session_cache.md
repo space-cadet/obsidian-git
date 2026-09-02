@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-02 14:42:28 IST*
+*Last Updated: 2026-09-02 15:21:22 IST*
 
 ## Current Session
 **Started**: 2026-09-02 14:11:31 IST
@@ -11,7 +11,7 @@
 
 **Session Title**: T29a: Implement full sidebar UI redesign presentation pass
 
-**Closeout Commit**: No commit; source implementation is uncommitted pending review
+**Closeout Commit**: No commit; mockup-match follow-up is uncommitted pending review
 
 **Next Session**: Verify T29a's redesigned sidebar in real Obsidian at desktop,
 mobile, and intermediate widths before continuing the existing release gates.
@@ -36,7 +36,7 @@ source file was missing.
 - T5: Error Handling & Logging — ✅ COMPLETED
 - T6: Git Sidebar UI — ✅ COMPLETED
 - T29: obsidian-git Plugin — 🔄 IN PROGRESS (release archive and automated tests verified; mobile acceptance pending)
-- T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄 IN PROGRESS (source pass implemented; real Obsidian acceptance pending)
+- T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄 IN PROGRESS (mockup-match source pass implemented; real Obsidian acceptance pending)
 - T30: Remote Commits View — ✅ COMPLETED (merged into v25)
 - T31: Branch Tree View — ⏳ BACKLOG
 - T32: Mobile Crash Fix + Progress — ✅ COMPLETED (v26)
@@ -88,7 +88,7 @@ replaces the presentation as one coordinated pass.
 **Progress**:
 1. ✅ Visual comparison and redesign decision recorded
 2. ✅ Task, implementation, session, and registry records created
-3. ✅ Implement redesigned sidebar presentation at source level
+3. ✅ Implement mockup-matching sidebar presentation at source level
 4. ⬜ Verify real Obsidian desktop/mobile visual acceptance
 
 ### T34: Remote Authentication for Obsidian Git

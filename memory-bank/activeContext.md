@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-02 14:42:28 IST*
+*Last Updated: 2026-09-02 15:21:22 IST*
 
 ## Current Tasks
 
@@ -14,8 +14,8 @@
 ### T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄
 - **Scope**: Replace the incremental sidebar presentation with one coherent
   mockup-led design across Changes, Commits, and Log.
-- **Status**: Source-level presentation pass is implemented and verified by
-  build/tests. Preserve existing Git actions, T33 completion, T34
+- **Status**: Mockup-matching source-level presentation pass is implemented and
+  verified by build/tests. Preserve existing Git actions, T33 completion, T34
   authentication ownership, and T35 hardening ownership.
 - **Next**: Verify the redesigned presentation in real Obsidian at desktop,
   mobile, and intermediate widths before continuing the existing release gates.

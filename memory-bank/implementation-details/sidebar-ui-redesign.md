@@ -1,7 +1,7 @@
 # Full Sidebar UI Redesign
 
 *Created: 2026-09-02 14:11:31 IST*
-*Last Updated: 2026-09-02 14:42:28 IST*
+*Last Updated: 2026-09-02 15:21:22 IST*
 *Task: T29a*
 
 ## Design Decision
@@ -18,11 +18,14 @@ state behavior.
 
 ## Implementation Status
 
-- The source-level presentation pass is implemented in
-  `src/views/GitSidebarView.ts` and `styles.css`.
+- The mockup-matching source-level presentation pass is implemented in
+  `src/views/GitSidebarView.ts` and `styles.css`. It replaces the previous
+  flat file rows, header status treatment, commit list, and log layout.
 - Existing Git handlers remain in place; the pass adds shared shell semantics,
-  icon treatment, accessible controls, and coordinated responsive styling.
-- Production build, the full test command, and `git diff --check` pass.
+  icon treatment, checkbox/status/path columns, commit timeline cards,
+  accessible controls, and coordinated responsive styling.
+- Production build, archive, the full test command, and `git diff --check`
+  pass.
 - Real Obsidian desktop/mobile screenshot acceptance is still pending.
 
 ## Reference Assets

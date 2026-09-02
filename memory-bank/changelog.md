@@ -1,3 +1,13 @@
+## 2026-09-02 — T29a mockup-match follow-up
+
+- Replaced the rough sidebar treatment with mockup-oriented composition:
+  branch/status header icons, checkbox/status/path/menu Changes rows, icon
+  footer actions, Commit timeline cards, and a clean Log feed.
+- Preserved the existing staging, commit, pull, push, ignore, history, and
+  log handlers.
+- Source verification and archive checks pass. Real Obsidian screenshot
+  acceptance remains pending.
+
 ## 2026-09-02 — T29a sidebar presentation implementation
 
 - Implemented the coordinated mockup-led sidebar presentation pass across
