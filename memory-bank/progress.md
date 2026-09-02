@@ -1,6 +1,20 @@
 # Project Progress
 
-*Last Updated: 2026-08-18 13:32:46 IST*
+*Last Updated: 2026-09-02 14:42:28 IST*
+
+## T29a: Full sidebar UI redesign and visual acceptance (2026-09-02)
+
+- Recorded the user's decision to redesign the sidebar presentation as one
+  coherent pass based on the approved Changes, Commits, and Log mockups.
+- Preserved the existing Git behavior and contextual action model as the
+  behavior contract; this plan does not reopen completed T33 work.
+- Created T29a and a dedicated implementation-detail document covering the
+  visual system, presentation structure, behavior map, and acceptance evidence.
+- Implemented the coordinated source-level presentation pass in
+  `src/views/GitSidebarView.ts` and `styles.css`, including accessible
+  navigation/controls, shared styling, responsive widths, and one scroll owner.
+- Production build, archive, and the full test command pass. Real Obsidian
+  desktop/mobile visual acceptance remains pending.
 
 ## T29: Sidebar UX and bulk staging follow-up (2026-08-18)
 
@@ -56,6 +70,7 @@
 
 ## Pending
 
+- T29a full sidebar visual redesign and real Obsidian visual acceptance
 - README and user documentation
 - Conflict resolution UI
 - SSH key authentication

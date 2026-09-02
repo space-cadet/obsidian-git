@@ -1,15 +1,24 @@
 # Active Context
 
-*Last Updated: 2026-08-18 13:32:46 IST*
+*Last Updated: 2026-09-02 14:42:28 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 sidebar UX published, mobile acceptance pending
+### T29: obsidian-git Plugin — 🔄 sidebar presentation implemented, mobile acceptance pending
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
-- **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T33 (Progress Modal + UI Fixes — COMPLETED)
+- **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T29a (Full Sidebar UI Redesign — ACTIVE), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
-- **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab sidebar direction are implemented and published in commit `4292bf9`. The UI slice moves commit entry and secondary controls behind menus, hides the action footer on Commits and Log, and adds log actions. Production build, archive, 29 Node tests, 10 isomorphic-git checks, and `git diff --check` pass. Authentication-backed mobile acceptance and public release remain separate gates.
-- **Next**: Verify the sidebar in Obsidian with a large change set, confirm the three tab layouts on desktop and mobile, then continue the existing mobile/release gates.
+- **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab interaction direction are implemented and published in commit `4292bf9`. T29a now owns the full visual redesign from the approved mockups while preserving those behaviors. Authentication-backed mobile acceptance and public release remain separate gates.
+- **Next**: Verify the T29a presentation pass in Obsidian before continuing the existing mobile/release gates.
+
+### T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄
+- **Scope**: Replace the incremental sidebar presentation with one coherent
+  mockup-led design across Changes, Commits, and Log.
+- **Status**: Source-level presentation pass is implemented and verified by
+  build/tests. Preserve existing Git actions, T33 completion, T34
+  authentication ownership, and T35 hardening ownership.
+- **Next**: Verify the redesigned presentation in real Obsidian at desktop,
+  mobile, and intermediate widths before continuing the existing release gates.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
 - **Scope**: Separate authentication task covering secret-safe PAT diagnostics,
@@ -90,6 +99,8 @@
 - The Changes footer is now action-only and tab-specific. Commit message entry,
   `.gitignore` controls, force push, per-file ignore, and log utilities are
   available on demand through modals or `More` menus.
+- The current interaction implementation is retained as the T29a behavior
+  contract; the full visual redesign is recorded separately.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
@@ -155,7 +166,7 @@
 - **Plugin**: v1.0.0 (manifest), v29 internal dev, core features + sidebar + progress modal + crash fix + UI parity
 - **Build**: ~280KB, mobile-compatible, tsc + esbuild pass
 - **CI**: GitHub Actions working, dev releases on every push
-- **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current build identity is embedded as commit `22857f1`
+- **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current generated build identity is embedded as commit `ed8014c`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
 - **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d active,
   T35e/T35f planned,

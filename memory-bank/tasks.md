@@ -1,7 +1,7 @@
 # Memory Bank — Obsidian Git Sync Plugin
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-08-18 13:32:46 IST*
+*Last Updated: 2026-09-02 14:42:28 IST*
 
 ## Overview
 
@@ -12,6 +12,7 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
 | T29 | obsidian-git Plugin — sidebar UX published; release acceptance | 🔄 | HIGH | 2026-05-31 | T1-T6 | [Details](tasks/T29.md) |
+| T29a | Full Sidebar UI Redesign and Visual Acceptance | 🔄 | HIGH | 2026-09-02 | T29 | [Details](tasks/T29a.md) |
 | T30 | Remote Commits View | ✅ | MEDIUM | 2026-06-01 | T29 | [Details](tasks/T30.md) |
 | T31 | Branch Tree View | ⏳ BACKLOG | LOW | 2026-06-01 | T29 | [Details](tasks/T31.md) |
 | T32 | Mobile Crash Fix + Progress | ✅ | HIGH | 2026-06-01 | T29 | [Details](tasks/T32.md) |
@@ -41,8 +42,8 @@ Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile w
 
 ## Status Summary
 
-- **Active parent tasks**: 3 (T29, T34, T35); **active child tasks**: T34a, T35a, T35b, T35c, T35d
+- **Active parent tasks**: 3 (T29, T34, T35); **active child tasks**: T29a, T34a, T35a, T35b, T35c, T35d
 - **Completed**: 6 (T1-T6) + 3 sub-tasks (T30, T32, T33)
 - **Paused**: 2 (T34b, T34c); **planned hardening children**: T35e, T35f
 - **Backlog**: 1 (T31)
-- **Total**: 22
+- **Total**: 23

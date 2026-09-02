@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitManager, GitFileStatus, GitCommit } from '../gitManager';
 import { log, LogEntry } from '../logger';
@@ -41,9 +41,13 @@ export class GitSidebarView extends ItemView {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass('git-sidebar-container');
+        container.setAttr('role', 'region');
+        container.setAttr('aria-label', 'Git Sync');
 
         // 1. TABS at the very top + settings icon
         const tabsWrapper = container.createDiv('git-sidebar-tabs-wrapper');
+        tabsWrapper.setAttr('role', 'tablist');
+        tabsWrapper.setAttr('aria-label', 'Git Sync views');
         this.tabsContainer = tabsWrapper.createDiv('git-sidebar-tabs');
         this.renderTabs();
         
@@ -63,6 +67,10 @@ export class GitSidebarView extends ItemView {
 
         // 3. Content area
         this.contentContainer = container.createDiv('git-sidebar-content');
+        this.contentContainer.setAttr('id', 'git-sidebar-content');
+        this.contentContainer.setAttr('role', 'tabpanel');
+        this.contentContainer.setAttr('tabindex', '0');
+        this.contentContainer.setAttr('aria-label', 'Git Sync content');
 
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');
@@ -119,7 +127,13 @@ export class GitSidebarView extends ItemView {
         for (const tab of tabs) {
             const btn = this.tabsContainer.createEl('button', {
                 text: tab.label,
-                cls: 'git-tab-btn' + (tab.id === this.activeTab ? ' git-tab-active' : '')
+                cls: 'git-tab-btn' + (tab.id === this.activeTab ? ' git-tab-active' : ''),
+                attr: {
+                    role: 'tab',
+                    'aria-selected': String(tab.id === this.activeTab),
+                    'aria-controls': 'git-sidebar-content',
+                    'data-tab': tab.id
+                }
             });
             btn.addEventListener('click', async () => {
                 this.activeTab = tab.id;
@@ -141,10 +155,10 @@ export class GitSidebarView extends ItemView {
             cls: 'git-branch-name' + (initialized ? '' : ' git-branch-uninit') 
         });
         const refreshBtn = branchRow.createEl('button', {
-            text: '↻',
             cls: 'git-header-refresh',
             attr: { title: 'Refresh git status', 'aria-label': 'Refresh git status' }
         });
+        setIcon(refreshBtn, 'refresh-cw');
         refreshBtn.addEventListener('click', async (event) => {
             event.stopPropagation();
             refreshBtn.disabled = true;
@@ -617,8 +631,12 @@ export class GitSidebarView extends ItemView {
         // Header with toggle arrow + title + count + bulk button
         const header = section.createDiv('git-status-section-header');
         
-        const toggle = header.createSpan({ cls: 'git-section-toggle' });
+        const toggle = header.createEl('button', {
+            cls: 'git-section-toggle',
+            attr: { type: 'button', 'aria-label': `${title} section` }
+        });
         toggle.setText(isCollapsed ? '▸' : '▾');
+        toggle.setAttr('aria-expanded', String(!isCollapsed));
         
         header.createSpan({ text: title, cls: 'git-status-section-label' });
         
@@ -658,6 +676,7 @@ export class GitSidebarView extends ItemView {
             const currentlyCollapsed = section.getAttr('data-collapsed') === 'true';
             section.setAttr('data-collapsed', String(!currentlyCollapsed));
             toggle.setText(!currentlyCollapsed ? '▸' : '▾');
+            toggle.setAttr('aria-expanded', String(currentlyCollapsed));
         });
 
         const list = section.createDiv('git-status-section-list');
@@ -718,6 +737,7 @@ export class GitSidebarView extends ItemView {
 
                 const btn = actions.createEl('button', { text: actionLabel, cls: 'git-file-btn' });
                 btn.setAttr('title', sectionClass === 'staged' ? 'Unstage file' : 'Stage file');
+                btn.setAttr('aria-label', `${sectionClass === 'staged' ? 'Unstage' : 'Stage'} ${filepath}`);
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     try {
@@ -783,7 +803,8 @@ export class GitSidebarView extends ItemView {
         const toggleBar = listContainer.createDiv('git-commits-toggle-bar');
         const localBtn = toggleBar.createEl('button', {
             text: 'Local',
-            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'local' ? ' git-commits-toggle-active' : '')
+            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'local' ? ' git-commits-toggle-active' : ''),
+            attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'local') }
         });
         localBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'local';
@@ -791,7 +812,8 @@ export class GitSidebarView extends ItemView {
         });
         const remoteBtn = toggleBar.createEl('button', {
             text: 'Remote',
-            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'remote' ? ' git-commits-toggle-active' : '')
+            cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'remote' ? ' git-commits-toggle-active' : ''),
+            attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'remote') }
         });
         remoteBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'remote';
@@ -851,6 +873,8 @@ export class GitSidebarView extends ItemView {
                 const row = listContainer.createDiv('git-commit-row' + (this.commitsViewMode === 'remote' ? ' git-commit-remote' : ''));
                 row.setAttr('data-oid', commit.oid);
                 row.setAttr('data-expanded', String(isExpanded));
+                row.setAttr('role', 'article');
+                row.setAttr('aria-expanded', String(isExpanded));
 
                 const mainRow = row.createDiv('git-commit-main');
 
@@ -881,12 +905,14 @@ export class GitSidebarView extends ItemView {
                     if (currentlyExpanded) {
                         this.expandedCommitOids.delete(commit.oid);
                         row.setAttr('data-expanded', 'false');
+                        row.setAttr('aria-expanded', 'false');
                         toggle.setText('▸');
                         const detailEl = row.querySelector('.git-commit-detail');
                         if (detailEl) detailEl.remove();
                     } else {
                         this.expandedCommitOids.add(commit.oid);
                         row.setAttr('data-expanded', 'true');
+                        row.setAttr('aria-expanded', 'true');
                         toggle.setText('▾');
                         await this.renderCommitDetail(row, commit.oid);
                     }
@@ -981,7 +1007,7 @@ export class GitSidebarView extends ItemView {
         const listContainer = this.contentContainer.createDiv('git-log-list');
 
         const toolbar = listContainer.createDiv('git-log-toolbar');
-        toolbar.createSpan({ text: 'Activity', cls: 'git-log-toolbar-title' });
+        toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
         new ButtonComponent(toolbar)
             .setButtonText('More')
             .setTooltip('Log actions')

@@ -104,6 +104,11 @@ The approved visual references are stored at:
 - `memory-bank/assets/ui-mockups/sidebar-commits-approved.png`
 - `memory-bank/assets/ui-mockups/sidebar-log-approved.png`
 
+The interaction contract above remains valid. The visual redesign and
+visual-acceptance plan are now tracked separately in
+`implementation-details/sidebar-ui-redesign.md` under T29a so this document
+continues to distinguish behavior from presentation.
+
 **View type:** `VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view'`
 
 **Tabs:**

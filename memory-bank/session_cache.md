@@ -1,21 +1,20 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-08-18 13:32:46 IST*
+*Last Updated: 2026-09-02 14:42:28 IST*
 
 ## Current Session
-**Started**: 2026-08-18 13:05 IST
-**Focus Task**: T29 session closeout and next-session handoff
-**Session File**: `memory-bank/sessions/2026-08-18-afternoon.md`
+**Started**: 2026-09-02 14:11:31 IST
+**Focus Task**: T29a full sidebar UI redesign and visual acceptance
+**Session File**: `memory-bank/sessions/2026-09-02-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+**Session Title**: T29a: Implement full sidebar UI redesign presentation pass
 
-**Closeout Commit**: `4292bf9` pushed to `origin/main`
+**Closeout Commit**: No commit; source implementation is uncommitted pending review
 
-**Next Session**: Begin with real Obsidian desktop/mobile acceptance of the
-three sidebar layouts, then continue the existing authentication and release
-gates.
+**Next Session**: Verify T29a's redesigned sidebar in real Obsidian at desktop,
+mobile, and intermediate widths before continuing the existing release gates.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -25,8 +24,8 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 3 parents (T29, T34, T35; T34a, T35a, T35b, T35c, T35d active) | Planned: 4 (T34b, T34c, T35e-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
-- Last Session: 2026-08-12 afternoon (gitignore controls and bulk-staging follow-up)
+- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d active) | Planned: 4 (T34b, T34c, T35e-T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Last Session: 2026-09-02 afternoon (T29a sidebar presentation implementation)
 - Current Period: afternoon
 
 ## Task Registry
@@ -37,6 +36,7 @@ source file was missing.
 - T5: Error Handling & Logging — ✅ COMPLETED
 - T6: Git Sidebar UI — ✅ COMPLETED
 - T29: obsidian-git Plugin — 🔄 IN PROGRESS (release archive and automated tests verified; mobile acceptance pending)
+- T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄 IN PROGRESS (source pass implemented; real Obsidian acceptance pending)
 - T30: Remote Commits View — ✅ COMPLETED (merged into v25)
 - T31: Branch Tree View — ⏳ BACKLOG
 - T32: Mobile Crash Fix + Progress — ✅ COMPLETED (v26)
@@ -77,6 +77,20 @@ source file was missing.
 15. ✅ Transactional install rollback and direct CI release assets
 16. ✅ Unpacked plugin files copied directly into `dist/`
 
+### T29a: Full Sidebar UI Redesign and Visual Acceptance
+**Status:** 🔄 **Priority:** HIGH
+**Started:** 2026-09-02 **Last:** 2026-09-02
+**Context**: The supplied current-UI screenshots show a visual gap from the
+approved sidebar mockups. The redesign preserves existing Git behavior and
+replaces the presentation as one coordinated pass.
+**Files**: `src/views/GitSidebarView.ts`, `styles.css`,
+`memory-bank/implementation-details/sidebar-ui-redesign.md`
+**Progress**:
+1. ✅ Visual comparison and redesign decision recorded
+2. ✅ Task, implementation, session, and registry records created
+3. ✅ Implement redesigned sidebar presentation at source level
+4. ⬜ Verify real Obsidian desktop/mobile visual acceptance
+
 ### T34: Remote Authentication for Obsidian Git
 **Status:** 🔄 **Priority:** HIGH
 **Started:** 2026-08-10 **Last:** 2026-08-10
@@ -99,9 +113,9 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   ownership boundaries.
 
 ## Session History (Recent)
-1. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
-2. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
-3. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
-4. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
-5. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
-6. `sessions/2026-08-10-night.md` — Connection-test repair, Android validation, and T34 authentication task split
+1. `sessions/2026-09-02-afternoon.md` — T29a: Implement full sidebar UI redesign presentation pass
+2. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+3. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
+4. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+5. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+6. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition

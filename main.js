@@ -20771,7 +20771,11 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("git-sidebar-container");
+    container.setAttr("role", "region");
+    container.setAttr("aria-label", "Git Sync");
     const tabsWrapper = container.createDiv("git-sidebar-tabs-wrapper");
+    tabsWrapper.setAttr("role", "tablist");
+    tabsWrapper.setAttr("aria-label", "Git Sync views");
     this.tabsContainer = tabsWrapper.createDiv("git-sidebar-tabs");
     this.renderTabs();
     const settingsBtn = tabsWrapper.createEl("button", {
@@ -20785,6 +20789,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     this.headerContainer = container.createDiv("git-sidebar-header");
     this.contentContainer = container.createDiv("git-sidebar-content");
+    this.contentContainer.setAttr("id", "git-sidebar-content");
+    this.contentContainer.setAttr("role", "tabpanel");
+    this.contentContainer.setAttr("tabindex", "0");
+    this.contentContainer.setAttr("aria-label", "Git Sync content");
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     await this.refresh();
@@ -20826,7 +20834,13 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     for (const tab of tabs) {
       const btn = this.tabsContainer.createEl("button", {
         text: tab.label,
-        cls: "git-tab-btn" + (tab.id === this.activeTab ? " git-tab-active" : "")
+        cls: "git-tab-btn" + (tab.id === this.activeTab ? " git-tab-active" : ""),
+        attr: {
+          role: "tab",
+          "aria-selected": String(tab.id === this.activeTab),
+          "aria-controls": "git-sidebar-content",
+          "data-tab": tab.id
+        }
       });
       btn.addEventListener("click", async () => {
         this.activeTab = tab.id;
@@ -20845,10 +20859,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       cls: "git-branch-name" + (initialized ? "" : " git-branch-uninit")
     });
     const refreshBtn = branchRow.createEl("button", {
-      text: "\u21BB",
       cls: "git-header-refresh",
       attr: { title: "Refresh git status", "aria-label": "Refresh git status" }
     });
+    (0, import_obsidian4.setIcon)(refreshBtn, "refresh-cw");
     refreshBtn.addEventListener("click", async (event) => {
       event.stopPropagation();
       refreshBtn.disabled = true;
@@ -21208,8 +21222,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const isCollapsed = files.length === 0;
     section.setAttr("data-collapsed", String(isCollapsed));
     const header = section.createDiv("git-status-section-header");
-    const toggle = header.createSpan({ cls: "git-section-toggle" });
+    const toggle = header.createEl("button", {
+      cls: "git-section-toggle",
+      attr: { type: "button", "aria-label": `${title} section` }
+    });
     toggle.setText(isCollapsed ? "\u25B8" : "\u25BE");
+    toggle.setAttr("aria-expanded", String(!isCollapsed));
     header.createSpan({ text: title, cls: "git-status-section-label" });
     const countBadge = header.createSpan({
       text: String(files.length),
@@ -21244,6 +21262,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       const currentlyCollapsed = section.getAttr("data-collapsed") === "true";
       section.setAttr("data-collapsed", String(!currentlyCollapsed));
       toggle.setText(!currentlyCollapsed ? "\u25B8" : "\u25BE");
+      toggle.setAttr("aria-expanded", String(currentlyCollapsed));
     });
     const list = section.createDiv("git-status-section-list");
     if (files.length === 0) {
@@ -21287,6 +21306,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         });
         const btn = actions.createEl("button", { text: actionLabel, cls: "git-file-btn" });
         btn.setAttr("title", sectionClass === "staged" ? "Unstage file" : "Stage file");
+        btn.setAttr("aria-label", `${sectionClass === "staged" ? "Unstage" : "Stage"} ${filepath}`);
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           try {
@@ -21336,7 +21356,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
       text: "Local",
-      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "local" ? " git-commits-toggle-active" : "")
+      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "local" ? " git-commits-toggle-active" : ""),
+      attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "local") }
     });
     localBtn.addEventListener("click", async () => {
       this.commitsViewMode = "local";
@@ -21344,7 +21365,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     const remoteBtn = toggleBar.createEl("button", {
       text: "Remote",
-      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "remote" ? " git-commits-toggle-active" : "")
+      cls: "git-commits-toggle-btn" + (this.commitsViewMode === "remote" ? " git-commits-toggle-active" : ""),
+      attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "remote") }
     });
     remoteBtn.addEventListener("click", async () => {
       this.commitsViewMode = "remote";
@@ -21392,6 +21414,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         const row = listContainer.createDiv("git-commit-row" + (this.commitsViewMode === "remote" ? " git-commit-remote" : ""));
         row.setAttr("data-oid", commit2.oid);
         row.setAttr("data-expanded", String(isExpanded));
+        row.setAttr("role", "article");
+        row.setAttr("aria-expanded", String(isExpanded));
         const mainRow = row.createDiv("git-commit-main");
         const toggle = mainRow.createSpan({ cls: "git-commit-toggle" });
         toggle.setText(isExpanded ? "\u25BE" : "\u25B8");
@@ -21413,6 +21437,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           if (currentlyExpanded) {
             this.expandedCommitOids.delete(commit2.oid);
             row.setAttr("data-expanded", "false");
+            row.setAttr("aria-expanded", "false");
             toggle.setText("\u25B8");
             const detailEl = row.querySelector(".git-commit-detail");
             if (detailEl)
@@ -21420,6 +21445,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           } else {
             this.expandedCommitOids.add(commit2.oid);
             row.setAttr("data-expanded", "true");
+            row.setAttr("aria-expanded", "true");
             toggle.setText("\u25BE");
             await this.renderCommitDetail(row, commit2.oid);
           }
@@ -21496,7 +21522,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   async renderLogTab() {
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
-    toolbar.createSpan({ text: "Activity", cls: "git-log-toolbar-title" });
+    toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
     new import_obsidian4.ButtonComponent(toolbar).setButtonText("More").setTooltip("Log actions").setClass("git-btn-ghost").onClick((event) => this.openLogMenu(event));
     const entries = log2.getEntries();
     if (entries.length === 0) {
@@ -21848,7 +21874,7 @@ var UpdateAvailableModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "be4ab44fc47554a74ce4efe5cec0c4b69b37a9c5" : "unknown";
+var GIT_COMMIT_HASH = true ? "ed8014c1ceba82b355e2a8b197c87431d4331848" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";
