@@ -1,5 +1,13 @@
 import { App, Modal, Notice, Setting, requestUrl } from 'obsidian';
 
+/** Small logger interface so updater diagnostics use the plugin activity log. */
+export interface UpdaterLogger {
+	log?: (level: string, ...args: any[]) => void;
+	debug?: (context: string, message: string, data?: any) => void;
+	info?: (context: string, message: string, data?: any) => void;
+	error?: (context: string, message: string, error?: Error) => void;
+}
+
 export interface ReleaseAsset {
 	name: string;
 	browser_download_url: string;
@@ -16,6 +24,21 @@ export interface ReleaseInfo {
 	assets: ReleaseAsset[];
 }
 
+export interface AvailableBuild {
+	release: ReleaseInfo;
+	branch: string;
+	commitHash?: string;
+	/** Git commit timestamp; release publication time is the fallback. */
+	committedAt?: string;
+}
+
+export interface CommitInfo {
+	sha: string;
+	message: string;
+	authorName: string;
+	committedAt: string;
+}
+
 export interface UpdateCheckResult {
 	hasUpdate: boolean;
 	currentVersion: string;
@@ -23,6 +46,8 @@ export interface UpdateCheckResult {
 	release: ReleaseInfo | null;
 	isPrerelease: boolean;
 	commitMatch?: boolean;
+	latestCommit?: CommitInfo | null;
+	error?: string;
 }
 
 const GITHUB_REPO = 'space-cadet/obsidian-git';
@@ -59,13 +84,32 @@ async function fetchJson(url: string): Promise<any> {
 		method: 'GET',
 		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
 	});
+	if (response.status < 200 || response.status >= 300) {
+		let message = `HTTP ${response.status}`;
+		try {
+			message = JSON.parse(response.text)?.message || message;
+		} catch {
+			// Keep the HTTP status when GitHub does not return JSON.
+		}
+		const error: any = new Error(message);
+		error.status = response.status;
+		throw error;
+	}
 	return JSON.parse(response.text);
 }
 
-async function fetchLatestCommitSHA(branch = 'main'): Promise<string | null> {
+async function fetchLatestCommit(branch = 'main'): Promise<CommitInfo | null> {
 	try {
-		const data = await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/commits/${branch}`);
-		return typeof data?.sha === 'string' ? data.sha : null;
+		const data = await fetchJson(
+			`https://api.github.com/repos/${GITHUB_REPO}/commits/${encodeURIComponent(branch)}?_cb=${Date.now()}`,
+		);
+		if (!data?.sha) return null;
+		return {
+			sha: data.sha,
+			message: data.commit?.message?.split('\n')[0] ?? '',
+			authorName: data.commit?.author?.name ?? data.author?.login ?? '',
+			committedAt: data.commit?.author?.date ?? data.commit?.committer?.date ?? '',
+		};
 	} catch {
 		return null;
 	}
@@ -77,23 +121,58 @@ async function downloadFile(app: App, url: string, destination: string): Promise
 		method: 'GET',
 		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
 	});
+	if (response.status < 200 || response.status >= 300) {
+		throw new Error(`Download failed: HTTP ${response.status}`);
+	}
 	await app.vault.adapter.write(destination, response.text);
 }
 
-function hashesMatch(localHash: string, remoteHash: string): boolean {
-	const local = localHash.trim().toLowerCase();
-	const remote = remoteHash.trim().toLowerCase();
-	if (!local || !remote || local === 'unknown' || remote === 'unknown') return false;
-	return local.slice(0, 7) === remote.slice(0, 7);
+function branchFromRelease(release: ReleaseInfo): string {
+	const prefix = 'latest-dev-';
+	return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : 'main';
+}
+
+/** Extract the immutable source identity recorded in an automated release. */
+function commitInfoFromRelease(release: ReleaseInfo): CommitInfo | null {
+	const sha = release.body?.match(/\*\*Commit:\*\*\s*`([^`]+)`/)?.[1];
+	if (!sha) return null;
+	return {
+		sha,
+		message: release.name || `Published ${release.tag_name}`,
+		authorName: 'GitHub Actions',
+		committedAt: release.body?.match(/\*\*Built at:\*\*\s*(.+)/)?.[1]?.trim() ?? release.published_at,
+	};
 }
 
 export class PluginUpdater {
 	private readonly app: App;
 	private readonly pluginDir: string;
+	private readonly logger: UpdaterLogger | null;
 
-	constructor(app: App, pluginId: string) {
+	constructor(app: App, pluginId: string, logger?: UpdaterLogger) {
 		this.app = app;
 		this.pluginDir = `.obsidian/plugins/${pluginId}`;
+		this.logger = logger ?? null;
+	}
+
+	private log(level: string, ...args: any[]): void {
+		if (this.logger) {
+			if (this.logger.log) {
+				this.logger.log(level, '[PluginUpdater]', ...args);
+				return;
+			}
+			const message = args.map((value) => typeof value === 'string' ? value : JSON.stringify(value)).join(' ');
+			if (level === 'error' && this.logger.error) {
+				this.logger.error('PluginUpdater', message);
+			} else if (level === 'debug' && this.logger.debug) {
+				this.logger.debug('PluginUpdater', message);
+			} else if (this.logger.info) {
+				this.logger.info('PluginUpdater', message);
+			}
+			return;
+		}
+		const fn = level === 'error' ? console.error : console.log;
+		fn('[PluginUpdater]', ...args);
 	}
 
 	private async ensureDir(path: string): Promise<void> {
@@ -134,16 +213,21 @@ export class PluginUpdater {
 		}
 	}
 
-	private async selectRelease(includePrerelease: boolean): Promise<ReleaseInfo | null> {
+	private async selectRelease(includePrerelease: boolean, currentBranch?: string): Promise<ReleaseInfo | null> {
 		if (!includePrerelease) {
-			return await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+			return await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_cb=${Date.now()}`);
 		}
 
-		const releases = await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=20`) as ReleaseInfo[];
+		const releases = await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=30&_cb=${Date.now()}`) as ReleaseInfo[];
 		if (!Array.isArray(releases) || releases.length === 0) return null;
-		// This repository uses a rolling `dev` release. Keep the fallback for
-		// repositories that use a different prerelease tag.
-		return releases.find((release) => release.tag_name === 'dev' && release.prerelease)
+		const branchRelease = currentBranch && currentBranch !== 'main'
+			? releases.find((release) => release.tag_name === `latest-dev-${currentBranch}`)
+			: undefined;
+		// Prefer a branch build when one exists, then use this repository's rolling
+		// main build. Keep a generic prerelease fallback for older releases.
+		return branchRelease
+			?? releases.find((release) => release.tag_name === 'dev' && release.prerelease)
+			?? releases.find((release) => release.tag_name === 'latest-dev' && release.prerelease)
 			?? releases.find((release) => release.prerelease)
 			?? releases[0];
 	}
@@ -153,44 +237,90 @@ export class PluginUpdater {
 		currentVersion: string,
 		includePrerelease: boolean,
 		currentCommitHash?: string,
+		currentBranch?: string,
 	): Promise<UpdateCheckResult> {
+		this.log('info', 'checkForUpdate:', {
+			currentVersion,
+			includePrerelease,
+			currentCommitHash: currentCommitHash?.slice(0, 7),
+			currentBranch,
+		});
 		try {
-			const release = await this.selectRelease(includePrerelease);
+			const release = await this.selectRelease(includePrerelease, currentBranch);
 			if (!release) {
 				return { hasUpdate: false, currentVersion, latestVersion: currentVersion, release: null, isPrerelease: false };
 			}
 
 			const latestVersion = release.tag_name.replace(/^v/, '');
+			const latestCommit = includePrerelease
+				? commitInfoFromRelease(release)
+				: await fetchLatestCommit('main');
+			this.log('info', 'latestCommit:', latestCommit?.sha?.slice(0, 7));
 			let commitMatch = false;
-			if (includePrerelease && currentCommitHash) {
-				const latestCommitSHA = await fetchLatestCommitSHA();
-				if (latestCommitSHA) {
-					commitMatch = hashesMatch(currentCommitHash, latestCommitSHA);
-					if (commitMatch) {
-						return {
-							hasUpdate: false,
-							currentVersion,
-							latestVersion,
-							release,
-							isPrerelease: true,
-							commitMatch: true,
-						};
-					}
+			if (includePrerelease && currentCommitHash && latestCommit) {
+				const shortLocal = currentCommitHash.slice(0, 7).toLowerCase();
+				const shortRemote = latestCommit.sha.slice(0, 7).toLowerCase();
+				commitMatch = shortLocal === shortRemote;
+				this.log('info', 'commit compare:', shortLocal, 'vs', shortRemote, 'match:', commitMatch);
+				if (commitMatch) {
+					return {
+						hasUpdate: false,
+						currentVersion,
+						latestVersion,
+						release,
+						isPrerelease: true,
+						commitMatch: true,
+						latestCommit,
+					};
 				}
 			}
 
+			// Rolling dev releases reuse one tag, so the release commit is the
+			// authoritative update signal when it is available.
+			const hasUpdate =
+				includePrerelease && currentCommitHash
+					? latestCommit ? !commitMatch : false
+					: compareVersions(latestVersion, currentVersion) > 0;
+			this.log('info', 'version compare:', latestVersion, 'vs', currentVersion, 'hasUpdate:', hasUpdate);
+
 			return {
-				hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
+				hasUpdate,
 				currentVersion,
 				latestVersion,
 				release,
 				isPrerelease: release.prerelease,
 				commitMatch,
+				latestCommit,
 			};
 		} catch (error) {
-			console.error('[PluginUpdater] Check failed:', error);
-			return { hasUpdate: false, currentVersion, latestVersion: currentVersion, release: null, isPrerelease: false };
+			this.log('error', 'Check failed:', error);
+			return {
+				hasUpdate: false,
+				currentVersion,
+				latestVersion: currentVersion,
+				release: null,
+				isPrerelease: false,
+				error: error instanceof Error ? error.message : String(error),
+			};
 		}
+	}
+
+	/** Return the published dev build for each available branch. */
+	async listAvailableBuilds(): Promise<AvailableBuild[]> {
+		const releases = await fetchJson(
+			`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&_cb=${Date.now()}`,
+		) as ReleaseInfo[];
+		return (releases ?? [])
+			.filter((release) => release.prerelease && release.tag_name.startsWith('latest-dev'))
+			.map((release) => {
+				const commitInfo = commitInfoFromRelease(release);
+				return {
+					release,
+					branch: branchFromRelease(release),
+					commitHash: commitInfo?.sha,
+					committedAt: commitInfo?.committedAt ?? release.published_at,
+				};
+			});
 	}
 
 	/** Download required release assets using Obsidian's native HTTP and vault APIs. */
@@ -304,6 +434,22 @@ export class UpdateAvailableModal extends Modal {
 			info.createEl('p', { text: '⚠️ This is a pre-release (dev build).', cls: 'updater-prerelease-warning' });
 		}
 
+		if (this.checkResult.latestCommit) {
+			const commit = this.checkResult.latestCommit;
+			contentEl.createEl('h3', { text: 'Build information' });
+			const buildInfo = contentEl.createDiv('updater-build-info');
+			const commitLink = buildInfo.createEl('a', {
+				text: commit.sha.slice(0, 7),
+				href: `https://github.com/${GITHUB_REPO}/commit/${commit.sha}`,
+			});
+			commitLink.setAttr('target', '_blank');
+			buildInfo.createEl('span', { text: ` — ${commit.message || 'No commit message'}` });
+			buildInfo.createEl('br');
+			buildInfo.createEl('span', {
+				text: `${commit.authorName ? `${commit.authorName} · ` : ''}${commit.committedAt ? new Date(commit.committedAt).toLocaleString() : 'Timestamp unavailable'}`,
+			});
+		}
+
 		if (this.checkResult.release?.body) {
 			contentEl.createEl('h3', { text: 'Changelog' });
 			contentEl.createDiv('updater-changelog').createEl('pre', { text: this.checkResult.release.body });
@@ -329,6 +475,65 @@ export class UpdateAvailableModal extends Modal {
 				}),
 			)
 			.addButton((button) => button.setButtonText('Skip').onClick(() => this.close()));
+	}
+
+	onClose() {
+		this.contentEl.empty();
+	}
+}
+
+/** Modal for selecting a published dev build from any branch. */
+export class AvailableBuildsModal extends Modal {
+	private builds: AvailableBuild[] = [];
+
+	constructor(
+		app: App,
+		private readonly updater: PluginUpdater,
+		private readonly onInstall: (build: AvailableBuild) => Promise<void>,
+	) {
+		super(app);
+	}
+
+	async onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl('h2', { text: 'Available dev builds' });
+		contentEl.createEl('p', { text: 'Choose a published branch build to download and install.' });
+		const status = contentEl.createEl('p', { text: 'Loading builds…' });
+
+		try {
+			this.builds = await this.updater.listAvailableBuilds();
+			status.remove();
+			if (this.builds.length === 0) {
+				contentEl.createEl('p', { text: 'No branch builds are currently available.' });
+				return;
+			}
+
+			for (const build of this.builds) {
+				const timestamp = build.committedAt
+					? new Date(build.committedAt).toLocaleString()
+					: new Date(build.release.published_at).toLocaleString();
+				new Setting(contentEl)
+					.setName(build.branch)
+					.setDesc(`${build.release.name} · ${build.commitHash?.slice(0, 7) ?? 'commit unavailable'} · ${timestamp}`)
+					.addButton((button) => button.setButtonText('Install').onClick(async () => {
+						button.setDisabled(true);
+						button.setButtonText('Installing…');
+						try {
+							await this.onInstall(build);
+							this.close();
+							new Notice('✅ Build installed. Reloading Obsidian…');
+							(this.app as any).commands.executeCommandById('app:reload');
+						} catch (error: any) {
+							button.setDisabled(false);
+							button.setButtonText('Install');
+							new Notice(`❌ Install failed: ${error?.message || String(error)}`);
+						}
+					}));
+			}
+		} catch (error) {
+			status.setText(`Could not load builds: ${error instanceof Error ? error.message : String(error)}`);
+		}
 	}
 
 	onClose() {

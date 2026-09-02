@@ -50,7 +50,7 @@ test.after(() => {
 });
 
 function jsonResponse(value) {
-  return { text: JSON.stringify(value) };
+  return { status: 200, text: JSON.stringify(value) };
 }
 
 function createAdapter(initialFiles = {}) {
@@ -91,7 +91,13 @@ test('dev channel selects the rolling dev release and suppresses matching commit
     if (url.includes('/releases?')) {
       return jsonResponse([
         { tag_name: 'v1.0.0', prerelease: false, assets: [] },
-        { tag_name: 'dev', prerelease: true, assets: [] },
+        {
+          tag_name: 'dev',
+          name: 'Dev Build',
+          body: '**Commit:** `abcdef1234567890`\n**Built at:** 2026-09-02T00:00:00Z',
+          prerelease: true,
+          assets: [],
+        },
       ]);
     }
     if (url.includes('/commits/main')) return jsonResponse({ sha: 'abcdef1234567890' });
@@ -108,7 +114,7 @@ test('dev channel selects the rolling dev release and suppresses matching commit
 
 test('stable channel compares the latest stable release', async () => {
   requestUrlImpl = async ({ url }) => {
-    assert.match(url, /\/releases\/latest$/);
+    assert.match(url, /\/releases\/latest\?_cb=/);
     return jsonResponse({ tag_name: 'v1.1.0', prerelease: false, assets: [] });
   };
 
@@ -117,6 +123,58 @@ test('stable channel compares the latest stable release', async () => {
   assert.equal(result.hasUpdate, true);
   assert.equal(result.isPrerelease, false);
   assert.equal(result.latestVersion, '1.1.0');
+});
+
+test('dev channel uses the commit recorded in the rolling release', async () => {
+  requestUrlImpl = async ({ url }) => {
+    assert.match(url, /\/releases\?/);
+    return jsonResponse([{
+      tag_name: 'dev',
+      name: 'Dev Build',
+      body: '**Commit:** `1234567890abcdef`\n**Built at:** 2026-09-02T00:00:00Z',
+      prerelease: true,
+      published_at: '2026-09-02T00:00:00Z',
+      assets: [],
+    }]);
+  };
+
+  const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
+  const result = await updater.checkForUpdate('1.0.0', true, 'fedcba9-local-build');
+  assert.equal(result.hasUpdate, true);
+  assert.equal(result.latestCommit.sha, '1234567890abcdef');
+});
+
+test('stable channel reports a GitHub error instead of saying it is up to date', async () => {
+  requestUrlImpl = async () => ({
+    status: 404,
+    text: JSON.stringify({ message: 'Not Found' }),
+  });
+
+  const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
+  const result = await updater.checkForUpdate('1.0.0', false);
+  assert.equal(result.hasUpdate, false);
+  assert.equal(result.release, null);
+  assert.equal(result.error, 'Not Found');
+});
+
+test('listAvailableBuilds exposes branch and release commit metadata', async () => {
+  requestUrlImpl = async ({ url }) => {
+    assert.match(url, /releases\?per_page=100&_cb=/);
+    return jsonResponse([{
+      tag_name: 'latest-dev-feature-ui',
+      name: 'Feature UI build',
+      body: '**Commit:** `abcdef1234567890`\n**Built at:** 2026-09-02T00:00:00Z',
+      prerelease: true,
+      published_at: '2026-09-02T00:00:00Z',
+      assets: [],
+    }]);
+  };
+
+  const updater = new PluginUpdater(createApp(createAdapter()), 'obsidian-git-sync');
+  const builds = await updater.listAvailableBuilds();
+  assert.equal(builds.length, 1);
+  assert.equal(builds[0].branch, 'feature-ui');
+  assert.equal(builds[0].commitHash, 'abcdef1234567890');
 });
 
 test('downloadUpdate requires direct release assets and validates plugin identity', async () => {

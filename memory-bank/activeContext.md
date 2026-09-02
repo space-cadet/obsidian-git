@@ -1,15 +1,15 @@
 # Active Context
 
-*Last Updated: 2026-09-02 15:21:22 IST*
+*Last Updated: 2026-09-02 15:55:25 IST*
 
 ## Current Tasks
 
-### T29: obsidian-git Plugin — 🔄 sidebar presentation implemented, mobile acceptance pending
+### T29: obsidian-git Plugin — 🔄 sidebar and updater implementation pending runtime acceptance
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T29a (Full Sidebar UI Redesign — ACTIVE), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
 - **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab interaction direction are implemented and published in commit `4292bf9`. T29a now owns the full visual redesign from the approved mockups while preserving those behaviors. Authentication-backed mobile acceptance and public release remain separate gates.
-- **Next**: Verify the T29a presentation pass in Obsidian before continuing the existing mobile/release gates.
+- **Next**: Verify the T29a presentation pass and updater installation in Obsidian before continuing the existing mobile/release gates.
 
 ### T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄
 - **Scope**: Replace the incremental sidebar presentation with one coherent
@@ -36,7 +36,7 @@
 - **Scope**: Cross-cutting credential safety, operation coordination,
   repository initialization safety, mobile transport, updater integrity, and
   test/CI/documentation alignment.
-- **Children**: T35a-T35d are active; T35e-T35f remain planned.
+- **Children**: T35a-T35e are active; T35f remains planned.
 - **Status**: The first KIRSS implementation slice adds logger redaction,
   protected automatic staging, URL normalization, repository-error
   classification, and safe repository initialization boundaries. T35a
@@ -46,6 +46,11 @@
 - **Next**: Add protected replacement backups and shared operation
   coordination, then perform mobile acceptance of clone resume and progress
   telemetry.
+
+### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
+- Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, available branch builds, and direct-asset validation.
+- Added compile-time branch identity, branch-build CI publishing, and an explicit manual error notice so a missing stable release is not reported as up to date.
+- Preserved the existing transactional install and rollback behavior. Checksums/signatures, temporary-directory cleanup on every failure path, and real Obsidian installation acceptance remain open.
 
 ### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;

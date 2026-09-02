@@ -13,8 +13,8 @@ import { ObsidianFsAdapter } from './adapters/ObsidianFsAdapter';
 import { GitManager, GitCredentials } from './gitManager';
 import { log, LogLevel } from './logger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
-import { PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
-import { GIT_COMMIT_HASH } from './buildInfo';
+import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
+import { GIT_BRANCH, GIT_COMMIT_HASH } from './buildInfo';
 import {
 	credentialStoreFromApp,
 	createSecretId,
@@ -124,7 +124,7 @@ export default class GitSyncPlugin extends Plugin {
 		this.addSettingTab(new GitSyncSettingTab(this.app, this));
 
 		// Initialize the cross-platform GitHub updater.
-		this.updater = new PluginUpdater(this.app, this.manifest.id);
+		this.updater = new PluginUpdater(this.app, this.manifest.id, log);
 		this.addCommand({
 			id: 'git-sync-check-for-updates',
 			name: 'Check for plugin updates',
@@ -328,9 +328,17 @@ export default class GitSyncPlugin extends Plugin {
 				this.manifest.version,
 				this.settings.updateChannel === 'dev',
 				GIT_COMMIT_HASH,
+				GIT_BRANCH,
 			);
 			this.settings.lastUpdateCheck = Date.now();
 			await this.saveSettings();
+
+			if (result.error) {
+				if (manual) {
+					new Notice(`❌ Update check failed: ${result.error}`);
+				}
+				return;
+			}
 
 			if (!result.hasUpdate || !result.release) {
 				if (manual) {
@@ -358,6 +366,18 @@ export default class GitSyncPlugin extends Plugin {
 				new Notice(`❌ Update check failed: ${error?.message || String(error)}`);
 			}
 		}
+	}
+
+	async showAvailableBuilds(): Promise<void> {
+		if (!this.updater) return;
+		new AvailableBuildsModal(
+			this.app,
+			this.updater,
+			async (build) => {
+				const tempDir = await this.updater!.downloadUpdate(build.release);
+				await this.updater!.installUpdate(tempDir);
+			},
+		).open();
 	}
 
 	setupAutoSync() {
@@ -938,7 +958,14 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.autoUpdate = value;
 					await this.plugin.saveSettings();
 					if (value) new Notice('Auto-update enabled for stable releases.');
-				}));
+					}));
+
+		new Setting(containerEl)
+			.setName('Available branch builds')
+			.setDesc('Browse and install published development builds from any branch.')
+			.addButton(button => button
+				.setButtonText('Browse builds')
+				.onClick(() => this.plugin.showAvailableBuilds()));
 
 		const versionSetting = new Setting(containerEl)
 			.setName('Current plugin version')

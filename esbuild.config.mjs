@@ -4,8 +4,12 @@ import builtins from "builtin-modules";
 import { execFileSync } from "node:child_process";
 
 let gitCommitHash = "unknown";
+let gitBranch = "unknown";
 try {
   gitCommitHash = execFileSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+  gitBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
     encoding: "utf8",
   }).trim();
 } catch {
@@ -55,6 +59,7 @@ const context = await esbuild.context({
   treeShaking: true,
   define: {
     __GIT_COMMIT_HASH__: JSON.stringify(gitCommitHash),
+    __GIT_BRANCH__: JSON.stringify(gitBranch),
   },
   outfile: "main.js",
 });
