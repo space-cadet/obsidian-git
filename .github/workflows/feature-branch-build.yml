@@ -41,6 +41,10 @@ jobs:
           cp main.js manifest.json styles.css "$PLUGIN_NAME"
           zip -r "${PLUGIN_NAME}.zip" "$PLUGIN_NAME"
 
+      - name: Read commit subject
+        id: commit
+        run: echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+
       - name: Update branch-specific dev tag
         run: |
           BRANCH_TAG="latest-dev-${{ github.ref_name }}"
@@ -58,6 +62,7 @@ jobs:
             Automated dev build from branch `${{ github.ref_name }}`.
 
             **Commit:** `${{ github.sha }}`
+            **Subject:** `${{ steps.commit.outputs.subject }}`
             **Built at:** ${{ github.event.head_commit.timestamp }}
 
             This is a development build — not for production use.

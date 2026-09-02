@@ -127,14 +127,19 @@ jobs:
       - name: Build archive
         run: pnpm run archive
 
+      - name: Read commit subject
+        id: commit
+        run: echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+
       - name: Create Dev Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: dev
-          name: Dev Build (${{ github.sha }})
+          name: Dev Build (main)
           body: |
             Latest development build from `main`.
             **Commit:** `${{ github.sha }}`
+            **Subject:** `${{ steps.commit.outputs.subject }}`
             - Branch: ${{ github.ref_name }}
             **Built at:** ${{ github.event.head_commit.timestamp }}
           files: |

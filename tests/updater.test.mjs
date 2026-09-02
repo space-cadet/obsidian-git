@@ -42,7 +42,7 @@ buildSync({
   logLevel: 'silent',
 });
 
-const { PluginUpdater, compareVersions } = await import(bundlePath);
+const { PluginUpdater, compareVersions, commitInfoFromRelease, releaseLabel } = await import(bundlePath);
 
 test.after(() => {
   Module._load = originalLoad;
@@ -55,9 +55,11 @@ function jsonResponse(value) {
 
 function createAdapter(initialFiles = {}) {
   const files = new Map(Object.entries(initialFiles));
+  const removedDirectories = [];
   let failNextPluginWrite = false;
   return {
     files,
+    removedDirectories,
     failNextPluginWrite() { failNextPluginWrite = true; },
     async mkdir() {},
     async exists(path) { return files.has(path); },
@@ -73,6 +75,12 @@ function createAdapter(initialFiles = {}) {
       files.set(path, data);
     },
     async remove(path) { files.delete(path); },
+    async rmdir(path) {
+      removedDirectories.push(path);
+      for (const file of files.keys()) {
+        if (file === path || file.startsWith(`${path}/`)) files.delete(file);
+      }
+    },
   };
 }
 
@@ -84,6 +92,22 @@ test('compareVersions handles stable versions and rolling dev tags', () => {
   assert.equal(compareVersions('1.2.0', '1.1.9') > 0, true);
   assert.equal(compareVersions('dev', '1.0.0') > 0, true);
   assert.equal(compareVersions('dev', 'dev'), 0);
+});
+
+test('release metadata keeps optional commit subjects and hides full SHAs from labels', () => {
+  const release = {
+    tag_name: 'dev',
+    name: 'Dev Build (1234567890abcdef)',
+    body: '**Commit:** `1234567890abcdef`\n**Subject:** `Repair sidebar refresh`\n**Built at:** 2026-09-02T00:00:00Z',
+    prerelease: true,
+    published_at: '2026-09-02T00:00:00Z',
+    assets: [],
+  };
+
+  assert.equal(commitInfoFromRelease(release).message, 'Repair sidebar refresh');
+  assert.equal(releaseLabel(release), 'Dev · main');
+  assert.doesNotMatch(releaseLabel(release), /1234567890abcdef/);
+  assert.equal(commitInfoFromRelease({ ...release, body: '**Commit:** `1234567890abcdef`' }).message, '');
 });
 
 test('dev channel selects the rolling dev release and suppresses matching commit updates', async () => {
@@ -244,6 +268,7 @@ test('listAvailableBuilds exposes branch and release commit metadata', async () 
   assert.equal(builds.length, 3);
   assert.equal(builds[0].branch, 'main');
   assert.equal(builds[1].commitHash, '1234567890abcdef');
+  assert.equal(builds[1].commitMessage, '');
   assert.equal(builds[2].branch, 'feature-ui');
   assert.equal(builds[2].commitHash, 'abcdef1234567890');
 });
@@ -283,6 +308,7 @@ test('downloadUpdate requires direct release assets and validates plugin identit
     }),
     /missing main\.js/,
   );
+  assert.equal(adapter.removedDirectories.length, 1);
 });
 
 test('installUpdate restores every original file after a partial write failure', async () => {
@@ -305,4 +331,5 @@ test('installUpdate restores every original file after a partial write failure',
   assert.equal(await adapter.read(`${pluginDir}/main.js`), 'old main');
   assert.equal(await adapter.read(`${pluginDir}/manifest.json`), '{"id":"obsidian-git-sync","version":"1.0.0"}');
   assert.equal(await adapter.read(`${pluginDir}/styles.css`), 'old css');
+  assert.deepEqual(adapter.removedDirectories, [`${pluginDir}/.update-tmp`]);
 });

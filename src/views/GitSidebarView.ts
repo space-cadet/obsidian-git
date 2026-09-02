@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
-import { GitManager, GitFileStatus, GitCommit } from '../gitManager';
+import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot } from '../gitManager';
 import { log, LogEntry } from '../logger';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
@@ -19,6 +19,10 @@ export class GitSidebarView extends ItemView {
     private expandedCommitOids: Set<string> = new Set();
     private hasRemote: boolean = false;
     private isLocalOnly: boolean = false;
+    private hasRealRepo: boolean = false;
+    private sidebarSnapshot: GitSidebarStatusSnapshot | null = null;
+    private remoteCommitsCache: { repoUrl: string; branch: string; commits: GitCommit[] } | null = null;
+    private renderGeneration = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
@@ -41,6 +45,7 @@ export class GitSidebarView extends ItemView {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass('git-sidebar-container');
+        container.toggleClass('git-sidebar-density-compact', this.plugin.settings.sidebarDensity === 'compact');
         container.setAttr('role', 'region');
         container.setAttr('aria-label', 'Git Sync');
 
@@ -85,6 +90,9 @@ export class GitSidebarView extends ItemView {
 
     async onClose(): Promise<void> {
         this.stopAutoRefresh();
+        // Invalidate any in-flight repository/history read before Obsidian
+        // detaches the view so late responses cannot render into stale DOM.
+        this.renderGeneration += 1;
     }
 
     // ─── Auto Refresh ───
@@ -113,6 +121,20 @@ export class GitSidebarView extends ItemView {
         this.startAutoRefresh();
     }
 
+    updateSidebarDensity(density: 'comfortable' | 'compact'): void {
+        this.plugin.settings.sidebarDensity = density;
+        const container = this.containerEl.querySelector('.git-sidebar-container') as HTMLElement | null;
+        container?.toggleClass('git-sidebar-density-compact', density === 'compact');
+    }
+
+    private invalidateRemoteCommitsCache(): void {
+        this.remoteCommitsCache = null;
+    }
+
+    private isCurrentRender(generation: number): boolean {
+        return generation === this.renderGeneration && this.containerEl.isConnected;
+    }
+
     // ─── Tabs ───
 
     private renderTabs(): void {
@@ -138,7 +160,7 @@ export class GitSidebarView extends ItemView {
             btn.addEventListener('click', async () => {
                 this.activeTab = tab.id;
                 this.renderTabs();
-                await this.refresh();
+                await this.refresh({ readRepository: false });
             });
         }
     }
@@ -251,6 +273,7 @@ export class GitSidebarView extends ItemView {
                     await this.plugin.refreshGitCredentials();
                     await this.plugin.gitManager.pull(this.plugin.settings.branchName);
                     new Notice('Pulled from remote');
+                    this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
                     new Notice('Pull failed: ' + e.message);
@@ -276,6 +299,7 @@ export class GitSidebarView extends ItemView {
                     await this.plugin.refreshGitCredentials();
                     await this.plugin.gitManager.push(this.plugin.settings.branchName);
                     new Notice('Pushed to remote');
+                    this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
                     new Notice('Push failed: ' + e.message);
@@ -381,6 +405,7 @@ export class GitSidebarView extends ItemView {
             await this.plugin.refreshGitCredentials();
             await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
             new Notice('Force pushed to remote');
+            this.invalidateRemoteCommitsCache();
             await this.refresh();
         } catch (e: any) {
             new Notice('Force push failed: ' + e.message);
@@ -389,88 +414,81 @@ export class GitSidebarView extends ItemView {
 
     // ─── Main refresh ───
 
-    async refresh(): Promise<void> {
-        // Try to auto-init gitManager if not already done
+    async refresh(options: { readRepository?: boolean } = {}): Promise<void> {
+        const generation = ++this.renderGeneration;
+        const readRepository = options.readRepository !== false;
+
+        // Manager construction is intentionally read-only. It is also needed
+        // for the remote/API history fallback when the vault has no .git.
         if (!this.plugin.gitManager) {
             await this.plugin.ensureGitManager();
         }
-        
-        // Check if real repo exists (for header and UI state)
-        let hasReal = false;
-        try {
-            hasReal = await this.plugin.detectRealGitRepo();
-        } catch (e) {
-            log.warn('GitSidebar', 'detectRealGitRepo failed', e);
-        }
+        if (!this.isCurrentRender(generation)) return;
 
-        // Manager creation is read-only; repository state determines initialization.
+        let hasReal = this.hasRealRepo;
+        if (readRepository) {
+            try {
+                hasReal = await this.plugin.detectRealGitRepo();
+            } catch (e) {
+                log.warn('GitSidebar', 'detectRealGitRepo failed', e);
+            }
+            this.hasRealRepo = hasReal;
+            this.sidebarSnapshot = null;
+
+            if (hasReal && this.plugin.gitManager) {
+                try {
+                    // One statusMatrix read supplies the header's staged count
+                    // and all Changes-tab rows. Branch/ahead/behind are read as
+                    // part of the same immutable view model.
+                    this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
+                } catch (e) {
+                    log.warn('GitSidebar', 'Failed to read repository snapshot', e);
+                }
+            }
+        }
+        if (!this.isCurrentRender(generation)) return;
+
         const initialized = hasReal;
-        if (this.plugin.gitManager) {
-            this.hasRemote = !!this.plugin.settings.repoUrl;
-            this.isLocalOnly = !this.hasRemote;
+        this.hasRemote = !!this.plugin.settings.repoUrl;
+        this.isLocalOnly = !this.hasRemote;
+        if (this.remoteCommitsCache && this.remoteCommitsCache.repoUrl !== this.plugin.settings.repoUrl) {
+            this.invalidateRemoteCommitsCache();
         }
 
-        // Try to get git info for header
-        let branch = 'unknown';
-        let ahead = 0;
-        let behind = 0;
-        
-        if (initialized) {
-            try {
-                branch = await this.plugin.gitManager!.getCurrentBranch();
-                const status = await this.plugin.gitManager!.getStatus();
-                ahead = status.ahead;
-                behind = status.behind;
-            } catch (e) {
-                log.warn('GitSidebar', 'Failed to get branch/status', e);
-            }
-        } else if (hasReal) {
-            branch = 'local';
-        } else {
-            branch = 'No repo';
-        }
+        const snapshot = this.sidebarSnapshot;
+        const branch = snapshot?.branch || (initialized ? 'local' : 'No repo');
+        const ahead = snapshot?.ahead || 0;
+        const behind = snapshot?.behind || 0;
 
-        // Update header with hasReal status
         this.renderHeader(branch, ahead, behind, initialized, hasReal);
-
-        // Keep the footer's Commit button accurate even when the user is on
-        // Commits or Log rather than the Changes tab.
-        this.stagedCount = 0;
-        if (initialized && this.plugin.gitManager) {
-            try {
-                this.stagedCount = (await this.plugin.gitManager.getStatusGroups()).staged.length;
-            } catch (e) {
-                log.warn('GitSidebar', 'Failed to refresh staged-file count', e);
-            }
-        }
-
-        // Render tab content
+        this.stagedCount = snapshot?.staged.length || 0;
         this.contentContainer.empty();
 
-        if (!initialized) {
+        // Remote history is an independent read capability. Keep it available
+        // when the local repository is absent, while local Changes/Log content
+        // still explains how to initialize the vault.
+        const remoteHistoryOnly = this.activeTab === 'commits'
+            && this.commitsViewMode === 'remote'
+            && this.hasRemote;
+        if (!initialized && !remoteHistoryOnly) {
             await this.renderUninitializedContent(hasReal);
-            const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
-            if (footerEl) this.renderFooter(footerEl);
-            return;
+        } else {
+            switch (this.activeTab) {
+                case 'status':
+                    this.renderStatusTab(snapshot);
+                    break;
+                case 'commits':
+                    await this.renderCommitsTab(generation);
+                    break;
+                case 'log':
+                    this.renderLogTab();
+                    break;
+            }
         }
 
-        switch (this.activeTab) {
-            case 'status':
-                await this.renderStatusTab();
-                break;
-            case 'commits':
-                await this.renderCommitsTab();
-                break;
-            case 'log':
-                await this.renderLogTab();
-                break;
-        }
-
-        // Re-render footer so Commit button state reflects current stagedCount
+        if (!this.isCurrentRender(generation)) return;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
-        if (footerEl) {
-            this.renderFooter(footerEl);
-        }
+        if (footerEl) this.renderFooter(footerEl);
     }
 
     private async renderUninitializedContent(hasReal: boolean): Promise<void> {
@@ -567,17 +585,16 @@ export class GitSidebarView extends ItemView {
 
     // ─── Tab renders ───
 
-    private async renderStatusTab(): Promise<void> {
+    private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null): void {
         const container = this.contentContainer.createDiv('git-status-container');
 
         try {
-            if (!this.plugin.gitManager) {
-                container.createEl('p', { text: 'Git manager not initialized', cls: 'git-empty-state' });
+            if (!snapshot) {
+                container.createEl('p', { text: 'Unable to read repository status', cls: 'git-empty-state' });
                 return;
             }
 
-            const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
-            const detailedStatus = await this.plugin.gitManager.getDetailedStatus();
+            const { staged, unstaged, detailedStatus } = snapshot;
             const statusByPath = new Map(
                 detailedStatus.map((file) => [file.filepath, file.status] as const)
             );
@@ -847,7 +864,7 @@ export class GitSidebarView extends ItemView {
         window.setTimeout(() => input.inputEl.focus(), 0);
     }
 
-    private async renderCommitsTab(): Promise<void> {
+    private async renderCommitsTab(generation: number): Promise<void> {
         const listContainer = this.contentContainer.createDiv('git-log-list');
 
         // Toggle bar: Local / Remote
@@ -859,7 +876,7 @@ export class GitSidebarView extends ItemView {
         });
         localBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'local';
-            await this.refresh();
+            await this.refresh({ readRepository: false });
         });
         const remoteBtn = toggleBar.createEl('button', {
             text: 'Remote',
@@ -868,7 +885,7 @@ export class GitSidebarView extends ItemView {
         });
         remoteBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'remote';
-            await this.refresh();
+            await this.refresh({ readRepository: false });
         });
 
         try {
@@ -894,6 +911,14 @@ export class GitSidebarView extends ItemView {
                     } catch (e) {
                         // use settings branch
                     }
+                }
+                const cached = this.remoteCommitsCache?.repoUrl === this.plugin.settings.repoUrl
+                    && this.remoteCommitsCache.branch === branch
+                    ? this.remoteCommitsCache.commits
+                    : null;
+                if (cached) {
+                    commits = cached;
+                } else if (this.plugin.gitManager) {
                     commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
                 }
                 // If no commits from gitManager (or no gitManager), try direct GitHub API
@@ -907,7 +932,12 @@ export class GitSidebarView extends ItemView {
                         25
                     );
                 }
+                if (this.isCurrentRender(generation)) {
+                    this.remoteCommitsCache = { repoUrl: this.plugin.settings.repoUrl, branch, commits };
+                }
             }
+
+            if (!this.isCurrentRender(generation)) return;
 
             if (commits.length === 0) {
                 const emptyMsg = this.commitsViewMode === 'local'
@@ -1009,10 +1039,31 @@ export class GitSidebarView extends ItemView {
         try {
             let files: { filepath: string; status: 'added' | 'modified' | 'deleted' }[] = [];
             
-            // Try local first
-            files = await this.plugin.gitManager!.getCommitFiles(oid);
-            
-            // If no files found locally and we're viewing remote commits, try GitHub API
+            // Use the API directly when remote history is being viewed without
+            // a healthy local repository. Otherwise prefer the local object
+            // database and retain the shallow-history fallback.
+            if (this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl && !this.hasRealRepo) {
+                detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
+                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
+                    this.plugin.settings.repoUrl,
+                    await this.plugin.resolveGitPassword(),
+                    oid
+                );
+                if (remoteFiles) {
+                    files = remoteFiles;
+                }
+            } else if (this.plugin.gitManager) {
+                try {
+                    files = await this.plugin.gitManager.getCommitFiles(oid);
+                } catch (error) {
+                    // A damaged local repository should not prevent the
+                    // remote commit-details fallback from being attempted.
+                    log.debug('GitSidebar', 'Local commit details unavailable; trying remote fallback', error);
+                }
+            }
+
+            // If no files were found locally and we're viewing remote commits,
+            // try GitHub API for shallow clones as well.
             if (files.length === 0 && this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
                 const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
@@ -1061,7 +1112,7 @@ export class GitSidebarView extends ItemView {
 
     private async renderHistoryTab(): Promise<void> {
         // Deprecated: renamed to renderCommitsTab
-        await this.renderCommitsTab();
+        await this.renderCommitsTab(this.renderGeneration);
     }
 
     private async renderLogTab(): Promise<void> {

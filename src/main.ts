@@ -34,6 +34,7 @@ interface GitSyncSettings {
 	autoSyncInterval: number; // in minutes, 0 means disabled
 	autoCommitMessage: string;
 	refreshInterval: number; // in seconds, 0 means disabled
+	sidebarDensity: 'comfortable' | 'compact';
 	checkForUpdates: boolean;
 	updateChannel: 'stable' | 'dev';
 	lastUpdateCheck: number;
@@ -52,6 +53,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	autoSyncInterval: 0,
 	autoCommitMessage: 'Vault backup: {{date}}',
 	refreshInterval: 60, // default 60 seconds
+	sidebarDensity: 'comfortable',
 	checkForUpdates: true,
 	updateChannel: 'stable',
 	lastUpdateCheck: 0,
@@ -922,6 +924,24 @@ class GitSyncSettingTab extends PluginSettingTab {
 						}
 						}
 					}));
+
+		new Setting(containerEl)
+			.setName('Sidebar Density')
+			.setDesc('Choose the spacing used by the Git Sync sidebar. Compact keeps rows smaller while preserving touch targets.')
+			.addDropdown(dropdown => dropdown
+				.addOption('comfortable', 'Comfortable')
+				.addOption('compact', 'Compact')
+				.setValue(this.plugin.settings.sidebarDensity)
+				.onChange(async value => {
+					this.plugin.settings.sidebarDensity = value as 'comfortable' | 'compact';
+					await this.plugin.saveSettings();
+					const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+					for (const leaf of leaves) {
+						if (leaf.view instanceof GitSidebarView) {
+							leaf.view.updateSidebarDensity(this.plugin.settings.sidebarDensity);
+						}
+					}
+				}));
 
 		containerEl.createEl('h3', { text: 'Plugin Updates' });
 		let updateVersionLabel: () => void = () => undefined;

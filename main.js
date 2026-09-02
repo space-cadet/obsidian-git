@@ -20167,30 +20167,7 @@ Try again with a faster connection or smaller repository.`
       async getDetailedStatus() {
         var _a, _b, _c;
         try {
-          const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
-          const result = [];
-          for (const row of matrix) {
-            const [filepath, head, workdir, stage] = row;
-            if (head === 1 && workdir === 1 && stage === 1)
-              continue;
-            let status2;
-            if (head === 0 && workdir === 2 && stage === 0)
-              status2 = "untracked";
-            else if (head === 0 && (stage === 2 || stage === 3))
-              status2 = "added";
-            else if (workdir === 0)
-              status2 = "deleted";
-            else if (head === 1 && workdir === 2 && stage === 1)
-              status2 = "modified";
-            else if (head === 1 && workdir === 1 && stage === 2)
-              status2 = "staged";
-            else if (head === 1 && workdir === 2 && stage === 2)
-              status2 = "staged";
-            else
-              status2 = "modified";
-            result.push({ filepath, status: status2 });
-          }
-          return result;
+          return (await this.readStatusSnapshot()).detailedStatus;
         } catch (error) {
           log2.error("GitManager", "Failed to get detailed status", error);
           if (((_a = error.message) == null ? void 0 : _a.includes("Cannot read properties of null")) || ((_b = error.stack) == null ? void 0 : _b.includes("BufferCursor.slice")) || ((_c = error.stack) == null ? void 0 : _c.includes("GitPackIndex"))) {
@@ -20209,27 +20186,57 @@ Try again with a faster connection or smaller repository.`
        */
       async getStatusGroups() {
         try {
-          const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
-          const staged = [];
-          const unstaged = [];
-          for (const row of matrix) {
-            const [filepath, head, workdir, stage] = row;
-            if (head === 1 && workdir === 1 && stage === 1)
-              continue;
-            const hasStagedChanges = stage !== 1 && stage !== 0;
-            const hasWorkdirChanges = workdir !== 1;
-            if (hasStagedChanges) {
-              staged.push(filepath);
-            }
-            if (hasWorkdirChanges && !hasStagedChanges) {
-              unstaged.push(filepath);
-            }
-          }
-          return { staged, unstaged };
+          const snapshot = await this.readStatusSnapshot();
+          return { staged: snapshot.staged, unstaged: snapshot.unstaged };
         } catch (error) {
           log2.error("GitManager", "Failed to get status groups", error);
           throw error;
         }
+      }
+      /**
+       * Read the complete working-tree status once and derive every sidebar
+       * representation from the same status matrix.
+       */
+      async getSidebarStatusSnapshot() {
+        const [repositoryStatus, fileStatus] = await Promise.all([
+          this.getStatus(),
+          this.readStatusSnapshot()
+        ]);
+        return { ...repositoryStatus, ...fileStatus };
+      }
+      async readStatusSnapshot() {
+        const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
+        const detailedStatus = [];
+        const staged = [];
+        const unstaged = [];
+        for (const row of matrix) {
+          const [filepath, head, workdir, stage] = row;
+          if (head === 1 && workdir === 1 && stage === 1)
+            continue;
+          let status2;
+          if (head === 0 && workdir === 2 && stage === 0)
+            status2 = "untracked";
+          else if (head === 0 && (stage === 2 || stage === 3))
+            status2 = "added";
+          else if (workdir === 0)
+            status2 = "deleted";
+          else if (head === 1 && workdir === 2 && stage === 1)
+            status2 = "modified";
+          else if (head === 1 && workdir === 1 && stage === 2)
+            status2 = "staged";
+          else if (head === 1 && workdir === 2 && stage === 2)
+            status2 = "staged";
+          else
+            status2 = "modified";
+          detailedStatus.push({ filepath, status: status2 });
+          const hasStagedChanges = stage !== 1 && stage !== 0;
+          const hasWorkdirChanges = workdir !== 1;
+          if (hasStagedChanges)
+            staged.push(filepath);
+          if (hasWorkdirChanges && !hasStagedChanges)
+            unstaged.push(filepath);
+        }
+        return { detailedStatus, staged, unstaged };
       }
       /**
        * Stage a single file
@@ -20756,6 +20763,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.expandedCommitOids = /* @__PURE__ */ new Set();
     this.hasRemote = false;
     this.isLocalOnly = false;
+    this.hasRealRepo = false;
+    this.sidebarSnapshot = null;
+    this.remoteCommitsCache = null;
+    this.renderGeneration = 0;
     this.plugin = plugin;
   }
   getViewType() {
@@ -20771,6 +20782,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("git-sidebar-container");
+    container.toggleClass("git-sidebar-density-compact", this.plugin.settings.sidebarDensity === "compact");
     container.setAttr("role", "region");
     container.setAttr("aria-label", "Git Sync");
     const tabsWrapper = container.createDiv("git-sidebar-tabs-wrapper");
@@ -20800,6 +20812,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   async onClose() {
     this.stopAutoRefresh();
+    this.renderGeneration += 1;
   }
   // ─── Auto Refresh ───
   startAutoRefresh() {
@@ -20823,6 +20836,17 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.plugin.settings.refreshInterval = seconds;
     this.startAutoRefresh();
   }
+  updateSidebarDensity(density) {
+    this.plugin.settings.sidebarDensity = density;
+    const container = this.containerEl.querySelector(".git-sidebar-container");
+    container == null ? void 0 : container.toggleClass("git-sidebar-density-compact", density === "compact");
+  }
+  invalidateRemoteCommitsCache() {
+    this.remoteCommitsCache = null;
+  }
+  isCurrentRender(generation) {
+    return generation === this.renderGeneration && this.containerEl.isConnected;
+  }
   // ─── Tabs ───
   renderTabs() {
     this.tabsContainer.empty();
@@ -20845,7 +20869,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       btn.addEventListener("click", async () => {
         this.activeTab = tab.id;
         this.renderTabs();
-        await this.refresh();
+        await this.refresh({ readRepository: false });
       });
     }
   }
@@ -20935,6 +20959,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         await this.plugin.refreshGitCredentials();
         await this.plugin.gitManager.pull(this.plugin.settings.branchName);
         new import_obsidian4.Notice("Pulled from remote");
+        this.invalidateRemoteCommitsCache();
         await this.refresh();
       } catch (e) {
         new import_obsidian4.Notice("Pull failed: " + e.message);
@@ -20953,6 +20978,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         await this.plugin.refreshGitCredentials();
         await this.plugin.gitManager.push(this.plugin.settings.branchName);
         new import_obsidian4.Notice("Pushed to remote");
+        this.invalidateRemoteCommitsCache();
         await this.refresh();
       } catch (e) {
         new import_obsidian4.Notice("Push failed: " + e.message);
@@ -21030,76 +21056,74 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       await this.plugin.refreshGitCredentials();
       await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
       new import_obsidian4.Notice("Force pushed to remote");
+      this.invalidateRemoteCommitsCache();
       await this.refresh();
     } catch (e) {
       new import_obsidian4.Notice("Force push failed: " + e.message);
     }
   }
   // ─── Main refresh ───
-  async refresh() {
+  async refresh(options = {}) {
+    const generation = ++this.renderGeneration;
+    const readRepository = options.readRepository !== false;
     if (!this.plugin.gitManager) {
       await this.plugin.ensureGitManager();
     }
-    let hasReal = false;
-    try {
-      hasReal = await this.plugin.detectRealGitRepo();
-    } catch (e) {
-      log2.warn("GitSidebar", "detectRealGitRepo failed", e);
-    }
-    const initialized = hasReal;
-    if (this.plugin.gitManager) {
-      this.hasRemote = !!this.plugin.settings.repoUrl;
-      this.isLocalOnly = !this.hasRemote;
-    }
-    let branch2 = "unknown";
-    let ahead = 0;
-    let behind = 0;
-    if (initialized) {
-      try {
-        branch2 = await this.plugin.gitManager.getCurrentBranch();
-        const status2 = await this.plugin.gitManager.getStatus();
-        ahead = status2.ahead;
-        behind = status2.behind;
-      } catch (e) {
-        log2.warn("GitSidebar", "Failed to get branch/status", e);
-      }
-    } else if (hasReal) {
-      branch2 = "local";
-    } else {
-      branch2 = "No repo";
-    }
-    this.renderHeader(branch2, ahead, behind, initialized, hasReal);
-    this.stagedCount = 0;
-    if (initialized && this.plugin.gitManager) {
-      try {
-        this.stagedCount = (await this.plugin.gitManager.getStatusGroups()).staged.length;
-      } catch (e) {
-        log2.warn("GitSidebar", "Failed to refresh staged-file count", e);
-      }
-    }
-    this.contentContainer.empty();
-    if (!initialized) {
-      await this.renderUninitializedContent(hasReal);
-      const footerEl2 = this.containerEl.querySelector(".git-sidebar-footer");
-      if (footerEl2)
-        this.renderFooter(footerEl2);
+    if (!this.isCurrentRender(generation))
       return;
+    let hasReal = this.hasRealRepo;
+    if (readRepository) {
+      try {
+        hasReal = await this.plugin.detectRealGitRepo();
+      } catch (e) {
+        log2.warn("GitSidebar", "detectRealGitRepo failed", e);
+      }
+      this.hasRealRepo = hasReal;
+      this.sidebarSnapshot = null;
+      if (hasReal && this.plugin.gitManager) {
+        try {
+          this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
+        } catch (e) {
+          log2.warn("GitSidebar", "Failed to read repository snapshot", e);
+        }
+      }
     }
-    switch (this.activeTab) {
-      case "status":
-        await this.renderStatusTab();
-        break;
-      case "commits":
-        await this.renderCommitsTab();
-        break;
-      case "log":
-        await this.renderLogTab();
-        break;
+    if (!this.isCurrentRender(generation))
+      return;
+    const initialized = hasReal;
+    this.hasRemote = !!this.plugin.settings.repoUrl;
+    this.isLocalOnly = !this.hasRemote;
+    if (this.remoteCommitsCache && this.remoteCommitsCache.repoUrl !== this.plugin.settings.repoUrl) {
+      this.invalidateRemoteCommitsCache();
     }
+    const snapshot = this.sidebarSnapshot;
+    const branch2 = (snapshot == null ? void 0 : snapshot.branch) || (initialized ? "local" : "No repo");
+    const ahead = (snapshot == null ? void 0 : snapshot.ahead) || 0;
+    const behind = (snapshot == null ? void 0 : snapshot.behind) || 0;
+    this.renderHeader(branch2, ahead, behind, initialized, hasReal);
+    this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
+    this.contentContainer.empty();
+    const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
+    if (!initialized && !remoteHistoryOnly) {
+      await this.renderUninitializedContent(hasReal);
+    } else {
+      switch (this.activeTab) {
+        case "status":
+          this.renderStatusTab(snapshot);
+          break;
+        case "commits":
+          await this.renderCommitsTab(generation);
+          break;
+        case "log":
+          this.renderLogTab();
+          break;
+      }
+    }
+    if (!this.isCurrentRender(generation))
+      return;
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
-    if (footerEl) {
+    if (footerEl)
       this.renderFooter(footerEl);
-    }
   }
   async renderUninitializedContent(hasReal) {
     const wrapper = this.contentContainer.createDiv("git-uninit-container");
@@ -21166,16 +21190,15 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   // ─── Tab renders ───
-  async renderStatusTab() {
+  renderStatusTab(snapshot) {
     var _a;
     const container = this.contentContainer.createDiv("git-status-container");
     try {
-      if (!this.plugin.gitManager) {
-        container.createEl("p", { text: "Git manager not initialized", cls: "git-empty-state" });
+      if (!snapshot) {
+        container.createEl("p", { text: "Unable to read repository status", cls: "git-empty-state" });
         return;
       }
-      const { staged, unstaged } = await this.plugin.gitManager.getStatusGroups();
-      const detailedStatus = await this.plugin.gitManager.getDetailedStatus();
+      const { staged, unstaged, detailedStatus } = snapshot;
       const statusByPath = new Map(
         detailedStatus.map((file) => [file.filepath, file.status])
       );
@@ -21386,7 +21409,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
   }
-  async renderCommitsTab() {
+  async renderCommitsTab(generation) {
+    var _a;
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
@@ -21396,7 +21420,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     localBtn.addEventListener("click", async () => {
       this.commitsViewMode = "local";
-      await this.refresh();
+      await this.refresh({ readRepository: false });
     });
     const remoteBtn = toggleBar.createEl("button", {
       text: "Remote",
@@ -21405,7 +21429,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     remoteBtn.addEventListener("click", async () => {
       this.commitsViewMode = "remote";
-      await this.refresh();
+      await this.refresh({ readRepository: false });
     });
     try {
       let branch2 = this.plugin.settings.branchName || "main";
@@ -21426,6 +21450,11 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
             branch2 = await this.plugin.gitManager.getCurrentBranch();
           } catch (e) {
           }
+        }
+        const cached = ((_a = this.remoteCommitsCache) == null ? void 0 : _a.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
+        if (cached) {
+          commits = cached;
+        } else if (this.plugin.gitManager) {
           commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
         }
         if (commits.length === 0 && this.plugin.settings.repoUrl) {
@@ -21438,7 +21467,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
             25
           );
         }
+        if (this.isCurrentRender(generation)) {
+          this.remoteCommitsCache = { repoUrl: this.plugin.settings.repoUrl, branch: branch2, commits };
+        }
       }
+      if (!this.isCurrentRender(generation))
+        return;
       if (commits.length === 0) {
         const emptyMsg = this.commitsViewMode === "local" ? "No commits yet \u2014 stage files and commit to create your first commit" : this.plugin.settings.repoUrl ? `No remote commits found on ${branch2} \u2014 check your repo URL and token` : "No remote URL configured \u2014 add one in settings to see remote commits";
         listContainer.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
@@ -21517,7 +21551,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   async renderCommitDetail(row, oid) {
-    var _a;
+    var _a, _b;
     const existing = row.querySelector(".git-commit-detail");
     if (existing)
       existing.remove();
@@ -21525,9 +21559,25 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     detail.createDiv("git-commit-detail-loading").setText("Loading...");
     try {
       let files = [];
-      files = await this.plugin.gitManager.getCommitFiles(oid);
-      if (files.length === 0 && this.commitsViewMode === "remote" && this.plugin.settings.repoUrl) {
+      if (this.commitsViewMode === "remote" && this.plugin.settings.repoUrl && !this.hasRealRepo) {
         (_a = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _a.setText("Fetching from GitHub...");
+        const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
+          this.plugin.settings.repoUrl,
+          await this.plugin.resolveGitPassword(),
+          oid
+        );
+        if (remoteFiles) {
+          files = remoteFiles;
+        }
+      } else if (this.plugin.gitManager) {
+        try {
+          files = await this.plugin.gitManager.getCommitFiles(oid);
+        } catch (error) {
+          log2.debug("GitSidebar", "Local commit details unavailable; trying remote fallback", error);
+        }
+      }
+      if (files.length === 0 && this.commitsViewMode === "remote" && this.plugin.settings.repoUrl) {
+        (_b = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _b.setText("Fetching from GitHub...");
         const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
           this.plugin.settings.repoUrl,
           await this.plugin.resolveGitPassword(),
@@ -21566,7 +21616,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   async renderHistoryTab() {
-    await this.renderCommitsTab();
+    await this.renderCommitsTab(this.renderGeneration);
   }
   async renderLogTab() {
     const listContainer = this.contentContainer.createDiv("git-log-list");
@@ -21753,14 +21803,15 @@ function releaseLabel(release) {
   return `Dev \xB7 ${version2}`;
 }
 function commitInfoFromRelease(release) {
-  var _a, _b, _c, _d, _e;
+  var _a, _b, _c, _d, _e, _f, _g, _h;
   const sha = (_b = (_a = release.body) == null ? void 0 : _a.match(/^\s*(?:-\s*)?(?:\*\*)?Commit:(?:\*\*)?\s*`?([^`\s]+)`?\s*$/im)) == null ? void 0 : _b[1];
   if (!sha)
     return null;
   const builtAt = (_e = (_d = (_c = release.body) == null ? void 0 : _c.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Built at|Timestamp):(?:\*\*)?\s*(.+)\s*$/im)) == null ? void 0 : _d[1]) == null ? void 0 : _e.trim();
+  const subject = (_h = (_g = (_f = release.body) == null ? void 0 : _f.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Subject|Commit message):(?:\*\*)?\s*`?(.+?)`?\s*$/im)) == null ? void 0 : _g[1]) == null ? void 0 : _h.trim();
   return {
     sha,
-    message: release.name || `Published ${release.tag_name}`,
+    message: subject != null ? subject : "",
     authorName: "GitHub Actions",
     committedAt: builtAt != null ? builtAt : release.published_at
   };
@@ -21911,6 +21962,7 @@ var PluginUpdater = class {
         release,
         branch: branchFromRelease(release),
         commitHash: commitInfo == null ? void 0 : commitInfo.sha,
+        commitMessage: commitInfo == null ? void 0 : commitInfo.message,
         committedAt: (_a = commitInfo == null ? void 0 : commitInfo.committedAt) != null ? _a : release.published_at
       };
     });
@@ -21919,19 +21971,24 @@ var PluginUpdater = class {
   async downloadUpdate(release) {
     var _a;
     const tempDir = `${this.pluginDir}/.update-tmp-${Date.now()}`;
-    await this.ensureDir(tempDir);
-    for (const filename of RELEASE_FILES) {
-      const asset = (_a = release.assets) == null ? void 0 : _a.find((candidate) => candidate.name === filename);
-      if (!asset) {
-        throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+    try {
+      await this.ensureDir(tempDir);
+      for (const filename of RELEASE_FILES) {
+        const asset = (_a = release.assets) == null ? void 0 : _a.find((candidate) => candidate.name === filename);
+        if (!asset) {
+          throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+        }
+        await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
       }
-      await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
+      const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
+      if (manifest.id !== this.pluginDir.split("/").pop()) {
+        throw new Error("Downloaded update belongs to a different plugin.");
+      }
+      return tempDir;
+    } catch (error) {
+      await this.removeDirectory(tempDir);
+      throw error;
     }
-    const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
-    if (manifest.id !== this.pluginDir.split("/").pop()) {
-      throw new Error("Downloaded update belongs to a different plugin.");
-    }
-    return tempDir;
   }
   async readBackupState(backupDir) {
     const statePath = `${backupDir}/${BACKUP_STATE_FILE}`;
@@ -21989,6 +22046,8 @@ var PluginUpdater = class {
         console.error("[PluginUpdater] Automatic rollback failed:", rollbackError);
       }
       throw new Error(`Update installation failed and was rolled back: ${(error == null ? void 0 : error.message) || String(error)}`);
+    } finally {
+      await this.removeDirectory(tempDir);
     }
   }
   /** Restore the last successfully backed-up installation. */
@@ -22079,7 +22138,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
       }
       for (const build of this.builds) {
         const timestamp = build.committedAt ? new Date(build.committedAt).toLocaleString() : new Date(build.release.published_at).toLocaleString();
-        new import_obsidian5.Setting(contentEl).setName(releaseLabel(build.release)).setDesc(`${build.release.name} \xB7 ${(_b = (_a = build.commitHash) == null ? void 0 : _a.slice(0, 7)) != null ? _b : "commit unavailable"} \xB7 ${timestamp}`).addButton((button) => button.setButtonText("Install").onClick(async () => {
+        new import_obsidian5.Setting(contentEl).setName(releaseLabel(build.release)).setDesc(`${build.commitMessage || build.release.name || "Commit message unavailable"} \xB7 ${(_b = (_a = build.commitHash) == null ? void 0 : _a.slice(0, 7)) != null ? _b : "commit unavailable"} \xB7 ${timestamp}`).addButton((button) => button.setButtonText("Install").onClick(async () => {
           button.setDisabled(true);
           button.setButtonText("Installing\u2026");
           try {
@@ -22104,7 +22163,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "3f269e4e6cda81e29ab2d5b6ca1cf844d1bce653" : "unknown";
+var GIT_COMMIT_HASH = true ? "dc84b1ba4935b7f326392775ce172f510937f969" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -22173,6 +22232,7 @@ var DEFAULT_SETTINGS = {
   autoCommitMessage: "Vault backup: {{date}}",
   refreshInterval: 60,
   // default 60 seconds
+  sidebarDensity: "comfortable",
   checkForUpdates: true,
   updateChannel: "stable",
   lastUpdateCheck: 0,
@@ -22839,6 +22899,16 @@ var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {
           if (leaf.view instanceof GitSidebarView) {
             leaf.view.updateRefreshInterval(numValue);
           }
+        }
+      }
+    }));
+    new import_obsidian6.Setting(containerEl).setName("Sidebar Density").setDesc("Choose the spacing used by the Git Sync sidebar. Compact keeps rows smaller while preserving touch targets.").addDropdown((dropdown) => dropdown.addOption("comfortable", "Comfortable").addOption("compact", "Compact").setValue(this.plugin.settings.sidebarDensity).onChange(async (value) => {
+      this.plugin.settings.sidebarDensity = value;
+      await this.plugin.saveSettings();
+      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+      for (const leaf of leaves) {
+        if (leaf.view instanceof GitSidebarView) {
+          leaf.view.updateSidebarDensity(this.plugin.settings.sidebarDensity);
         }
       }
     }));

@@ -28,6 +28,7 @@ export interface AvailableBuild {
 	release: ReleaseInfo;
 	branch: string;
 	commitHash?: string;
+	commitMessage?: string;
 	/** Git commit timestamp; release publication time is the fallback. */
 	committedAt?: string;
 }
@@ -132,7 +133,7 @@ function branchFromRelease(release: ReleaseInfo): string {
 	return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : 'main';
 }
 
-function releaseLabel(release: ReleaseInfo): string {
+export function releaseLabel(release: ReleaseInfo): string {
 	const version = release.tag_name.replace(/^v/, '');
 	if (!release.prerelease) return `Stable · ${version}`;
 	if (release.tag_name === 'dev') return 'Dev · main';
@@ -143,13 +144,14 @@ function releaseLabel(release: ReleaseInfo): string {
 }
 
 /** Extract the immutable source identity recorded in an automated release. */
-function commitInfoFromRelease(release: ReleaseInfo): CommitInfo | null {
+export function commitInfoFromRelease(release: ReleaseInfo): CommitInfo | null {
 	const sha = release.body?.match(/^\s*(?:-\s*)?(?:\*\*)?Commit:(?:\*\*)?\s*`?([^`\s]+)`?\s*$/im)?.[1];
 	if (!sha) return null;
 	const builtAt = release.body?.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Built at|Timestamp):(?:\*\*)?\s*(.+)\s*$/im)?.[1]?.trim();
+	const subject = release.body?.match(/^\s*(?:-\s*)?(?:\*\*)?(?:Subject|Commit message):(?:\*\*)?\s*`?(.+?)`?\s*$/im)?.[1]?.trim();
 	return {
 		sha,
-		message: release.name || `Published ${release.tag_name}`,
+		message: subject ?? '',
 		authorName: 'GitHub Actions',
 		committedAt: builtAt ?? release.published_at,
 	};
@@ -336,6 +338,7 @@ export class PluginUpdater {
 					release,
 					branch: branchFromRelease(release),
 					commitHash: commitInfo?.sha,
+					commitMessage: commitInfo?.message,
 					committedAt: commitInfo?.committedAt ?? release.published_at,
 				};
 			});
@@ -344,21 +347,26 @@ export class PluginUpdater {
 	/** Download required release assets using Obsidian's native HTTP and vault APIs. */
 	async downloadUpdate(release: ReleaseInfo): Promise<string> {
 		const tempDir = `${this.pluginDir}/.update-tmp-${Date.now()}`;
-		await this.ensureDir(tempDir);
+		try {
+			await this.ensureDir(tempDir);
 
-		for (const filename of RELEASE_FILES) {
-			const asset = release.assets?.find((candidate) => candidate.name === filename);
-			if (!asset) {
-				throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+			for (const filename of RELEASE_FILES) {
+				const asset = release.assets?.find((candidate) => candidate.name === filename);
+				if (!asset) {
+					throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+				}
+				await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
 			}
-			await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
-		}
 
-		const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
-		if (manifest.id !== this.pluginDir.split('/').pop()) {
-			throw new Error('Downloaded update belongs to a different plugin.');
+			const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
+			if (manifest.id !== this.pluginDir.split('/').pop()) {
+				throw new Error('Downloaded update belongs to a different plugin.');
+			}
+			return tempDir;
+		} catch (error) {
+			await this.removeDirectory(tempDir);
+			throw error;
 		}
-		return tempDir;
 	}
 
 	private async readBackupState(backupDir: string): Promise<string[]> {
@@ -419,6 +427,8 @@ export class PluginUpdater {
 				console.error('[PluginUpdater] Automatic rollback failed:', rollbackError);
 			}
 			throw new Error(`Update installation failed and was rolled back: ${error?.message || String(error)}`);
+		} finally {
+			await this.removeDirectory(tempDir);
 		}
 	}
 
@@ -533,7 +543,7 @@ export class AvailableBuildsModal extends Modal {
 					: new Date(build.release.published_at).toLocaleString();
 				new Setting(contentEl)
 					.setName(releaseLabel(build.release))
-					.setDesc(`${build.release.name} · ${build.commitHash?.slice(0, 7) ?? 'commit unavailable'} · ${timestamp}`)
+					.setDesc(`${build.commitMessage || build.release.name || 'Commit message unavailable'} · ${build.commitHash?.slice(0, 7) ?? 'commit unavailable'} · ${timestamp}`)
 					.addButton((button) => button.setButtonText('Install').onClick(async () => {
 						button.setDisabled(true);
 						button.setButtonText('Installing…');

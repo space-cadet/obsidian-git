@@ -2241,3 +2241,125 @@
 .theme-dark .git-progress-phase-error .git-progress-phase-name { color: #f14c4c; }
 .theme-dark .git-progress-status-success { color: #4ec9b0; }
 .theme-dark .git-progress-status-error { color: #f14c4c; }
+
+/* Optional compact sidebar density. Keep interactive controls large enough
+   for touch input while reducing the surrounding visual rhythm. */
+.git-sidebar-density-compact .git-sidebar-tabs-wrapper {
+    min-height: 48px;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
+.git-sidebar-density-compact .git-tab-btn {
+    min-height: 48px;
+    padding-left: 4px;
+    padding-right: 4px;
+    font-size: var(--font-ui-small);
+}
+
+.git-sidebar-density-compact .git-settings-btn {
+    width: 34px;
+    height: 34px;
+    padding: 7px;
+}
+
+.git-sidebar-density-compact .git-sidebar-header {
+    padding: 10px 16px 8px;
+}
+
+.git-sidebar-density-compact .git-header-branch {
+    min-height: 34px;
+    gap: 8px;
+    font-size: var(--font-ui-small);
+}
+
+.git-sidebar-density-compact .git-branch-icon {
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
+}
+
+.git-sidebar-density-compact .git-branch-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.git-sidebar-density-compact .git-branch-name {
+    font-size: 15px;
+}
+
+.git-sidebar-density-compact .git-header-refresh {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+}
+
+.git-sidebar-density-compact .git-header-status {
+    min-height: 18px;
+    margin-left: 38px;
+    font-size: var(--font-smaller);
+}
+
+.git-sidebar-density-compact .git-status-section-header {
+    min-height: 44px;
+    gap: 8px;
+    padding: 6px 16px;
+}
+
+.git-sidebar-density-compact .git-status-section-action {
+    min-height: 30px;
+    padding: 4px 9px;
+}
+
+.git-sidebar-density-compact .git-file-row {
+    min-height: 40px;
+    gap: 8px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.git-sidebar-density-compact .git-file-btn {
+    width: 30px;
+    height: 30px;
+}
+
+.git-sidebar-density-compact .git-commits-toggle-bar {
+    margin: 10px 16px;
+}
+
+.git-sidebar-density-compact .git-commits-toggle-btn {
+    min-height: 34px;
+    padding: 5px 12px;
+}
+
+.git-sidebar-density-compact .git-commit-main {
+    padding-top: 8px;
+    padding-bottom: 2px;
+}
+
+.git-sidebar-density-compact .git-commit-meta {
+    padding-top: 2px;
+    padding-bottom: 8px;
+    font-size: var(--font-smaller);
+}
+
+.git-sidebar-density-compact .git-log-toolbar {
+    min-height: 46px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+.git-sidebar-density-compact .git-log-entry {
+    padding-top: 7px;
+    padding-bottom: 7px;
+}
+
+.git-sidebar-density-compact .git-sidebar-footer {
+    padding: 8px 16px 10px;
+}
+
+.git-sidebar-density-compact .git-footer-buttons-row button {
+    min-height: 34px;
+    padding-top: 5px !important;
+    padding-bottom: 5px !important;
+}

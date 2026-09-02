@@ -402,6 +402,15 @@ export interface GitCommit {
     files?: { filepath: string; status: 'added' | 'modified' | 'deleted' }[];
 }
 
+export interface GitSidebarStatusSnapshot {
+    branch: string;
+    ahead: number;
+    behind: number;
+    detailedStatus: GitFileStatus[];
+    staged: string[];
+    unstaged: string[];
+}
+
 export interface GitCommitFile {
     filepath: string;
     status: 'added' | 'modified' | 'deleted';
@@ -1330,29 +1339,7 @@ export class GitManager {
      */
     async getDetailedStatus(): Promise<GitFileStatus[]> {
         try {
-            const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
-            const result: GitFileStatus[] = [];
-            
-            for (const row of matrix) {
-                const [filepath, head, workdir, stage] = row;
-                // head: 0=absent, 1=same as HEAD, 2=different from HEAD
-                // workdir: 0=absent, 1=same as HEAD, 2=different from HEAD
-                // stage: 0=absent, 1=same as HEAD, 2=different from HEAD, 3=untracked
-                
-                if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
-                
-                let status: 'modified' | 'added' | 'deleted' | 'untracked' | 'staged' | 'conflict';
-                if (head === 0 && workdir === 2 && stage === 0) status = 'untracked';
-                else if (head === 0 && (stage === 2 || stage === 3)) status = 'added';
-                else if (workdir === 0) status = 'deleted';
-                else if (head === 1 && workdir === 2 && stage === 1) status = 'modified';
-                else if (head === 1 && workdir === 1 && stage === 2) status = 'staged';
-                else if (head === 1 && workdir === 2 && stage === 2) status = 'staged'; // staged + modified → show as staged
-                else status = 'modified';
-                
-                result.push({ filepath, status });
-            }
-            return result;
+            return (await this.readStatusSnapshot()).detailedStatus;
         } catch (error: any) {
             log.error('GitManager', 'Failed to get detailed status', error);
             // Check if this is the known pack index issue
@@ -1376,30 +1363,57 @@ export class GitManager {
      */
     async getStatusGroups(): Promise<{ staged: string[]; unstaged: string[] }> {
         try {
-            const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
-            const staged: string[] = [];
-            const unstaged: string[] = [];
-            
-            for (const row of matrix) {
-                const [filepath, head, workdir, stage] = row;
-                if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
-                
-                const hasStagedChanges = stage !== 1 && stage !== 0;
-                const hasWorkdirChanges = workdir !== 1;
-                
-                if (hasStagedChanges) {
-                    staged.push(filepath);
-                }
-                if (hasWorkdirChanges && !hasStagedChanges) {
-                    unstaged.push(filepath);
-                }
-            }
-            
-            return { staged, unstaged };
+            const snapshot = await this.readStatusSnapshot();
+            return { staged: snapshot.staged, unstaged: snapshot.unstaged };
         } catch (error: any) {
             log.error('GitManager', 'Failed to get status groups', error);
             throw error;
         }
+    }
+
+    /**
+     * Read the complete working-tree status once and derive every sidebar
+     * representation from the same status matrix.
+     */
+    async getSidebarStatusSnapshot(): Promise<GitSidebarStatusSnapshot> {
+        const [repositoryStatus, fileStatus] = await Promise.all([
+            this.getStatus(),
+            this.readStatusSnapshot(),
+        ]);
+        return { ...repositoryStatus, ...fileStatus };
+    }
+
+    private async readStatusSnapshot(): Promise<Pick<GitSidebarStatusSnapshot, 'detailedStatus' | 'staged' | 'unstaged'>> {
+        const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
+        const detailedStatus: GitFileStatus[] = [];
+        const staged: string[] = [];
+        const unstaged: string[] = [];
+
+        for (const row of matrix) {
+            const [filepath, head, workdir, stage] = row;
+            if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
+
+            // head: 0=absent, 1=same as HEAD, 2=different from HEAD
+            // workdir: 0=absent, 1=same as HEAD, 2=different from HEAD
+            // stage: 0=absent, 1=same as HEAD, 2=different from HEAD, 3=untracked
+            let status: GitFileStatus['status'];
+            if (head === 0 && workdir === 2 && stage === 0) status = 'untracked';
+            else if (head === 0 && (stage === 2 || stage === 3)) status = 'added';
+            else if (workdir === 0) status = 'deleted';
+            else if (head === 1 && workdir === 2 && stage === 1) status = 'modified';
+            else if (head === 1 && workdir === 1 && stage === 2) status = 'staged';
+            else if (head === 1 && workdir === 2 && stage === 2) status = 'staged'; // staged + modified → show as staged
+            else status = 'modified';
+
+            detailedStatus.push({ filepath, status });
+
+            const hasStagedChanges = stage !== 1 && stage !== 0;
+            const hasWorkdirChanges = workdir !== 1;
+            if (hasStagedChanges) staged.push(filepath);
+            if (hasWorkdirChanges && !hasStagedChanges) unstaged.push(filepath);
+        }
+
+        return { detailedStatus, staged, unstaged };
     }
 
     /**
