@@ -128,6 +128,95 @@ async function downloadFile(app: App, url: string, destination: string): Promise
 	await app.vault.adapter.write(destination, response.text);
 }
 
+async function downloadBinary(url: string): Promise<Uint8Array> {
+	const response = await requestUrl({
+		url,
+		method: 'GET',
+		headers: { 'User-Agent': 'obsidian-git-sync-updater' },
+	});
+	if (response.status < 200 || response.status >= 300) {
+		throw new Error(`Download failed: HTTP ${response.status}`);
+	}
+
+	const binary = (response as any).arrayBuffer;
+	if (binary instanceof ArrayBuffer) return new Uint8Array(binary);
+	if (binary instanceof Uint8Array) return binary;
+	if (typeof binary === 'function') return new Uint8Array(await binary.call(response));
+	throw new Error('The downloaded release archive did not contain binary data.');
+}
+
+function readZipUint16(bytes: Uint8Array, offset: number): number {
+	return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function readZipUint32(bytes: Uint8Array, offset: number): number {
+	return (
+		bytes[offset] |
+		(bytes[offset + 1] << 8) |
+		(bytes[offset + 2] << 16) |
+		(bytes[offset + 3] << 24)
+	) >>> 0;
+}
+
+function zipSignatureAt(bytes: Uint8Array, offset: number, signature: number): boolean {
+	return readZipUint32(bytes, offset) === signature;
+}
+
+async function inflateZipEntry(bytes: Uint8Array): Promise<Uint8Array> {
+	const DecompressionStreamImpl = (globalThis as any).DecompressionStream;
+	if (!DecompressionStreamImpl) {
+		throw new Error('The release archive is compressed. Install a build with direct plugin assets.');
+	}
+	const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStreamImpl('deflate-raw'));
+	return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+/** Read one plugin file from the ZIP format produced by scripts/build-archive.mjs. */
+async function readZipEntry(archive: Uint8Array, filename: string): Promise<Uint8Array | null> {
+	const minimumEndRecordOffset = Math.max(0, archive.length - 0xffff - 22);
+	let endRecordOffset = -1;
+	for (let offset = archive.length - 22; offset >= minimumEndRecordOffset; offset -= 1) {
+		if (zipSignatureAt(archive, offset, 0x06054b50)) {
+			endRecordOffset = offset;
+			break;
+		}
+	}
+	if (endRecordOffset < 0) throw new Error('The downloaded release archive is not a valid ZIP file.');
+
+	const entryCount = readZipUint16(archive, endRecordOffset + 10);
+	const centralDirectoryOffset = readZipUint32(archive, endRecordOffset + 16);
+	let offset = centralDirectoryOffset;
+	for (let entryIndex = 0; entryIndex < entryCount; entryIndex += 1) {
+		if (!zipSignatureAt(archive, offset, 0x02014b50)) {
+			throw new Error('The downloaded release archive has an invalid directory.');
+		}
+		const compressionMethod = readZipUint16(archive, offset + 10);
+		const compressedSize = readZipUint32(archive, offset + 20);
+		const filenameLength = readZipUint16(archive, offset + 28);
+		const extraLength = readZipUint16(archive, offset + 30);
+		const commentLength = readZipUint16(archive, offset + 32);
+		const localHeaderOffset = readZipUint32(archive, offset + 42);
+		const entryName = new TextDecoder().decode(archive.slice(offset + 46, offset + 46 + filenameLength)).replace(/\\/g, '/');
+		const matches = entryName === filename || entryName.endsWith(`/${filename}`);
+
+		if (matches) {
+			if (!zipSignatureAt(archive, localHeaderOffset, 0x04034b50)) {
+				throw new Error(`The release archive entry for ${filename} is invalid.`);
+			}
+			const localFilenameLength = readZipUint16(archive, localHeaderOffset + 26);
+			const localExtraLength = readZipUint16(archive, localHeaderOffset + 28);
+			const dataStart = localHeaderOffset + 30 + localFilenameLength + localExtraLength;
+			const compressed = archive.slice(dataStart, dataStart + compressedSize);
+			if (compressionMethod === 0) return compressed;
+			if (compressionMethod === 8) return await inflateZipEntry(compressed);
+			throw new Error(`The release archive uses an unsupported compression method for ${filename}.`);
+		}
+
+		offset += 46 + filenameLength + extraLength + commentLength;
+	}
+	return null;
+}
+
 function branchFromRelease(release: ReleaseInfo): string {
 	const prefix = 'latest-dev-';
 	return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : 'main';
@@ -350,12 +439,24 @@ export class PluginUpdater {
 		try {
 			await this.ensureDir(tempDir);
 
-			for (const filename of RELEASE_FILES) {
-				const asset = release.assets?.find((candidate) => candidate.name === filename);
-				if (!asset) {
-					throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+			const assets = release.assets ?? [];
+			const directAssets = RELEASE_FILES.map((filename) => assets.find((asset) => asset.name === filename));
+			if (directAssets.every((asset): asset is ReleaseAsset => Boolean(asset))) {
+				for (let index = 0; index < RELEASE_FILES.length; index += 1) {
+					await downloadFile(this.app, directAssets[index].browser_download_url, `${tempDir}/${RELEASE_FILES[index]}`);
 				}
-				await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
+			} else {
+				const archive = assets.find((asset) => /\.zip$/i.test(asset.name));
+				if (!archive) {
+					const missing = RELEASE_FILES.filter((_, index) => !directAssets[index]).join(', ');
+					throw new Error(`Release has no installable plugin assets (missing ${missing}). Publish direct plugin assets or a ZIP archive.`);
+				}
+				const archiveBytes = await downloadBinary(archive.browser_download_url);
+				for (const filename of RELEASE_FILES) {
+					const contents = await readZipEntry(archiveBytes, filename);
+					if (!contents) throw new Error(`Release archive is missing ${filename}.`);
+					await this.writeFile(`${tempDir}/${filename}`, new TextDecoder().decode(contents));
+				}
 			}
 
 			const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));

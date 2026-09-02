@@ -177,16 +177,33 @@ export class ObsidianFsAdapter {
         // Obsidian's list() may return paths relative to the vault root,
         // not relative to the queried directory. If so, strip the directory prefix.
         const stripDirPrefix = (name: string): string => {
-            if (path !== '.' && name.startsWith(path + '/')) {
-                return name.slice(path.length + 1);
+            const normalizedName = name.startsWith('./') ? name.slice(2) : name;
+            if (path !== '.' && normalizedName.startsWith(path + '/')) {
+                return normalizedName.slice(path.length + 1);
             }
-            if (name.startsWith('./')) {
-                return name.slice(2);
-            }
-            return name;
+            return normalizedName;
         };
         
-        return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
+        // Mobile vault indexes can briefly return a path that has already been
+        // removed (for example, a trashed file). isomorphic-git aborts the
+        // entire status scan when that happens, so discard only entries that
+        // no longer exist and let other adapter errors propagate.
+        const entries = [...listed.files, ...listed.folders];
+        const existingEntries = await Promise.all(entries.map(async (entry) => {
+            const relativePath = stripDirPrefix(entry);
+            const candidatePath = path === '.' ? relativePath : `${path}/${relativePath}`;
+            try {
+                const stat = await this.adapter.stat(candidatePath);
+                return stat ? relativePath : null;
+            } catch (error: any) {
+                if (error?.code === 'ENOENT' || /no such file|not found/i.test(error?.message || '')) {
+                    return null;
+                }
+                throw error;
+            }
+        }));
+
+        return existingEntries.filter((entry): entry is string => entry !== null);
     }
 
     private async unlinkImpl(filepath: string): Promise<void> {

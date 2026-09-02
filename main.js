@@ -18518,6 +18518,8 @@ var init_logger = __esm({
         this.entries = [];
         this.maxEntries = 500;
         this.sensitiveValues = [];
+        this.recentNoticeTimes = /* @__PURE__ */ new Map();
+        this.noticeCooldownMs = 5 * 60 * 1e3;
       }
       /**
        * Get the singleton instance of the logger
@@ -18608,6 +18610,22 @@ var init_logger = __esm({
       setShowNotices(show) {
         this.showNotices = show;
       }
+      /** Show a background warning/error once per message during the cooldown. */
+      showNotice(level, message) {
+        const key = `${level}:${message}`;
+        const now = Date.now();
+        const previous = this.recentNoticeTimes.get(key);
+        if (previous !== void 0 && now - previous < this.noticeCooldownMs)
+          return;
+        this.recentNoticeTimes.set(key, now);
+        if (this.recentNoticeTimes.size > 100) {
+          for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
+            if (now - timestamp >= this.noticeCooldownMs)
+              this.recentNoticeTimes.delete(noticeKey);
+          }
+        }
+        new import_obsidian.Notice(`[${level}] ${message}`);
+      }
       setSensitiveValues(values) {
         this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
       }
@@ -18643,7 +18661,7 @@ var init_logger = __esm({
         if (this.logLevel <= 2 /* WARN */) {
           console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
           if (this.showNotices) {
-            new import_obsidian.Notice(`[Warning] ${safeMessage}`);
+            this.showNotice("Warning", safeMessage);
           }
         }
       }
@@ -18661,7 +18679,7 @@ var init_logger = __esm({
             console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
           }
           if (this.showNotices) {
-            new import_obsidian.Notice(`[Error] ${safeMessage}${errorText ? `: ${errorText}` : ""}`);
+            this.showNotice("Error", `${safeMessage}${errorText ? `: ${errorText}` : ""}`);
           }
         }
       }
@@ -20690,15 +20708,27 @@ var ObsidianFsAdapter = class {
     const path = this.resolve(filepath);
     const listed = await this.adapter.list(path);
     const stripDirPrefix = (name) => {
-      if (path !== "." && name.startsWith(path + "/")) {
-        return name.slice(path.length + 1);
+      const normalizedName = name.startsWith("./") ? name.slice(2) : name;
+      if (path !== "." && normalizedName.startsWith(path + "/")) {
+        return normalizedName.slice(path.length + 1);
       }
-      if (name.startsWith("./")) {
-        return name.slice(2);
-      }
-      return name;
+      return normalizedName;
     };
-    return [...listed.files.map(stripDirPrefix), ...listed.folders.map(stripDirPrefix)];
+    const entries = [...listed.files, ...listed.folders];
+    const existingEntries = await Promise.all(entries.map(async (entry) => {
+      const relativePath = stripDirPrefix(entry);
+      const candidatePath = path === "." ? relativePath : `${path}/${relativePath}`;
+      try {
+        const stat = await this.adapter.stat(candidatePath);
+        return stat ? relativePath : null;
+      } catch (error) {
+        if ((error == null ? void 0 : error.code) === "ENOENT" || /no such file|not found/i.test((error == null ? void 0 : error.message) || "")) {
+          return null;
+        }
+        throw error;
+      }
+    }));
+    return existingEntries.filter((entry) => entry !== null);
   }
   async unlinkImpl(filepath) {
     var _a, _b;
@@ -21787,6 +21817,85 @@ async function downloadFile(app, url, destination) {
   }
   await app.vault.adapter.write(destination, response.text);
 }
+async function downloadBinary(url) {
+  const response = await (0, import_obsidian5.requestUrl)({
+    url,
+    method: "GET",
+    headers: { "User-Agent": "obsidian-git-sync-updater" }
+  });
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Download failed: HTTP ${response.status}`);
+  }
+  const binary = response.arrayBuffer;
+  if (binary instanceof ArrayBuffer)
+    return new Uint8Array(binary);
+  if (binary instanceof Uint8Array)
+    return binary;
+  if (typeof binary === "function")
+    return new Uint8Array(await binary.call(response));
+  throw new Error("The downloaded release archive did not contain binary data.");
+}
+function readZipUint16(bytes, offset) {
+  return bytes[offset] | bytes[offset + 1] << 8;
+}
+function readZipUint32(bytes, offset) {
+  return (bytes[offset] | bytes[offset + 1] << 8 | bytes[offset + 2] << 16 | bytes[offset + 3] << 24) >>> 0;
+}
+function zipSignatureAt(bytes, offset, signature) {
+  return readZipUint32(bytes, offset) === signature;
+}
+async function inflateZipEntry(bytes) {
+  const DecompressionStreamImpl = globalThis.DecompressionStream;
+  if (!DecompressionStreamImpl) {
+    throw new Error("The release archive is compressed. Install a build with direct plugin assets.");
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStreamImpl("deflate-raw"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+async function readZipEntry(archive, filename) {
+  const minimumEndRecordOffset = Math.max(0, archive.length - 65535 - 22);
+  let endRecordOffset = -1;
+  for (let offset2 = archive.length - 22; offset2 >= minimumEndRecordOffset; offset2 -= 1) {
+    if (zipSignatureAt(archive, offset2, 101010256)) {
+      endRecordOffset = offset2;
+      break;
+    }
+  }
+  if (endRecordOffset < 0)
+    throw new Error("The downloaded release archive is not a valid ZIP file.");
+  const entryCount = readZipUint16(archive, endRecordOffset + 10);
+  const centralDirectoryOffset = readZipUint32(archive, endRecordOffset + 16);
+  let offset = centralDirectoryOffset;
+  for (let entryIndex = 0; entryIndex < entryCount; entryIndex += 1) {
+    if (!zipSignatureAt(archive, offset, 33639248)) {
+      throw new Error("The downloaded release archive has an invalid directory.");
+    }
+    const compressionMethod = readZipUint16(archive, offset + 10);
+    const compressedSize = readZipUint32(archive, offset + 20);
+    const filenameLength = readZipUint16(archive, offset + 28);
+    const extraLength = readZipUint16(archive, offset + 30);
+    const commentLength = readZipUint16(archive, offset + 32);
+    const localHeaderOffset = readZipUint32(archive, offset + 42);
+    const entryName = new TextDecoder().decode(archive.slice(offset + 46, offset + 46 + filenameLength)).replace(/\\/g, "/");
+    const matches = entryName === filename || entryName.endsWith(`/${filename}`);
+    if (matches) {
+      if (!zipSignatureAt(archive, localHeaderOffset, 67324752)) {
+        throw new Error(`The release archive entry for ${filename} is invalid.`);
+      }
+      const localFilenameLength = readZipUint16(archive, localHeaderOffset + 26);
+      const localExtraLength = readZipUint16(archive, localHeaderOffset + 28);
+      const dataStart = localHeaderOffset + 30 + localFilenameLength + localExtraLength;
+      const compressed = archive.slice(dataStart, dataStart + compressedSize);
+      if (compressionMethod === 0)
+        return compressed;
+      if (compressionMethod === 8)
+        return await inflateZipEntry(compressed);
+      throw new Error(`The release archive uses an unsupported compression method for ${filename}.`);
+    }
+    offset += 46 + filenameLength + extraLength + commentLength;
+  }
+  return null;
+}
 function branchFromRelease(release) {
   const prefix = "latest-dev-";
   return release.tag_name.startsWith(prefix) ? release.tag_name.slice(prefix.length) : "main";
@@ -21973,12 +22082,25 @@ var PluginUpdater = class {
     const tempDir = `${this.pluginDir}/.update-tmp-${Date.now()}`;
     try {
       await this.ensureDir(tempDir);
-      for (const filename of RELEASE_FILES) {
-        const asset = (_a = release.assets) == null ? void 0 : _a.find((candidate) => candidate.name === filename);
-        if (!asset) {
-          throw new Error(`Release is missing ${filename}. Update the release workflow to publish direct plugin assets.`);
+      const assets = (_a = release.assets) != null ? _a : [];
+      const directAssets = RELEASE_FILES.map((filename) => assets.find((asset) => asset.name === filename));
+      if (directAssets.every((asset) => Boolean(asset))) {
+        for (let index2 = 0; index2 < RELEASE_FILES.length; index2 += 1) {
+          await downloadFile(this.app, directAssets[index2].browser_download_url, `${tempDir}/${RELEASE_FILES[index2]}`);
         }
-        await downloadFile(this.app, asset.browser_download_url, `${tempDir}/${filename}`);
+      } else {
+        const archive = assets.find((asset) => /\.zip$/i.test(asset.name));
+        if (!archive) {
+          const missing = RELEASE_FILES.filter((_, index2) => !directAssets[index2]).join(", ");
+          throw new Error(`Release has no installable plugin assets (missing ${missing}). Publish direct plugin assets or a ZIP archive.`);
+        }
+        const archiveBytes = await downloadBinary(archive.browser_download_url);
+        for (const filename of RELEASE_FILES) {
+          const contents = await readZipEntry(archiveBytes, filename);
+          if (!contents)
+            throw new Error(`Release archive is missing ${filename}.`);
+          await this.writeFile(`${tempDir}/${filename}`, new TextDecoder().decode(contents));
+        }
       }
       const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
       if (manifest.id !== this.pluginDir.split("/").pop()) {
@@ -22163,7 +22285,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "dc84b1ba4935b7f326392775ce172f510937f969" : "unknown";
+var GIT_COMMIT_HASH = true ? "1389297d5223fc6f897558e5fb983066f7ef8906" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

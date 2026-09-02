@@ -88,6 +88,49 @@ function createApp(adapter) {
   return { vault: { adapter }, commands: { executeCommandById() {} } };
 }
 
+function createStoredZip(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  for (const [name, value] of Object.entries(files)) {
+    const nameBytes = Buffer.from(name);
+    const content = Buffer.from(value);
+    const local = Buffer.alloc(30 + nameBytes.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(0, 6);
+    local.writeUInt16LE(0, 8);
+    local.writeUInt32LE(content.length, 18);
+    local.writeUInt32LE(content.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    nameBytes.copy(local, 30);
+    localParts.push(local, content);
+
+    const central = Buffer.alloc(46 + nameBytes.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0, 8);
+    central.writeUInt16LE(0, 10);
+    central.writeUInt32LE(content.length, 20);
+    central.writeUInt32LE(content.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(offset, 42);
+    nameBytes.copy(central, 46);
+    centralParts.push(central);
+    offset += local.length + content.length;
+  }
+
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(centralParts.length, 8);
+  end.writeUInt16LE(centralParts.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...localParts, centralDirectory, end]);
+}
+
 test('compareVersions handles stable versions and rolling dev tags', () => {
   assert.equal(compareVersions('1.2.0', '1.1.9') > 0, true);
   assert.equal(compareVersions('dev', '1.0.0') > 0, true);
@@ -273,7 +316,7 @@ test('listAvailableBuilds exposes branch and release commit metadata', async () 
   assert.equal(builds[2].commitHash, 'abcdef1234567890');
 });
 
-test('downloadUpdate requires direct release assets and validates plugin identity', async () => {
+test('downloadUpdate uses direct release assets and validates plugin identity', async () => {
   const adapter = createAdapter();
   requestUrlImpl = async ({ url }) => {
     const filename = url.split('/').pop();
@@ -309,6 +352,34 @@ test('downloadUpdate requires direct release assets and validates plugin identit
     /missing main\.js/,
   );
   assert.equal(adapter.removedDirectories.length, 1);
+});
+
+test('downloadUpdate extracts the published ZIP when direct assets are unavailable', async () => {
+  const adapter = createAdapter();
+  const archive = createStoredZip({
+    'obsidian-git-sync/main.js': 'updated main',
+    'obsidian-git-sync/manifest.json': '{"id":"obsidian-git-sync","version":"1.1.0"}',
+    'obsidian-git-sync/styles.css': 'updated css',
+  });
+  requestUrlImpl = async ({ url }) => {
+    assert.match(url, /\.zip$/);
+    return { status: 200, text: '', arrayBuffer: archive.buffer.slice(archive.byteOffset, archive.byteOffset + archive.byteLength) };
+  };
+
+  const updater = new PluginUpdater(createApp(adapter), 'obsidian-git-sync');
+  const tempDir = await updater.downloadUpdate({
+    tag_name: 'v1.1.0',
+    name: 'v1.1.0',
+    body: '',
+    prerelease: false,
+    published_at: '',
+    html_url: '',
+    assets: [{ name: 'obsidian-git-sync-v1.1.0.zip', browser_download_url: 'https://example.test/build.zip' }],
+  });
+
+  assert.equal(await adapter.read(`${tempDir}/main.js`), 'updated main');
+  assert.equal(await adapter.read(`${tempDir}/manifest.json`), '{"id":"obsidian-git-sync","version":"1.1.0"}');
+  assert.equal(await adapter.read(`${tempDir}/styles.css`), 'updated css');
 });
 
 test('installUpdate restores every original file after a partial write failure', async () => {

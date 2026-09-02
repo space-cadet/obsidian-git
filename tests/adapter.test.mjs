@@ -59,3 +59,18 @@ test('ObsidianFsAdapter reports worktree write byte counts through its fs API', 
   ]);
   assert.equal(writes.length, 2);
 });
+
+test('ObsidianFsAdapter filters stale entries returned by the vault index', async () => {
+  const dataAdapter = {
+    async list(path) {
+      assert.equal(path, '.');
+      return { files: ['trash/missing.md', 'Notes/today.md'], folders: [] };
+    },
+    async stat(path) {
+      return path === 'Notes/today.md' ? { type: 'file', size: 1, mtime: 1, ctime: 1 } : null;
+    },
+  };
+  const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+
+  assert.deepEqual(await adapter.promises.readdir('.'), ['Notes/today.md']);
+});

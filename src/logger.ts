@@ -28,6 +28,8 @@ export class Logger {
   private entries: LogEntry[] = [];
   private maxEntries: number = 500;
   private sensitiveValues: string[] = [];
+  private recentNoticeTimes = new Map<string, number>();
+  private readonly noticeCooldownMs = 5 * 60 * 1000;
 
   private constructor() {}
 
@@ -132,6 +134,22 @@ export class Logger {
     this.showNotices = show;
   }
 
+  /** Show a background warning/error once per message during the cooldown. */
+  private showNotice(level: 'Warning' | 'Error', message: string): void {
+    const key = `${level}:${message}`;
+    const now = Date.now();
+    const previous = this.recentNoticeTimes.get(key);
+    if (previous !== undefined && now - previous < this.noticeCooldownMs) return;
+
+    this.recentNoticeTimes.set(key, now);
+    if (this.recentNoticeTimes.size > 100) {
+      for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
+        if (now - timestamp >= this.noticeCooldownMs) this.recentNoticeTimes.delete(noticeKey);
+      }
+    }
+    new Notice(`[${level}] ${message}`);
+  }
+
   public setSensitiveValues(values: readonly unknown[]): void {
     this.sensitiveValues = values
       .filter((value): value is string => typeof value === 'string' && value.length >= 3);
@@ -171,7 +189,7 @@ export class Logger {
     if (this.logLevel <= LogLevel.WARN) {
       console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || '');
       if (this.showNotices) {
-        new Notice(`[Warning] ${safeMessage}`);
+        this.showNotice('Warning', safeMessage);
       }
     }
   }
@@ -190,7 +208,7 @@ export class Logger {
         console.error(`[Git Sync][${context}] Stack trace:`, (safeError as { stack?: string }).stack || '');
       }
       if (this.showNotices) {
-        new Notice(`[Error] ${safeMessage}${errorText ? `: ${errorText}` : ''}`);
+        this.showNotice('Error', `${safeMessage}${errorText ? `: ${errorText}` : ''}`);
       }
     }
   }

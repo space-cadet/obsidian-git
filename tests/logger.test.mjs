@@ -10,7 +10,12 @@ const temporaryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-logger-tests
 const bundlePath = join(temporaryDirectory, 'logger.cjs');
 const originalLoad = Module._load;
 
-class Notice {}
+class Notice {
+	static messages = [];
+	constructor(message) {
+		Notice.messages.push(message);
+	}
+}
 Module._load = function(request, parent, isMain) {
 	if (request === 'obsidian') return { Notice, normalizePath: (value) => value };
 	return originalLoad.call(this, request, parent, isMain);
@@ -46,4 +51,14 @@ test('logger redacts credentials before retention and export', () => {
 	const output = JSON.stringify(log.getEntries());
 	assert.doesNotMatch(output, /secret-token|abc123|user:pass/);
 	assert.match(output, /\[REDACTED\]/);
+});
+
+test('logger does not repeat the same background notice immediately', () => {
+	log.setLogLevel(LogLevel.WARN);
+	log.setShowNotices(true);
+	const before = Notice.messages.length;
+	log.warn('Refresh', 'Repeated background warning');
+	log.warn('Refresh', 'Repeated background warning');
+	assert.equal(Notice.messages.length - before, 1);
+	log.setShowNotices(false);
 });
