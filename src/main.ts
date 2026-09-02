@@ -34,7 +34,6 @@ interface GitSyncSettings {
 	autoSyncInterval: number; // in minutes, 0 means disabled
 	autoCommitMessage: string;
 	refreshInterval: number; // in seconds, 0 means disabled
-	sidebarDensity: 'comfortable' | 'compact';
 	checkForUpdates: boolean;
 	updateChannel: 'stable' | 'dev';
 	lastUpdateCheck: number;
@@ -53,7 +52,6 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	autoSyncInterval: 0,
 	autoCommitMessage: 'Vault backup: {{date}}',
 	refreshInterval: 60, // default 60 seconds
-	sidebarDensity: 'comfortable',
 	checkForUpdates: true,
 	updateChannel: 'stable',
 	lastUpdateCheck: 0,
@@ -266,6 +264,10 @@ export default class GitSyncPlugin extends Plugin {
 		const legacyPassword = typeof stored.password === 'string' ? stored.password : '';
 		const { password: _password, ...withoutPassword } = stored;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, withoutPassword);
+		// The sidebar has one compact layout. Migrate settings written by the
+		// short-lived comfortable/compact toggle so old data cannot restore the
+		// oversized header.
+		delete (this.settings as any).sidebarDensity;
 		if (!this.settings.passwordSecretId) {
 			this.settings.passwordSecretId = createSecretId(this.app.vault.getName?.() || 'default');
 		}
@@ -434,11 +436,11 @@ export default class GitSyncPlugin extends Plugin {
 	 * dotfiles in the file explorer. Create it on demand for new repositories.
 	 */
 	async openGitIgnore(): Promise<void> {
-		const content = await this.readGitIgnore();
 		// Always use the adapter-backed editor. Obsidian may expose a hidden
 		// .gitignore in its file index on one platform but not another, and
-		// opening that indexed TFile is unreliable on mobile.
-		new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
+		// opening that indexed TFile is unreliable on mobile. Open the modal
+		// immediately while the provider-backed read happens in the editor.
+		new GitIgnoreEditorModal(this.app, () => this.readGitIgnore(), async (updatedContent) => {
 			await this.app.vault.adapter.write('.gitignore', updatedContent);
 			new Notice('Saved .gitignore');
 		}).open();
@@ -715,13 +717,15 @@ export default class GitSyncPlugin extends Plugin {
 class GitIgnoreEditorModal extends Modal {
 	constructor(
 		app: App,
-		private readonly initialContent: string,
+		private readonly loadContent: () => Promise<string>,
 		private readonly onSave: (content: string) => Promise<void>,
 	) {
 		super(app);
 	}
 
 	onOpen(): void {
+		this.modalEl.addClass('git-ignore-editor-modal');
+		this.contentEl.addClass('git-ignore-editor-content');
 		this.titleEl.setText('Edit .gitignore');
 
 		this.contentEl.createEl('p', {
@@ -730,9 +734,10 @@ class GitIgnoreEditorModal extends Modal {
 		});
 
 		const editor = new TextAreaComponent(this.contentEl)
-			.setValue(this.initialContent);
+			.setPlaceholder('Loading .gitignore…');
 		editor.inputEl.addClass('git-ignore-editor-textarea');
 		editor.inputEl.rows = 16;
+		editor.inputEl.disabled = true;
 
 		const actions = this.contentEl.createDiv('git-ignore-modal-actions');
 		new ButtonComponent(actions)
@@ -743,7 +748,9 @@ class GitIgnoreEditorModal extends Modal {
 		const saveButton = new ButtonComponent(actions)
 			.setButtonText('Save')
 			.setClass('git-btn-primary');
+		saveButton.setDisabled(true);
 		saveButton.onClick(async () => {
+			if (editor.inputEl.disabled) return;
 			saveButton.setDisabled(true);
 			saveButton.setButtonText('Saving…');
 			try {
@@ -756,7 +763,24 @@ class GitIgnoreEditorModal extends Modal {
 			}
 		});
 
-		this.openEditorWhenReady(editor);
+		void this.loadEditorContent(editor, saveButton);
+	}
+
+	private async loadEditorContent(editor: TextAreaComponent, saveButton: ButtonComponent): Promise<void> {
+		try {
+			const content = await this.loadContent();
+			if (!editor.inputEl.isConnected) return;
+			editor.setValue(content);
+			editor.inputEl.disabled = false;
+			editor.inputEl.removeAttribute('aria-busy');
+			saveButton.setDisabled(false);
+			this.openEditorWhenReady(editor);
+		} catch (error: any) {
+			if (!editor.inputEl.isConnected) return;
+			editor.inputEl.placeholder = 'Could not load .gitignore';
+			editor.inputEl.removeAttribute('aria-busy');
+			new Notice(`Could not load .gitignore: ${error?.message || String(error)}`);
+		}
 	}
 
 	private openEditorWhenReady(editor: TextAreaComponent): void {
@@ -921,24 +945,6 @@ class GitSyncSettingTab extends PluginSettingTab {
 						}
 						}
 					}));
-
-		new Setting(containerEl)
-			.setName('Sidebar Density')
-			.setDesc('Choose the spacing used by the Git Sync sidebar. Compact keeps rows smaller while preserving touch targets.')
-			.addDropdown(dropdown => dropdown
-				.addOption('comfortable', 'Comfortable')
-				.addOption('compact', 'Compact')
-				.setValue(this.plugin.settings.sidebarDensity)
-				.onChange(async value => {
-					this.plugin.settings.sidebarDensity = value as 'comfortable' | 'compact';
-					await this.plugin.saveSettings();
-					const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
-					for (const leaf of leaves) {
-						if (leaf.view instanceof GitSidebarView) {
-							leaf.view.updateSidebarDensity(this.plugin.settings.sidebarDensity);
-						}
-					}
-				}));
 
 		containerEl.createEl('h3', { text: 'Plugin Updates' });
 		let updateVersionLabel: () => void = () => undefined;

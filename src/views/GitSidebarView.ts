@@ -45,7 +45,9 @@ export class GitSidebarView extends ItemView {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass('git-sidebar-container');
-        container.toggleClass('git-sidebar-density-compact', this.plugin.settings.sidebarDensity === 'compact');
+        // The sidebar uses the compact layout by default; there is no larger
+        // alternative because the repository header must leave room for files.
+        container.addClass('git-sidebar-density-compact');
         container.setAttr('role', 'region');
         container.setAttr('aria-label', 'Git Sync');
 
@@ -119,12 +121,6 @@ export class GitSidebarView extends ItemView {
     updateRefreshInterval(seconds: number): void {
         this.plugin.settings.refreshInterval = seconds;
         this.startAutoRefresh();
-    }
-
-    updateSidebarDensity(density: 'comfortable' | 'compact'): void {
-        this.plugin.settings.sidebarDensity = density;
-        const container = this.containerEl.querySelector('.git-sidebar-container') as HTMLElement | null;
-        container?.toggleClass('git-sidebar-density-compact', density === 'compact');
     }
 
     private invalidateRemoteCommitsCache(): void {

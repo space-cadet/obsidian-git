@@ -1563,9 +1563,11 @@ export class GitManager {
             return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
         } catch (error: any) {
             const msg = error?.message || String(error);
-            // "Could not find" is expected for shallow clones — don't spam error notices
+            // A shallow clone commonly lacks a remote commit's parent. The
+            // sidebar has a GitHub fallback, so keep this expected condition
+            // in the activity log without turning it into a visible notice.
             if (msg.includes('Could not find') || msg.includes('not found')) {
-                log.warn('GitManager', `Commit ${oid.slice(0, 7)} not found locally (shallow clone?)`, msg);
+                log.debug('GitManager', `Commit ${oid.slice(0, 7)} not found locally; shallow-history fallback may be needed`, msg);
             } else {
                 log.error('GitManager', `Failed to get commit files for ${oid.slice(0, 7)}`, error);
             }

@@ -75,15 +75,15 @@ export class ObsidianFsAdapter {
     }
 
     /**
-     * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
-     * no encoding for binary (expects Buffer/Uint8Array).
+     * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
+     * Node-compatible 'utf8' string for text; no encoding means binary.
      * 
      * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
      * We use Node.js fs via window.require (Electron desktop) as a fallback.
      */
-    private async readFileImpl(filepath: string, options?: { encoding?: string }): Promise<string | Uint8Array> {
+    private async readFileImpl(filepath: string, options?: { encoding?: string } | string): Promise<string | Uint8Array> {
         const path = this.resolve(filepath);
-        const encoding = options?.encoding;
+        const encoding = typeof options === 'string' ? options : options?.encoding;
 
         if (encoding === 'utf8') {
             return this.adapter.read(path);

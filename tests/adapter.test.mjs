@@ -74,3 +74,15 @@ test('ObsidianFsAdapter filters stale entries returned by the vault index', asyn
 
   assert.deepEqual(await adapter.promises.readdir('.'), ['Notes/today.md']);
 });
+
+test('ObsidianFsAdapter accepts the Node-style string text encoding', async () => {
+  const dataAdapter = {
+    async read(path) {
+      assert.equal(path, '.gitignore');
+      return '.obsidian/\n';
+    },
+  };
+  const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+
+  assert.equal(await adapter.promises.readFile('.gitignore', 'utf8'), '.obsidian/\n');
+});

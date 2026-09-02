@@ -20389,7 +20389,7 @@ Try again with a faster connection or smaller repository.`
         } catch (error) {
           const msg = (error == null ? void 0 : error.message) || String(error);
           if (msg.includes("Could not find") || msg.includes("not found")) {
-            log2.warn("GitManager", `Commit ${oid.slice(0, 7)} not found locally (shallow clone?)`, msg);
+            log2.debug("GitManager", `Commit ${oid.slice(0, 7)} not found locally; shallow-history fallback may be needed`, msg);
           } else {
             log2.error("GitManager", `Failed to get commit files for ${oid.slice(0, 7)}`, error);
           }
@@ -20649,8 +20649,8 @@ var ObsidianFsAdapter = class {
     return typeof window !== "undefined" && !!window.require && !!window.process;
   }
   /**
-   * readFile — isomorphic-git passes { encoding: 'utf8' } for text,
-   * no encoding for binary (expects Buffer/Uint8Array).
+   * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
+   * Node-compatible 'utf8' string for text; no encoding means binary.
    * 
    * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
    * We use Node.js fs via window.require (Electron desktop) as a fallback.
@@ -20658,7 +20658,7 @@ var ObsidianFsAdapter = class {
   async readFileImpl(filepath, options) {
     var _a, _b;
     const path = this.resolve(filepath);
-    const encoding = options == null ? void 0 : options.encoding;
+    const encoding = typeof options === "string" ? options : options == null ? void 0 : options.encoding;
     if (encoding === "utf8") {
       return this.adapter.read(path);
     }
@@ -20838,7 +20838,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const container = this.containerEl.children[1];
     container.empty();
     container.addClass("git-sidebar-container");
-    container.toggleClass("git-sidebar-density-compact", this.plugin.settings.sidebarDensity === "compact");
+    container.addClass("git-sidebar-density-compact");
     container.setAttr("role", "region");
     container.setAttr("aria-label", "Git Sync");
     const tabsWrapper = container.createDiv("git-sidebar-tabs-wrapper");
@@ -20891,11 +20891,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   updateRefreshInterval(seconds) {
     this.plugin.settings.refreshInterval = seconds;
     this.startAutoRefresh();
-  }
-  updateSidebarDensity(density) {
-    this.plugin.settings.sidebarDensity = density;
-    const container = this.containerEl.querySelector(".git-sidebar-container");
-    container == null ? void 0 : container.toggleClass("git-sidebar-density-compact", density === "compact");
   }
   invalidateRemoteCommitsCache() {
     this.remoteCommitsCache = null;
@@ -22372,7 +22367,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "68632ddd09a7cb406b65e53128202c4577f2ef8d" : "unknown";
+var GIT_COMMIT_HASH = true ? "25be638147b5b290dcddc749a2c4e88b5b005dab" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -22441,7 +22436,6 @@ var DEFAULT_SETTINGS = {
   autoCommitMessage: "Vault backup: {{date}}",
   refreshInterval: 60,
   // default 60 seconds
-  sidebarDensity: "comfortable",
   checkForUpdates: true,
   updateChannel: "stable",
   lastUpdateCheck: 0,
@@ -22620,6 +22614,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
     const legacyPassword = typeof stored.password === "string" ? stored.password : "";
     const { password: _password, ...withoutPassword } = stored;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, withoutPassword);
+    delete this.settings.sidebarDensity;
     if (!this.settings.passwordSecretId) {
       this.settings.passwordSecretId = createSecretId(((_b = (_a = this.app.vault).getName) == null ? void 0 : _b.call(_a)) || "default");
     }
@@ -22767,8 +22762,7 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
    * dotfiles in the file explorer. Create it on demand for new repositories.
    */
   async openGitIgnore() {
-    const content = await this.readGitIgnore();
-    new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
+    new GitIgnoreEditorModal(this.app, () => this.readGitIgnore(), async (updatedContent) => {
       await this.app.vault.adapter.write(".gitignore", updatedContent);
       new import_obsidian6.Notice("Saved .gitignore");
     }).open();
@@ -22993,24 +22987,30 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
   }
 };
 var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
-  constructor(app, initialContent, onSave) {
+  constructor(app, loadContent, onSave) {
     super(app);
-    this.initialContent = initialContent;
+    this.loadContent = loadContent;
     this.onSave = onSave;
   }
   onOpen() {
+    this.modalEl.addClass("git-ignore-editor-modal");
+    this.contentEl.addClass("git-ignore-editor-content");
     this.titleEl.setText("Edit .gitignore");
     this.contentEl.createEl("p", {
       text: "Obsidian hides dotfiles from its file index, so this editor writes directly to the vault.",
       cls: "git-ignore-editor-description"
     });
-    const editor = new import_obsidian6.TextAreaComponent(this.contentEl).setValue(this.initialContent);
+    const editor = new import_obsidian6.TextAreaComponent(this.contentEl).setPlaceholder("Loading .gitignore\u2026");
     editor.inputEl.addClass("git-ignore-editor-textarea");
     editor.inputEl.rows = 16;
+    editor.inputEl.disabled = true;
     const actions = this.contentEl.createDiv("git-ignore-modal-actions");
     new import_obsidian6.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => this.close());
     const saveButton = new import_obsidian6.ButtonComponent(actions).setButtonText("Save").setClass("git-btn-primary");
+    saveButton.setDisabled(true);
     saveButton.onClick(async () => {
+      if (editor.inputEl.disabled)
+        return;
       saveButton.setDisabled(true);
       saveButton.setButtonText("Saving\u2026");
       try {
@@ -23022,7 +23022,25 @@ var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
         saveButton.setButtonText("Save");
       }
     });
-    this.openEditorWhenReady(editor);
+    void this.loadEditorContent(editor, saveButton);
+  }
+  async loadEditorContent(editor, saveButton) {
+    try {
+      const content = await this.loadContent();
+      if (!editor.inputEl.isConnected)
+        return;
+      editor.setValue(content);
+      editor.inputEl.disabled = false;
+      editor.inputEl.removeAttribute("aria-busy");
+      saveButton.setDisabled(false);
+      this.openEditorWhenReady(editor);
+    } catch (error) {
+      if (!editor.inputEl.isConnected)
+        return;
+      editor.inputEl.placeholder = "Could not load .gitignore";
+      editor.inputEl.removeAttribute("aria-busy");
+      new import_obsidian6.Notice(`Could not load .gitignore: ${(error == null ? void 0 : error.message) || String(error)}`);
+    }
   }
   openEditorWhenReady(editor) {
     window.setTimeout(() => {
@@ -23106,16 +23124,6 @@ var GitSyncSettingTab = class extends import_obsidian6.PluginSettingTab {
           if (leaf.view instanceof GitSidebarView) {
             leaf.view.updateRefreshInterval(numValue);
           }
-        }
-      }
-    }));
-    new import_obsidian6.Setting(containerEl).setName("Sidebar Density").setDesc("Choose the spacing used by the Git Sync sidebar. Compact keeps rows smaller while preserving touch targets.").addDropdown((dropdown) => dropdown.addOption("comfortable", "Comfortable").addOption("compact", "Compact").setValue(this.plugin.settings.sidebarDensity).onChange(async (value) => {
-      this.plugin.settings.sidebarDensity = value;
-      await this.plugin.saveSettings();
-      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
-      for (const leaf of leaves) {
-        if (leaf.view instanceof GitSidebarView) {
-          leaf.view.updateSidebarDensity(this.plugin.settings.sidebarDensity);
         }
       }
     }));
