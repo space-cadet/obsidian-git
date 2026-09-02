@@ -100,3 +100,30 @@ acceptance remains separate and pending.
   intermediate widths.
 - Complete remote authentication, repair/rebuild acceptance, and existing
   T29/T35 release gates before tagging v1.0.0.
+
+## Post-Closeout Continuation — 2026-09-03 02:37:37 IST
+
+**Session Title**: T29, T29a, T30, T35b, T35c, T35e, T35f: Sidebar, gitignore, updater, status, and repository-recovery work
+
+### Source changes pushed
+
+- `1389297`: sidebar/updater optimization, shared reads, remote caching, and
+  stale-render protection.
+- `6aa7550`: adapter/status resilience, logger diagnostics, and updater repair.
+- `ec8927b`: restored local/remote history behavior and Git-manager tests.
+- `68632dd`: hidden `.gitignore` editing and ignore-action repair.
+- `25be638`: updater timeouts, asset logging, and stale temporary-folder cleanup.
+- `fa2156c`: compact-only sidebar, UTF-8 ignore parsing, and quiet shallow-history fallback.
+- `d38e28e`: viewport-aware `.gitignore` editor and partial-status fallback.
+
+### Verification and remaining work
+
+- TypeScript, production build, 43 Node tests, 10 isomorphic-git checks, and
+  `git diff --check` passed.
+- Android testing still shows keyboard overlap in the `.gitignore` dialog;
+  the viewport-aware source change is not accepted as a device fix.
+- Repository health diagnostics and protected remote-based `.git` repair remain
+  open under T35c. Updater installation/reload acceptance remains open under
+  T35e.
+- The source worktree matched `origin/main` at `d38e28e` before this Memory
+  Bank update.

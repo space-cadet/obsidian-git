@@ -1,7 +1,7 @@
 # Gitignore Controls and Hidden Dotfile Editing
 
 *Created: 2026-08-12 15:59:54 IST*
-*Last Updated: 2026-08-18 13:05:58 IST*
+*Last Updated: 2026-09-03 02:37:37 IST*
 *Tasks: T29, T35b*
 
 ## Purpose
@@ -44,6 +44,16 @@ the sidebar passes its visible unstaged file list to the manager, the manager
 continues through the full list, and the UI reports the actual staged and
 failed counts. The remaining acceptance gate is a real Obsidian run with a
 large change set.
+
+## Session Update — 2026-09-03
+
+- The filesystem adapter now recognizes both string and object UTF-8 read
+  options used by isomorphic-git, so ignore rules can be parsed as text.
+- Ignored untracked files should leave the Changes list after refresh; files
+  already tracked by Git remain visible until explicitly removed from the
+  index.
+- The adapter-backed editor now opens before the file read completes, but the
+  Android keyboard still covers part of the dialog in device testing.
 
 ## Related Files
 

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-02 19:26:31 IST*
+*Last Updated: 2026-09-03 02:37:37 IST*
 
 ## Current Tasks
 
@@ -9,7 +9,7 @@
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T29a (Full Sidebar UI Redesign — ACTIVE), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
 - **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab interaction direction are implemented and published in commit `4292bf9`. T29a now owns the full visual redesign from the approved mockups while preserving those behaviors. Authentication-backed mobile acceptance and public release remain separate gates.
-- **Next**: Implement the recorded T29a/T35b/T35c/T35e follow-ups, then verify the presentation, updater, remote browsing, and repair paths in Obsidian before continuing the existing mobile/release gates.
+- **Next**: Verify the pushed sidebar/updater changes in Obsidian, investigate the unresolved Android keyboard overlap, and continue the repository-health and repair work before the existing mobile/release gates.
 
 ### T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄
 - **Scope**: Replace the incremental sidebar presentation with one coherent
@@ -17,9 +17,9 @@
 - **Status**: Mockup-matching source-level presentation pass is implemented and
   verified by build/tests. Preserve existing Git actions, T33 completion, T34
   authentication ownership, and T35 hardening ownership.
-- **Next**: Add compact density settings and remove repeated sidebar read work;
-  then verify the redesigned presentation in real Obsidian at desktop, mobile,
-  and intermediate widths before continuing the existing release gates.
+- **Next**: Investigate the failed Android keyboard acceptance using measured
+  WebView viewport/modal bounds; compact-only layout and shared status reads are
+  implemented, but real Obsidian visual acceptance remains open.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
 - **Scope**: Separate authentication task covering secret-safe PAT diagnostics,
@@ -44,9 +44,9 @@
   SecretStorage is implemented; T35c replacement backups and T35b lifecycle
   coordination remain open. T35 is separate from T29 release ownership and
   T34 authentication ownership.
-- **Next**: Add protected replacement backups and shared operation
-  coordination, then perform mobile acceptance of clone resume and progress
-  telemetry.
+- **Next**: Add protected replacement backups, repository-health diagnostics,
+  and shared operation coordination, then perform mobile acceptance of clone,
+  updater, and progress behavior.
 
 ### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.
@@ -54,12 +54,16 @@
 - Preserved the existing transactional install and rollback behavior. Checksums/signatures, temporary-directory cleanup on every failure path, and real Obsidian installation acceptance remain open.
 - Corrected the sidebar typography to explicit compact sizes rather than theme-scaled medium text, and changed Browse Builds to enumerate all published stable, rolling-dev, and branch releases.
 - Commit `910c5f5` repaired current and older dev-release metadata detection; commit-subject display and release-title cleanup remain open.
+- Commit `25be638` added bounded updater requests and vault operations plus
+  stale temporary-folder cleanup. Real Android installation/reload acceptance,
+  checksums, and signed metadata remain open.
 
 ### T35b/T35c/T30 Follow-up Audit — 🔄 planned implementation
 - Remote commit browsing must work with a configured usable remote even when
   local `.git` is missing or unhealthy.
-- Sidebar reads should use one shared status snapshot and tab-specific loading;
-  repository repair should use a temporary remote reconstruction, comparison,
+- Sidebar reads now use one shared status snapshot with stale-render protection;
+  branch comparison failure no longer hides a successful file-status scan.
+  Repository repair should use temporary remote reconstruction, comparison,
   and protected replacement rather than implicit overwrite.
 - These follow-ups preserve T29a visual ownership, T30 remote-history context,
   T35b refresh/lifecycle ownership, and T35c repository-recovery ownership.
@@ -118,6 +122,18 @@
   available on demand through modals or `More` menus.
 - The current interaction implementation is retained as the T29a behavior
   contract; the full visual redesign is recorded separately.
+
+### 2026-09-03 Session Closeout
+
+- Source commits `1389297`, `6aa7550`, `ec8927b`, `68632dd`, `25be638`,
+  `fa2156c`, and `d38e28e` were pushed to `origin/main`.
+- The session covered sidebar redesign and compact-only density, remote commit
+  browsing, `.gitignore` controls and UTF-8 parsing, updater timeouts/cleanup,
+  shared status reads, and stale-history/status resilience.
+- Android testing still reports keyboard overlap in the `.gitignore` dialog;
+  this remains an unaccepted T29a issue despite the viewport-aware attempt.
+- Current source and remote are synchronized at `d38e28e`; worktree was clean
+  before this Memory Bank update.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback

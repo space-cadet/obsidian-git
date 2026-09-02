@@ -1,7 +1,7 @@
 # Full Sidebar UI Redesign
 
 *Created: 2026-09-02 14:11:31 IST*
-*Last Updated: 2026-09-02 19:26:31 IST*
+*Last Updated: 2026-09-03 02:37:37 IST*
 *Task: T29a*
 
 ## Design Decision
@@ -141,3 +141,11 @@ They are not copied into the repository by this planning record.
 - Remote commit browsing and damaged-repository rebuilding are documented under
   T30 and T35c because they change repository-state behavior rather than the
   mockup presentation contract.
+
+## Session Update — 2026-09-03
+
+- Compact is now the only sidebar density; the temporary comfortable setting
+  was removed after the user's layout feedback.
+- The `.gitignore` editor received visual-viewport sizing and focus scrolling,
+  but Android testing still shows keyboard overlap. Real WebView inspection is
+  required before this behavior can be accepted.

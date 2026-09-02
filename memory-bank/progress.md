@@ -1,6 +1,21 @@
 # Project Progress
 
-*Last Updated: 2026-09-02 19:26:31 IST*
+*Last Updated: 2026-09-03 02:37:37 IST*
+
+## 2026-09-03 Session Closeout
+
+- Pushed commits `1389297`, `6aa7550`, `ec8927b`, `68632dd`, `25be638`,
+  `fa2156c`, and `d38e28e` covering sidebar presentation, compact-only layout,
+  remote history, `.gitignore`, updater bounds, and status resilience.
+- The `.gitignore` editor now tracks the visual viewport and scrolls focus,
+  but Android acceptance still reports keyboard overlap.
+- Local Changes status now uses one matrix and can remain visible when branch
+  comparison metadata is unavailable.
+- Verification passed: production build, 43 Node tests, 10 isomorphic-git
+  checks, and `git diff --check`.
+- Remaining: measured Android keyboard fix, repository health/repair preview,
+  protected `.git` replacement, updater install acceptance, and full mutation
+  coordination.
 
 ## 2026-09-02 Updater, Sidebar, and Repository-Recovery Follow-up
 

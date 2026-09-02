@@ -101,7 +101,7 @@ service and discard responses whose generation ID is no longer current. Closing
 the view must stop timers and invalidate pending renders. Unloading the plugin
 must invalidate all repository operations and close progress surfaces.
 
-## Sidebar Read Snapshot and Remote-Only Access — 2026-09-02
+## Sidebar Read Snapshot and Remote-Only Access — 2026-09-02 / 2026-09-03
 
 The current sidebar refresh performs repeated repository status reads before
 rendering Changes, and tab switches repeat that shared work even when only the
@@ -117,6 +117,11 @@ own data without recalculating working-tree status. Local/Remote history should
 use a short-lived session cache and invalidate it after a repository mutation.
 Every asynchronous render must check a view generation or cancellation signal
 before updating the DOM.
+
+The source implementation now derives the header, staged count, and Changes
+rows from one status matrix and invalidates stale refresh generations. If
+branch comparison fails but the working-tree scan succeeds, file status is
+still rendered and the header reports unavailable comparison metadata.
 
 Remote history is an independent read capability. A configured reachable remote
 must be browseable through the remote/API path even when local Git is missing or
@@ -177,3 +182,9 @@ mutations.
 - T35c: initialization and destructive-operation safety
 - T35d: mobile/remote transport and transfer telemetry
 - `implementation-details/clone-resume-and-progress.md`
+
+## Repository Repair Status — 2026-09-03
+
+The session did not implement repository replacement. Health checks, protected
+backups, temporary reconstruction, conflict comparison, explicit confirmation,
+and rollback remain required before a repair action is exposed.

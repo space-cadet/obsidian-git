@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-02 19:26:31 IST*
+*Last Updated: 2026-09-03 02:37:37 IST*
 
 ## Current Session
 **Started**: 2026-09-02 14:11:31 IST
@@ -9,13 +9,13 @@
 **Session File**: `memory-bank/sessions/2026-09-02-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
+**Session Title**: T29, T29a, T30, T35b, T35c, T35e, T35f: Sidebar, gitignore, updater, status, and repository-recovery work
 
-**Closeout Commit**: This Memory Bank documentation closeout
+**Closeout Commit**: Source changes pushed as `d38e28e`; this Memory Bank update follows
 
-**Next Session**: Implement the recorded compact-density, sidebar read-
-performance, remote-only browsing, repository-rebuild, and updater metadata
-follow-ups before real Obsidian acceptance and the existing release gates.
+**Next Session**: Reproduce and fix the unresolved Android keyboard overlap,
+then implement repository health/repair preview and complete real Obsidian
+sidebar and updater acceptance.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -37,7 +37,7 @@ source file was missing.
 - T5: Error Handling & Logging — ✅ COMPLETED
 - T6: Git Sidebar UI — ✅ COMPLETED
 - T29: obsidian-git Plugin — 🔄 IN PROGRESS (release archive and automated tests verified; mobile acceptance pending)
-- T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄 IN PROGRESS (mockup-match source pass implemented; real Obsidian acceptance pending)
+- T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄 IN PROGRESS (compact-only source pass pushed; Android keyboard acceptance failed)
 - T30: Remote Commits View — ✅ COMPLETED (merged into v25)
 - T31: Branch Tree View — ⏳ BACKLOG
 - T32: Mobile Crash Fix + Progress — ✅ COMPLETED (v26)
@@ -48,10 +48,10 @@ source file was missing.
 - T34c: Android/Desktop Authentication Acceptance Tests — ⏸️ PLANNED
 - T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 IN PROGRESS
 - T35a: Credential Safety and Git Staging Boundaries — 🔄 IN PROGRESS (read-only audit complete)
-- T35b: Operation Coordination and Lifecycle Safety — 🔄 IN PROGRESS (resumable clone and cancellation slice implemented)
-- T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (read-only audit complete)
+- T35b: Operation Coordination and Lifecycle Safety — 🔄 IN PROGRESS (shared status snapshot and stale-render protection implemented; mutation coordinator open)
+- T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (health checks and protected rebuild open)
 - T35d: Mobile and Remote Transport Reliability — 🔄 IN PROGRESS (separate progress telemetry and modal stats implemented)
-- T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (repair shipped; metadata presentation and runtime acceptance remain)
+- T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (timeouts and stale-folder cleanup shipped; runtime acceptance remains)
 - T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
 
 ## Active Tasks
@@ -112,6 +112,17 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 **Next:** Implement protected replacement backups, T35b operation
   coordination, and the recorded remote-read/rebuild follow-ups, then complete
   mobile acceptance while preserving T29 and T34 ownership boundaries.
+
+## Latest Session Handoff — 2026-09-03
+
+- The source implementation is pushed at `d38e28e` and the worktree was clean
+  before this documentation update.
+- The `.gitignore` editor viewport fix was not accepted on Android; keyboard
+  overlap remains the first fresh-session investigation.
+- Local status now derives from one matrix and survives branch-comparison
+  failure when the working-tree scan succeeds.
+- The next repository step is read-only health detection followed by a
+  protected remote reconstruction/compare/confirm/rollback workflow.
 
 ## Session History (Recent)
 1. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit

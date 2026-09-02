@@ -1,4 +1,4 @@
-# Updater parity follow-up — 2026-09-02
+# Updater parity follow-up — 2026-09-02 / 2026-09-03
 
 ## Decision
 
@@ -22,6 +22,14 @@ transactional install and rollback behavior where it is stronger.
   branch-specific development build.
 - A feature-branch workflow publishes direct plugin assets and a ZIP using the
   same `latest-dev-<branch>` naming convention.
+
+## Session Update — 2026-09-03
+
+- Commit `25be638` bounds GitHub metadata, asset downloads, and vault reads and
+  writes with 30-second timeouts, logs each asset, and removes stale
+  `.update-tmp-*` directories before retrying.
+- The generated bundle was pushed in `d38e28e`; real Android install/reload
+  acceptance is still pending.
 
 ## Verification
 

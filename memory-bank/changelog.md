@@ -59,3 +59,18 @@
   own utility menu.
 - Recorded that the bulk staging behavior has been fixed in source; real
   Obsidian acceptance remains pending.
+## 2026-09-03 — T29/T29a/T30/T35b/T35c/T35e/T35f
+
+### Changed
+
+- Made compact the only sidebar density and removed the comfortable setting.
+- Unified sidebar status reads and preserved file status when branch comparison
+  metadata cannot be read.
+- Added updater timeouts, asset diagnostics, and stale temporary-folder cleanup.
+
+### Fixed
+
+- Corrected UTF-8 option handling so isomorphic-git can process `.gitignore`.
+- Reduced shallow-history warning noise and retained remote commit fallback.
+- Added a viewport-aware `.gitignore` editor attempt; Android keyboard overlap
+  remains an unresolved acceptance issue.
