@@ -163,7 +163,14 @@ export class GitSidebarView extends ItemView {
 
     // ─── Header ───
 
-    private renderHeader(branch: string, ahead: number, behind: number, initialized: boolean, hasRealRepo: boolean): void {
+    private renderHeader(
+        branch: string,
+        ahead: number,
+        behind: number,
+        initialized: boolean,
+        hasRealRepo: boolean,
+        repositoryStatusAvailable = true,
+    ): void {
         this.headerContainer.empty();
         this.headerContainer.addClass('git-repository-header');
         this.headerContainer.addClass(`git-header-${this.activeTab}`);
@@ -216,6 +223,9 @@ export class GitSidebarView extends ItemView {
         } else if (this.isLocalOnly) {
             setIcon(statusIcon, 'circle-alert');
             statusRow.createSpan({ text: 'Local only — no remote', cls: 'git-local-only' });
+        } else if (!repositoryStatusAvailable) {
+            setIcon(statusIcon, 'circle-alert');
+            statusRow.createSpan({ text: 'Repository comparison unavailable', cls: 'git-header-hint' });
         } else if (ahead > 0 || behind > 0) {
             setIcon(statusIcon, 'arrow-up-down');
             statusRow.createSpan({
@@ -458,8 +468,9 @@ export class GitSidebarView extends ItemView {
         const branch = snapshot?.branch || (initialized ? 'local' : 'No repo');
         const ahead = snapshot?.ahead || 0;
         const behind = snapshot?.behind || 0;
+        const repositoryStatusAvailable = snapshot?.repositoryStatusAvailable !== false;
 
-        this.renderHeader(branch, ahead, behind, initialized, hasReal);
+        this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable);
         this.stagedCount = snapshot?.staged.length || 0;
         this.contentContainer.empty();
 

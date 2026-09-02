@@ -20228,8 +20228,20 @@ Try again with a faster connection or smaller repository.`
        * representation from the same status matrix.
        */
       async getSidebarStatusSnapshot() {
+        const repositoryStatusPromise = this.getStatus().then((status2) => ({
+          ...status2,
+          repositoryStatusAvailable: true
+        })).catch((error) => {
+          log2.warn("GitManager", "Repository comparison unavailable; continuing with file status", error);
+          return {
+            branch: "local",
+            ahead: 0,
+            behind: 0,
+            repositoryStatusAvailable: false
+          };
+        });
         const [repositoryStatus, fileStatus] = await Promise.all([
-          this.getStatus(),
+          repositoryStatusPromise,
           this.readStatusSnapshot()
         ]);
         return { ...repositoryStatus, ...fileStatus };
@@ -20925,7 +20937,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   // ─── Header ───
-  renderHeader(branch2, ahead, behind, initialized, hasRealRepo) {
+  renderHeader(branch2, ahead, behind, initialized, hasRealRepo, repositoryStatusAvailable = true) {
     this.headerContainer.empty();
     this.headerContainer.addClass("git-repository-header");
     this.headerContainer.addClass(`git-header-${this.activeTab}`);
@@ -20974,6 +20986,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     } else if (this.isLocalOnly) {
       (0, import_obsidian4.setIcon)(statusIcon, "circle-alert");
       statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
+    } else if (!repositoryStatusAvailable) {
+      (0, import_obsidian4.setIcon)(statusIcon, "circle-alert");
+      statusRow.createSpan({ text: "Repository comparison unavailable", cls: "git-header-hint" });
     } else if (ahead > 0 || behind > 0) {
       (0, import_obsidian4.setIcon)(statusIcon, "arrow-up-down");
       statusRow.createSpan({
@@ -21152,7 +21167,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const branch2 = (snapshot == null ? void 0 : snapshot.branch) || (initialized ? "local" : "No repo");
     const ahead = (snapshot == null ? void 0 : snapshot.ahead) || 0;
     const behind = (snapshot == null ? void 0 : snapshot.behind) || 0;
-    this.renderHeader(branch2, ahead, behind, initialized, hasReal);
+    const repositoryStatusAvailable = (snapshot == null ? void 0 : snapshot.repositoryStatusAvailable) !== false;
+    this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable);
     this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
     this.contentContainer.empty();
     const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
@@ -22367,7 +22383,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "25be638147b5b290dcddc749a2c4e88b5b005dab" : "unknown";
+var GIT_COMMIT_HASH = true ? "fa2156c5043ca0e17ab2fbf9d8e9e9e374ba38a7" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -22991,6 +23007,7 @@ var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
     super(app);
     this.loadContent = loadContent;
     this.onSave = onSave;
+    this.viewportCleanup = null;
   }
   onOpen() {
     this.modalEl.addClass("git-ignore-editor-modal");
@@ -23004,6 +23021,7 @@ var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
     editor.inputEl.addClass("git-ignore-editor-textarea");
     editor.inputEl.rows = 16;
     editor.inputEl.disabled = true;
+    editor.inputEl.setAttribute("aria-busy", "true");
     const actions = this.contentEl.createDiv("git-ignore-modal-actions");
     new import_obsidian6.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => this.close());
     const saveButton = new import_obsidian6.ButtonComponent(actions).setButtonText("Save").setClass("git-btn-primary");
@@ -23022,6 +23040,7 @@ var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
         saveButton.setButtonText("Save");
       }
     });
+    this.setupKeyboardViewport(editor);
     void this.loadEditorContent(editor, saveButton);
   }
   async loadEditorContent(editor, saveButton) {
@@ -23042,13 +23061,44 @@ var GitIgnoreEditorModal = class extends import_obsidian6.Modal {
       new import_obsidian6.Notice(`Could not load .gitignore: ${(error == null ? void 0 : error.message) || String(error)}`);
     }
   }
+  setupKeyboardViewport(editor) {
+    const visualViewport = window.visualViewport;
+    const adjust = () => {
+      var _a;
+      const height = (_a = visualViewport == null ? void 0 : visualViewport.height) != null ? _a : window.innerHeight;
+      this.modalEl.style.setProperty("--git-ignore-viewport-height", `${Math.max(220, height)}px`);
+      if (document.activeElement === editor.inputEl) {
+        this.scrollEditorIntoView(editor.inputEl);
+      }
+    };
+    visualViewport == null ? void 0 : visualViewport.addEventListener("resize", adjust);
+    visualViewport == null ? void 0 : visualViewport.addEventListener("scroll", adjust);
+    window.addEventListener("resize", adjust);
+    this.viewportCleanup = () => {
+      visualViewport == null ? void 0 : visualViewport.removeEventListener("resize", adjust);
+      visualViewport == null ? void 0 : visualViewport.removeEventListener("scroll", adjust);
+      window.removeEventListener("resize", adjust);
+    };
+    adjust();
+  }
+  scrollEditorIntoView(editor) {
+    window.requestAnimationFrame(() => {
+      if (document.activeElement === editor) {
+        editor.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    });
+  }
   openEditorWhenReady(editor) {
     window.setTimeout(() => {
       editor.inputEl.focus();
       editor.inputEl.setSelectionRange(0, 0);
+      this.scrollEditorIntoView(editor.inputEl);
     }, 0);
   }
   onClose() {
+    var _a;
+    (_a = this.viewportCleanup) == null ? void 0 : _a.call(this);
+    this.viewportCleanup = null;
     this.contentEl.empty();
   }
 };

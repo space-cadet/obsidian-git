@@ -422,6 +422,7 @@ export interface GitSidebarStatusSnapshot {
     branch: string;
     ahead: number;
     behind: number;
+    repositoryStatusAvailable?: boolean;
     detailedStatus: GitFileStatus[];
     staged: string[];
     unstaged: string[];
@@ -1387,8 +1388,23 @@ export class GitManager {
      * representation from the same status matrix.
      */
     async getSidebarStatusSnapshot(): Promise<GitSidebarStatusSnapshot> {
+        const repositoryStatusPromise = this.getStatus().then((status) => ({
+            ...status,
+            repositoryStatusAvailable: true,
+        })).catch((error) => {
+            // Branch comparison is useful for the header but must not hide a
+            // working-tree status that was read successfully. A missing remote
+            // ref or damaged branch metadata is reported honestly in the UI.
+            log.warn('GitManager', 'Repository comparison unavailable; continuing with file status', error);
+            return {
+                branch: 'local',
+                ahead: 0,
+                behind: 0,
+                repositoryStatusAvailable: false,
+            };
+        });
         const [repositoryStatus, fileStatus] = await Promise.all([
-            this.getStatus(),
+            repositoryStatusPromise,
             this.readStatusSnapshot(),
         ]);
         return { ...repositoryStatus, ...fileStatus };

@@ -715,6 +715,8 @@ export default class GitSyncPlugin extends Plugin {
 }
 
 class GitIgnoreEditorModal extends Modal {
+	private viewportCleanup: (() => void) | null = null;
+
 	constructor(
 		app: App,
 		private readonly loadContent: () => Promise<string>,
@@ -738,6 +740,7 @@ class GitIgnoreEditorModal extends Modal {
 		editor.inputEl.addClass('git-ignore-editor-textarea');
 		editor.inputEl.rows = 16;
 		editor.inputEl.disabled = true;
+		editor.inputEl.setAttribute('aria-busy', 'true');
 
 		const actions = this.contentEl.createDiv('git-ignore-modal-actions');
 		new ButtonComponent(actions)
@@ -763,6 +766,7 @@ class GitIgnoreEditorModal extends Modal {
 			}
 		});
 
+		this.setupKeyboardViewport(editor);
 		void this.loadEditorContent(editor, saveButton);
 	}
 
@@ -783,14 +787,46 @@ class GitIgnoreEditorModal extends Modal {
 		}
 	}
 
+	private setupKeyboardViewport(editor: TextAreaComponent): void {
+		const visualViewport = (window as Window & { visualViewport?: VisualViewport }).visualViewport;
+		const adjust = () => {
+			const height = visualViewport?.height ?? window.innerHeight;
+			this.modalEl.style.setProperty('--git-ignore-viewport-height', `${Math.max(220, height)}px`);
+			if (document.activeElement === editor.inputEl) {
+				this.scrollEditorIntoView(editor.inputEl);
+			}
+		};
+
+		visualViewport?.addEventListener('resize', adjust);
+		visualViewport?.addEventListener('scroll', adjust);
+		window.addEventListener('resize', adjust);
+		this.viewportCleanup = () => {
+			visualViewport?.removeEventListener('resize', adjust);
+			visualViewport?.removeEventListener('scroll', adjust);
+			window.removeEventListener('resize', adjust);
+		};
+		adjust();
+	}
+
+	private scrollEditorIntoView(editor: HTMLTextAreaElement): void {
+		window.requestAnimationFrame(() => {
+			if (document.activeElement === editor) {
+				editor.scrollIntoView({block: 'nearest', inline: 'nearest'});
+			}
+		});
+	}
+
 	private openEditorWhenReady(editor: TextAreaComponent): void {
 		window.setTimeout(() => {
 			editor.inputEl.focus();
 			editor.inputEl.setSelectionRange(0, 0);
+			this.scrollEditorIntoView(editor.inputEl);
 		}, 0);
 	}
 
 	onClose(): void {
+		this.viewportCleanup?.();
+		this.viewportCleanup = null;
 		this.contentEl.empty();
 	}
 }

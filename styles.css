@@ -247,7 +247,7 @@
     width: 100%;
     min-height: 0;
     height: min(48dvh, 360px);
-    max-height: calc(100dvh - 240px);
+    max-height: max(120px, calc(var(--git-ignore-viewport-height, 100dvh) - 240px));
     box-sizing: border-box;
     resize: none;
     overflow-y: auto;
@@ -257,7 +257,7 @@
 
 .git-ignore-editor-modal .modal-content,
 .git-ignore-editor-content {
-    max-height: calc(100dvh - 32px);
+    max-height: min(680px, calc(var(--git-ignore-viewport-height, 100dvh) - 32px));
     overflow-y: auto;
     overscroll-behavior: contain;
 }
@@ -286,7 +286,7 @@
 
     .git-ignore-editor-textarea {
         height: min(42dvh, 300px);
-        max-height: calc(100dvh - 260px);
+        max-height: max(120px, calc(var(--git-ignore-viewport-height, 100dvh) - 260px));
     }
 }
 
