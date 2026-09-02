@@ -44,4 +44,6 @@ transactional install and rollback behavior where it is stronger.
 The final mockup override block had promoted ordinary sidebar content to medium
 or 20–24px text. Tabs, status text, file paths, commit metadata, log rows, and
 footer controls now use the compact Obsidian small UI scale, with only branch
-and commit titles retaining a modest visual hierarchy.
+and commit titles retaining a modest visual hierarchy. The compact row sizes
+are explicit so a theme-level UI scale cannot silently promote them back to
+medium text.

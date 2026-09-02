@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-02 18:28:38 IST*
+*Last Updated: 2026-09-02 18:44:00 IST*
 
 ## Current Tasks
 
@@ -51,7 +51,7 @@
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.
 - Added compile-time branch identity, branch-build CI publishing, and an explicit manual error notice so a missing stable release is not reported as up to date.
 - Preserved the existing transactional install and rollback behavior. Checksums/signatures, temporary-directory cleanup on every failure path, and real Obsidian installation acceptance remain open.
-- Corrected the sidebar typography back to a compact row scale and changed Browse Builds to enumerate all published stable, rolling-dev, and branch releases.
+- Corrected the sidebar typography to explicit compact sizes rather than theme-scaled medium text, and changed Browse Builds to enumerate all published stable, rolling-dev, and branch releases.
 
 ### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;

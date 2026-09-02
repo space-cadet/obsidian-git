@@ -1886,6 +1886,10 @@
 
 /* Compact typography correction: keep the mockup hierarchy without making
    ordinary sidebar rows read like headings. */
+.git-sidebar-container {
+    font-size: 13px;
+}
+
 .git-tab-btn,
 .git-header-branch,
 .git-header-status,
@@ -1900,27 +1904,48 @@
 .git-commit-file-row,
 .git-log-entry,
 .git-footer-buttons-row button {
-    font-size: var(--font-ui-small) !important;
+    font-size: 13px !important;
+}
+
+.git-tab-btn {
+    font-size: 16px !important;
 }
 
 .git-branch-name {
-    font-size: 18px;
-}
-
-.git-status-icon {
-    font-size: 16px;
-}
-
-.git-commit-summary .git-commit-message {
     font-size: 17px;
 }
 
+.git-status-icon {
+    font-size: 15px;
+}
+
+.git-commit-summary .git-commit-message {
+    font-size: 16px;
+}
+
 .git-commit-toggle {
-    font-size: 20px;
+    font-size: 18px;
 }
 
 .git-commit-file-icon {
-    font-size: 20px;
+    font-size: 18px;
+}
+
+.git-section-toggle {
+    font-size: 16px;
+}
+
+.git-uninit-title {
+    font-size: 16px;
+}
+
+.git-uninit-desc,
+.git-empty-state,
+.git-commit-hash,
+.git-log-level,
+.git-log-detail,
+.git-commit-file-status {
+    font-size: 12px !important;
 }
 
 /* ============================================
