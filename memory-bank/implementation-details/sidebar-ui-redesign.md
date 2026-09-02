@@ -1,7 +1,7 @@
 # Full Sidebar UI Redesign
 
 *Created: 2026-09-02 14:11:31 IST*
-*Last Updated: 2026-09-02 15:21:22 IST*
+*Last Updated: 2026-09-02 19:26:31 IST*
 *Task: T29a*
 
 ## Design Decision
@@ -129,3 +129,15 @@ They are not copied into the repository by this planning record.
 - Updater integrity and release-asset signing.
 - Progress transport changes.
 - Removal of Obsidian-owned surrounding view chrome.
+
+## Follow-up Audit — 2026-09-02
+
+- The branch/header and Local/Remote selector should support compact density
+  settings while preserving usable touch targets. The current source has no
+  separate branch-selection control; branch switching remains T31 scope.
+- The visual implementation should consume a shared sidebar read snapshot and
+  load only the active tab's data. Repeated status scans and stale asynchronous
+  renders are performance and lifecycle follow-ups, not new visual variants.
+- Remote commit browsing and damaged-repository rebuilding are documented under
+  T30 and T35c because they change repository-state behavior rather than the
+  mockup presentation contract.

@@ -1,7 +1,7 @@
 # CI/CD Architecture — obsidian-git Plugin
 
 *Created: 2026-06-01 10:51:00 IST*
-*Last Updated: 2026-08-05 00:20:03 IST*
+*Last Updated: 2026-09-02 19:26:31 IST*
 
 ## Overview
 
@@ -52,8 +52,14 @@ Creates or updates a **pre-release** at `https://github.com/space-cadet/obsidian
 - `tag_name: dev` — fixed tag, updated in-place
 - `prerelease: true` — marked as pre-release
 - `make_latest: false` — does not appear as "latest" release
-- Release name: `Dev Build (<short-sha>)`
-- Body includes: commit SHA, branch, timestamp
+- Release name: currently `Dev Build (<full-sha>)`; change this to a branch or
+  descriptive title without the full SHA.
+- Body includes: commit SHA, branch, timestamp; add the commit subject so the
+  updater can show the message for each build.
+
+The updater remains permissive when optional release metadata is absent. Its
+install-time checks, rather than release presentation fields, are responsible
+for validating the downloaded plugin.
 
 #### 3. `release`
 

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-02 18:44:00 IST*
+*Last Updated: 2026-09-02 19:26:31 IST*
 
 ## Current Tasks
 
@@ -9,7 +9,7 @@
 - **Sub-tasks**: T1 (Core Git), T2 (Commands/UI), T3 (Mobile), T4 (Auto-sync), T5 (Error Handling), T6 (Sidebar UI), T7 (Multi-Repo — pending), T29a (Full Sidebar UI Redesign — ACTIVE), T33 (Progress Modal + UI Fixes — COMPLETED)
 - **Phase 7**: v27-v29 — Git progress modal, mobile crash fix #2, desktop UI mobile match, commit file GitHub fallback
 - **Status**: Core sync workflow, bulk staging behavior, and the approved three-tab interaction direction are implemented and published in commit `4292bf9`. T29a now owns the full visual redesign from the approved mockups while preserving those behaviors. Authentication-backed mobile acceptance and public release remain separate gates.
-- **Next**: Verify the T29a presentation pass and updater installation in Obsidian before continuing the existing mobile/release gates.
+- **Next**: Implement the recorded T29a/T35b/T35c/T35e follow-ups, then verify the presentation, updater, remote browsing, and repair paths in Obsidian before continuing the existing mobile/release gates.
 
 ### T29a: Full Sidebar UI Redesign and Visual Acceptance — 🔄
 - **Scope**: Replace the incremental sidebar presentation with one coherent
@@ -17,8 +17,9 @@
 - **Status**: Mockup-matching source-level presentation pass is implemented and
   verified by build/tests. Preserve existing Git actions, T33 completion, T34
   authentication ownership, and T35 hardening ownership.
-- **Next**: Verify the redesigned presentation in real Obsidian at desktop,
-  mobile, and intermediate widths before continuing the existing release gates.
+- **Next**: Add compact density settings and remove repeated sidebar read work;
+  then verify the redesigned presentation in real Obsidian at desktop, mobile,
+  and intermediate widths before continuing the existing release gates.
 
 ### T34: Remote Authentication for Obsidian Git — 🔄 Diagnostics active
 - **Scope**: Separate authentication task covering secret-safe PAT diagnostics,
@@ -52,6 +53,16 @@
 - Added compile-time branch identity, branch-build CI publishing, and an explicit manual error notice so a missing stable release is not reported as up to date.
 - Preserved the existing transactional install and rollback behavior. Checksums/signatures, temporary-directory cleanup on every failure path, and real Obsidian installation acceptance remain open.
 - Corrected the sidebar typography to explicit compact sizes rather than theme-scaled medium text, and changed Browse Builds to enumerate all published stable, rolling-dev, and branch releases.
+- Commit `910c5f5` repaired current and older dev-release metadata detection; commit-subject display and release-title cleanup remain open.
+
+### T35b/T35c/T30 Follow-up Audit — 🔄 planned implementation
+- Remote commit browsing must work with a configured usable remote even when
+  local `.git` is missing or unhealthy.
+- Sidebar reads should use one shared status snapshot and tab-specific loading;
+  repository repair should use a temporary remote reconstruction, comparison,
+  and protected replacement rather than implicit overwrite.
+- These follow-ups preserve T29a visual ownership, T30 remote-history context,
+  T35b refresh/lifecycle ownership, and T35c repository-recovery ownership.
 
 ### T35a Secure Credential Storage — 🔄 SecretStorage implemented
 - Obsidian `SecretStorage`/`SecretComponent` is the primary planned boundary;
@@ -172,10 +183,10 @@
 - **Plugin**: v1.0.0 (manifest), v29 internal dev, core features + sidebar + progress modal + crash fix + UI parity
 - **Build**: ~280KB, mobile-compatible, tsc + esbuild pass
 - **CI**: GitHub Actions working, dev releases on every push
-- **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; current generated build identity is embedded as commit `ed8014c`
+- **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; the latest repaired generated build is embedded as commit `3f269e4` in source commit `910c5f5`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
-- **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d active,
-  T35e/T35f planned,
+- **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d/T35e active,
+  T35f planned,
   T1-T6/T30/T32/T33 completed; mb-core protocols, templates, and missing
   support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)

@@ -1,6 +1,25 @@
 # Project Progress
 
-*Last Updated: 2026-09-02 15:21:22 IST*
+*Last Updated: 2026-09-02 19:26:31 IST*
+
+## 2026-09-02 Updater, Sidebar, and Repository-Recovery Follow-up
+
+- Recorded the latest updater repair commit `910c5f5`, which accepts current
+  and older development-release metadata and falls back to the selected branch
+  head when optional commit metadata is absent.
+- Recorded the remaining updater presentation work: publish commit subjects,
+  use them in build listings, and remove full SHAs from release titles without
+  making build discovery unnecessarily restrictive.
+- Recorded T29a compact-density settings and sidebar read-performance work:
+  one shared status snapshot, tab-specific loading, remote-history caching, and
+  stale-refresh protection.
+- Recorded the T30/T35c requirement for remote commit browsing with no healthy
+  local `.git`, plus an explicit protected rebuild/compare/replace workflow for
+  damaged repositories.
+- Verification for `910c5f5`: 10 focused updater tests, 34 full project tests,
+  production build, isomorphic-git checks, and `git diff --check` passed.
+- These implementation follow-ups remain open; real Obsidian desktop/mobile
+  acceptance and the existing T29 release gates remain separate.
 
 ## T29a: Full sidebar UI redesign and visual acceptance (2026-09-02)
 

@@ -101,6 +101,38 @@ service and discard responses whose generation ID is no longer current. Closing
 the view must stop timers and invalidate pending renders. Unloading the plugin
 must invalidate all repository operations and close progress surfaces.
 
+## Sidebar Read Snapshot and Remote-Only Access — 2026-09-02
+
+The current sidebar refresh performs repeated repository status reads before
+rendering Changes, and tab switches repeat that shared work even when only the
+visible history source changes. The target read path is:
+
+```text
+repository read -> immutable snapshot -> header / Changes / active tab
+```
+
+The snapshot should contain the current branch, ahead/behind state, one status
+matrix, and derived staged/detailed groups. Commits and Log should load their
+own data without recalculating working-tree status. Local/Remote history should
+use a short-lived session cache and invalidate it after a repository mutation.
+Every asynchronous render must check a view generation or cancellation signal
+before updating the DOM.
+
+Remote history is an independent read capability. A configured reachable remote
+must be browseable through the remote/API path even when local Git is missing or
+unhealthy. Repository existence checks must therefore be separated from
+repository health checks.
+
+## Damaged Repository Rebuild — 2026-09-02
+
+Repairing a damaged `.git` directory must be an explicit, recoverable action.
+The implementation should construct temporary Git state from the configured
+remote, compare its tree with current vault files, and present local-only,
+remote-only, and conflicting paths before any replacement. Existing `.git`
+state should be retained as a protected backup until the replacement has been
+validated. Vault files must not be overwritten as an implicit consequence of
+opening the sidebar or browsing remote history.
+
 ## Progress Contract
 
 Progress helpers must expose separate `complete()` and `fail(error)` paths.

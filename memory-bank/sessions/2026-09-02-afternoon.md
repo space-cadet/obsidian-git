@@ -1,7 +1,7 @@
 # Session 2026-09-02 - Afternoon
 
 *Created: 2026-09-02 14:11:31 IST*
-*Last Updated: 2026-09-02 15:21:22 IST*
+*Last Updated: 2026-09-02 19:26:31 IST*
 
 ## Focus Task
 
@@ -51,3 +51,52 @@ acceptance remains separate and pending.
 - Production build, archive, and the full test command passed;
   `git diff --check` also passed.
 - Real Obsidian desktop/mobile visual acceptance is still pending.
+
+## Session Closeout — 2026-09-02 19:26:31 IST
+
+**Session Title**: T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
+
+**Status**: ✅ CLOSED
+
+### Work completed
+
+- Recorded and implemented the T29a mockup-led sidebar redesign across Changes,
+  Commits, and Log, including the contextual action model, responsive styling,
+  regenerated bundle, and typography follow-ups.
+- Ported the T35e updater structure from the local `obsidian-ai` reference,
+  including cache-busted release checks, branch-aware development builds,
+  direct release assets, all published-build browsing, and transactional
+  installation behavior.
+- Repaired the rolling development updater in commit `910c5f5`: the main
+  workflow now emits parseable commit metadata, older metadata remains
+  supported, and missing commit metadata falls back to the selected branch
+  head instead of silently treating a fresh build as current.
+- Verified the updater repair with 10 focused updater tests, 34 full project
+  tests, the production build, isomorphic-git checks, and `git diff --check`.
+- Audited the remaining requirements for commit-message display and release
+  title cleanup, compact density settings, repeated sidebar status scans,
+  full-refresh Local/Remote switching, remote browsing without healthy local
+  Git, and protected damaged-repository rebuilding.
+
+### Documentation and follow-up decisions
+
+- T29a owns compact sidebar density settings and visual/runtime acceptance.
+- T30 remains the historical remote-commits feature owner; its remote read path
+  must also work without a healthy local `.git` directory.
+- T35b owns shared sidebar read snapshots, tab-specific loading, caching, and
+  stale-refresh protection.
+- T35c owns explicit remote-based repository rebuild, comparison, protected
+  backup, and replacement behavior.
+- T35e owns commit-subject metadata, release-title cleanup, permissive build
+  discovery, and updater acceptance.
+- T35f owns regression and integration coverage for these follow-ups.
+- No new top-level task was created because all findings fit existing task
+  ownership.
+
+### Remaining work for the next session
+
+- Implement the recorded T29a/T35b/T35c/T35e follow-ups.
+- Verify the sidebar and updater in real Obsidian at desktop, mobile, and
+  intermediate widths.
+- Complete remote authentication, repair/rebuild acceptance, and existing
+  T29/T35 release gates before tagging v1.0.0.

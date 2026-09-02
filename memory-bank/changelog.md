@@ -1,3 +1,17 @@
+## 2026-09-02 — T29/T35 updater repair and sidebar follow-up audit
+
+- Repaired rolling development-build detection in `910c5f5` by aligning the
+  main release metadata with the updater, accepting older metadata, and using
+  the selected branch head when optional commit metadata is absent.
+- Recorded the remaining updater work: show commit subjects for builds and
+  remove full SHAs from generated release titles without hiding builds that
+  lack optional metadata.
+- Recorded the remaining T29a/T35b/T35c/T30 work for compact density settings,
+  shared sidebar read snapshots, tab-specific history loading, remote browsing
+  without healthy local Git, and protected repository rebuilding.
+- Verification for the repair passed: 10 focused updater tests, 34 full
+  project tests, production build, isomorphic-git checks, and `git diff --check`.
+
 ## 2026-09-02 — T29a mockup-match follow-up
 
 - Replaced the rough sidebar treatment with mockup-oriented composition:
