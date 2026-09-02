@@ -435,17 +435,9 @@ export default class GitSyncPlugin extends Plugin {
 	 */
 	async openGitIgnore(): Promise<void> {
 		const content = await this.readGitIgnore();
-		const file = this.app.vault.getFileByPath('.gitignore');
-
-		if (file) {
-			const leaf = this.app.workspace.getLeaf('tab');
-			await leaf.openFile(file);
-			return;
-		}
-
-		// Obsidian may intentionally omit dotfiles from its indexed TFile list.
-		// Keep editing available through a small adapter-backed editor instead
-		// of trying to create a second .gitignore.
+		// Always use the adapter-backed editor. Obsidian may expose a hidden
+		// .gitignore in its file index on one platform but not another, and
+		// opening that indexed TFile is unreliable on mobile.
 		new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
 			await this.app.vault.adapter.write('.gitignore', updatedContent);
 			new Notice('Saved .gitignore');
@@ -473,11 +465,16 @@ export default class GitSyncPlugin extends Plugin {
 
 	private async readGitIgnore(): Promise<string> {
 		const adapter = this.app.vault.adapter;
-		if (!(await adapter.exists('.gitignore'))) {
+		// Read the adapter directly first. Some mobile vault indexes report a
+		// hidden file as absent even though the underlying adapter can read it.
+		try {
+			return await adapter.read('.gitignore');
+		} catch (error: any) {
+			if (await adapter.exists('.gitignore')) throw error;
 			await adapter.write('.gitignore', '');
 			new Notice('Created .gitignore');
+			return '';
 		}
-		return adapter.read('.gitignore');
 	}
 
 	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {

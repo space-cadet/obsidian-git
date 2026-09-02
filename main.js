@@ -21403,11 +21403,24 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           const menu = new import_obsidian4.Menu();
           if (filepath !== ".gitignore") {
             menu.addItem((item) => item.setTitle("Ignore this file").setIcon("file-minus").onClick(async () => {
+              var _a;
               try {
                 const pattern = `/${filepath.replace(/^\/+/, "")}`;
+                const currentStatus = statusByPath.get(filepath);
                 const added = await this.plugin.addGitIgnorePattern(pattern);
-                new import_obsidian4.Notice(added ? `Added ${pattern} to .gitignore` : `${pattern} is already in .gitignore`);
                 await this.refresh();
+                if (!added) {
+                  new import_obsidian4.Notice(`${pattern} is already in .gitignore`);
+                } else if (currentStatus !== "untracked") {
+                  new import_obsidian4.Notice(
+                    `Added ${pattern} to .gitignore. ${filepath} remains in Changes because it is tracked or staged.`
+                  );
+                } else {
+                  const stillListed = (_a = this.sidebarSnapshot) == null ? void 0 : _a.detailedStatus.some(
+                    (file) => file.filepath === filepath
+                  );
+                  new import_obsidian4.Notice(stillListed ? `Added ${pattern} to .gitignore, but ${filepath} is still listed after refresh.` : `Ignored ${filepath}; removed from local changes.`);
+                }
               } catch (err) {
                 new import_obsidian4.Notice(`Could not update .gitignore: ${err.message}`);
               }
@@ -22308,7 +22321,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "6aa7550da669c25efe8a0437af329a528de8bd20" : "unknown";
+var GIT_COMMIT_HASH = true ? "ec8927b2bf6a325507bded0ec6941f0cfa60c6ba" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -22704,12 +22717,6 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
    */
   async openGitIgnore() {
     const content = await this.readGitIgnore();
-    const file = this.app.vault.getFileByPath(".gitignore");
-    if (file) {
-      const leaf = this.app.workspace.getLeaf("tab");
-      await leaf.openFile(file);
-      return;
-    }
     new GitIgnoreEditorModal(this.app, content, async (updatedContent) => {
       await this.app.vault.adapter.write(".gitignore", updatedContent);
       new import_obsidian6.Notice("Saved .gitignore");
@@ -22735,11 +22742,15 @@ var GitSyncPlugin = class extends import_obsidian6.Plugin {
   }
   async readGitIgnore() {
     const adapter = this.app.vault.adapter;
-    if (!await adapter.exists(".gitignore")) {
+    try {
+      return await adapter.read(".gitignore");
+    } catch (error) {
+      if (await adapter.exists(".gitignore"))
+        throw error;
       await adapter.write(".gitignore", "");
       new import_obsidian6.Notice("Created .gitignore");
+      return "";
     }
-    return adapter.read(".gitignore");
   }
   async ensureGitManager(requireRemote = false) {
     if (this.gitManager)

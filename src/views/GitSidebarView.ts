@@ -786,11 +786,24 @@ export class GitSidebarView extends ItemView {
                             .onClick(async () => {
                                 try {
                                     const pattern = `/${filepath.replace(/^\/+/, '')}`;
+                                    const currentStatus = statusByPath.get(filepath);
                                     const added = await this.plugin.addGitIgnorePattern(pattern);
-                                    new Notice(added
-                                        ? `Added ${pattern} to .gitignore`
-                                        : `${pattern} is already in .gitignore`);
                                     await this.refresh();
+
+                                    if (!added) {
+                                        new Notice(`${pattern} is already in .gitignore`);
+                                    } else if (currentStatus !== 'untracked') {
+                                        new Notice(
+                                            `Added ${pattern} to .gitignore. ${filepath} remains in Changes because it is tracked or staged.`,
+                                        );
+                                    } else {
+                                        const stillListed = this.sidebarSnapshot?.detailedStatus.some(
+                                            (file) => file.filepath === filepath,
+                                        );
+                                        new Notice(stillListed
+                                            ? `Added ${pattern} to .gitignore, but ${filepath} is still listed after refresh.`
+                                            : `Ignored ${filepath}; removed from local changes.`);
+                                    }
                                 } catch (err: any) {
                                     new Notice(`Could not update .gitignore: ${err.message}`);
                                 }
