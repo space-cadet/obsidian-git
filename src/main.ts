@@ -24,6 +24,7 @@ import {
 } from './credentialStore';
 import { OperationCoordinator } from './operationCoordinator';
 import { DiagnosticLogLevel, renderDiagnosticsSection } from './settings-sections/diagnostics';
+import { renderMaintenanceSection } from './settings-sections/maintenance';
 
 interface GitSyncSettings {
 	repoUrl: string;
@@ -44,6 +45,7 @@ interface GitSyncSettings {
 	debugLogLevel: DiagnosticLogLevel;
 	debugLogRetention: number;
 	debugLogMaxSizeMB: number;
+	settingsSectionStates: Record<string, boolean>;
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -65,6 +67,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	debugLogLevel: 'error',
 	debugLogRetention: 200,
 	debugLogMaxSizeMB: 5,
+	settingsSectionStates: {},
 };
 
 export default class GitSyncPlugin extends Plugin {
@@ -360,6 +363,9 @@ export default class GitSyncPlugin extends Plugin {
 		if (!Number.isFinite(this.settings.debugLogMaxSizeMB) || this.settings.debugLogMaxSizeMB <= 0) {
 			this.settings.debugLogMaxSizeMB = DEFAULT_SETTINGS.debugLogMaxSizeMB;
 		}
+		if (!this.settings.settingsSectionStates || typeof this.settings.settingsSectionStates !== 'object') {
+			this.settings.settingsSectionStates = {};
+		}
 		// The sidebar has one compact layout. Migrate settings written by the
 		// short-lived comfortable/compact toggle so old data cannot restore the
 		// oversized header.
@@ -384,6 +390,10 @@ export default class GitSyncPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.setupAutoSync(); // Reconfigure auto sync with new settings
+	}
+
+	async saveSettingsSectionStates(): Promise<void> {
+		await this.saveData(this.settings);
 	}
 
 	setDiagnosticLogLevel(level: DiagnosticLogLevel): void {
@@ -678,6 +688,14 @@ export default class GitSyncPlugin extends Plugin {
 			if (!this.settings.repoUrl) throw new Error('Set a remote repository URL before comparing a rebuild.');
 			return manager.previewRepositoryRebuild(this.settings.repoUrl, this.settings.branchName);
 		});
+	}
+
+	async previewIndexRepair(): Promise<import('./gitManager').RepositoryIndexRepairPreview> {
+		return this.runGitMutation('Preview Git index repair', async (manager) => manager.previewIndexRepair());
+	}
+
+	async previewLatestRepositoryIndexBackup(): Promise<import('./gitManager').RepositoryIndexBackupPreview | null> {
+		return this.runGitMutation('Preview Git index backup restore', async (manager) => manager.previewLatestIndexBackup());
 	}
 
 	async rebuildRepositoryIndex(): Promise<import('./gitManager').RepositoryIndexRepairResult> {
@@ -1012,12 +1030,42 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const {containerEl} = this;
-
 		containerEl.empty();
-
+		containerEl.addClass('git-settings-root');
 		containerEl.createEl('h2', {text: 'Git Sync Settings'});
 
-		new Setting(containerEl)
+		const sections = [
+			{ id: 'general', title: 'General', description: 'Repository identity and commit author settings.' },
+			{ id: 'authentication', title: 'Authentication', description: 'Credentials used for remote Git operations.' },
+			{ id: 'sync', title: 'Sync', description: 'Automatic synchronization and sidebar behavior.' },
+			{ id: 'updates', title: 'Updates', description: 'Plugin release channel and update behavior.' },
+			{ id: 'diagnostics', title: 'Diagnostics', description: 'Logging, metrics, and troubleshooting tools.' },
+			{ id: 'maintenance', title: 'Maintenance', description: 'Repository health checks, dry runs, and repair actions.' },
+		] as const;
+
+		const toc = containerEl.createDiv({ cls: 'git-settings-toc' });
+		toc.createEl('div', { text: 'Sections', cls: 'git-settings-toc-title' });
+		const tocList = toc.createEl('nav', {
+			cls: 'git-settings-toc-list',
+			attr: { 'aria-label': 'Git Sync settings sections' },
+		});
+		for (const section of sections) {
+			const link = tocList.createEl('a', {
+				text: section.title,
+				href: `#git-settings-section-${section.id}`,
+				cls: 'git-settings-toc-link',
+			});
+			link.addEventListener('click', (event) => {
+				event.preventDefault();
+				const target = containerEl.querySelector(`#git-settings-section-${section.id}`) as HTMLDetailsElement | null;
+				if (!target) return;
+				target.open = true;
+				target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			});
+		}
+
+		const general = this.createSettingsSection(containerEl, sections[0]);
+		new Setting(general)
 			.setName('Repository URL')
 			.setDesc('The URL of your Git repository')
 			.addText(text => text
@@ -1027,8 +1075,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.repoUrl = value;
 					await this.plugin.saveSettings();
 				}));
-
-		new Setting(containerEl)
+		new Setting(general)
 			.setName('Branch')
 			.setDesc('The branch to sync with')
 			.addText(text => text
@@ -1038,8 +1085,29 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.branchName = value;
 					await this.plugin.saveSettings();
 				}));
+		new Setting(general)
+			.setName('Author Name')
+			.setDesc('Your name for Git commits')
+			.addText(text => text
+				.setPlaceholder('Your Name')
+				.setValue(this.plugin.settings.author.name)
+				.onChange(async (value) => {
+					this.plugin.settings.author.name = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(general)
+			.setName('Author Email')
+			.setDesc('Your email for Git commits')
+			.addText(text => text
+				.setPlaceholder('your.email@example.com')
+				.setValue(this.plugin.settings.author.email)
+				.onChange(async (value) => {
+					this.plugin.settings.author.email = value;
+					await this.plugin.saveSettings();
+				}));
 
-		new Setting(containerEl)
+		const authentication = this.createSettingsSection(containerEl, sections[1]);
+		new Setting(authentication)
 			.setName('Username')
 			.setDesc('Git username (optional when using a Personal Access Token)')
 			.addText(text => text
@@ -1049,8 +1117,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.username = value;
 					await this.plugin.saveSettings();
 				}));
-
-		new Setting(containerEl)
+		new Setting(authentication)
 			.setName('Password / Personal Access Token')
 			.setDesc('Stored in Obsidian secure storage. Leave blank to keep the current credential.')
 			.addText(text => {
@@ -1065,10 +1132,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 							new Notice(error?.message || 'Secure credential storage is unavailable');
 						}
 					});
-				
-				// Force password type immediately
 				input.inputEl.type = 'password';
-				
 				return input;
 			})
 			.addExtraButton(button => {
@@ -1085,29 +1149,8 @@ class GitSyncSettingTab extends PluginSettingTab {
 					});
 			});
 
-		new Setting(containerEl)
-			.setName('Author Name')
-			.setDesc('Your name for Git commits')
-			.addText(text => text
-				.setPlaceholder('Your Name')
-				.setValue(this.plugin.settings.author.name)
-				.onChange(async (value) => {
-					this.plugin.settings.author.name = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
-			.setName('Author Email')
-			.setDesc('Your email for Git commits')
-			.addText(text => text
-				.setPlaceholder('your.email@example.com')
-				.setValue(this.plugin.settings.author.email)
-				.onChange(async (value) => {
-					this.plugin.settings.author.email = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
+		const sync = this.createSettingsSection(containerEl, sections[2]);
+		new Setting(sync)
 			.setName('Auto Sync Interval')
 			.setDesc('How often to automatically sync (in minutes, 0 to disable)')
 			.addText(text => text
@@ -1120,8 +1163,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}
 				}));
-
-		new Setting(containerEl)
+		new Setting(sync)
 			.setName('Auto Commit Message')
 			.setDesc('Message for automatic commits. Use {{date}} for current date/time')
 			.addText(text => text
@@ -1131,8 +1173,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.autoCommitMessage = value;
 					await this.plugin.saveSettings();
 				}));
-
-		new Setting(containerEl)
+		new Setting(sync)
 			.setName('Sidebar Refresh Interval')
 			.setDesc('How often to auto-refresh the sidebar (in seconds, 0 to disable)')
 			.addText(text => text
@@ -1143,92 +1184,15 @@ class GitSyncSettingTab extends PluginSettingTab {
 					if (!isNaN(numValue) && numValue >= 0) {
 						this.plugin.settings.refreshInterval = numValue;
 						await this.plugin.saveSettings();
-						// Restart sidebar refresh with new interval
 						const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
 						for (const leaf of leaves) {
 							if (leaf.view instanceof GitSidebarView) {
 								(leaf.view as GitSidebarView).updateRefreshInterval(numValue);
 							}
 						}
-						}
-					}));
-
-		containerEl.createEl('h3', { text: 'Plugin Updates' });
-		let updateVersionLabel: () => void = () => undefined;
-
-		new Setting(containerEl)
-			.setName('Check for updates on startup')
-			.setDesc('Check GitHub once per day for a newer Git Sync release.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.checkForUpdates)
-				.onChange(async value => {
-					this.plugin.settings.checkForUpdates = value;
-					await this.plugin.saveSettings();
+					}
 				}));
-
-		new Setting(containerEl)
-			.setName('Release channel')
-			.setDesc('Stable releases are tested builds. Dev builds contain the latest main-branch changes.')
-			.addDropdown(dropdown => dropdown
-				.addOption('stable', 'Stable')
-				.addOption('dev', 'Dev (pre-release)')
-				.setValue(this.plugin.settings.updateChannel)
-				.onChange(async value => {
-					this.plugin.settings.updateChannel = value as 'stable' | 'dev';
-					await this.plugin.saveSettings();
-					updateVersionLabel();
-				}));
-
-		new Setting(containerEl)
-			.setName('Auto-install stable updates')
-			.setDesc('Install stable updates without prompting. Dev updates always require confirmation.')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.autoUpdate)
-				.onChange(async value => {
-					this.plugin.settings.autoUpdate = value;
-					await this.plugin.saveSettings();
-					if (value) new Notice('Auto-update enabled for stable releases.');
-					}));
-
-		new Setting(containerEl)
-			.setName('Available builds')
-			.setDesc('Browse and install any published stable or development build.')
-			.addButton(button => button
-				.setButtonText('Browse builds')
-				.onClick(() => this.plugin.showAvailableBuilds()));
-
-		const versionSetting = new Setting(containerEl)
-			.setName('Current plugin version')
-			.addButton(button => button
-				.setButtonText('Check Now')
-				.setCta()
-				.onClick(async () => {
-					button.setDisabled(true);
-					button.setButtonText('Checking…');
-					await this.plugin.checkForUpdates(true);
-					button.setButtonText('Check Now');
-					button.setDisabled(false);
-				}));
-		const displayedCommit = GIT_COMMIT_HASH !== 'unknown'
-			? GIT_COMMIT_HASH.slice(0, 7)
-			: 'unknown';
-		updateVersionLabel = () => {
-			versionSetting.setDesc(
-				`${this.plugin.manifest.version} (${this.plugin.settings.updateChannel} channel) — commit ${displayedCommit}`,
-			);
-			versionSetting.descEl.setAttr('title', `Full commit: ${GIT_COMMIT_HASH}`);
-		};
-		updateVersionLabel();
-
-		if (this.plugin.settings.lastUpdateCheck > 0) {
-			containerEl.createEl('p', {
-				text: `Last checked: ${new Date(this.plugin.settings.lastUpdateCheck).toLocaleString()}`,
-				cls: 'setting-item-description',
-			});
-		}
-
-		// Add a button to test the connection
-		new Setting(containerEl)
+		new Setting(sync)
 			.setName('Test Connection')
 			.setDesc('Checks the remote URL and credentials without cloning, initializing, or changing this vault.')
 			.addButton(button => button
@@ -1241,13 +1205,10 @@ class GitSyncSettingTab extends PluginSettingTab {
 							new Notice('Please enter a repository URL first');
 							return;
 						}
-
 						new Notice('Testing remote connection…');
-							const { testRemoteConnection } = await import('./gitManager');
-							const credentials = await this.plugin.getGitCredentials();
-							await testRemoteConnection({
-								...credentials,
-							});
+						const { testRemoteConnection } = await import('./gitManager');
+						const credentials = await this.plugin.getGitCredentials();
+						await testRemoteConnection({ ...credentials });
 						new Notice('Remote connection successful. You can now clone it or initialize a local repository.');
 					} catch (error: any) {
 						new Notice(`Remote connection test failed: ${error?.message || String(error)}`);
@@ -1256,9 +1217,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 						button.setButtonText('Test');
 					}
 				}));
-
-		// Add a button to manually sync
-		new Setting(containerEl)
+		new Setting(sync)
 			.setName('Manual Sync')
 			.setDesc('Manually sync your vault with the Git repository')
 			.addButton(button => button
@@ -1267,13 +1226,79 @@ class GitSyncSettingTab extends PluginSettingTab {
 					try {
 						await this.plugin.syncVault();
 						new Notice('Git sync completed successfully');
-					} catch (error) {
-						new Notice(`Git sync failed: ${error.message}`);
+					} catch (error: any) {
+						new Notice(`Git sync failed: ${error?.message || String(error)}`);
 					}
 				}));
 
-		// Add a button to export debug logs
-		new Setting(containerEl)
+		const updates = this.createSettingsSection(containerEl, sections[3]);
+		let updateVersionLabel: () => void = () => undefined;
+		new Setting(updates)
+			.setName('Check for updates on startup')
+			.setDesc('Check GitHub once per day for a newer Git Sync release.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.checkForUpdates)
+				.onChange(async value => {
+					this.plugin.settings.checkForUpdates = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(updates)
+			.setName('Release channel')
+			.setDesc('Stable releases are tested builds. Dev builds contain the latest main-branch changes.')
+			.addDropdown(dropdown => dropdown
+				.addOption('stable', 'Stable')
+				.addOption('dev', 'Dev (pre-release)')
+				.setValue(this.plugin.settings.updateChannel)
+				.onChange(async value => {
+					this.plugin.settings.updateChannel = value as 'stable' | 'dev';
+					await this.plugin.saveSettings();
+					updateVersionLabel();
+				}));
+		new Setting(updates)
+			.setName('Auto-install stable updates')
+			.setDesc('Install stable updates without prompting. Dev updates always require confirmation.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.autoUpdate)
+				.onChange(async value => {
+					this.plugin.settings.autoUpdate = value;
+					await this.plugin.saveSettings();
+					if (value) new Notice('Auto-update enabled for stable releases.');
+				}));
+		new Setting(updates)
+			.setName('Available builds')
+			.setDesc('Browse and install any published stable or development build.')
+			.addButton(button => button
+				.setButtonText('Browse builds')
+				.onClick(() => this.plugin.showAvailableBuilds()));
+		const versionSetting = new Setting(updates)
+			.setName('Current plugin version')
+			.addButton(button => button
+				.setButtonText('Check Now')
+				.setCta()
+				.onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText('Checking…');
+					await this.plugin.checkForUpdates(true);
+					button.setButtonText('Check Now');
+					button.setDisabled(false);
+				}));
+		const displayedCommit = GIT_COMMIT_HASH !== 'unknown' ? GIT_COMMIT_HASH.slice(0, 7) : 'unknown';
+		updateVersionLabel = () => {
+			versionSetting.setDesc(
+				`${this.plugin.manifest.version} (${this.plugin.settings.updateChannel} channel) — commit ${displayedCommit}`,
+			);
+			versionSetting.descEl.setAttr('title', `Full commit: ${GIT_COMMIT_HASH}`);
+		};
+		updateVersionLabel();
+		if (this.plugin.settings.lastUpdateCheck > 0) {
+			updates.createEl('p', {
+				text: `Last checked: ${new Date(this.plugin.settings.lastUpdateCheck).toLocaleString()}`,
+				cls: 'setting-item-description',
+			});
+		}
+
+		const diagnostics = this.createSettingsSection(containerEl, sections[4]);
+		new Setting(diagnostics)
 			.setName('Export Debug Logs')
 			.setDesc('Export captured debug logs to a markdown file in your vault')
 			.addButton(button => button
@@ -1286,7 +1311,29 @@ class GitSyncSettingTab extends PluginSettingTab {
 						new Notice(`Export failed: ${error.message}`);
 					}
 				}));
+		renderDiagnosticsSection(diagnostics, this.plugin);
 
-		renderDiagnosticsSection(containerEl, this.plugin);
+		const maintenance = this.createSettingsSection(containerEl, sections[5]);
+		renderMaintenanceSection(maintenance, this.plugin);
+	}
+
+	private createSettingsSection(
+		containerEl: HTMLElement,
+		section: { id: string; title: string; description: string },
+	): HTMLElement {
+		const sectionEl = containerEl.createEl('details', {
+			cls: 'git-settings-section',
+			attr: { id: `git-settings-section-${section.id}` },
+		}) as HTMLDetailsElement;
+		sectionEl.open = this.plugin.settings.settingsSectionStates[section.id] !== false;
+		const summary = sectionEl.createEl('summary', { cls: 'git-settings-section-summary' });
+		summary.createEl('span', { text: section.title, cls: 'git-settings-section-title' });
+		summary.createEl('span', { text: section.description, cls: 'git-settings-section-description' });
+		const content = sectionEl.createDiv({ cls: 'git-settings-section-content' });
+		sectionEl.addEventListener('toggle', () => {
+			this.plugin.settings.settingsSectionStates[section.id] = sectionEl.open;
+			void this.plugin.saveSettingsSectionStates().catch(() => undefined);
+		});
+		return content;
 	}
 }

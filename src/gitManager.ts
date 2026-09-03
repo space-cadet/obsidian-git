@@ -531,6 +531,21 @@ export interface RepositoryIndexRepairResult {
     stagedStateRecovered: false;
 }
 
+export interface RepositoryIndexRepairPreview {
+    index: RepositoryIndexHealth;
+    trackedFiles: number;
+    modifiedFiles: number;
+    deletedFiles: number;
+    untrackedFiles: number;
+    unchangedFiles: number;
+}
+
+export interface RepositoryIndexBackupPreview {
+    filename: string;
+    size: number;
+    validFormat: boolean;
+}
+
 export interface RepositoryRebuildPreview {
     branch: string;
     remoteOid: string | null;
@@ -914,6 +929,71 @@ export class GitManager {
     }
 
     /**
+     * Calculate the worktree impact of an index rebuild without writing any
+     * Git metadata or changing vault files.
+     */
+    async previewIndexRepair(): Promise<RepositoryIndexRepairPreview> {
+        this.assertOperationActive();
+        const fs = this.fs.promises || this.fs;
+        const index = await this.checkRepositoryIndex();
+        const headOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
+        const headCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
+        const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, '', true);
+        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
+        const headFingerprints = new Map<string, string>();
+
+        for (const [filepath, oid] of headFiles) {
+            const { blob } = await git.readBlob({ fs: this.fs, dir: this.dir, oid });
+            headFingerprints.set(filepath, bytesToExactFingerprint(blob));
+        }
+
+        let modifiedFiles = 0;
+        let deletedFiles = 0;
+        let unchangedFiles = 0;
+        for (const [filepath, fingerprint] of headFingerprints) {
+            const worktreeFingerprint = worktreeFiles.get(filepath);
+            if (worktreeFingerprint === undefined) deletedFiles += 1;
+            else if (worktreeFingerprint === fingerprint) unchangedFiles += 1;
+            else modifiedFiles += 1;
+        }
+
+        let untrackedFiles = 0;
+        for (const filepath of worktreeFiles.keys()) {
+            if (!headFingerprints.has(filepath)) untrackedFiles += 1;
+        }
+
+        return {
+            index,
+            trackedFiles: headFingerprints.size,
+            modifiedFiles,
+            deletedFiles,
+            untrackedFiles,
+            unchangedFiles,
+        };
+    }
+
+    /** Return a read-only description of the newest repair backup. */
+    async previewLatestIndexBackup(): Promise<RepositoryIndexBackupPreview | null> {
+        this.assertOperationActive();
+        const fs = this.fs.promises || this.fs;
+        const gitDir = this.dir === '.' ? '.git' : `${this.dir}/.git`;
+        const entries = await fs.readdir(gitDir, { encoding: 'utf8' });
+        const backups = entries
+            .filter((entry: string) => /^index\.obsidian-git-backup-\d+$/.test(entry))
+            .sort()
+            .reverse();
+        if (backups.length === 0) return null;
+
+        const filename = backups[0];
+        const value = await fs.readFile(`${gitDir}/${filename}`);
+        const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+        const magic = bytes.byteLength >= 4
+            ? String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3])
+            : '';
+        return { filename, size: bytes.byteLength, validFormat: magic === 'DIRC' };
+    }
+
+    /**
      * Rebuild the Git index from HEAD while leaving all vault files in place.
      *
      * The damaged index is backed up first. Current worktree files are added
@@ -943,7 +1023,7 @@ export class GitManager {
         const headOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
         const headCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
         const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, '', true);
-        const worktreeFiles = await this.readLocalFileFingerprints(fs);
+        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
         let backupPath: string | null = null;
         let originalIndex: Uint8Array | null = null;
 
@@ -992,6 +1072,23 @@ export class GitManager {
             log.error('GitManager', 'Git index rebuild failed; original index restored', error);
             throw error;
         }
+    }
+
+    private async readRepairWorktreeFiles(fs: any): Promise<Map<string, string>> {
+        const files = await this.readLocalFileFingerprints(fs);
+        const result = new Map<string, string>();
+        for (const [filepath, fingerprint] of files) {
+            try {
+                const ignored = await git.isIgnored({ fs: this.fs, dir: this.dir, filepath });
+                if (ignored) continue;
+            } catch (error) {
+                // If ignore evaluation is unavailable, retain the file in the
+                // preview/rebuild so it is never accidentally omitted.
+                log.debug('GitManager', `Could not evaluate ignore rule for ${filepath}`, error);
+            }
+            result.set(filepath, fingerprint);
+        }
+        return result;
     }
 
     /**

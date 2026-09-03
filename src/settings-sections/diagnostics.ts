@@ -105,12 +105,6 @@ export function renderDiagnosticsSection(
 	containerEl: HTMLElement,
 	plugin: DiagnosticsPlugin,
 ): void {
-	containerEl.createEl('h3', { text: 'Diagnostics' });
-	containerEl.createEl('p', {
-		text: 'Monitor runtime state and manage debug logging when diagnosing sync or updater issues.',
-		cls: 'setting-item-description',
-	});
-
 	new Setting(containerEl)
 		.setName('Debug log level')
 		.setDesc('Choose how much runtime information the plugin records.')

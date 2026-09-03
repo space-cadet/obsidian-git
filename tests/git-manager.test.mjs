@@ -342,6 +342,15 @@ test('repository health detects an empty index and repair rebuilds it without ch
     assert.equal(damaged.state, 'damaged');
     assert.equal(damaged.reason, 'Git index is empty (.git/index)');
 
+    const preview = await manager.previewIndexRepair();
+    assert.equal(preview.index.state, 'empty');
+    assert.equal(preview.trackedFiles, 2);
+    assert.equal(preview.modifiedFiles, 1);
+    assert.equal(preview.deletedFiles, 1);
+    assert.equal(preview.untrackedFiles, 1);
+    assert.equal(preview.unchangedFiles, 0);
+    assert.equal((await fsPromises.stat(join(repositoryDirectory, '.git/index'))).size, 0);
+
     const result = await manager.rebuildIndexFromHead();
     assert.equal(result.trackedFiles, 2);
     assert.equal(result.worktreeFiles, 2);
