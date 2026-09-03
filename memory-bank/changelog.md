@@ -1,3 +1,10 @@
+## 2026-09-04 — T35b/T35f/T37 sidebar read-model extraction
+
+- Added `SidebarReadModel` to own plugin-lifetime history, commit-detail, and
+  activity-log cache data.
+- Kept rendering and Git mutations in `GitSidebarView`, with explicit model
+  invalidation and independent unit coverage.
+
 ## 2026-09-04 — T29a/T35d/T35f UI and log regression fixes
 
 - Fixed the Changes view so a single staging action cannot animate every

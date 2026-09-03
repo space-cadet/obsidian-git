@@ -1,30 +1,25 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../gitManager';
-import { log, LogEntry } from '../logger';
+import { log } from '../logger';
+import { SidebarReadModel } from '../sidebarReadModel';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
 type SidebarTab = 'status' | 'commits' | 'log';
 
-interface SidebarHistoryCache {
-    remoteCommits: { repoUrl: string; branch: string; commits: GitCommit[] } | null;
-    localCommits: { branch: string; commits: GitCommit[] } | null;
-    commitDetails: Map<string, GitCommit['files']>;
-}
-
 // Keep immutable history data for the lifetime of the plugin, not only for
 // the lifetime of one ItemView instance. Obsidian can recreate a sidebar view
 // when the workspace is backgrounded or its leaf is restored.
-const sidebarHistoryCaches = new WeakMap<GitSyncPlugin, SidebarHistoryCache>();
+const sidebarReadModels = new WeakMap<GitSyncPlugin, SidebarReadModel>();
 
-function getSidebarHistoryCache(plugin: GitSyncPlugin): SidebarHistoryCache {
-    let cache = sidebarHistoryCaches.get(plugin);
-    if (!cache) {
-        cache = { remoteCommits: null, localCommits: null, commitDetails: new Map() };
-        sidebarHistoryCaches.set(plugin, cache);
+function getSidebarReadModel(plugin: GitSyncPlugin): SidebarReadModel {
+    let model = sidebarReadModels.get(plugin);
+    if (!model) {
+        model = new SidebarReadModel();
+        sidebarReadModels.set(plugin, model);
     }
-    return cache;
+    return model;
 }
 
 export class GitSidebarView extends ItemView {
@@ -41,10 +36,7 @@ export class GitSidebarView extends ItemView {
     private isLocalOnly: boolean = false;
     private hasRealRepo: boolean = false;
     private sidebarSnapshot: GitSidebarStatusSnapshot | null = null;
-    private remoteCommitsCache: { repoUrl: string; branch: string; commits: GitCommit[] } | null = null;
-    private localCommitsCache: { branch: string; commits: GitCommit[] } | null = null;
-    private commitDetailsCache = new Map<string, GitCommit['files']>();
-    private logEntriesCache: LogEntry[] | null = null;
+    private readonly readModel: SidebarReadModel;
     private renderGeneration = 0;
     private logUnsubscribe: (() => void) | null = null;
     private logRenderScheduled = false;
@@ -53,10 +45,7 @@ export class GitSidebarView extends ItemView {
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
         this.plugin = plugin;
-        const cache = getSidebarHistoryCache(plugin);
-        this.remoteCommitsCache = cache.remoteCommits;
-        this.localCommitsCache = cache.localCommits;
-        this.commitDetailsCache = cache.commitDetails;
+        this.readModel = getSidebarReadModel(plugin);
     }
 
     getViewType(): string {
@@ -115,7 +104,7 @@ export class GitSidebarView extends ItemView {
         this.renderLoadingState();
 
         this.logUnsubscribe = log.subscribe(() => {
-            this.logEntriesCache = null;
+            this.readModel.invalidateLogs();
             if (this.activeTab !== 'log' || this.logRenderScheduled) return;
             this.logRenderScheduled = true;
             window.setTimeout(() => {
@@ -180,12 +169,7 @@ export class GitSidebarView extends ItemView {
     }
 
     private invalidateRemoteCommitsCache(): void {
-        this.remoteCommitsCache = null;
-        this.localCommitsCache = null;
-        this.commitDetailsCache.clear();
-        const cache = getSidebarHistoryCache(this.plugin);
-        cache.remoteCommits = null;
-        cache.localCommits = null;
+        this.readModel.invalidateHistory();
     }
 
     private isCurrentRender(generation: number): boolean {
@@ -563,7 +547,7 @@ export class GitSidebarView extends ItemView {
         const initialized = hasReal;
         this.hasRemote = !!this.plugin.settings.repoUrl;
         this.isLocalOnly = !this.hasRemote;
-        if (this.remoteCommitsCache && this.remoteCommitsCache.repoUrl !== this.plugin.settings.repoUrl) {
+        if (this.readModel.getRemoteRepositoryUrl() && this.readModel.getRemoteRepositoryUrl() !== this.plugin.settings.repoUrl) {
             this.invalidateRemoteCommitsCache();
         }
 
@@ -1069,22 +1053,19 @@ export class GitSidebarView extends ItemView {
                     return;
                 }
                 branch = await this.plugin.gitManager.getCurrentBranch();
-                if (this.localCommitsCache?.branch === branch) {
-                    commits = this.localCommitsCache.commits;
+                const cached = this.readModel.getLocalCommits(branch);
+                if (cached) {
+                    commits = cached;
                 } else {
                     commits = await this.plugin.gitManager.getLog(25);
-                    this.localCommitsCache = { branch, commits };
-                    getSidebarHistoryCache(this.plugin).localCommits = this.localCommitsCache;
+                    this.readModel.setLocalCommits(branch, commits);
                 }
             } else {
                 // Remote history is independent of local repository health.
                 // Use the configured branch and query GitHub first so stale or
                 // damaged origin refs cannot hide the actual remote history.
                 const remoteUrl = this.plugin.settings.repoUrl;
-                const cached = this.remoteCommitsCache?.repoUrl === this.plugin.settings.repoUrl
-                    && this.remoteCommitsCache.branch === branch
-                    ? this.remoteCommitsCache.commits
-                    : null;
+                const cached = this.readModel.getRemoteCommits(remoteUrl, branch);
                 if (cached !== null) {
                     commits = cached;
                 } else {
@@ -1095,8 +1076,7 @@ export class GitSidebarView extends ItemView {
                         commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
                     }
                 }
-                this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
-                getSidebarHistoryCache(this.plugin).remoteCommits = this.remoteCommitsCache;
+                this.readModel.setRemoteCommits(remoteUrl, branch, commits);
             }
 
             loading?.remove();
@@ -1204,7 +1184,7 @@ export class GitSidebarView extends ItemView {
 
         try {
             let files: { filepath: string; status: 'added' | 'modified' | 'deleted' }[] = [];
-            const cachedFiles = this.commitDetailsCache.get(oid);
+            const cachedFiles = this.readModel.getCommitDetails(oid);
             if (cachedFiles) files = cachedFiles;
             
             // Use the API directly when remote history is being viewed without
@@ -1247,7 +1227,7 @@ export class GitSidebarView extends ItemView {
                 }
             }
 
-            this.commitDetailsCache.set(oid, files);
+            this.readModel.setCommitDetails(oid, files);
             
             detail.empty();
 
@@ -1295,14 +1275,15 @@ export class GitSidebarView extends ItemView {
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
         
         const currentLogEntries = log.getEntries();
-        const cacheStale = this.logEntriesCache
-            && currentLogEntries.length !== this.logEntriesCache.length;
-        if (!this.logEntriesCache || cacheStale) {
+        const cachedEntries = this.readModel.getLogEntries();
+        const cacheStale = cachedEntries
+            && currentLogEntries.length !== cachedEntries.length;
+        if (!cachedEntries || cacheStale) {
             const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
             log.mergePersistedEntries(persisted);
-            this.logEntriesCache = log.getEntries();
+            this.readModel.setLogEntries(log.getEntries());
         }
-        const entries = this.logEntriesCache;
+        const entries = this.readModel.getLogEntries() || [];
         
         if (entries.length === 0) {
             listContainer.createEl('p', { text: 'No activity yet', cls: 'git-empty-state' });
@@ -1344,10 +1325,10 @@ export class GitSidebarView extends ItemView {
             .setIcon('download')
             .onClick(async () => {
                 try {
-                    if (!this.logEntriesCache) {
+                    if (!this.readModel.getLogEntries()) {
                         const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
                         log.mergePersistedEntries(persisted);
-                        this.logEntriesCache = log.getEntries();
+                        this.readModel.setLogEntries(log.getEntries());
                     }
                     const path = await log.exportToFile(this.app.vault);
                     new Notice(`Log exported to ${path}`);
@@ -1361,7 +1342,7 @@ export class GitSidebarView extends ItemView {
             .onClick(async () => {
                 log.clear();
                 await this.plugin.fileLogger?.clear();
-                this.logEntriesCache = [];
+                this.readModel.setLogEntries([]);
                 new Notice('Activity log cleared');
                 this.contentContainer.empty();
                 await this.renderLogTab();
@@ -1370,12 +1351,12 @@ export class GitSidebarView extends ItemView {
             .setTitle('Copy details')
             .setIcon('copy')
             .onClick(async () => {
-                if (!this.logEntriesCache) {
+                if (!this.readModel.getLogEntries()) {
                     const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
                     log.mergePersistedEntries(persisted);
-                    this.logEntriesCache = log.getEntries();
+                    this.readModel.setLogEntries(log.getEntries());
                 }
-                const entries = [...this.logEntriesCache].reverse().slice(0, 50);
+                const entries = [...(this.readModel.getLogEntries() || [])].reverse().slice(0, 50);
                 const details = entries.length === 0
                     ? 'No activity yet'
                     : entries.map((entry) => {

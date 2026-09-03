@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 01:01:19 IST*
+*Last Updated: 2026-09-04 01:15:22 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -205,3 +205,12 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   avoiding the reported post-push `AlreadyExistsError` warning.
 - Full package verification passes with 65 Node tests and 10 isomorphic-git
   checks. Real Obsidian visual acceptance remains open.
+
+## Current Read-Model Checkpoint — 2026-09-04
+
+- Added and integrated `SidebarReadModel` for plugin-lifetime history,
+  commit-detail, and activity-log cache ownership.
+- Added model tests for repository/branch keying and invalidation; the view
+  still owns rendering and operation callbacks.
+- Full package verification passes with 67 Node tests, artifact identity,
+  production build, and 10 isomorphic-git checks.

@@ -1,6 +1,15 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 01:01:19 IST*
+*Last Updated: 2026-09-04 01:15:22 IST*
+
+## 2026-09-04 Sidebar Read-Model Extraction
+
+- Extracted plugin-lifetime sidebar history, commit-detail, and log cache
+  ownership into `SidebarReadModel`.
+- Kept rendering, user interaction, Git calls, and stale-render guards in the
+  view while adding independent cache-key and invalidation tests.
+- Verification passed: 67 Node tests, artifact identity, production build,
+  10 isomorphic-git checks, and `git diff --check`.
 
 ## 2026-09-04 UI and Log Regression Fixes
 

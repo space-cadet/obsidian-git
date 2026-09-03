@@ -245,3 +245,16 @@ Focused lifecycle tests cover overlap rejection, cancellation, disposal,
 late-success rejection, terminal cleanup, and observer failures. This is a
 source-level checkpoint, not proof of real Obsidian desktop/mobile behavior;
 protected repository replacement and full device conformance remain open.
+
+## Sidebar Read-Model Checkpoint — 2026-09-04
+
+`SidebarReadModel` now owns the plugin-lifetime cache for local history, remote
+history, commit details, and activity-log entries. History is keyed by the
+repository URL and branch; log and history invalidation are explicit methods.
+`GitSidebarView` keeps DOM rendering, tab state, mutation callbacks, and
+generation checks, so the extraction does not create a second UI owner or move
+Git operations into a passive data module.
+
+The model is covered without Obsidian DOM dependencies. The view integration is
+source/build verified; real desktop/mobile freshness and visual behavior remain
+runtime evidence gaps.

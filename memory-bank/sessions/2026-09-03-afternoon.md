@@ -228,3 +228,21 @@ the incremental architecture plan
   build, 10 isomorphic-git checks, and `git diff --check`.
 - Real Obsidian desktop/mobile visual acceptance and remote push execution
   remain separate runtime evidence layers.
+
+## Sidebar Read-Model Extraction — 2026-09-04 01:15:22 IST
+
+### Work Completed
+
+- Added `src/sidebarReadModel.ts` as a testable plugin-lifetime cache boundary
+  for local/remote history, commit details, and activity-log entries.
+- Integrated the model into `GitSidebarView`; rendering, user actions, Git
+  calls, and stale-render generation checks remain in the view.
+- Added independent model coverage for repository/branch cache keys,
+  view-recreation retention, and explicit invalidation.
+
+### Verification and Handoff
+
+- `CI=true pnpm test` passed: 67 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
+- This is the first read-boundary extraction. The next work should add stale
+  view/repository-state behavior coverage before extracting further modules.

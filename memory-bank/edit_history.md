@@ -1,9 +1,34 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 01:03:01 IST*
+*Last Updated: 2026-09-04 01:15:22 IST*
 
 ---
+
+## 2026-09-04
+
+#### 01:15:22 IST - T35b/T35f/T37: Extract the sidebar read model
+- Created `src/sidebarReadModel.ts` - Added plugin-lifetime cache ownership
+  for local/remote history, commit details, and activity-log entries.
+- Modified `src/views/GitSidebarView.ts` - Integrated the read model while
+  retaining rendering, mutation callbacks, and stale-render guards in the view.
+- Created `tests/sidebar-read-model.test.mjs` - Added cache-key, retention,
+  and invalidation coverage without Obsidian DOM dependencies.
+- Modified `memory-bank/tasks/T35b.md` - Recorded the read-model checkpoint.
+- Modified `memory-bank/tasks/T35f.md` - Recorded model coverage and 67-test
+  verification.
+- Modified `memory-bank/tasks/T37.md` - Recorded incremental extraction progress.
+- Modified `memory-bank/tasks.md` - Updated the registry timestamp.
+- Modified `memory-bank/implementation-details/reliability-and-lifecycle.md`
+  - Documented the sidebar read-model boundary.
+- Modified `memory-bank/activeContext.md` - Recorded the extraction and scope.
+- Modified `memory-bank/session_cache.md` - Recorded the current checkpoint.
+- Modified `memory-bank/sessions/2026-09-03-afternoon.md` - Appended the
+  extraction work and handoff.
+- Modified `memory-bank/progress.md` - Recorded the read-model milestone.
+- Modified `memory-bank/changelog.md` - Recorded the architecture extraction.
+- Created `memory-bank/edits/2026-09-04/011522-T35b-sidebar-read-model.md`
+  - Recorded the edit chunk and verification boundary.
 
 ## 2026-09-04
 

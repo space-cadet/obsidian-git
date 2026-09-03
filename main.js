@@ -24449,15 +24449,67 @@ var FileLogger = _FileLogger;
 var import_obsidian5 = require("obsidian");
 init_gitManager();
 init_logger();
-var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
-var sidebarHistoryCaches = /* @__PURE__ */ new WeakMap();
-function getSidebarHistoryCache(plugin) {
-  let cache = sidebarHistoryCaches.get(plugin);
-  if (!cache) {
-    cache = { remoteCommits: null, localCommits: null, commitDetails: /* @__PURE__ */ new Map() };
-    sidebarHistoryCaches.set(plugin, cache);
+
+// src/sidebarReadModel.ts
+var SidebarReadModel = class {
+  constructor() {
+    this.remoteCommits = null;
+    this.localCommits = null;
+    this.commitDetails = /* @__PURE__ */ new Map();
+    this.logEntries = null;
   }
-  return cache;
+  getRemoteCommits(repoUrl, branch2) {
+    var _a;
+    if (((_a = this.remoteCommits) == null ? void 0 : _a.repoUrl) !== repoUrl || this.remoteCommits.branch !== branch2)
+      return null;
+    return this.remoteCommits.commits;
+  }
+  setRemoteCommits(repoUrl, branch2, commits) {
+    this.remoteCommits = { repoUrl, branch: branch2, commits };
+  }
+  getRemoteRepositoryUrl() {
+    var _a;
+    return ((_a = this.remoteCommits) == null ? void 0 : _a.repoUrl) || null;
+  }
+  getLocalCommits(branch2) {
+    var _a;
+    return ((_a = this.localCommits) == null ? void 0 : _a.branch) === branch2 ? this.localCommits.commits : null;
+  }
+  setLocalCommits(branch2, commits) {
+    this.localCommits = { branch: branch2, commits };
+  }
+  getCommitDetails(oid) {
+    return this.commitDetails.get(oid) || null;
+  }
+  setCommitDetails(oid, files) {
+    this.commitDetails.set(oid, files);
+  }
+  getLogEntries() {
+    return this.logEntries;
+  }
+  setLogEntries(entries) {
+    this.logEntries = entries;
+  }
+  invalidateHistory() {
+    this.remoteCommits = null;
+    this.localCommits = null;
+    this.commitDetails.clear();
+  }
+  invalidateLogs() {
+    this.logEntries = null;
+  }
+};
+
+// src/views/GitSidebarView.ts
+var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
+var sidebarReadModels = /* @__PURE__ */ new WeakMap();
+function getSidebarReadModel(plugin) {
+  let model = sidebarReadModels.get(plugin);
+  if (!model) {
+    model = new SidebarReadModel();
+    sidebarReadModels.set(plugin, model);
+  }
+  return model;
 }
 var GitSidebarView = class extends import_obsidian5.ItemView {
   constructor(leaf, plugin) {
@@ -24471,19 +24523,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.isLocalOnly = false;
     this.hasRealRepo = false;
     this.sidebarSnapshot = null;
-    this.remoteCommitsCache = null;
-    this.localCommitsCache = null;
-    this.commitDetailsCache = /* @__PURE__ */ new Map();
-    this.logEntriesCache = null;
     this.renderGeneration = 0;
     this.logUnsubscribe = null;
     this.logRenderScheduled = false;
     this.mutationInFlight = false;
     this.plugin = plugin;
-    const cache = getSidebarHistoryCache(plugin);
-    this.remoteCommitsCache = cache.remoteCommits;
-    this.localCommitsCache = cache.localCommits;
-    this.commitDetailsCache = cache.commitDetails;
+    this.readModel = getSidebarReadModel(plugin);
   }
   getViewType() {
     return VIEW_TYPE_GIT_SIDEBAR;
@@ -24523,7 +24568,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("aria-label", "Git Sync content");
     this.renderLoadingState();
     this.logUnsubscribe = log2.subscribe(() => {
-      this.logEntriesCache = null;
+      this.readModel.invalidateLogs();
       if (this.activeTab !== "log" || this.logRenderScheduled)
         return;
       this.logRenderScheduled = true;
@@ -24573,12 +24618,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.startAutoRefresh();
   }
   invalidateRemoteCommitsCache() {
-    this.remoteCommitsCache = null;
-    this.localCommitsCache = null;
-    this.commitDetailsCache.clear();
-    const cache = getSidebarHistoryCache(this.plugin);
-    cache.remoteCommits = null;
-    cache.localCommits = null;
+    this.readModel.invalidateHistory();
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
@@ -24869,7 +24909,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const initialized = hasReal;
     this.hasRemote = !!this.plugin.settings.repoUrl;
     this.isLocalOnly = !this.hasRemote;
-    if (this.remoteCommitsCache && this.remoteCommitsCache.repoUrl !== this.plugin.settings.repoUrl) {
+    if (this.readModel.getRemoteRepositoryUrl() && this.readModel.getRemoteRepositoryUrl() !== this.plugin.settings.repoUrl) {
       this.invalidateRemoteCommitsCache();
     }
     const snapshot = this.sidebarSnapshot;
@@ -25240,7 +25280,6 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     window.setTimeout(() => input.inputEl.focus(), 0);
   }
   async renderCommitsTab(generation) {
-    var _a, _b;
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
@@ -25274,16 +25313,16 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           return;
         }
         branch2 = await this.plugin.gitManager.getCurrentBranch();
-        if (((_a = this.localCommitsCache) == null ? void 0 : _a.branch) === branch2) {
-          commits = this.localCommitsCache.commits;
+        const cached = this.readModel.getLocalCommits(branch2);
+        if (cached) {
+          commits = cached;
         } else {
           commits = await this.plugin.gitManager.getLog(25);
-          this.localCommitsCache = { branch: branch2, commits };
-          getSidebarHistoryCache(this.plugin).localCommits = this.localCommitsCache;
+          this.readModel.setLocalCommits(branch2, commits);
         }
       } else {
         const remoteUrl = this.plugin.settings.repoUrl;
-        const cached = ((_b = this.remoteCommitsCache) == null ? void 0 : _b.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
+        const cached = this.readModel.getRemoteCommits(remoteUrl, branch2);
         if (cached !== null) {
           commits = cached;
         } else {
@@ -25293,8 +25332,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
           }
         }
-        this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
-        getSidebarHistoryCache(this.plugin).remoteCommits = this.remoteCommitsCache;
+        this.readModel.setRemoteCommits(remoteUrl, branch2, commits);
       }
       loading == null ? void 0 : loading.remove();
       if (!this.isCurrentRender(generation))
@@ -25387,7 +25425,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     detail.createDiv("git-commit-detail-loading").setText("Loading...");
     try {
       let files = [];
-      const cachedFiles = this.commitDetailsCache.get(oid);
+      const cachedFiles = this.readModel.getCommitDetails(oid);
       if (cachedFiles)
         files = cachedFiles;
       if (cachedFiles) {
@@ -25419,7 +25457,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           files = remoteFiles;
         }
       }
-      this.commitDetailsCache.set(oid, files);
+      this.readModel.setCommitDetails(oid, files);
       detail.empty();
       if (files.length === 0) {
         const isRemoteMode = this.commitsViewMode === "remote";
@@ -25457,13 +25495,14 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
     const currentLogEntries = log2.getEntries();
-    const cacheStale = this.logEntriesCache && currentLogEntries.length !== this.logEntriesCache.length;
-    if (!this.logEntriesCache || cacheStale) {
+    const cachedEntries = this.readModel.getLogEntries();
+    const cacheStale = cachedEntries && currentLogEntries.length !== cachedEntries.length;
+    if (!cachedEntries || cacheStale) {
       const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
       log2.mergePersistedEntries(persisted);
-      this.logEntriesCache = log2.getEntries();
+      this.readModel.setLogEntries(log2.getEntries());
     }
-    const entries = this.logEntriesCache;
+    const entries = this.readModel.getLogEntries() || [];
     if (entries.length === 0) {
       listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
       return;
@@ -25495,10 +25534,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     menu.addItem((item) => item.setTitle("Export log").setIcon("download").onClick(async () => {
       var _a;
       try {
-        if (!this.logEntriesCache) {
+        if (!this.readModel.getLogEntries()) {
           const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
           log2.mergePersistedEntries(persisted);
-          this.logEntriesCache = log2.getEntries();
+          this.readModel.setLogEntries(log2.getEntries());
         }
         const path = await log2.exportToFile(this.app.vault);
         new import_obsidian5.Notice(`Log exported to ${path}`);
@@ -25510,19 +25549,19 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       var _a;
       log2.clear();
       await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
-      this.logEntriesCache = [];
+      this.readModel.setLogEntries([]);
       new import_obsidian5.Notice("Activity log cleared");
       this.contentContainer.empty();
       await this.renderLogTab();
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
       var _a;
-      if (!this.logEntriesCache) {
+      if (!this.readModel.getLogEntries()) {
         const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
         log2.mergePersistedEntries(persisted);
-        this.logEntriesCache = log2.getEntries();
+        this.readModel.setLogEntries(log2.getEntries());
       }
-      const entries = [...this.logEntriesCache].reverse().slice(0, 50);
+      const entries = [...this.readModel.getLogEntries() || []].reverse().slice(0, 50);
       const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
         const time = new Date(entry.timestamp).toISOString();
         const data = entry.data ? `
@@ -26337,7 +26376,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "249ba50e1585df19439e42793d24022840899eed" : "unknown";
+var GIT_COMMIT_HASH = true ? "f0574f9102ee5780ec69fbe88ff08d4f03665d21" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

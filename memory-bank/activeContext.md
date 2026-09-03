@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 01:01:19 IST*
+*Last Updated: 2026-09-04 01:15:22 IST*
 
 ## Current Tasks
 
@@ -117,6 +117,14 @@
   timestamp drift no longer creates duplicate Log-tab events.
 - Focused and full automated verification passes. Real Obsidian visual and
   mobile acceptance remains open.
+
+### Sidebar Read-Model Extraction — 2026-09-04
+- `SidebarReadModel` now owns plugin-lifetime history, commit-detail, and log
+  cache data with explicit repository/branch keys and invalidation.
+- `GitSidebarView` retains rendering, tab interaction, mutation callbacks, and
+  stale-render guards. The model is independently unit tested.
+- This is the first read-boundary extraction; further module work remains
+  subject to conformance and real desktop/mobile evidence.
 
 ### Current Implementation Session — 2026-09-03 18:26 IST
 - **Authorized scope**: Implement the seven confirmed sidebar, staging,
