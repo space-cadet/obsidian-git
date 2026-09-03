@@ -23,6 +23,7 @@ import {
 	migrateLegacySecret,
 } from './credentialStore';
 import { OperationCoordinator } from './operationCoordinator';
+import { DiagnosticLogLevel, renderDiagnosticsSection } from './settings-sections/diagnostics';
 
 interface GitSyncSettings {
 	repoUrl: string;
@@ -40,6 +41,9 @@ interface GitSyncSettings {
 	updateChannel: 'stable' | 'dev';
 	lastUpdateCheck: number;
 	autoUpdate: boolean;
+	debugLogLevel: DiagnosticLogLevel;
+	debugLogRetention: number;
+	debugLogMaxSizeMB: number;
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -58,6 +62,9 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	updateChannel: 'stable',
 	lastUpdateCheck: 0,
 	autoUpdate: false,
+	debugLogLevel: 'error',
+	debugLogRetention: 200,
+	debugLogMaxSizeMB: 5,
 };
 
 export default class GitSyncPlugin extends Plugin {
@@ -68,7 +75,7 @@ export default class GitSyncPlugin extends Plugin {
 	statusBarItem: HTMLElement | null = null;
 	isDesktop: boolean = false;
 	private updater: PluginUpdater | null = null;
-	private fileLogger: FileLogger | null = null;
+	fileLogger: FileLogger | null = null;
 	private credentialStore: CredentialStore | null = null;
 	private credentialStorageError: Error | null = null;
 	private readonly operationCoordinator = new OperationCoordinator();
@@ -79,6 +86,8 @@ export default class GitSyncPlugin extends Plugin {
 		this.fileLogger = new FileLogger(this.app, this.manifest.id);
 		await this.fileLogger.init();
 		await this.loadSettings();
+		this.setDiagnosticLogLevel(this.settings.debugLogLevel);
+		this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
 		if (this.credentialStorageError) {
 			new Notice(this.credentialStorageError.message);
 		}
@@ -301,6 +310,15 @@ export default class GitSyncPlugin extends Plugin {
 		const legacyPassword = typeof stored.password === 'string' ? stored.password : '';
 		const { password: _password, ...withoutPassword } = stored;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, withoutPassword);
+		if (!['off', 'error', 'info', 'debug'].includes(this.settings.debugLogLevel)) {
+			this.settings.debugLogLevel = DEFAULT_SETTINGS.debugLogLevel;
+		}
+		if (!Number.isFinite(this.settings.debugLogRetention) || this.settings.debugLogRetention <= 0) {
+			this.settings.debugLogRetention = DEFAULT_SETTINGS.debugLogRetention;
+		}
+		if (!Number.isFinite(this.settings.debugLogMaxSizeMB) || this.settings.debugLogMaxSizeMB <= 0) {
+			this.settings.debugLogMaxSizeMB = DEFAULT_SETTINGS.debugLogMaxSizeMB;
+		}
 		// The sidebar has one compact layout. Migrate settings written by the
 		// short-lived comfortable/compact toggle so old data cannot restore the
 		// oversized header.
@@ -325,6 +343,20 @@ export default class GitSyncPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 		this.setupAutoSync(); // Reconfigure auto sync with new settings
+	}
+
+	setDiagnosticLogLevel(level: DiagnosticLogLevel): void {
+		const levels: Record<DiagnosticLogLevel, LogLevel> = {
+			off: LogLevel.ERROR,
+			error: LogLevel.ERROR,
+			info: LogLevel.INFO,
+			debug: LogLevel.DEBUG,
+		};
+		log.setLogLevel(levels[level]);
+	}
+
+	setDiagnosticLogMaxSize(maxSizeMB: number): void {
+		this.fileLogger?.setMaxSize(maxSizeMB * 1024 * 1024);
 	}
 
 	private requireCredentialStore(): CredentialStore {
@@ -1200,5 +1232,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 						new Notice(`Export failed: ${error.message}`);
 					}
 				}));
+
+		renderDiagnosticsSection(containerEl, this.plugin);
 	}
 }

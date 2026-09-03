@@ -51,7 +51,7 @@ const context = await esbuild.context({
     "@lezer/common",
     "@lezer/highlight",
     "@lezer/lr",
-    ...builtins.filter(b => b !== 'buffer' && b !== 'path')],
+    ...builtins.filter(b => b !== 'buffer')],
   format: "cjs",
   target: "es2018",
   logLevel: "info",
