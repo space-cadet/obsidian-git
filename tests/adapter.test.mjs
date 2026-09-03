@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import Module from 'node:module';
+import { createRequire } from 'node:module';
 
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-adapter-tests-'));
 const bundlePath = join(temporaryDirectory, 'adapter.cjs');
@@ -85,4 +87,29 @@ test('ObsidianFsAdapter accepts the Node-style string text encoding', async () =
   const adapter = new ObsidianFsAdapter(dataAdapter, '.');
 
   assert.equal(await adapter.promises.readFile('.gitignore', 'utf8'), '.obsidian/\n');
+});
+
+test('ObsidianFsAdapter uses native desktop files for Git metadata', async () => {
+  const vaultDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-native-adapter-'));
+  const previousWindow = globalThis.window;
+  try {
+    mkdirSync(join(vaultDirectory, '.git'), { recursive: true });
+    writeFileSync(join(vaultDirectory, '.git', 'index'), Buffer.from('DIRC-native-index'));
+    globalThis.window = {
+      require: createRequire(import.meta.url),
+      process,
+    };
+    const dataAdapter = {
+      getBasePath() { return vaultDirectory; },
+      async readBinary() { return new ArrayBuffer(0); },
+      async list() { return { files: [], folders: [] }; },
+      async stat() { return null; },
+    };
+    const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+    const value = await adapter.promises.readFile('.git/index');
+    assert.equal(new TextDecoder().decode(value), 'DIRC-native-index');
+  } finally {
+    globalThis.window = previousWindow;
+    rmSync(vaultDirectory, { recursive: true, force: true });
+  }
 });

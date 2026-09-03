@@ -74,6 +74,21 @@ export class ObsidianFsAdapter {
                !!(window as any).process;
     }
 
+    /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
+    private nodePathFor(path: string): { fs: any; path: any; fullPath: string } | null {
+        if (!this.isNodeAvailable()) return null;
+        try {
+            const nodeRequire = (window as any).require;
+            const nodeFs = nodeRequire('fs');
+            const nodePath = nodeRequire('path');
+            const basePath = (this.adapter as any).getBasePath?.();
+            if (!basePath) return null;
+            return { fs: nodeFs, path: nodePath, fullPath: nodePath.join(basePath, path) };
+        } catch {
+            return null;
+        }
+    }
+
     /**
      * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
      * Node-compatible 'utf8' string for text; no encoding means binary.
@@ -89,6 +104,19 @@ export class ObsidianFsAdapter {
             return this.adapter.read(path);
         }
 
+        // Desktop's native filesystem is substantially faster for the many
+        // small files in a vault and reliably exposes .git metadata. Obsidian's
+        // adapter remains the fallback for mobile and virtual vault adapters.
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                const buffer = await nodeFile.fs.promises.readFile(nodeFile.fullPath);
+                return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+            } catch {
+                // Continue with the Obsidian adapter below.
+            }
+        }
+
         // Try 1: Obsidian's readBinary
         try {
             const arrayBuffer = await this.adapter.readBinary(path);
@@ -97,25 +125,6 @@ export class ObsidianFsAdapter {
             }
         } catch (e: any) {
             // Obsidian readBinary failed, try fallback below
-        }
-
-        // Try 2: Node.js fs via window.require (Electron desktop only)
-        if (this.isNodeAvailable()) {
-            try {
-                const nodeRequire = (window as any).require;
-                const nodeFs = nodeRequire('fs');
-                const nodePath = nodeRequire('path');
-                
-                // Get vault base path
-                const basePath = (this.adapter as any).getBasePath?.();
-                if (basePath) {
-                    const fullPath = nodePath.join(basePath, path);
-                    const buffer = await nodeFs.promises.readFile(fullPath);
-                    return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-                }
-            } catch (e: any) {
-                // Node fs fallback failed, throw below
-            }
         }
 
         // All methods failed
@@ -172,6 +181,16 @@ export class ObsidianFsAdapter {
 
     private async readdirImpl(filepath: string, _options?: { encoding?: string }): Promise<string[]> {
         const path = this.resolve(filepath);
+
+        const nodeDirectory = this.nodePathFor(path);
+        if (nodeDirectory) {
+            try {
+                return await nodeDirectory.fs.promises.readdir(nodeDirectory.fullPath, { encoding: 'utf8' });
+            } catch {
+                // Fall back to Obsidian's vault index below.
+            }
+        }
+
         const listed: ListedFiles = await this.adapter.list(path);
         
         // Obsidian's list() may return paths relative to the vault root,
@@ -219,6 +238,16 @@ export class ObsidianFsAdapter {
 
     private async statImpl(filepath: string): Promise<any> {
         const path = this.resolve(filepath);
+
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                return await nodeFile.fs.promises.stat(nodeFile.fullPath);
+            } catch {
+                // Fall back to Obsidian's adapter below.
+            }
+        }
+
         const stat: Stat | null = await this.adapter.stat(path);
 
         if (!stat) {

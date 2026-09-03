@@ -6,9 +6,6 @@
 }
 
 .git-settings-toc {
-    position: sticky;
-    top: 0;
-    z-index: 2;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -16,8 +13,7 @@
     padding: 8px 10px;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--git-settings-radius);
-    background: color-mix(in srgb, var(--background-primary) 92%, transparent);
-    backdrop-filter: blur(8px);
+    background: var(--background-secondary);
 }
 
 .git-settings-toc-title {

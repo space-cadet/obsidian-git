@@ -18520,6 +18520,7 @@ var init_logger = __esm({
         this.sensitiveValues = [];
         this.recentNoticeTimes = /* @__PURE__ */ new Map();
         this.noticeCooldownMs = 5 * 60 * 1e3;
+        this.fileLogSink = null;
       }
       /**
        * Get the singleton instance of the logger
@@ -18629,6 +18630,10 @@ var init_logger = __esm({
       setSensitiveValues(values) {
         this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
       }
+      /** Attach the plugin-owned persistent log sink without touching global console state. */
+      setFileLogSink(sink) {
+        this.fileLogSink = sink;
+      }
       /**
        * Log a debug message
        */
@@ -18684,15 +18689,33 @@ var init_logger = __esm({
         }
       }
       pushEntry(level, namespace, message, data) {
+        var _a, _b;
+        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+        const safeData = redactSensitiveData(data, this.sensitiveValues);
         this.entries.push({
           timestamp: Date.now(),
           level,
           namespace,
-          message: redactSensitiveText(message, this.sensitiveValues),
-          data: redactSensitiveData(data, this.sensitiveValues)
+          message: safeMessage,
+          data: safeData
         });
         if (this.entries.length > this.maxEntries) {
           this.entries = this.entries.slice(-this.maxEntries);
+        }
+        const levelRank = {
+          debug: 0 /* DEBUG */,
+          info: 1 /* INFO */,
+          warn: 2 /* WARN */,
+          error: 3 /* ERROR */,
+          fatal: 3 /* ERROR */
+        };
+        if (((_a = levelRank[level]) != null ? _a : 1 /* INFO */) >= this.logLevel) {
+          (_b = this.fileLogSink) == null ? void 0 : _b.call(
+            this,
+            level,
+            `[Git Sync][${namespace}] ${safeMessage}`,
+            safeData || ""
+          );
         }
       }
     };
@@ -19231,13 +19254,6 @@ function parseGitHubRepositoryUrl(repoUrl) {
     return { owner: sshMatch[1], repo: sshMatch[2] };
   return null;
 }
-function bytesToExactFingerprint(value) {
-  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value instanceof Uint8Array ? value : new Uint8Array(value);
-  let result = "";
-  for (const byte of bytes)
-    result += byte.toString(16).padStart(2, "0");
-  return result;
-}
 function isProtectedRepairPath(filepath) {
   const normalized = filepath.replace(/^\.\//, "").replace(/^\/+/, "");
   return normalized === ".git" || normalized.startsWith(".git/") || normalized === ".git-sync-repair" || normalized.startsWith(".git-sync-repair-") || normalized.startsWith(".obsidian/plugins/obsidian-git-sync/");
@@ -19526,6 +19542,10 @@ var init_gitManager = __esm({
         error.name = "AbortError";
         throw error;
       }
+      /** Keep long vault scans cancellable and give Obsidian a chance to paint. */
+      async yieldToEventLoop() {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
       updateStatus(message) {
         if (this.statusBarItem) {
           this.statusBarItem.setText(`Git: ${message}`);
@@ -19801,41 +19821,64 @@ var init_gitManager = __esm({
       async previewIndexRepair() {
         this.assertOperationActive();
         const fs = this.fs.promises || this.fs;
+        const startedAt = Date.now();
+        log2.info("GitManager", "Git index repair preview started");
         const index2 = await this.checkRepositoryIndex();
         const headOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: "HEAD" });
         const headCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
         const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, "", true);
-        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
-        const headFingerprints = /* @__PURE__ */ new Map();
-        for (const [filepath, oid] of headFiles) {
-          const { blob } = await readBlob({ fs: this.fs, dir: this.dir, oid });
-          headFingerprints.set(filepath, bytesToExactFingerprint(blob));
-        }
+        const trackedPaths = new Set(headFiles.keys());
+        const worktreeFiles = await this.readRepairWorktreePaths(fs, trackedPaths);
+        log2.debug("GitManager", "Git index repair preview discovered worktree paths", {
+          trackedFiles: headFiles.size,
+          worktreeFiles: worktreeFiles.size,
+          elapsedMs: Date.now() - startedAt
+        });
         let modifiedFiles = 0;
         let deletedFiles = 0;
         let unchangedFiles = 0;
-        for (const [filepath, fingerprint] of headFingerprints) {
-          const worktreeFingerprint = worktreeFiles.get(filepath);
-          if (worktreeFingerprint === void 0)
+        let comparedFiles = 0;
+        for (const [filepath, oid] of headFiles) {
+          this.assertOperationActive();
+          if (!worktreeFiles.has(filepath)) {
             deletedFiles += 1;
-          else if (worktreeFingerprint === fingerprint)
-            unchangedFiles += 1;
-          else
-            modifiedFiles += 1;
+          } else {
+            const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
+            const value = await fs.readFile(fullPath);
+            const localOid = (await hashBlob({ object: value })).oid;
+            if (localOid === oid)
+              unchangedFiles += 1;
+            else
+              modifiedFiles += 1;
+          }
+          comparedFiles += 1;
+          if (comparedFiles % 50 === 0) {
+            log2.debug("GitManager", "Git index repair preview comparing tracked files", {
+              comparedFiles,
+              trackedFiles: headFiles.size,
+              elapsedMs: Date.now() - startedAt
+            });
+            await this.yieldToEventLoop();
+          }
         }
         let untrackedFiles = 0;
-        for (const filepath of worktreeFiles.keys()) {
-          if (!headFingerprints.has(filepath))
+        for (const filepath of worktreeFiles) {
+          if (!trackedPaths.has(filepath))
             untrackedFiles += 1;
         }
-        return {
+        const result = {
           index: index2,
-          trackedFiles: headFingerprints.size,
+          trackedFiles: headFiles.size,
           modifiedFiles,
           deletedFiles,
           untrackedFiles,
           unchangedFiles
         };
+        log2.info("GitManager", "Git index repair preview completed", {
+          ...result,
+          elapsedMs: Date.now() - startedAt
+        });
+        return result;
       }
       /** Return a read-only description of the newest repair backup. */
       async previewLatestIndexBackup() {
@@ -19864,6 +19907,8 @@ var init_gitManager = __esm({
       async rebuildIndexFromHead() {
         this.assertOperationActive();
         const fs = this.fs.promises || this.fs;
+        const startedAt = Date.now();
+        log2.info("GitManager", "Git index repair started");
         const indexPath = this.repositoryGitPath("index");
         const lockPath = this.repositoryGitPath("index.lock");
         const health = await this.checkRepositoryIndex();
@@ -19882,7 +19927,21 @@ var init_gitManager = __esm({
         const headOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: "HEAD" });
         const headCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
         const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, "", true);
-        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
+        const worktreeFiles = await this.readRepairWorktreePaths(fs, new Set(headFiles.keys()));
+        const modifiedTrackedFiles = [];
+        const deletedTrackedFiles = [];
+        for (const [filepath, oid] of headFiles) {
+          this.assertOperationActive();
+          if (!worktreeFiles.has(filepath)) {
+            deletedTrackedFiles.push(filepath);
+            continue;
+          }
+          const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
+          const value = await fs.readFile(fullPath);
+          if ((await hashBlob({ object: value })).oid !== oid) {
+            modifiedTrackedFiles.push(filepath);
+          }
+        }
         let backupPath = null;
         let originalIndex = null;
         try {
@@ -19892,23 +19951,39 @@ var init_gitManager = __esm({
             backupPath = await this.backupIndex(fs, "index.obsidian-git-backup");
           }
           await this.removeIndexIfPresent(fs);
-          for (const filepath of worktreeFiles.keys()) {
-            this.assertOperationActive();
-            await add({ fs: this.fs, dir: this.dir, filepath });
+          const existingTrackedFiles = [...headFiles.keys()].filter((filepath) => worktreeFiles.has(filepath));
+          if (existingTrackedFiles.length > 0) {
+            log2.info("GitManager", "Adding existing tracked files while rebuilding Git index", {
+              files: existingTrackedFiles.length,
+              totalTrackedFiles: headFiles.size
+            });
+            await add({
+              fs: this.fs,
+              dir: this.dir,
+              filepath: existingTrackedFiles,
+              parallel: true,
+              force: true
+            });
           }
-          for (const filepath of headFiles.keys()) {
+          const pathsToReset = [...modifiedTrackedFiles, ...deletedTrackedFiles];
+          let resetCount = 0;
+          for (const filepath of pathsToReset) {
             this.assertOperationActive();
             await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
-          }
-          for (const filepath of worktreeFiles.keys()) {
-            if (headFiles.has(filepath))
-              continue;
-            this.assertOperationActive();
-            await resetIndex({ fs: this.fs, dir: this.dir, filepath });
+            resetCount += 1;
+            if (resetCount % 50 === 0) {
+              await this.yieldToEventLoop();
+            }
           }
           await listFiles({ fs: this.fs, dir: this.dir });
           await statusMatrix({ fs: this.fs, dir: this.dir });
-          log2.info("GitManager", `Rebuilt Git index from HEAD (${headFiles.size} tracked files, ${worktreeFiles.size} worktree files)`);
+          log2.info("GitManager", "Git index repair completed", {
+            trackedFiles: headFiles.size,
+            worktreeFiles: worktreeFiles.size,
+            modifiedFiles: modifiedTrackedFiles.length,
+            deletedFiles: deletedTrackedFiles.length,
+            elapsedMs: Date.now() - startedAt
+          });
           return {
             backupPath,
             trackedFiles: headFiles.size,
@@ -19924,19 +19999,62 @@ var init_gitManager = __esm({
           throw error;
         }
       }
-      async readRepairWorktreeFiles(fs) {
-        const files = await this.readLocalFileFingerprints(fs);
-        const result = /* @__PURE__ */ new Map();
-        for (const [filepath, fingerprint] of files) {
+      async readRepairWorktreePaths(fs, trackedPaths) {
+        const result = /* @__PURE__ */ new Set();
+        const startedAt = Date.now();
+        let examined = 0;
+        const hasTrackedDescendant = (directory) => {
+          const prefix = `${directory}/`;
+          for (const trackedPath of trackedPaths) {
+            if (trackedPath.startsWith(prefix))
+              return true;
+          }
+          return false;
+        };
+        const isIgnored2 = async (filepath) => {
           try {
-            const ignored = await isIgnored({ fs: this.fs, dir: this.dir, filepath });
-            if (ignored)
-              continue;
+            return await isIgnored({ fs: this.fs, dir: this.dir, filepath });
           } catch (error) {
             log2.debug("GitManager", `Could not evaluate ignore rule for ${filepath}`, error);
+            return false;
           }
-          result.set(filepath, fingerprint);
-        }
+        };
+        const walk2 = async (relativeDir) => {
+          this.assertOperationActive();
+          const lookupPath = relativeDir || (this.dir === "." ? "." : this.dir);
+          const entries = await fs.readdir(lookupPath, { encoding: "utf8" });
+          for (const entry of entries) {
+            const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
+            if (isProtectedRepairPath(filepath))
+              continue;
+            const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
+            const stat = await fs.stat(fullPath);
+            examined += 1;
+            if (stat.isDirectory()) {
+              if (!hasTrackedDescendant(filepath) && await isIgnored2(filepath))
+                continue;
+              await walk2(filepath);
+            } else if (stat.isFile()) {
+              if (trackedPaths.has(filepath) || !await isIgnored2(filepath)) {
+                result.add(filepath);
+              }
+            }
+            if (examined % 32 === 0) {
+              log2.debug("GitManager", "Git index repair scanning worktree", {
+                examined,
+                included: result.size,
+                elapsedMs: Date.now() - startedAt
+              });
+              await this.yieldToEventLoop();
+            }
+          }
+        };
+        await walk2("");
+        log2.info("GitManager", "Git index repair worktree scan completed", {
+          examined,
+          included: result.size,
+          elapsedMs: Date.now() - startedAt
+        });
         return result;
       }
       /**
@@ -20027,7 +20145,7 @@ var init_gitManager = __esm({
               if (isProtectedRepairPath(filepath))
                 continue;
               const { blob } = await readBlob({ fs: this.fs, dir: temporaryDir, oid: blobOid });
-              remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+              remoteFiles.set(filepath, (await hashBlob({ object: blob })).oid);
             }
           }
           return {
@@ -20059,7 +20177,7 @@ var init_gitManager = __esm({
               await walk2(filepath);
             } else if (stat.isFile()) {
               const value = await fs.readFile(fullPath);
-              result.set(filepath, bytesToExactFingerprint(value));
+              result.set(filepath, (await hashBlob({ object: value })).oid);
             }
           }
         };
@@ -20187,7 +20305,7 @@ var init_gitManager = __esm({
           const commits = await log({ fs: this.fs, dir: this.dir, ref: "HEAD", depth: 1 });
           return commits.length > 0;
         } catch (error) {
-          console.error("pending checkout validation failed", error);
+          log2.error("GitManager", "Pending checkout validation failed", error);
           return false;
         }
       }
@@ -20463,7 +20581,7 @@ Try again with a faster connection or smaller repository.`
           if (isProtectedRepairPath(filepath))
             continue;
           const { blob } = await readBlob({ fs: this.fs, dir: this.dir, oid: blobOid });
-          remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+          remoteFiles.set(filepath, (await hashBlob({ object: blob })).oid);
         }
         const localFiles = await this.readLocalFileFingerprints(fs);
         const comparison = compareRepositoryPaths(localFiles, remoteFiles);
@@ -21209,6 +21327,23 @@ var ObsidianFsAdapter = class {
   isNodeAvailable() {
     return typeof window !== "undefined" && !!window.require && !!window.process;
   }
+  /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
+  nodePathFor(path) {
+    var _a, _b;
+    if (!this.isNodeAvailable())
+      return null;
+    try {
+      const nodeRequire = window.require;
+      const nodeFs = nodeRequire("fs");
+      const nodePath = nodeRequire("path");
+      const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
+      if (!basePath)
+        return null;
+      return { fs: nodeFs, path: nodePath, fullPath: nodePath.join(basePath, path) };
+    } catch (e) {
+      return null;
+    }
+  }
   /**
    * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
    * Node-compatible 'utf8' string for text; no encoding means binary.
@@ -21217,11 +21352,18 @@ var ObsidianFsAdapter = class {
    * We use Node.js fs via window.require (Electron desktop) as a fallback.
    */
   async readFileImpl(filepath, options) {
-    var _a, _b;
     const path = this.resolve(filepath);
     const encoding = typeof options === "string" ? options : options == null ? void 0 : options.encoding;
     if (encoding === "utf8") {
       return this.adapter.read(path);
+    }
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        const buffer = await nodeFile.fs.promises.readFile(nodeFile.fullPath);
+        return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      } catch (e) {
+      }
     }
     try {
       const arrayBuffer = await this.adapter.readBinary(path);
@@ -21229,20 +21371,6 @@ var ObsidianFsAdapter = class {
         return new Uint8Array(arrayBuffer);
       }
     } catch (e) {
-    }
-    if (this.isNodeAvailable()) {
-      try {
-        const nodeRequire = window.require;
-        const nodeFs = nodeRequire("fs");
-        const nodePath = nodeRequire("path");
-        const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
-        if (basePath) {
-          const fullPath = nodePath.join(basePath, path);
-          const buffer = await nodeFs.promises.readFile(fullPath);
-          return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        }
-      } catch (e) {
-      }
     }
     const err = new Error(`ENOENT: cannot read '${path}'`);
     err.code = "ENOENT";
@@ -21293,6 +21421,13 @@ var ObsidianFsAdapter = class {
   }
   async readdirImpl(filepath, _options) {
     const path = this.resolve(filepath);
+    const nodeDirectory = this.nodePathFor(path);
+    if (nodeDirectory) {
+      try {
+        return await nodeDirectory.fs.promises.readdir(nodeDirectory.fullPath, { encoding: "utf8" });
+      } catch (e) {
+      }
+    }
     const listed = await this.adapter.list(path);
     const stripDirPrefix = (name) => {
       const normalizedName = name.startsWith("./") ? name.slice(2) : name;
@@ -21330,6 +21465,13 @@ var ObsidianFsAdapter = class {
   }
   async statImpl(filepath) {
     const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        return await nodeFile.fs.promises.stat(nodeFile.fullPath);
+      } catch (e) {
+      }
+    }
     const stat = await this.adapter.stat(path);
     if (!stat) {
       const err = new Error(`ENOENT: no such file or directory, stat '${path}'`);
@@ -21368,13 +21510,6 @@ init_logger();
 // src/fileLogger.ts
 var import_obsidian4 = require("obsidian");
 init_security();
-var ORIGINAL_CONSOLE = {
-  debug: console.debug,
-  log: console.log,
-  error: console.error,
-  warn: console.warn,
-  info: console.info
-};
 var _FileLogger = class _FileLogger {
   constructor(app, pluginId, maxSizeBytes = 5 * 1024 * 1024) {
     this.buffer = [];
@@ -21386,21 +21521,6 @@ var _FileLogger = class _FileLogger {
     this.stopped = false;
     this.bytesWrittenSinceCheck = 0;
     this.sensitiveValues = [];
-    this.originalOnError = null;
-    this.originalOnUnhandledRejection = null;
-    this.handleWindowError = (message, source, lineno, colno, error) => {
-      this.writeDirect("fatal", `window.onerror: ${message} at ${source}:${lineno}:${colno}`, (error == null ? void 0 : error.stack) || "");
-      return this.originalOnError ? this.originalOnError.call(window, message, source, lineno, colno, error) : false;
-    };
-    this.handleUnhandledRejection = (event) => {
-      var _a;
-      this.writeDirect(
-        "fatal",
-        "Unhandled rejection:",
-        event.reason instanceof Error ? event.reason.stack || event.reason.message : String(event.reason)
-      );
-      (_a = this.originalOnUnhandledRejection) == null ? void 0 : _a.call(window, event);
-    };
     this.app = app;
     this.pluginDir = `${app.vault.configDir}/plugins/${pluginId}`;
     this.logPath = `${this.pluginDir}/debug.log`;
@@ -21416,11 +21536,6 @@ var _FileLogger = class _FileLogger {
       await this.app.vault.adapter.mkdir(this.pluginDir);
     } catch (e) {
     }
-    window.__obsidianGitLogger = this;
-    this.originalOnError = window.onerror;
-    this.originalOnUnhandledRejection = window.onunhandledrejection;
-    this.wrapConsole();
-    this.setupErrorHandlers();
     this.writeDirect("info", "=== Obsidian Git Sync debug log started ===");
     this.writeDirect("info", `Platform: ${import_obsidian4.Platform.isMobile ? "mobile" : "desktop"}`);
     this.writeDirect("info", `Obsidian version: ${((_a = window.app) == null ? void 0 : _a.version) || "unknown"}`);
@@ -21475,43 +21590,7 @@ var _FileLogger = class _FileLogger {
       this.flushTimer = null;
     }
     this.stopped = true;
-    console.log = ORIGINAL_CONSOLE.log;
-    console.debug = ORIGINAL_CONSOLE.debug;
-    console.error = ORIGINAL_CONSOLE.error;
-    console.warn = ORIGINAL_CONSOLE.warn;
-    console.info = ORIGINAL_CONSOLE.info;
-    if (window.onerror === this.handleWindowError)
-      window.onerror = this.originalOnError;
-    if (window.onunhandledrejection === this.handleUnhandledRejection) {
-      window.onunhandledrejection = this.originalOnUnhandledRejection;
-    }
     this.flushNow();
-  }
-  wrapConsole() {
-    console.debug = (...args) => {
-      ORIGINAL_CONSOLE.debug.apply(console, args);
-      this.log("debug", ...args);
-    };
-    console.log = (...args) => {
-      ORIGINAL_CONSOLE.log.apply(console, args);
-      this.log("log", ...args);
-    };
-    console.error = (...args) => {
-      ORIGINAL_CONSOLE.error.apply(console, args);
-      this.log("error", ...args);
-    };
-    console.warn = (...args) => {
-      ORIGINAL_CONSOLE.warn.apply(console, args);
-      this.log("warn", ...args);
-    };
-    console.info = (...args) => {
-      ORIGINAL_CONSOLE.info.apply(console, args);
-      this.log("info", ...args);
-    };
-  }
-  setupErrorHandlers() {
-    window.onerror = this.handleWindowError;
-    window.onunhandledrejection = this.handleUnhandledRejection;
   }
   scheduleFlush() {
     if (this.flushTimer !== null)
@@ -21605,7 +21684,7 @@ ${truncated}`);
           void this.truncateIfNeeded();
         }
       } catch (error) {
-        ORIGINAL_CONSOLE.error("[FileLogger] flush failed:", error);
+        console.error("[Git Sync][FileLogger] flush failed:", error);
       }
     })().finally(() => {
       this.flushInProgress = null;
@@ -23378,7 +23457,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "d6670c8374250ca7ed6db7073a251be3160386dd" : "unknown";
+var GIT_COMMIT_HASH = true ? "ee9edf8e27caf736dab2dfab50c51d3b49a4fd35" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -23810,6 +23889,10 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   async onload() {
     this.fileLogger = new FileLogger(this.app, this.manifest.id);
     await this.fileLogger.init();
+    log2.setFileLogSink((level, ...args) => {
+      var _a;
+      return (_a = this.fileLogger) == null ? void 0 : _a.log(level, ...args);
+    });
     await this.loadSettings();
     this.setDiagnosticLogLevel(this.settings.debugLogLevel);
     this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
@@ -23823,7 +23906,6 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       window.Buffer = Buffer2;
       log2.info("GitSyncPlugin", "Buffer polyfill loaded for mobile");
     }
-    log2.setLogLevel(0 /* DEBUG */);
     log2.info("GitSyncPlugin", "Initializing Git Sync plugin");
     this.fs = new ObsidianFsAdapter(this.app.vault.adapter, ".").promises;
     log2.debug("GitSyncPlugin", "File system adapter initialized");
@@ -24031,6 +24113,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     var _a;
     this.clearAutoSync();
     this.operationCoordinator.dispose();
+    log2.setFileLogSink(null);
     (_a = this.fileLogger) == null ? void 0 : _a.stop();
     this.fileLogger = null;
   }

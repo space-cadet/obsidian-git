@@ -21,6 +21,8 @@ export interface LogEntry {
   data?: any;
 }
 
+export type FileLogSink = (level: string, ...args: unknown[]) => void;
+
 export class Logger {
   private static instance: Logger;
   private logLevel: LogLevel = LogLevel.INFO;
@@ -30,6 +32,7 @@ export class Logger {
   private sensitiveValues: string[] = [];
   private recentNoticeTimes = new Map<string, number>();
   private readonly noticeCooldownMs = 5 * 60 * 1000;
+  private fileLogSink: FileLogSink | null = null;
 
   private constructor() {}
 
@@ -155,6 +158,11 @@ export class Logger {
       .filter((value): value is string => typeof value === 'string' && value.length >= 3);
   }
 
+  /** Attach the plugin-owned persistent log sink without touching global console state. */
+  public setFileLogSink(sink: FileLogSink | null): void {
+    this.fileLogSink = sink;
+  }
+
   /**
    * Log a debug message
    */
@@ -214,15 +222,31 @@ export class Logger {
   }
 
   private pushEntry(level: string, namespace: string, message: string, data?: any): void {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
     this.entries.push({
       timestamp: Date.now(),
       level,
       namespace,
-      message: redactSensitiveText(message, this.sensitiveValues),
-      data: redactSensitiveData(data, this.sensitiveValues),
+      message: safeMessage,
+      data: safeData,
     });
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(-this.maxEntries);
+    }
+    const levelRank: Record<string, LogLevel> = {
+      debug: LogLevel.DEBUG,
+      info: LogLevel.INFO,
+      warn: LogLevel.WARN,
+      error: LogLevel.ERROR,
+      fatal: LogLevel.ERROR,
+    };
+    if ((levelRank[level] ?? LogLevel.INFO) >= this.logLevel) {
+      this.fileLogSink?.(
+        level,
+        `[Git Sync][${namespace}] ${safeMessage}`,
+        safeData || '',
+      );
     }
   }
 }

@@ -452,17 +452,6 @@ function parseGitHubRepositoryUrl(repoUrl: string): { owner: string; repo: strin
     return null;
 }
 
-function bytesToExactFingerprint(value: Uint8Array | ArrayBuffer | string): string {
-    const bytes = typeof value === 'string'
-        ? new TextEncoder().encode(value)
-        : value instanceof Uint8Array
-            ? value
-            : new Uint8Array(value);
-    let result = '';
-    for (const byte of bytes) result += byte.toString(16).padStart(2, '0');
-    return result;
-}
-
 function isProtectedRepairPath(filepath: string): boolean {
     const normalized = filepath.replace(/^\.\//, '').replace(/^\/+/, '');
     return normalized === '.git'
@@ -620,6 +609,11 @@ export class GitManager {
         const error = new Error('Git operation cancelled');
         error.name = 'AbortError';
         throw error;
+    }
+
+    /** Keep long vault scans cancellable and give Obsidian a chance to paint. */
+    private async yieldToEventLoop(): Promise<void> {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
 
     private updateStatus(message: string) {
@@ -935,41 +929,64 @@ export class GitManager {
     async previewIndexRepair(): Promise<RepositoryIndexRepairPreview> {
         this.assertOperationActive();
         const fs = this.fs.promises || this.fs;
+        const startedAt = Date.now();
+        log.info('GitManager', 'Git index repair preview started');
         const index = await this.checkRepositoryIndex();
         const headOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
         const headCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
         const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, '', true);
-        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
-        const headFingerprints = new Map<string, string>();
-
-        for (const [filepath, oid] of headFiles) {
-            const { blob } = await git.readBlob({ fs: this.fs, dir: this.dir, oid });
-            headFingerprints.set(filepath, bytesToExactFingerprint(blob));
-        }
+        const trackedPaths = new Set(headFiles.keys());
+        const worktreeFiles = await this.readRepairWorktreePaths(fs, trackedPaths);
+        log.debug('GitManager', 'Git index repair preview discovered worktree paths', {
+            trackedFiles: headFiles.size,
+            worktreeFiles: worktreeFiles.size,
+            elapsedMs: Date.now() - startedAt,
+        });
 
         let modifiedFiles = 0;
         let deletedFiles = 0;
         let unchangedFiles = 0;
-        for (const [filepath, fingerprint] of headFingerprints) {
-            const worktreeFingerprint = worktreeFiles.get(filepath);
-            if (worktreeFingerprint === undefined) deletedFiles += 1;
-            else if (worktreeFingerprint === fingerprint) unchangedFiles += 1;
-            else modifiedFiles += 1;
+        let comparedFiles = 0;
+        for (const [filepath, oid] of headFiles) {
+            this.assertOperationActive();
+            if (!worktreeFiles.has(filepath)) {
+                deletedFiles += 1;
+            } else {
+                const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
+                const value = await fs.readFile(fullPath);
+                const localOid = (await git.hashBlob({ object: value })).oid;
+                if (localOid === oid) unchangedFiles += 1;
+                else modifiedFiles += 1;
+            }
+            comparedFiles += 1;
+            if (comparedFiles % 50 === 0) {
+                log.debug('GitManager', 'Git index repair preview comparing tracked files', {
+                    comparedFiles,
+                    trackedFiles: headFiles.size,
+                    elapsedMs: Date.now() - startedAt,
+                });
+                await this.yieldToEventLoop();
+            }
         }
 
         let untrackedFiles = 0;
-        for (const filepath of worktreeFiles.keys()) {
-            if (!headFingerprints.has(filepath)) untrackedFiles += 1;
+        for (const filepath of worktreeFiles) {
+            if (!trackedPaths.has(filepath)) untrackedFiles += 1;
         }
 
-        return {
+        const result = {
             index,
-            trackedFiles: headFingerprints.size,
+            trackedFiles: headFiles.size,
             modifiedFiles,
             deletedFiles,
             untrackedFiles,
             unchangedFiles,
         };
+        log.info('GitManager', 'Git index repair preview completed', {
+            ...result,
+            elapsedMs: Date.now() - startedAt,
+        });
+        return result;
     }
 
     /** Return a read-only description of the newest repair backup. */
@@ -1005,6 +1022,8 @@ export class GitManager {
     async rebuildIndexFromHead(): Promise<RepositoryIndexRepairResult> {
         this.assertOperationActive();
         const fs = this.fs.promises || this.fs;
+        const startedAt = Date.now();
+        log.info('GitManager', 'Git index repair started');
         const indexPath = this.repositoryGitPath('index');
         const lockPath = this.repositoryGitPath('index.lock');
         const health = await this.checkRepositoryIndex();
@@ -1023,7 +1042,21 @@ export class GitManager {
         const headOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
         const headCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
         const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, '', true);
-        const worktreeFiles = await this.readRepairWorktreeFiles(fs);
+        const worktreeFiles = await this.readRepairWorktreePaths(fs, new Set(headFiles.keys()));
+        const modifiedTrackedFiles: string[] = [];
+        const deletedTrackedFiles: string[] = [];
+        for (const [filepath, oid] of headFiles) {
+            this.assertOperationActive();
+            if (!worktreeFiles.has(filepath)) {
+                deletedTrackedFiles.push(filepath);
+                continue;
+            }
+            const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
+            const value = await fs.readFile(fullPath);
+            if ((await git.hashBlob({ object: value })).oid !== oid) {
+                modifiedTrackedFiles.push(filepath);
+            }
+        }
         let backupPath: string | null = null;
         let originalIndex: Uint8Array | null = null;
 
@@ -1038,25 +1071,41 @@ export class GitManager {
             // whereas it deliberately rejects a zero-byte index.
             await this.removeIndexIfPresent(fs);
 
-            for (const filepath of worktreeFiles.keys()) {
-                this.assertOperationActive();
-                await git.add({ fs: this.fs, dir: this.dir, filepath });
+            const existingTrackedFiles = [...headFiles.keys()].filter((filepath) => worktreeFiles.has(filepath));
+            if (existingTrackedFiles.length > 0) {
+                log.info('GitManager', 'Adding existing tracked files while rebuilding Git index', {
+                    files: existingTrackedFiles.length,
+                    totalTrackedFiles: headFiles.size,
+                });
+                await git.add({
+                    fs: this.fs,
+                    dir: this.dir,
+                    filepath: existingTrackedFiles,
+                    parallel: true,
+                    force: true,
+                });
             }
 
-            for (const filepath of headFiles.keys()) {
+            const pathsToReset = [...modifiedTrackedFiles, ...deletedTrackedFiles];
+            let resetCount = 0;
+            for (const filepath of pathsToReset) {
                 this.assertOperationActive();
                 await git.resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
-            }
-
-            for (const filepath of worktreeFiles.keys()) {
-                if (headFiles.has(filepath)) continue;
-                this.assertOperationActive();
-                await git.resetIndex({ fs: this.fs, dir: this.dir, filepath });
+                resetCount += 1;
+                if (resetCount % 50 === 0) {
+                    await this.yieldToEventLoop();
+                }
             }
 
             await git.listFiles({ fs: this.fs, dir: this.dir });
             await git.statusMatrix({ fs: this.fs, dir: this.dir });
-            log.info('GitManager', `Rebuilt Git index from HEAD (${headFiles.size} tracked files, ${worktreeFiles.size} worktree files)`);
+            log.info('GitManager', 'Git index repair completed', {
+                trackedFiles: headFiles.size,
+                worktreeFiles: worktreeFiles.size,
+                modifiedFiles: modifiedTrackedFiles.length,
+                deletedFiles: deletedTrackedFiles.length,
+                elapsedMs: Date.now() - startedAt,
+            });
             return {
                 backupPath,
                 trackedFiles: headFiles.size,
@@ -1074,20 +1123,67 @@ export class GitManager {
         }
     }
 
-    private async readRepairWorktreeFiles(fs: any): Promise<Map<string, string>> {
-        const files = await this.readLocalFileFingerprints(fs);
-        const result = new Map<string, string>();
-        for (const [filepath, fingerprint] of files) {
-            try {
-                const ignored = await git.isIgnored({ fs: this.fs, dir: this.dir, filepath });
-                if (ignored) continue;
-            } catch (error) {
-                // If ignore evaluation is unavailable, retain the file in the
-                // preview/rebuild so it is never accidentally omitted.
-                log.debug('GitManager', `Could not evaluate ignore rule for ${filepath}`, error);
+    private async readRepairWorktreePaths(fs: any, trackedPaths: Set<string>): Promise<Set<string>> {
+        const result = new Set<string>();
+        const startedAt = Date.now();
+        let examined = 0;
+
+        const hasTrackedDescendant = (directory: string): boolean => {
+            const prefix = `${directory}/`;
+            for (const trackedPath of trackedPaths) {
+                if (trackedPath.startsWith(prefix)) return true;
             }
-            result.set(filepath, fingerprint);
-        }
+            return false;
+        };
+
+        const isIgnored = async (filepath: string): Promise<boolean> => {
+            try {
+                return await git.isIgnored({ fs: this.fs, dir: this.dir, filepath });
+            } catch (error) {
+                // If ignore evaluation is unavailable, retain the file so it is
+                // never accidentally omitted from repair accounting.
+                log.debug('GitManager', `Could not evaluate ignore rule for ${filepath}`, error);
+                return false;
+            }
+        };
+
+        const walk = async (relativeDir: string): Promise<void> => {
+            this.assertOperationActive();
+            const lookupPath = relativeDir || (this.dir === '.' ? '.' : this.dir);
+            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' });
+            for (const entry of entries) {
+                const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
+                if (isProtectedRepairPath(filepath)) continue;
+                const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
+                const stat = await fs.stat(fullPath);
+                examined += 1;
+                if (stat.isDirectory()) {
+                    // Ignored directories can be discarded as a whole. Preserve
+                    // traversal when HEAD contains a tracked path below one.
+                    if (!hasTrackedDescendant(filepath) && await isIgnored(filepath)) continue;
+                    await walk(filepath);
+                } else if (stat.isFile()) {
+                    if (trackedPaths.has(filepath) || !(await isIgnored(filepath))) {
+                        result.add(filepath);
+                    }
+                }
+                if (examined % 32 === 0) {
+                    log.debug('GitManager', 'Git index repair scanning worktree', {
+                        examined,
+                        included: result.size,
+                        elapsedMs: Date.now() - startedAt,
+                    });
+                    await this.yieldToEventLoop();
+                }
+            }
+        };
+
+        await walk('');
+        log.info('GitManager', 'Git index repair worktree scan completed', {
+            examined,
+            included: result.size,
+            elapsedMs: Date.now() - startedAt,
+        });
         return result;
     }
 
@@ -1186,7 +1282,7 @@ export class GitManager {
                 for (const [filepath, blobOid] of tree) {
                     if (isProtectedRepairPath(filepath)) continue;
                     const { blob } = await git.readBlob({ fs: this.fs, dir: temporaryDir, oid: blobOid });
-                    remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+                    remoteFiles.set(filepath, (await git.hashBlob({ object: blob })).oid);
                 }
             }
 
@@ -1219,7 +1315,7 @@ export class GitManager {
                     await walk(filepath);
                 } else if (stat.isFile()) {
                     const value = await fs.readFile(fullPath);
-                    result.set(filepath, bytesToExactFingerprint(value));
+                    result.set(filepath, (await git.hashBlob({ object: value })).oid);
                 }
             }
         };
@@ -1367,7 +1463,7 @@ export class GitManager {
             const commits = await git.log({ fs: this.fs, dir: this.dir, ref: 'HEAD', depth: 1 });
             return commits.length > 0;
         } catch (error) {
-            console.error('pending checkout validation failed', error);
+            log.error('GitManager', 'Pending checkout validation failed', error as Error);
             return false;
         }
     }
@@ -1673,7 +1769,7 @@ export class GitManager {
         for (const [filepath, blobOid] of remoteTree) {
             if (isProtectedRepairPath(filepath)) continue;
             const { blob } = await git.readBlob({ fs: this.fs, dir: this.dir, oid: blobOid });
-            remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+            remoteFiles.set(filepath, (await git.hashBlob({ object: blob })).oid);
         }
         const localFiles = await this.readLocalFileFingerprints(fs);
         const comparison = compareRepositoryPaths(localFiles, remoteFiles);

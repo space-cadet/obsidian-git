@@ -62,3 +62,16 @@ test('logger does not repeat the same background notice immediately', () => {
 	assert.equal(Notice.messages.length - before, 1);
 	log.setShowNotices(false);
 });
+
+test('logger sends only explicit plugin entries to the persistent sink', () => {
+  const entries = [];
+  log.setLogLevel(LogLevel.INFO);
+  log.setFileLogSink((level, ...args) => entries.push({ level, args }));
+  log.info('GitManager', 'Plugin-owned diagnostic');
+  log.setFileLogSink(null);
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].level, 'info');
+  assert.match(entries[0].args[0], /^\[Git Sync\]\[GitManager\]/);
+  assert.doesNotMatch(entries[0].args[0], /Dataview|ObsidianAI/);
+});

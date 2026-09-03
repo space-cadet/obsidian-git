@@ -88,6 +88,7 @@ export default class GitSyncPlugin extends Plugin {
 		// startup failures and update timing are available from debug.log.
 		this.fileLogger = new FileLogger(this.app, this.manifest.id);
 		await this.fileLogger.init();
+		log.setFileLogSink((level, ...args) => this.fileLogger?.log(level, ...args));
 		await this.loadSettings();
 		this.setDiagnosticLogLevel(this.settings.debugLogLevel);
 		this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
@@ -108,8 +109,8 @@ export default class GitSyncPlugin extends Plugin {
 			log.info('GitSyncPlugin', 'Buffer polyfill loaded for mobile');
 		}
 
-		// Configure logger
-		log.setLogLevel(LogLevel.DEBUG); // Set to DEBUG during development, INFO for production
+		// The persisted diagnostic level is configured from settings above. Do not
+		// force DEBUG here or a user's logging preference is silently overridden.
 		log.info('GitSyncPlugin', 'Initializing Git Sync plugin');
 
 		// Use Obsidian's native filesystem adapter (works on desktop + mobile)
@@ -345,6 +346,7 @@ export default class GitSyncPlugin extends Plugin {
 	onunload() {
 		this.clearAutoSync();
 		this.operationCoordinator.dispose();
+		log.setFileLogSink(null);
 		this.fileLogger?.stop();
 		this.fileLogger = null;
 	}
