@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 01:51:29 IST*
+*Last Updated: 2026-09-04 02:19:21 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -9,11 +9,11 @@
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
 **Status**: 🔄 IN PROGRESS
 
-**Session Title**: T35b, T35d, T35f, T37: Fix sidebar history, staging latency, and commit controls
+**Session Title**: T29a, T35b, T35d, T35f, T37: Harden sidebar lifecycle, logging, staging, and modularity boundaries
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Complete repository-state coverage, protected replacement safety, and real Obsidian acceptance.
+**Next Session**: Continue the remaining UI fixes, then complete repository-state coverage, protected replacement safety, and real Obsidian acceptance.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -190,6 +190,13 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 - Full package verification passes with 72 Node tests, artifact identity,
   production build, 10 isomorphic-git checks, and `git diff --check`.
 - Runtime Obsidian desktop/mobile evidence remains pending.
+
+## Session Closeout Note — 2026-09-04 02:19:21 IST
+
+- Many UI issues remain unresolved; this is a targeted hardening checkpoint,
+  not a broad UI acceptance closeout.
+- Preserve the distinction between automated source/build evidence and real
+  Obsidian desktop/mobile visual and timing evidence.
 
 ## Current Implementation Checkpoint — 2026-09-04
 

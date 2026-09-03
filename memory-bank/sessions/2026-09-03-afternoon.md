@@ -303,3 +303,14 @@ the incremental architecture plan
   and failed paths, so partial operations remain accurate in the UI.
 - Full verification passed: 72 Node tests, artifact identity, production
   build, 10 isomorphic-git checks, and `git diff --check`.
+
+## Session Closeout — 2026-09-04 02:19:21 IST
+
+- Central work: sidebar lifecycle hardening, persistent Log display, staging
+  and bulk-action performance/repaint fixes, commit-source controls, and the
+  corresponding modularity/test documentation.
+- Final evidence: commits `a13d4f0` and `af549c5` were pushed; the final
+  remote commit is `af549c5`, with 72 Node tests and 10 isomorphic-git checks
+  passing.
+- Many UI issues remain unresolved. T29a remains in progress, and real
+  Obsidian desktop/mobile visual and timing acceptance is still pending.

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 01:51:29 IST*
+*Last Updated: 2026-09-04 02:19:21 IST*
 
 ## Current Tasks
 
@@ -349,6 +349,14 @@
   production build, 10 isomorphic-git checks, and `git diff --check`.
 - Real Obsidian cross-session log, staging timing, and visual acceptance are
   still pending; T35c repository replacement and mobile ref work remain open.
+
+## Session Closeout — 2026-09-04
+
+- Session title: `T29a, T35b, T35d, T35f, T37: Harden sidebar lifecycle, logging, staging, and modularity boundaries`.
+- The session delivered targeted lifecycle, Log, staging, bulk-action, and
+  commit-control fixes, with generated-bundle and automated-test evidence.
+- Many UI issues still remain. Keep T29a in progress and do not claim broad
+  desktop/mobile visual acceptance.
 
 ## Decisions Made
 

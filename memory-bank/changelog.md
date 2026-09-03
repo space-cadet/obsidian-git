@@ -7,6 +7,8 @@
 - Added source-level regression coverage for the bulk completion path.
 - Verification passed: 72 Node tests, artifact identity, production build, 10
   isomorphic-git checks, and `git diff --check`.
+- This was targeted work only; many UI issues remain unresolved and real
+  Obsidian visual/runtime acceptance is still open.
 
 ## 2026-09-04 — T29a/T35b/T35d/T35f/T37 sidebar follow-up
 

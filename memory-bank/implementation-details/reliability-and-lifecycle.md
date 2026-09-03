@@ -292,3 +292,9 @@ Bulk staging follows the same completion rule. `addAll()` supplies the files
 that actually reached the index, and `unstageAll()` now supplies successful and
 failed paths. The view moves only successful paths before repainting, so a
 partial bulk operation stays visible and honest without a second full scan.
+
+## Session Closeout — 2026-09-04
+
+This session improved several sidebar lifecycle and staging paths, but it did
+not resolve the broader UI backlog. Real Obsidian desktop/mobile behavior,
+visual parity, and remaining UI issues must stay separate acceptance work.

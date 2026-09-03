@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 01:51:29 IST*
+*Last Updated: 2026-09-04 02:19:21 IST*
 
 ## 2026-09-04 Sidebar History, Staging, and Commit Controls
 
@@ -19,6 +19,12 @@
 - Verification passed: 72 Node tests, artifact identity, production build, 10
   isomorphic-git checks, and `git diff --check`. Real Obsidian runtime,
   cross-session persistence, and visual acceptance remain open.
+
+## 2026-09-04 Session Closeout
+
+- This session's targeted sidebar fixes are recorded, but many UI issues still
+  remain. T29a stays in progress; no broad visual or device acceptance is
+  claimed.
 
 ## 2026-09-04 Stale-Read Guard
 

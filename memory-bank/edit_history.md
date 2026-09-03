@@ -1,11 +1,25 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 01:51:29 IST*
+*Last Updated: 2026-09-04 02:19:21 IST*
 
 ---
 
 ## 2026-09-04
+
+#### 02:19:21 IST - T29a/T35b/T35d/T35f/T37: Record session closeout and remaining UI issues
+- Updated `memory-bank/tasks.md` - Refreshed the registry timestamp without
+  changing unrelated task status.
+- Updated `memory-bank/tasks/T29a.md`, `T35b.md`, `T35d.md`, `T35f.md`, and
+  `T37.md` - Recorded the session results and kept the active UI work open.
+- Updated `memory-bank/activeContext.md`, `session_cache.md`, `progress.md`,
+  and `changelog.md` - Recorded the requested session title, evidence, and
+  that many UI issues remain unresolved.
+- Updated `memory-bank/implementation-details/reliability-and-lifecycle.md`
+  and `memory-bank/sessions/2026-09-03-afternoon.md` - Preserved the session
+  history and acceptance boundaries.
+- Created `memory-bank/edits/2026-09-04/021921-T29a-T35-sidebar-session-closeout.md`
+  - Recorded the complete session closeout.
 
 #### 01:51:29 IST - T29a/T35b/T35f: Fix bulk stage and unstage repaint
 - Modified `src/gitManager.ts` - Return per-file success and failure data from
