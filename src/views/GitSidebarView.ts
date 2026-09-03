@@ -579,7 +579,7 @@ export class GitSidebarView extends ItemView {
                     await this.renderCommitsTab(generation);
                     break;
                 case 'log':
-                    await this.renderLogTab();
+                    await this.renderLogTab(generation);
                     break;
             }
         }
@@ -1150,13 +1150,13 @@ export class GitSidebarView extends ItemView {
                         row.setAttr('aria-expanded', 'true');
                         toggle.setText('⌄');
                         timelineDot.addClass('git-commit-timeline-dot-active');
-                        await this.renderCommitDetail(row, commit.oid);
+                        await this.renderCommitDetail(row, commit.oid, generation);
                     }
                 });
 
                 // If already expanded, render detail
                 if (isExpanded) {
-                    await this.renderCommitDetail(row, commit.oid);
+                    await this.renderCommitDetail(row, commit.oid, generation);
                 }
             }
         } catch (e: any) {
@@ -1174,7 +1174,7 @@ export class GitSidebarView extends ItemView {
         }
     }
 
-    private async renderCommitDetail(row: HTMLElement, oid: string): Promise<void> {
+    private async renderCommitDetail(row: HTMLElement, oid: string, generation: number): Promise<void> {
         // Remove existing detail if any
         const existing = row.querySelector('.git-commit-detail');
         if (existing) existing.remove();
@@ -1227,6 +1227,8 @@ export class GitSidebarView extends ItemView {
                 }
             }
 
+            if (!this.isCurrentRender(generation) || !row.isConnected) return;
+
             this.readModel.setCommitDetails(oid, files);
             
             detail.empty();
@@ -1268,7 +1270,7 @@ export class GitSidebarView extends ItemView {
         await this.renderCommitsTab(this.renderGeneration);
     }
 
-    private async renderLogTab(): Promise<void> {
+    private async renderLogTab(generation: number): Promise<void> {
         const listContainer = this.contentContainer.createDiv('git-log-list');
 
         const toolbar = listContainer.createDiv('git-log-toolbar');
@@ -1280,6 +1282,7 @@ export class GitSidebarView extends ItemView {
             && currentLogEntries.length !== cachedEntries.length;
         if (!cachedEntries || cacheStale) {
             const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+            if (!this.isCurrentRender(generation)) return;
             log.mergePersistedEntries(persisted);
             this.readModel.setLogEntries(log.getEntries());
         }
@@ -1345,7 +1348,7 @@ export class GitSidebarView extends ItemView {
                 this.readModel.setLogEntries([]);
                 new Notice('Activity log cleared');
                 this.contentContainer.empty();
-                await this.renderLogTab();
+                await this.renderLogTab(this.renderGeneration);
             }));
         menu.addItem((item) => item
             .setTitle('Copy details')

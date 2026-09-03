@@ -96,3 +96,12 @@ test('successful pushes force-update the existing local tracking ref', () => {
     /ref: `refs\/remotes\/origin\/\$\{branchName\}`,[\s\S]*value: localOid,[\s\S]*force: true,/,
   );
 });
+
+test('async sidebar reads guard log and commit-detail responses against stale renders', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /private async renderLogTab\(generation: number\)/);
+  assert.match(sidebarSource, /await this\.plugin\.fileLogger\?\.readEntries\(500\)[\s\S]*if \(!this\.isCurrentRender\(generation\)\) return;/);
+  assert.match(sidebarSource, /private async renderCommitDetail\(row: HTMLElement, oid: string, generation: number\)/);
+  assert.match(sidebarSource, /if \(!this\.isCurrentRender\(generation\) \|\| !row\.isConnected\) return;/);
+});

@@ -1,9 +1,31 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 01:15:22 IST*
+*Last Updated: 2026-09-04 01:19:03 IST*
 
 ---
+
+## 2026-09-04
+
+#### 01:19:03 IST - T35b/T35f/T37: Guard stale sidebar read responses
+- Modified `src/views/GitSidebarView.ts` - Passed render generations into Log
+  and commit-detail reads and rejected stale or detached results.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Added stale-read
+  guard assertions.
+- Modified `memory-bank/tasks/T35b.md` - Recorded the stale-read checkpoint.
+- Modified `memory-bank/tasks/T35f.md` - Recorded conformance and 68-test
+  verification.
+- Modified `memory-bank/tasks/T37.md` - Recorded lifecycle/read-model progress.
+- Modified `memory-bank/implementation-details/reliability-and-lifecycle.md`
+  - Documented delayed-response protection.
+- Modified `memory-bank/activeContext.md` - Recorded the stale-read guard.
+- Modified `memory-bank/session_cache.md` - Recorded the current checkpoint.
+- Modified `memory-bank/sessions/2026-09-03-afternoon.md` - Appended the guard
+  work and handoff.
+- Modified `memory-bank/progress.md` - Recorded the stale-read milestone.
+- Modified `memory-bank/changelog.md` - Recorded the stale-response hardening.
+- Created `memory-bank/edits/2026-09-04/011903-T35b-stale-read-guard.md`
+  - Recorded the edit chunk and verification boundary.
 
 ## 2026-09-04
 

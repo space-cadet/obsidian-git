@@ -258,3 +258,11 @@ Git operations into a passive data module.
 The model is covered without Obsidian DOM dependencies. The view integration is
 source/build verified; real desktop/mobile freshness and visual behavior remain
 runtime evidence gaps.
+
+## Stale Read Guard Checkpoint — 2026-09-04
+
+The sidebar now passes the current render generation into Log-tab and
+commit-detail reads. After asynchronous file, Git, or GitHub reads complete,
+the view checks both the generation and, for commit details, row attachment
+before updating cache or DOM. This keeps a delayed response from a prior tab
+or detached leaf from becoming visible state.

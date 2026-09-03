@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 01:15:22 IST*
+*Last Updated: 2026-09-04 01:19:03 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -214,3 +214,10 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   still owns rendering and operation callbacks.
 - Full package verification passes with 67 Node tests, artifact identity,
   production build, and 10 isomorphic-git checks.
+
+## Current Stale-Read Checkpoint — 2026-09-04
+
+- Log and commit-detail async reads now reject stale render generations and
+  detached commit rows before applying results.
+- Focused and full tests pass with 68 Node tests. Repository-state modeling,
+  protected replacement, and real Obsidian acceptance remain open.

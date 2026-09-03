@@ -24933,7 +24933,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           await this.renderCommitsTab(generation);
           break;
         case "log":
-          await this.renderLogTab();
+          await this.renderLogTab(generation);
           break;
       }
     }
@@ -25395,11 +25395,11 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             row.setAttr("aria-expanded", "true");
             toggle.setText("\u2304");
             timelineDot.addClass("git-commit-timeline-dot-active");
-            await this.renderCommitDetail(row, commit2.oid);
+            await this.renderCommitDetail(row, commit2.oid, generation);
           }
         });
         if (isExpanded) {
-          await this.renderCommitDetail(row, commit2.oid);
+          await this.renderCommitDetail(row, commit2.oid, generation);
         }
       }
     } catch (e) {
@@ -25416,7 +25416,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     }
   }
-  async renderCommitDetail(row, oid) {
+  async renderCommitDetail(row, oid, generation) {
     var _a, _b;
     const existing = row.querySelector(".git-commit-detail");
     if (existing)
@@ -25457,6 +25457,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           files = remoteFiles;
         }
       }
+      if (!this.isCurrentRender(generation) || !row.isConnected)
+        return;
       this.readModel.setCommitDetails(oid, files);
       detail.empty();
       if (files.length === 0) {
@@ -25489,7 +25491,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   async renderHistoryTab() {
     await this.renderCommitsTab(this.renderGeneration);
   }
-  async renderLogTab() {
+  async renderLogTab(generation) {
     var _a;
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
@@ -25499,6 +25501,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const cacheStale = cachedEntries && currentLogEntries.length !== cachedEntries.length;
     if (!cachedEntries || cacheStale) {
       const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+      if (!this.isCurrentRender(generation))
+        return;
       log2.mergePersistedEntries(persisted);
       this.readModel.setLogEntries(log2.getEntries());
     }
@@ -25552,7 +25556,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.readModel.setLogEntries([]);
       new import_obsidian5.Notice("Activity log cleared");
       this.contentContainer.empty();
-      await this.renderLogTab();
+      await this.renderLogTab(this.renderGeneration);
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
       var _a;
@@ -26376,7 +26380,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "f0574f9102ee5780ec69fbe88ff08d4f03665d21" : "unknown";
+var GIT_COMMIT_HASH = true ? "b4f6fc67a32f9daa66c05cd1e4e2ba8509ed0c72" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

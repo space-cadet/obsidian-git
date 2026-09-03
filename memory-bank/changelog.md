@@ -1,3 +1,9 @@
+## 2026-09-04 — T35b/T35f stale-read guard
+
+- Guarded asynchronous Log-tab and commit-detail responses against stale
+  render generations and detached rows.
+- Added source-level regression coverage for the delayed-response paths.
+
 ## 2026-09-04 — T35b/T35f/T37 sidebar read-model extraction
 
 - Added `SidebarReadModel` to own plugin-lifetime history, commit-detail, and

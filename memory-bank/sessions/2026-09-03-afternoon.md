@@ -246,3 +246,19 @@ the incremental architecture plan
   build, 10 isomorphic-git checks, and `git diff --check`.
 - This is the first read-boundary extraction. The next work should add stale
   view/repository-state behavior coverage before extracting further modules.
+
+## Stale-Read Guard — 2026-09-04 01:19:03 IST
+
+### Work Completed
+
+- Passed the current render generation into Log-tab and commit-detail reads.
+- Added checks after asynchronous reads so delayed results cannot update a
+  changed tab, detached leaf, or detached commit row.
+- Added source-level conformance assertions for both guarded paths.
+
+### Verification and Handoff
+
+- `CI=true pnpm test` passed: 68 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
+- Repository-state outcomes and protected replacement are the next source
+  architecture work; runtime desktop/mobile acceptance remains separate.

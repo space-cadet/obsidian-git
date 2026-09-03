@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 01:15:22 IST*
+*Last Updated: 2026-09-04 01:19:03 IST*
 
 ## Current Tasks
 
@@ -125,6 +125,13 @@
   stale-render guards. The model is independently unit tested.
 - This is the first read-boundary extraction; further module work remains
   subject to conformance and real desktop/mobile evidence.
+
+### Stale-Read Guard — 2026-09-04
+- Log loading and commit-detail responses now verify the current render
+  generation before updating cache or DOM; commit details also require an
+  attached row.
+- Full automated verification passes. Repository-state outcomes and runtime
+  desktop/mobile acceptance remain the next evidence gaps.
 
 ### Current Implementation Session — 2026-09-03 18:26 IST
 - **Authorized scope**: Implement the seven confirmed sidebar, staging,

@@ -1,6 +1,13 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 01:15:22 IST*
+*Last Updated: 2026-09-04 01:19:03 IST*
+
+## 2026-09-04 Stale-Read Guard
+
+- Applied render-generation and detached-row checks to async Log-tab and
+  commit-detail responses.
+- Added conformance coverage and verified 68 Node tests, artifact identity,
+  production build, 10 isomorphic-git checks, and `git diff --check`.
 
 ## 2026-09-04 Sidebar Read-Model Extraction
 
