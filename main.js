@@ -20704,14 +20704,19 @@ Try again with a faster connection or smaller repository.`
           const staged = [];
           const failed = [];
           this.updateStatus(filesToStage.length > 0 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? "" : "s"}...` : "No changes to add");
+          const statusByPath = /* @__PURE__ */ new Map();
+          if (filesToStage.length > 0) {
+            const statusMatrix2 = await statusMatrix({
+              fs: this.fs,
+              dir: this.dir
+            });
+            for (const row of statusMatrix2)
+              statusByPath.set(row[0], row);
+          }
           for (const file of filesToStage) {
             try {
               this.assertOperationActive();
-              await add({
-                fs: this.fs,
-                dir: this.dir,
-                filepath: file
-              });
+              await this.stagePath(file, statusByPath);
               staged.push(file);
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
@@ -20956,7 +20961,7 @@ Try again with a faster connection or smaller repository.`
           else
             status2 = "modified";
           detailedStatus.push({ filepath, status: status2 });
-          const hasStagedChanges = stage !== 1 && stage !== 0;
+          const hasStagedChanges = head === 1 && stage === 0 || stage !== 1 && stage !== 0;
           const hasWorkdirChanges = workdir !== 1;
           if (hasStagedChanges)
             staged.push(filepath);
@@ -20971,12 +20976,33 @@ Try again with a faster connection or smaller repository.`
       async stageFile(filepath) {
         try {
           this.assertOperationActive();
-          await add({ fs: this.fs, dir: this.dir, filepath });
+          await this.stagePath(filepath);
           log2.debug("GitManager", `Staged file: ${filepath}`);
         } catch (error) {
           log2.error("GitManager", `Failed to stage file: ${filepath}`, error);
           throw error;
         }
+      }
+      /**
+       * Stage a path, including tracked paths that have been deleted locally.
+       * isomorphic-git.add() reads the working-tree file and therefore throws
+       * NotFoundError for a tracked deletion. remove() updates only the index,
+       * which is exactly what staging that deletion requires.
+       */
+      async stagePath(filepath, statusByPath) {
+        let row = statusByPath == null ? void 0 : statusByPath.get(filepath);
+        if (!row) {
+          const statusMatrix2 = await statusMatrix({
+            fs: this.fs,
+            dir: this.dir
+          });
+          row = statusMatrix2.find((candidate) => candidate[0] === filepath);
+        }
+        if (row && row[1] === 1 && row[2] === 0) {
+          await remove({ fs: this.fs, dir: this.dir, filepath });
+          return;
+        }
+        await add({ fs: this.fs, dir: this.dir, filepath });
       }
       /**
        * Unstage a single file (reset to HEAD, or remove from index for new files)
@@ -23472,7 +23498,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "b7284707587237181b5fa856a177ed323f1f515b" : "unknown";
+var GIT_COMMIT_HASH = true ? "9a45d379a5bcc4cab5bfeb48652a1aaf795a1001" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

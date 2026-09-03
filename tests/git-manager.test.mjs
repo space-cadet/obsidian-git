@@ -453,6 +453,70 @@ test('addAll stages more than ten changed files', async () => {
   }
 });
 
+test('addAll stages tracked deletions without reading the missing file', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-add-deletion-'));
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(stageDirectory, 'deleted.md'), 'file to delete\n');
+    await git.add({ fs: fsPromises, dir: stageDirectory, filepath: 'deleted.md' });
+    await git.commit({
+      fs: fsPromises,
+      dir: stageDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    await fsPromises.unlink(join(stageDirectory, 'deleted.md'));
+
+    const manager = new GitManager(fsPromises, stageDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    const result = await manager.addAll(['deleted.md']);
+    assert.equal(result.requested, 1);
+    assert.deepEqual(result.staged, ['deleted.md']);
+    assert.deepEqual(result.failed, []);
+
+    const matrix = await git.statusMatrix({ fs: fsPromises, dir: stageDirectory });
+    assert.deepEqual(matrix, [['deleted.md', 1, 0, 0]]);
+    assert.deepEqual(await manager.getStatusGroups(), { staged: ['deleted.md'], unstaged: [] });
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
+test('stageFile stages a tracked deletion without reading the missing file', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-stage-deletion-'));
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(stageDirectory, 'deleted.md'), 'file to delete\n');
+    await git.add({ fs: fsPromises, dir: stageDirectory, filepath: 'deleted.md' });
+    await git.commit({
+      fs: fsPromises,
+      dir: stageDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    await fsPromises.unlink(join(stageDirectory, 'deleted.md'));
+
+    const manager = new GitManager(fsPromises, stageDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    await manager.stageFile('deleted.md');
+
+    const matrix = await git.statusMatrix({ fs: fsPromises, dir: stageDirectory });
+    assert.deepEqual(matrix, [['deleted.md', 1, 0, 0]]);
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
 test('clone retains initialized partial git state when the remote fails', async () => {
   const cloneDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-resume-'));
   requestUrlImpl = async () => {

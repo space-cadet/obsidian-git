@@ -427,6 +427,8 @@ export interface BulkStageResult {
     failed: Array<{ filepath: string; message: string }>;
 }
 
+type GitStatusMatrixRow = [string, number, number, number];
+
 export interface GitCommit {
     oid: string;
     message: string;
@@ -1915,16 +1917,24 @@ export class GitManager {
                 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? '' : 's'}...`
                 : 'No changes to add');
 
+            // isomorphic-git.add() expects a file to exist in the working tree.
+            // Build one status snapshot so tracked deletions can use remove()
+            // without rescanning the vault once per file.
+            const statusByPath = new Map<string, GitStatusMatrixRow>();
+            if (filesToStage.length > 0) {
+                const statusMatrix = await git.statusMatrix({
+                    fs: this.fs,
+                    dir: this.dir,
+                }) as GitStatusMatrixRow[];
+                for (const row of statusMatrix) statusByPath.set(row[0], row);
+            }
+
             // Keep going if one file cannot be staged. A single bad file must
             // not make the user lose the progress made on all the other files.
             for (const file of filesToStage) {
                 try {
                     this.assertOperationActive();
-                    await git.add({
-                        fs: this.fs,
-                        dir: this.dir,
-                        filepath: file
-                    });
+                    await this.stagePath(file, statusByPath);
                     staged.push(file);
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
@@ -2203,7 +2213,10 @@ export class GitManager {
 
             detailedStatus.push({ filepath, status });
 
-            const hasStagedChanges = stage !== 1 && stage !== 0;
+            // A tracked deletion is represented by stage=0 after it has been
+            // removed from the index. Distinguish that from an untracked path
+            // (head=0, stage=0), which must remain unstaged.
+            const hasStagedChanges = (head === 1 && stage === 0) || (stage !== 1 && stage !== 0);
             const hasWorkdirChanges = workdir !== 1;
             if (hasStagedChanges) staged.push(filepath);
             if (hasWorkdirChanges && !hasStagedChanges) unstaged.push(filepath);
@@ -2218,12 +2231,39 @@ export class GitManager {
     async stageFile(filepath: string): Promise<void> {
         try {
             this.assertOperationActive();
-            await git.add({ fs: this.fs, dir: this.dir, filepath });
+            await this.stagePath(filepath);
             log.debug('GitManager', `Staged file: ${filepath}`);
         } catch (error) {
             log.error('GitManager', `Failed to stage file: ${filepath}`, error);
             throw error;
         }
+    }
+
+    /**
+     * Stage a path, including tracked paths that have been deleted locally.
+     * isomorphic-git.add() reads the working-tree file and therefore throws
+     * NotFoundError for a tracked deletion. remove() updates only the index,
+     * which is exactly what staging that deletion requires.
+     */
+    private async stagePath(
+        filepath: string,
+        statusByPath?: ReadonlyMap<string, GitStatusMatrixRow>,
+    ): Promise<void> {
+        let row = statusByPath?.get(filepath);
+        if (!row) {
+            const statusMatrix = await git.statusMatrix({
+                fs: this.fs,
+                dir: this.dir,
+            }) as GitStatusMatrixRow[];
+            row = statusMatrix.find((candidate) => candidate[0] === filepath);
+        }
+
+        if (row && row[1] === 1 && row[2] === 0) {
+            await git.remove({ fs: this.fs, dir: this.dir, filepath });
+            return;
+        }
+
+        await git.add({ fs: this.fs, dir: this.dir, filepath });
     }
 
     /**
