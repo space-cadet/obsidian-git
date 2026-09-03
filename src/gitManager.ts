@@ -1127,6 +1127,7 @@ export class GitManager {
         const result = new Set<string>();
         const startedAt = Date.now();
         let examined = 0;
+        let missingEntries = 0;
 
         const hasTrackedDescendant = (directory: string): boolean => {
             const prefix = `${directory}/`;
@@ -1155,7 +1156,23 @@ export class GitManager {
                 const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
                 if (isProtectedRepairPath(filepath)) continue;
                 const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
-                const stat = await fs.stat(fullPath);
+                let stat: any;
+                try {
+                    stat = await fs.stat(fullPath);
+                } catch (error) {
+                    if (isTransientMissingPath(error)) {
+                        // Cloud/mobile vault indexes can briefly retain a path
+                        // after its backing file has disappeared. It cannot be
+                        // part of the repair if it cannot be stat'ed.
+                        missingEntries += 1;
+                        log.debug('GitManager', 'Skipping missing worktree entry during index repair scan', {
+                            filepath,
+                            missingEntries,
+                        });
+                        continue;
+                    }
+                    throw error;
+                }
                 examined += 1;
                 if (stat.isDirectory()) {
                     // Ignored directories can be discarded as a whole. Preserve
@@ -1182,6 +1199,7 @@ export class GitManager {
         log.info('GitManager', 'Git index repair worktree scan completed', {
             examined,
             included: result.size,
+            missingEntries,
             elapsedMs: Date.now() - startedAt,
         });
         return result;

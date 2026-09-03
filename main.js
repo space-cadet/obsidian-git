@@ -20003,6 +20003,7 @@ var init_gitManager = __esm({
         const result = /* @__PURE__ */ new Set();
         const startedAt = Date.now();
         let examined = 0;
+        let missingEntries = 0;
         const hasTrackedDescendant = (directory) => {
           const prefix = `${directory}/`;
           for (const trackedPath of trackedPaths) {
@@ -20028,7 +20029,20 @@ var init_gitManager = __esm({
             if (isProtectedRepairPath(filepath))
               continue;
             const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-            const stat = await fs.stat(fullPath);
+            let stat;
+            try {
+              stat = await fs.stat(fullPath);
+            } catch (error) {
+              if (isTransientMissingPath(error)) {
+                missingEntries += 1;
+                log2.debug("GitManager", "Skipping missing worktree entry during index repair scan", {
+                  filepath,
+                  missingEntries
+                });
+                continue;
+              }
+              throw error;
+            }
             examined += 1;
             if (stat.isDirectory()) {
               if (!hasTrackedDescendant(filepath) && await isIgnored2(filepath))
@@ -20053,6 +20067,7 @@ var init_gitManager = __esm({
         log2.info("GitManager", "Git index repair worktree scan completed", {
           examined,
           included: result.size,
+          missingEntries,
           elapsedMs: Date.now() - startedAt
         });
         return result;
@@ -23457,7 +23472,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "ee9edf8e27caf736dab2dfab50c51d3b49a4fd35" : "unknown";
+var GIT_COMMIT_HASH = true ? "29085edfc8decca766a1b2e5f4f620b03eec5ad3" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
