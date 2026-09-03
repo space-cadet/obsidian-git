@@ -1,19 +1,19 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 01:19:03 IST*
+*Last Updated: 2026-09-04 01:42:44 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
-**Focus Task**: T35b, T35f, T37 operation ownership and verified bundle
+**Focus Task**: T35b, T35d, T35f, T37 sidebar reliability and verified bundle
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
 **Status**: 🔄 IN PROGRESS
 
-**Session Title**: T35b, T35f, T37: Implement operation ownership and publish the verified bundle
+**Session Title**: T35b, T35d, T35f, T37: Fix sidebar history, staging latency, and commit controls
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Complete stale-view and repository-state coverage, protected replacement safety, and real Obsidian acceptance.
+**Next Session**: Complete repository-state coverage, protected replacement safety, and real Obsidian acceptance.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -174,6 +174,20 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
 5. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
 6. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+
+## Current Sidebar Follow-up Checkpoint — 2026-09-04 01:42:44 IST
+
+- Removed the Log view's newest-50 display cap so persisted entries from prior
+  sessions remain visible within the configured bounded retention.
+- Optimized direct single-file staging to avoid a whole-vault status scan;
+  tracked deletion and ignore enforcement remain explicit.
+- Made the Local/Remote commit-source controls sticky while the commit list
+  scrolls.
+- Single-file stage/unstage completion now repaints the Changes view from the
+  updated snapshot without a second full repository read.
+- Full package verification passes with 71 Node tests, artifact identity,
+  production build, 10 isomorphic-git checks, and `git diff --check`.
+- Runtime Obsidian desktop/mobile evidence remains pending.
 
 ## Current Implementation Checkpoint — 2026-09-04
 

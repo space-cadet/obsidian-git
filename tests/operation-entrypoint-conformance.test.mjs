@@ -77,13 +77,13 @@ test('plugin lifecycle owns coordinator disposal and signal cleanup', () => {
   assert.match(mainSource, /manager\.setOperationSignal\(null\)/);
 });
 
-test('only the pressed staging control can receive the busy spinner', () => {
+test('staging controls stay stationary while a mutation is in flight', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
 
-  assert.match(sidebarSource, /stageBtn\.addClass\('git-file-stage-busy'\)/);
+  assert.match(sidebarSource, /this\.setMutationBusy\(true\)/);
   assert.match(sidebarSource, /control\.addClass\('git-operation-busy'\)/);
-  assert.doesNotMatch(sidebarSource, /if \(busy\) control\.addClass\('git-file-stage-busy'\)/);
+  assert.doesNotMatch(sidebarSource, /git-file-stage-busy/);
   assert.match(styles, /\.git-header-refreshing svg[\s\S]*animation: git-sync-spin/);
   assert.doesNotMatch(styles, /\.git-file-stage-busy svg/);
   assert.doesNotMatch(styles, /\.git-operation-busy svg[\s\S]*animation: git-sync-spin/);
@@ -104,4 +104,40 @@ test('async sidebar reads guard log and commit-detail responses against stale re
   assert.match(sidebarSource, /await this\.plugin\.fileLogger\?\.readEntries\(500\)[\s\S]*if \(!this\.isCurrentRender\(generation\)\) return;/);
   assert.match(sidebarSource, /private async renderCommitDetail\(row: HTMLElement, oid: string, generation: number\)/);
   assert.match(sidebarSource, /if \(!this\.isCurrentRender\(generation\) \|\| !row\.isConnected\) return;/);
+});
+
+test('sidebar keeps retained activity history and commit source controls visible', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
+
+  assert.match(sidebarSource, /const recent = \[\.\.\.entries\]\.reverse\(\);/);
+  assert.doesNotMatch(sidebarSource, /reverse\(\)\.slice\(0, 50\)/);
+  assert.match(
+    styles,
+    /\.git-sidebar-content \.git-commits-toggle-bar \{[\s\S]*position:\s*sticky;[\s\S]*top:\s*0;[\s\S]*z-index:\s*4;/,
+  );
+});
+
+test('single-file staging avoids a repository-wide status scan', () => {
+  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
+  const stagePathSource = gitManagerSource.match(
+    /private async stagePath\([\s\S]*?\n    \}\n\n    \/\*\*\n     \* Ask isomorphic-git for ignore semantics/,
+  )?.[0] || '';
+
+  assert.match(stagePathSource, /git\.listFiles\(/);
+  assert.match(stagePathSource, /this\.fs\.stat\(/);
+  assert.doesNotMatch(stagePathSource, /git\.statusMatrix\(/);
+});
+
+test('single-file sidebar mutations repaint from the completed operation', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const actionStart = sidebarSource.indexOf("stageBtn.addEventListener('click'");
+  const actionEnd = sidebarSource.indexOf('\n                });', actionStart);
+  const actionSource = sidebarSource.slice(actionStart, actionEnd);
+
+  assert.ok(actionStart >= 0 && actionEnd > actionStart, 'single-file action handler not found');
+  assert.match(actionSource, /this\.applyFileMutationToSnapshot\(/);
+  assert.match(actionSource, /this\.contentContainer\.empty\(\);[\s\S]*this\.renderStatusTab\(this\.sidebarSnapshot\);/);
+  assert.doesNotMatch(actionSource, /await this\.refresh\(/);
+  assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged'\)/);
 });

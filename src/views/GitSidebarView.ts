@@ -176,6 +176,27 @@ export class GitSidebarView extends ItemView {
         return generation === this.renderGeneration && this.containerEl.isConnected;
     }
 
+    /**
+     * Apply the known result of a completed single-file mutation to the
+     * current snapshot before repainting. The next full refresh will still
+     * reconcile against Git, but the completed user action must not wait for a
+     * second whole-vault status scan before becoming visible.
+     */
+    private applyFileMutationToSnapshot(filepath: string, destination: 'staged' | 'unstaged'): void {
+        if (!this.sidebarSnapshot) return;
+
+        const staged = this.sidebarSnapshot.staged.filter((path) => path !== filepath);
+        const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
+        if (destination === 'staged') staged.push(filepath);
+        else unstaged.push(filepath);
+
+        this.sidebarSnapshot = {
+            ...this.sidebarSnapshot,
+            staged,
+            unstaged,
+        };
+    }
+
     private async refreshFromButton(button: HTMLButtonElement): Promise<void> {
         if (button.disabled) return;
         button.disabled = true;
@@ -931,22 +952,25 @@ export class GitSidebarView extends ItemView {
                     e.stopPropagation();
                     if (this.mutationInFlight) return;
                     this.setMutationBusy(true);
-                    stageBtn.disabled = true;
-                    stageBtn.addClass('git-file-stage-busy');
-                    stageBtn.setAttr('aria-busy', 'true');
                     try {
                         await onAction(filepath);
-                        await this.refresh();
+                        this.applyFileMutationToSnapshot(
+                            filepath,
+                            sectionClass === 'staged' ? 'unstaged' : 'staged',
+                        );
+                        // The Git operation has completed. Repaint the current
+                        // Changes view directly instead of starting a second
+                        // repository-wide read just to reflect this result.
+                        if (this.activeTab === 'status') {
+                            this.contentContainer.empty();
+                            this.renderStatusTab(this.sidebarSnapshot);
+                            const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
+                            if (footerEl) this.renderFooter(footerEl);
+                        }
                     } catch (err: any) {
                         new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
                     } finally {
                         this.setMutationBusy(false);
-                        if (stageBtn.isConnected) {
-                            stageBtn.disabled = false;
-                            stageBtn.removeClass('git-file-stage-busy');
-                            stageBtn.removeAttribute('aria-busy');
-                            setIcon(stageBtn, sectionClass === 'staged' ? 'square-check' : 'square');
-                        }
                     }
                 });
             }
@@ -1293,7 +1317,10 @@ export class GitSidebarView extends ItemView {
             return;
         }
 
-        const recent = [...entries].reverse().slice(0, 50);
+        // FileLogger and Logger both apply the configured retention limit.
+        // Do not impose a smaller view-only limit here: that made a busy
+        // session hide every persisted entry from earlier sessions.
+        const recent = [...entries].reverse();
         
         for (const entry of recent) {
             const row = listContainer.createDiv('git-log-entry');
@@ -1359,7 +1386,7 @@ export class GitSidebarView extends ItemView {
                     log.mergePersistedEntries(persisted);
                     this.readModel.setLogEntries(log.getEntries());
                 }
-                const entries = [...(this.readModel.getLogEntries() || [])].reverse().slice(0, 50);
+                const entries = [...(this.readModel.getLogEntries() || [])].reverse();
                 const details = entries.length === 0
                     ? 'No activity yet'
                     : entries.map((entry) => {

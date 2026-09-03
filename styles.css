@@ -1844,6 +1844,16 @@
     border-radius: 13px;
 }
 
+/* Local / Remote are controls for the commit source, not list headings. Keep
+   them available while the selected commit list scrolls underneath. */
+.git-sidebar-content .git-commits-toggle-bar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background: var(--background-primary);
+    box-shadow: 0 1px 0 var(--git-sidebar-divider);
+}
+
 .git-commits-toggle-btn {
     min-height: 48px;
     font-size: var(--font-ui-medium);

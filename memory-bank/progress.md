@@ -1,6 +1,22 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 01:19:03 IST*
+*Last Updated: 2026-09-04 01:42:44 IST*
+
+## 2026-09-04 Sidebar History, Staging, and Commit Controls
+
+- Removed the Log panel's view-only newest-50 limit; it now renders the full
+  retained logger/file-logger history, including earlier sessions available in
+  the persistent `debug.log`.
+- Reduced direct single-file staging from a full repository status scan to an
+  index tracked-path lookup plus a targeted worktree stat. Bulk staging keeps
+  its shared status snapshot and final verification.
+- Kept Local/Remote commit-source buttons sticky inside the sidebar scroll
+  owner, matching their role as persistent controls rather than headings.
+- Repainted the Changes view directly after a completed single-file mutation,
+  avoiding a second repository-wide read before the UI reflects the result.
+- Verification passed: 71 Node tests, artifact identity, production build, 10
+  isomorphic-git checks, and `git diff --check`. Real Obsidian runtime,
+  cross-session persistence, and visual acceptance remain open.
 
 ## 2026-09-04 Stale-Read Guard
 

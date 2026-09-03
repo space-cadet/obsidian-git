@@ -23621,11 +23621,29 @@ Try again with a faster connection or smaller repository.`
       async stagePath(filepath, statusByPath) {
         let row = statusByPath == null ? void 0 : statusByPath.get(filepath);
         if (!row) {
-          const statusMatrix2 = await statusMatrix({
+          const trackedPaths = await listFiles({
             fs: this.fs,
             dir: this.dir
           });
-          row = statusMatrix2.find((candidate) => candidate[0] === filepath);
+          const tracked = trackedPaths.includes(filepath);
+          if (tracked) {
+            try {
+              await this.fs.stat(this.dir === "." ? filepath : `${this.dir}/${filepath}`);
+            } catch (error) {
+              if (isTransientMissingPath(error)) {
+                await remove({ fs: this.fs, dir: this.dir, filepath });
+                return;
+              }
+              throw error;
+            }
+            await add({ fs: this.fs, dir: this.dir, filepath });
+            return;
+          }
+          if (await this.isIgnoredPath(filepath)) {
+            throw new Error(`Path "${filepath}" is ignored by .gitignore`);
+          }
+          await add({ fs: this.fs, dir: this.dir, filepath });
+          return;
         }
         if (row && row[1] === 1 && row[2] === 0) {
           await remove({ fs: this.fs, dir: this.dir, filepath });
@@ -24623,6 +24641,27 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
   }
+  /**
+   * Apply the known result of a completed single-file mutation to the
+   * current snapshot before repainting. The next full refresh will still
+   * reconcile against Git, but the completed user action must not wait for a
+   * second whole-vault status scan before becoming visible.
+   */
+  applyFileMutationToSnapshot(filepath, destination) {
+    if (!this.sidebarSnapshot)
+      return;
+    const staged = this.sidebarSnapshot.staged.filter((path) => path !== filepath);
+    const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
+    if (destination === "staged")
+      staged.push(filepath);
+    else
+      unstaged.push(filepath);
+    this.sidebarSnapshot = {
+      ...this.sidebarSnapshot,
+      staged,
+      unstaged
+    };
+  }
   async refreshFromButton(button) {
     if (button.disabled)
       return;
@@ -25211,22 +25250,23 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           if (this.mutationInFlight)
             return;
           this.setMutationBusy(true);
-          stageBtn.disabled = true;
-          stageBtn.addClass("git-file-stage-busy");
-          stageBtn.setAttr("aria-busy", "true");
           try {
             await onAction(filepath);
-            await this.refresh();
+            this.applyFileMutationToSnapshot(
+              filepath,
+              sectionClass === "staged" ? "unstaged" : "staged"
+            );
+            if (this.activeTab === "status") {
+              this.contentContainer.empty();
+              this.renderStatusTab(this.sidebarSnapshot);
+              const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
+              if (footerEl)
+                this.renderFooter(footerEl);
+            }
           } catch (err) {
             new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
           } finally {
             this.setMutationBusy(false);
-            if (stageBtn.isConnected) {
-              stageBtn.disabled = false;
-              stageBtn.removeClass("git-file-stage-busy");
-              stageBtn.removeAttribute("aria-busy");
-              (0, import_obsidian5.setIcon)(stageBtn, sectionClass === "staged" ? "square-check" : "square");
-            }
           }
         });
       }
@@ -25511,7 +25551,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
       return;
     }
-    const recent = [...entries].reverse().slice(0, 50);
+    const recent = [...entries].reverse();
     for (const entry of recent) {
       const row = listContainer.createDiv("git-log-entry");
       const time = row.createSpan({
@@ -25565,7 +25605,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         log2.mergePersistedEntries(persisted);
         this.readModel.setLogEntries(log2.getEntries());
       }
-      const entries = [...this.readModel.getLogEntries() || []].reverse().slice(0, 50);
+      const entries = [...this.readModel.getLogEntries() || []].reverse();
       const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
         const time = new Date(entry.timestamp).toISOString();
         const data = entry.data ? `
@@ -26380,7 +26420,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "b4f6fc67a32f9daa66c05cd1e4e2ba8509ed0c72" : "unknown";
+var GIT_COMMIT_HASH = true ? "84da15fb914acc6a957195e961a29452ce317f70" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

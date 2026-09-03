@@ -2495,11 +2495,37 @@ export class GitManager {
     ): Promise<void> {
         let row = statusByPath?.get(filepath);
         if (!row) {
-            const statusMatrix = await git.statusMatrix({
+            // A direct single-file stage must not scan the entire vault. The
+            // index tells us whether the path is tracked; only the requested
+            // worktree path needs a targeted stat so tracked deletions can use
+            // remove() without asking isomorphic-git to read a missing file.
+            const trackedPaths = await git.listFiles({
                 fs: this.fs,
                 dir: this.dir,
-            }) as GitStatusMatrixRow[];
-            row = statusMatrix.find((candidate) => candidate[0] === filepath);
+            });
+            const tracked = trackedPaths.includes(filepath);
+
+            if (tracked) {
+                try {
+                    await this.fs.stat(this.dir === '.' ? filepath : `${this.dir}/${filepath}`);
+                } catch (error) {
+                    if (isTransientMissingPath(error)) {
+                        await git.remove({ fs: this.fs, dir: this.dir, filepath });
+                        return;
+                    }
+                    throw error;
+                }
+
+                await git.add({ fs: this.fs, dir: this.dir, filepath });
+                return;
+            }
+
+            if (await this.isIgnoredPath(filepath)) {
+                throw new Error(`Path "${filepath}" is ignored by .gitignore`);
+            }
+
+            await git.add({ fs: this.fs, dir: this.dir, filepath });
+            return;
         }
 
         if (row && row[1] === 1 && row[2] === 0) {

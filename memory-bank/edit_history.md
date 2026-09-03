@@ -1,11 +1,36 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 01:19:03 IST*
+*Last Updated: 2026-09-04 01:42:44 IST*
 
 ---
 
 ## 2026-09-04
+
+#### 01:42:44 IST - T29a/T35b/T35d/T35f/T37: Simplify post-stage repaint
+- Modified `src/views/GitSidebarView.ts` - Removed duplicate per-button busy
+  state and repainted Changes directly from the completed mutation snapshot,
+  avoiding a second repository-wide refresh.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Updated the
+  stationary-control assertion and added direct-repaint coverage.
+- `CI=true pnpm test` passed: 71 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
+
+#### 01:34:56 IST - T29a/T35b/T35d/T35f/T37: Fix sidebar history, staging latency, and commit controls
+- Modified `src/gitManager.ts` - Removed the full status-matrix scan from
+  direct single-file staging; use the index, targeted stat, and explicit
+  tracked-deletion/ignore paths.
+- Modified `src/views/GitSidebarView.ts` - Render all retained Log entries and
+  copy the full retained set instead of limiting the view to 50 rows.
+- Modified `styles.css` - Keep Local/Remote commit-source buttons sticky in
+  the sidebar content scroll owner.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Added source
+  regressions for retained logs, sticky controls, and staging scan ownership.
+- Regenerated `main.js` through the production build.
+- Updated T29a, T35b, T35d, T35f, T37, activeContext, session_cache, progress,
+  changelog, and reliability documentation with the diagnosis and evidence.
+- `CI=true pnpm test` passed: 70 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
 
 #### 01:19:03 IST - T35b/T35f/T37: Guard stale sidebar read responses
 - Modified `src/views/GitSidebarView.ts` - Passed render generations into Log

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 01:19:03 IST*
+*Last Updated: 2026-09-04 01:42:44 IST*
 
 ## Current Tasks
 
@@ -330,6 +330,23 @@
   T1-T6/T30/T32/T33 completed; T37 tentative/paused; mb-core protocols, templates, and missing
   support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
+
+## Current Sidebar Follow-up Checkpoint — 2026-09-04
+
+- The Log panel renders all retained entries loaded from the persistent
+  plugin-scoped `debug.log`; the former view-only newest-50 cap is removed.
+- Direct single-file staging uses `git.listFiles()` plus one targeted worktree
+  stat instead of a full vault `statusMatrix()` scan, preserving tracked
+  deletion and ignored-untracked safeguards.
+- Local/Remote commit-source buttons are sticky inside the sidebar content
+  scroll owner and remain available while commits scroll.
+- After a single-file stage/unstage completes, the Changes view repaints from
+  the updated snapshot directly instead of waiting for another repository
+  status scan.
+- `CI=true pnpm test` passes with 71 Node tests, artifact identity,
+  production build, 10 isomorphic-git checks, and `git diff --check`.
+- Real Obsidian cross-session log, staging timing, and visual acceptance are
+  still pending; T35c repository replacement and mobile ref work remain open.
 
 ## Decisions Made
 

@@ -262,3 +262,35 @@ the incremental architecture plan
   build, 10 isomorphic-git checks, and `git diff --check`.
 - Repository-state outcomes and protected replacement are the next source
   architecture work; runtime desktop/mobile acceptance remains separate.
+
+## Sidebar History and Staging Follow-up — 2026-09-04 01:34:56 IST
+
+### Work Completed
+
+- Diagnosed the reported Log behavior as a view-only newest-50 limit; the
+  persistent file logger already retained bounded entries across plugin
+  sessions. The view now renders the full retained set and copies the full set.
+- Reduced direct single-file staging from a repository-wide status scan to an
+  index tracked-path lookup and targeted worktree stat, preserving tracked
+  deletion and ignored-untracked safeguards. Bulk staging keeps its shared
+  snapshot and final verification.
+- Made the Local/Remote commit-source buttons sticky inside the sidebar scroll
+  owner so they remain controls while commit history scrolls.
+
+### Verification and Handoff
+
+- Full verification passed: 70 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
+- Runtime cross-session log, staging timing, and visual acceptance remain
+  pending; protected repository replacement and mobile ref diagnostics remain
+  open.
+
+## Post-Stage Repaint Simplification — 2026-09-04 01:42:44 IST
+
+- Removed duplicate per-button busy state; the shared mutation guard remains
+  the only busy-state owner and no checkbox receives animation.
+- After single-file stage/unstage completes, the view updates its known status
+  snapshot and repaints Changes directly. It no longer waits for another
+  whole-vault status scan before reflecting the result.
+- Full verification passed: 71 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.

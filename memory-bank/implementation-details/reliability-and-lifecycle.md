@@ -266,3 +266,24 @@ commit-detail reads. After asynchronous file, Git, or GitHub reads complete,
 the view checks both the generation and, for commit details, row attachment
 before updating cache or DOM. This keeps a delayed response from a prior tab
 or detached leaf from becoming visible state.
+
+## Sidebar History and Staging Follow-up — 2026-09-04
+
+The direct single-file staging path now uses the index's tracked-path list and
+a targeted worktree stat. It no longer computes a full working-tree
+`statusMatrix()` before every checkbox action. Tracked deletions still use
+`git.remove()`, while untracked paths still pass through the `.gitignore`
+policy check. Bulk staging intentionally keeps its shared snapshot and final
+verification because it operates on a caller-supplied set of paths.
+
+The Log view reads persisted entries through `FileLogger`, merges them through
+the shared `Logger`, and now renders the entire bounded retained set rather
+than an additional newest-50 display limit. The Local/Remote commit-source
+buttons are sticky within `.git-sidebar-content`; they remain controls while
+the selected history list scrolls.
+
+Single-file staging now has one completion path in the view: the mutation
+finishes, the known staged/unstaged arrays are updated, and the Changes DOM is
+repainted immediately. It does not trigger a second full status read merely to
+show a result Git has already returned. The next ordinary refresh remains the
+authoritative reconciliation path.

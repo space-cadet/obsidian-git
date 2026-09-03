@@ -1,3 +1,19 @@
+## 2026-09-04 — T29a/T35b/T35d/T35f/T37 sidebar follow-up
+
+- Removed the Log panel's newest-50 display cap so all bounded persistent and
+  live entries can be viewed, including entries from prior sessions present in
+  `debug.log`.
+- Avoided a full vault `statusMatrix()` scan for direct single-file staging by
+  using the Git index and a targeted worktree existence check; deletion and
+  `.gitignore` behavior remain protected.
+- Made the Local/Remote commit-source buttons sticky while the chosen commit
+  list scrolls.
+- Repainted the Changes view directly after a completed single-file stage or
+  unstage action instead of starting a second full repository status read.
+- Added source-level regression checks for all three reported behaviors.
+- Verification passed: 71 Node tests, artifact identity, production build, 10
+  isomorphic-git checks, and `git diff --check`.
+
 ## 2026-09-04 — T35b/T35f stale-read guard
 
 - Guarded asynchronous Log-tab and commit-detail responses against stale
