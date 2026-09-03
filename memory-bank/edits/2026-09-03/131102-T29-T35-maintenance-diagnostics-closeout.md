@@ -16,6 +16,7 @@ source_commit: b7284707587237181b5fa856a177ed323f1f515b
 - Modified `memory-bank/tasks/T35d.md` - Recorded the existing-repository mobile ref-resolution failure.
 - Modified `memory-bank/tasks/T35e.md` - Recorded scoped updater diagnostics and remaining release acceptance.
 - Modified `memory-bank/tasks/T35f.md` - Recorded maintenance coverage and mobile acceptance gaps.
+- Modified `main.js` - Regenerated the embedded build identity for source commit `b728470`.
 - Modified `memory-bank/implementation-details/T29-obsidian-git.md` - Recorded Maintenance and Diagnostics behavior.
 - Modified `memory-bank/implementation-details/mobile-compatibility.md` - Recorded the mobile ref-resolution failure.
 - Modified `memory-bank/implementation-details/reliability-and-lifecycle.md` - Recorded repair and recovery boundaries.

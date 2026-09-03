@@ -17,6 +17,8 @@ diagnostics, and document updater/mobile recovery
   maintenance UI, index repair, adapter, and status-resilience work.
 - Confirmed the source implementation is pushed through `b728470` and the
   checkout is clean and synchronized with `origin/main`.
+- Regenerated the bundled `main.js` build identity so it names the current
+  source commit `b728470`.
 - Added a Settings Maintenance panel with health, index repair, backup/restore,
   and remote comparison preview actions.
 - Added persistent plugin-scoped diagnostics, metrics, updater tracing, and
@@ -41,7 +43,7 @@ diagnostics, and document updater/mobile recovery
 ## Verification and Handoff
 
 - Recorded verification: 51 Node tests, 10 isomorphic-git checks, production
-  build, artifact checks, and `git diff --check`.
+  build, artifact identity checks, and `git diff --check`.
 - Desktop/local implementation is complete for this scope; mobile acceptance
   is not complete.
 - Next session: inspect mobile adapter reads for `HEAD`, `refs/heads/main`,
