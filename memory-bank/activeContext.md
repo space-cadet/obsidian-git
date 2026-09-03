@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 00:45:38 IST*
+*Last Updated: 2026-09-04 00:53:16 IST*
 
 ## Current Tasks
 
@@ -91,8 +91,8 @@
   focused lifecycle coverage.
 - **Verification**: Production build and `CI=true pnpm test` pass with 59 Node
   tests, artifact checks, 10 isomorphic-git checks, and diff validation.
-- **Remaining**: Commit/push this continuation, then complete entry-point
-  conformance, protected replacement safety, and real desktop/mobile acceptance.
+- **Remaining**: Complete stale-view and repository-state coverage, protected
+  replacement safety, and real desktop/mobile acceptance.
 
 ### Operation Ownership Checkpoint — 2026-09-04
 - `OperationCoordinator` now admits one mutation at a time and emits explicit
@@ -101,6 +101,12 @@
   success result; lifecycle observers cannot change operation outcomes.
 - `GitSyncPlugin` owns the coordinator subscription and operation log records;
   local initialization now uses the same cancellable GitManager path.
+
+### Operation Entry-Point Conformance — 2026-09-04
+- A TypeScript-AST-backed test now checks that repository mutations in the main
+  plugin and sidebar use `runGitMutation`.
+- The same focused test checks coordinator disposal and GitManager signal
+  cleanup. Runtime Obsidian and mobile acceptance remain separate.
 
 ### Current Implementation Session — 2026-09-03 18:26 IST
 - **Authorized scope**: Implement the seven confirmed sidebar, staging,

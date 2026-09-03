@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 00:45:38 IST*
+*Last Updated: 2026-09-04 00:53:16 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -13,7 +13,7 @@
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Complete operation entry-point conformance, protected replacement safety, and real Obsidian acceptance.
+**Next Session**: Complete stale-view and repository-state coverage, protected replacement safety, and real Obsidian acceptance.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -184,3 +184,13 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   build, and 10 isomorphic-git checks.
 - T35b and T35f remain in progress. Protected replacement, full conformance,
   and real desktop/mobile acceptance remain open.
+
+## Current Conformance Checkpoint — 2026-09-04
+
+- Added `tests/operation-entrypoint-conformance.test.mjs` with AST-backed
+  checks for all repository mutation entry points in the main plugin and
+  sidebar.
+- The focused test passes for wrapper ownership, coordinator disposal, and
+  operation-signal cleanup.
+- Remaining: stale-view and repository-state cases, protected replacement,
+  and real Obsidian desktop/mobile/release acceptance.

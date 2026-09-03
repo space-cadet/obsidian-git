@@ -1,3 +1,10 @@
+## 2026-09-04 — T35b/T35f operation-entry-point conformance
+
+- Added AST-backed source checks that keep all main-plugin and sidebar Git
+  mutations inside `runGitMutation`.
+- Added lifecycle checks for coordinator disposal and GitManager signal
+  cleanup.
+
 ## 2026-09-04 — T35b/T35f operation ownership checkpoint
 
 - Added explicit operation lifecycle events and cancellation finalization.

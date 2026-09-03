@@ -1,6 +1,15 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 00:45:38 IST*
+*Last Updated: 2026-09-04 00:53:16 IST*
+
+## 2026-09-04 Operation Entry-Point Conformance
+
+- Added AST-backed source coverage for all mutating GitManager calls in the
+  main plugin and sidebar.
+- Added lifecycle assertions for coordinator disposal and operation-signal
+  cleanup.
+- Focused conformance checks pass; stale-view, repository-state, protected
+  replacement, and real desktop/mobile acceptance remain open.
 
 ## 2026-09-04 Operation Ownership Checkpoint
 

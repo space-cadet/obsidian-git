@@ -1,9 +1,32 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 00:45:38 IST*
+*Last Updated: 2026-09-04 00:53:16 IST*
 
 ---
+
+## 2026-09-04
+
+#### 00:53:16 IST - T35b/T35f/T37: Add operation entry-point conformance
+- Created `tests/operation-entrypoint-conformance.test.mjs` - Added
+  TypeScript-AST-backed checks for mutation wrapper ownership and lifecycle
+  cleanup.
+- Modified `memory-bank/tasks/T35b.md` - Recorded the conformance checkpoint.
+- Modified `memory-bank/tasks/T35f.md` - Recorded focused conformance coverage
+  and remaining evidence gaps.
+- Modified `memory-bank/tasks/T37.md` - Recorded conformance progress toward
+  the architecture decision.
+- Modified `memory-bank/tasks.md` - Updated the Memory Bank registry timestamp.
+- Modified `memory-bank/activeContext.md` - Updated the current continuation
+  and conformance checkpoint.
+- Modified `memory-bank/session_cache.md` - Recorded the current conformance
+  checkpoint and next evidence.
+- Modified `memory-bank/sessions/2026-09-03-afternoon.md` - Appended the
+  focused implementation and handoff record.
+- Modified `memory-bank/progress.md` - Recorded the conformance milestone.
+- Modified `memory-bank/changelog.md` - Recorded the source conformance checks.
+- Created `memory-bank/edits/2026-09-04/005316-T35f-entrypoint-conformance.md`
+  - Recorded the edit chunk and verification boundary.
 
 ## 2026-09-04
 

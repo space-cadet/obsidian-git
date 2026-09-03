@@ -192,3 +192,19 @@ the incremental architecture plan
 - T35b/T35f source-level progress is recorded; protected repository
   replacement, full entry-point conformance, and real Obsidian desktop/mobile
   acceptance remain open.
+
+## Operation Entry-Point Conformance — 2026-09-04 00:53:16 IST
+
+### Work Completed
+
+- Added `tests/operation-entrypoint-conformance.test.mjs`, using the TypeScript
+  AST to check that mutating GitManager calls in the main plugin and sidebar
+  are enclosed by `runGitMutation`.
+- Added focused lifecycle assertions for coordinator disposal and
+  GitManager operation-signal cleanup.
+
+### Verification and Handoff
+
+- The focused conformance test passes with two tests and no failures.
+- The next planned evidence is stale-view and repository-state coverage,
+  followed by protected replacement and real Obsidian desktop/mobile tests.
