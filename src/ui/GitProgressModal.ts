@@ -64,6 +64,7 @@ export class GitProgressModal extends Modal {
     private filesTotal = 0;
     private bytesWritten = 0;
     private elapsedTimer: number | null = null;
+    private completedElapsedMs: number | null = null;
 
     constructor(app: App, operationName: string) {
         super(app);
@@ -186,11 +187,14 @@ export class GitProgressModal extends Modal {
     complete(message = 'Completed') {
         if (this.isComplete) return;
         this.isComplete = true;
+        this.completedElapsedMs = Date.now() - this.startTime;
+        this.stopElapsedTimer();
 
         for (const phase of this.phases.values()) {
-            if (phase.status === 'active') {
+            if (phase.status !== 'error') {
                 phase.status = 'completed';
                 phase.percent = 100;
+                phase.detail = this.statusLabel('completed');
             }
         }
         this.render();
@@ -206,9 +210,14 @@ export class GitProgressModal extends Modal {
     fail(error: unknown) {
         if (this.isComplete) return;
         this.isComplete = true;
+        this.completedElapsedMs = Date.now() - this.startTime;
+        this.stopElapsedTimer();
 
         for (const phase of this.phases.values()) {
-            if (phase.status === 'active') phase.status = 'error';
+            if (phase.status === 'active') {
+                phase.status = 'error';
+                phase.detail = this.statusLabel('error');
+            }
         }
         this.render();
 
@@ -245,6 +254,13 @@ export class GitProgressModal extends Modal {
         this.renderStatistics();
         this.renderPhases();
         this.updateFooter();
+    }
+
+    private stopElapsedTimer(): void {
+        if (this.elapsedTimer !== null) {
+            window.clearInterval(this.elapsedTimer);
+            this.elapsedTimer = null;
+        }
     }
 
     private renderStatistics() {
@@ -309,7 +325,7 @@ export class GitProgressModal extends Modal {
 
     private updateFooter() {
         if (!this.footerEl) return;
-        const elapsed = ((Date.now() - this.startTime) / 1000).toFixed(1);
+        const elapsed = ((this.completedElapsedMs ?? (Date.now() - this.startTime)) / 1000).toFixed(1);
         const completed = Array.from(this.phases.values()).filter((p) => p.status === 'completed').length;
         const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : 'rate unavailable';
         this.footerEl.empty();

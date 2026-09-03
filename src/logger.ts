@@ -34,6 +34,7 @@ export class Logger {
   private recentNoticeTimes = new Map<string, number>();
   private readonly noticeCooldownMs = 5 * 60 * 1000;
   private fileLogSink: FileLogSink | null = null;
+  private readonly listeners = new Set<() => void>();
 
   private constructor() {}
 
@@ -60,6 +61,12 @@ export class Logger {
 
   public mergePersistedEntries(entries: readonly LogEntry[]): void {
     this.persistedEntries = [...entries].slice(-this.maxEntries);
+  }
+
+  /** Subscribe to new entries so long-lived views can update without polling. */
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** Clear the in-memory activity log shown in the sidebar. */
@@ -243,6 +250,9 @@ export class Logger {
     });
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(-this.maxEntries);
+    }
+    for (const listener of this.listeners) {
+      try { listener(); } catch { /* a view listener must not break logging */ }
     }
     const levelRank: Record<string, LogLevel> = {
       debug: LogLevel.DEBUG,

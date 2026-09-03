@@ -20898,6 +20898,7 @@ var init_logger = __esm({
         this.recentNoticeTimes = /* @__PURE__ */ new Map();
         this.noticeCooldownMs = 5 * 60 * 1e3;
         this.fileLogSink = null;
+        this.listeners = /* @__PURE__ */ new Set();
       }
       /**
        * Get the singleton instance of the logger
@@ -20920,6 +20921,11 @@ var init_logger = __esm({
       }
       mergePersistedEntries(entries) {
         this.persistedEntries = [...entries].slice(-this.maxEntries);
+      }
+      /** Subscribe to new entries so long-lived views can update without polling. */
+      subscribe(listener) {
+        this.listeners.add(listener);
+        return () => this.listeners.delete(listener);
       }
       /** Clear the in-memory activity log shown in the sidebar. */
       clear() {
@@ -21087,6 +21093,12 @@ var init_logger = __esm({
         if (this.entries.length > this.maxEntries) {
           this.entries = this.entries.slice(-this.maxEntries);
         }
+        for (const listener of this.listeners) {
+          try {
+            listener();
+          } catch (e) {
+          }
+        }
         const levelRank = {
           debug: 0 /* DEBUG */,
           info: 1 /* INFO */,
@@ -21213,6 +21225,7 @@ var init_GitProgressModal = __esm({
         this.filesTotal = 0;
         this.bytesWritten = 0;
         this.elapsedTimer = null;
+        this.completedElapsedMs = null;
         this.operationName = operationName;
         this.phaseOrder = /push/i.test(operationName) ? PUSH_PHASE_ORDER : CLONE_PHASE_ORDER;
         this.startTime = Date.now();
@@ -21318,10 +21331,13 @@ var init_GitProgressModal = __esm({
         if (this.isComplete)
           return;
         this.isComplete = true;
+        this.completedElapsedMs = Date.now() - this.startTime;
+        this.stopElapsedTimer();
         for (const phase of this.phases.values()) {
-          if (phase.status === "active") {
+          if (phase.status !== "error") {
             phase.status = "completed";
             phase.percent = 100;
+            phase.detail = this.statusLabel("completed");
           }
         }
         this.render();
@@ -21336,9 +21352,13 @@ var init_GitProgressModal = __esm({
         if (this.isComplete)
           return;
         this.isComplete = true;
+        this.completedElapsedMs = Date.now() - this.startTime;
+        this.stopElapsedTimer();
         for (const phase of this.phases.values()) {
-          if (phase.status === "active")
+          if (phase.status === "active") {
             phase.status = "error";
+            phase.detail = this.statusLabel("error");
+          }
         }
         this.render();
         const message = error instanceof Error ? error.message : String(error);
@@ -21372,6 +21392,12 @@ var init_GitProgressModal = __esm({
         this.renderStatistics();
         this.renderPhases();
         this.updateFooter();
+      }
+      stopElapsedTimer() {
+        if (this.elapsedTimer !== null) {
+          window.clearInterval(this.elapsedTimer);
+          this.elapsedTimer = null;
+        }
       }
       renderStatistics() {
         this.statsEl.empty();
@@ -21425,9 +21451,10 @@ var init_GitProgressModal = __esm({
         valueEl.setText(value);
       }
       updateFooter() {
+        var _a;
         if (!this.footerEl)
           return;
-        const elapsed = ((Date.now() - this.startTime) / 1e3).toFixed(1);
+        const elapsed = (((_a = this.completedElapsedMs) != null ? _a : Date.now() - this.startTime) / 1e3).toFixed(1);
         const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
         const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
         this.footerEl.empty();
@@ -21960,6 +21987,7 @@ var init_gitManager = __esm({
       constructor(fs, dir, credentials, app, statusBarItem) {
         this.statusBarItem = null;
         this.operationSignal = null;
+        this.comparisonCache = null;
         this.fs = fs;
         this.dir = dir;
         this.credentials = credentials;
@@ -22829,17 +22857,13 @@ var init_gitManager = __esm({
           };
           try {
             startPullTimer();
-            await pull({
+            await fetch({
               fs: this.fs,
               http: this.createHttpClient(progress),
               dir: this.dir,
+              remote: "origin",
               ref: branchName,
               singleBranch: true,
-              fastForwardOnly: true,
-              author: {
-                name: this.credentials.author.name || "Obsidian Git",
-                email: this.credentials.author.email || "obsidian@example.com"
-              },
               onAuth: () => ({
                 username: this.credentials.username,
                 password: this.credentials.password
@@ -22847,6 +22871,36 @@ var init_gitManager = __esm({
               onProgress,
               onMessage
             });
+            const [localOid, fetchHead] = await Promise.all([
+              resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` }),
+              resolveRef({ fs: this.fs, dir: this.dir, ref: "FETCH_HEAD" })
+            ]);
+            if (localOid === fetchHead) {
+              onMessage("Already up to date");
+            } else {
+              await merge({
+                fs: this.fs,
+                dir: this.dir,
+                ours: branchName,
+                theirs: fetchHead,
+                fastForward: true,
+                fastForwardOnly: true,
+                author: {
+                  name: this.credentials.author.name || "Obsidian Git",
+                  email: this.credentials.author.email || "obsidian@example.com"
+                },
+                committer: {
+                  name: this.credentials.author.name || "Obsidian Git",
+                  email: this.credentials.author.email || "obsidian@example.com"
+                }
+              });
+              await checkout({
+                fs: this.fs,
+                dir: this.dir,
+                ref: branchName,
+                onProgress
+              });
+            }
             stopPullTimer();
             progress.complete();
             this.updateStatus("Pull completed");
@@ -23358,6 +23412,7 @@ Try again with a faster connection or smaller repository.`
        * Get the current status of the repository
        */
       async getStatus() {
+        var _a, _b;
         try {
           log2.debug("GitManager", "Getting repository status");
           const currentBranch2 = await currentBranch({
@@ -23384,18 +23439,27 @@ Try again with a faster connection or smaller repository.`
               comparisonError: error instanceof Error ? error.message : String(error)
             };
           }
+          let remoteOid;
           try {
-            await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+            remoteOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
           } catch (error) {
             log2.info("GitManager", `No tracking ref for ${currentBranch2}`);
+            if (((_a = this.comparisonCache) == null ? void 0 : _a.branch) === currentBranch2 && this.comparisonCache.localOid === localOid && this.comparisonCache.remoteOid === null) {
+              return this.comparisonCache.result;
+            }
             const localCommits2 = localOid ? await log({ fs: this.fs, dir: this.dir, ref: localRef }).catch(() => []) : [];
-            return {
+            const result2 = {
               branch: currentBranch2,
               ahead: localCommits2.length,
               behind: 0,
               comparison: localOid ? "local-only" : "unavailable",
               comparisonError: error instanceof Error ? error.message : String(error)
             };
+            this.comparisonCache = { branch: currentBranch2, localOid, remoteOid: null, result: result2 };
+            return result2;
+          }
+          if (((_b = this.comparisonCache) == null ? void 0 : _b.branch) === currentBranch2 && this.comparisonCache.localOid === localOid && this.comparisonCache.remoteOid === remoteOid) {
+            return this.comparisonCache.result;
           }
           const [localCommits, remoteCommits] = await Promise.all([
             log({ fs: this.fs, dir: this.dir, ref: localRef }),
@@ -23407,12 +23471,9 @@ Try again with a faster connection or smaller repository.`
           const behind = remoteCommits.filter((commit2) => !localOids.has(commit2.oid)).length;
           const comparison = ahead > 0 && behind > 0 ? "diverged" : ahead > 0 ? "ahead" : behind > 0 ? "behind" : "up-to-date";
           log2.info("GitManager", `Repository status: branch=${currentBranch2}, ahead=${ahead}, behind=${behind}`);
-          return {
-            branch: currentBranch2,
-            ahead,
-            behind,
-            comparison
-          };
+          const result = { branch: currentBranch2, ahead, behind, comparison };
+          this.comparisonCache = { branch: currentBranch2, localOid, remoteOid, result };
+          return result;
         } catch (error) {
           log2.error("GitManager", "Failed to get repository status", error);
           throw error;
@@ -24359,6 +24420,15 @@ var import_obsidian5 = require("obsidian");
 init_gitManager();
 init_logger();
 var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
+var sidebarHistoryCaches = /* @__PURE__ */ new WeakMap();
+function getSidebarHistoryCache(plugin) {
+  let cache = sidebarHistoryCaches.get(plugin);
+  if (!cache) {
+    cache = { remoteCommits: null, localCommits: null, commitDetails: /* @__PURE__ */ new Map() };
+    sidebarHistoryCaches.set(plugin, cache);
+  }
+  return cache;
+}
 var GitSidebarView = class extends import_obsidian5.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
@@ -24376,7 +24446,14 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.commitDetailsCache = /* @__PURE__ */ new Map();
     this.logEntriesCache = null;
     this.renderGeneration = 0;
+    this.logUnsubscribe = null;
+    this.logRenderScheduled = false;
+    this.mutationInFlight = false;
     this.plugin = plugin;
+    const cache = getSidebarHistoryCache(plugin);
+    this.remoteCommitsCache = cache.remoteCommits;
+    this.localCommitsCache = cache.localCommits;
+    this.commitDetailsCache = cache.commitDetails;
   }
   getViewType() {
     return VIEW_TYPE_GIT_SIDEBAR;
@@ -24415,13 +24492,32 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("tabindex", "0");
     this.contentContainer.setAttr("aria-label", "Git Sync content");
     this.renderLoadingState();
+    this.logUnsubscribe = log2.subscribe(() => {
+      this.logEntriesCache = null;
+      if (this.activeTab !== "log" || this.logRenderScheduled)
+        return;
+      this.logRenderScheduled = true;
+      window.setTimeout(() => {
+        this.logRenderScheduled = false;
+        if (this.activeTab === "log" && this.containerEl.isConnected) {
+          void this.refresh({ readRepository: false });
+        }
+      }, 0);
+    });
+    this.registerEvent(this.app.vault.on("delete", () => {
+      if (this.containerEl.isConnected)
+        void this.refresh({ force: true });
+    }));
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     await this.refresh();
     this.startAutoRefresh();
   }
   async onClose() {
+    var _a;
     this.stopAutoRefresh();
+    (_a = this.logUnsubscribe) == null ? void 0 : _a.call(this);
+    this.logUnsubscribe = null;
     this.renderGeneration += 1;
   }
   // ─── Auto Refresh ───
@@ -24450,9 +24546,28 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.remoteCommitsCache = null;
     this.localCommitsCache = null;
     this.commitDetailsCache.clear();
+    const cache = getSidebarHistoryCache(this.plugin);
+    cache.remoteCommits = null;
+    cache.localCommits = null;
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
+  }
+  async refreshFromButton(button) {
+    if (button.disabled)
+      return;
+    button.disabled = true;
+    button.addClass("git-header-refreshing");
+    button.setAttr("aria-busy", "true");
+    try {
+      await this.refresh({ force: true });
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.removeClass("git-header-refreshing");
+        button.removeAttribute("aria-busy");
+      }
+    }
   }
   renderLoadingState() {
     this.headerContainer.empty();
@@ -24515,18 +24630,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       (0, import_obsidian5.setIcon)(headerAction, "chevron-down");
       headerAction.setAttr("title", "Refresh commit history");
       headerAction.setAttr("aria-label", "Refresh commit history");
-      headerAction.addEventListener("click", () => void this.refresh());
+      headerAction.addEventListener("click", () => void this.refreshFromButton(headerAction));
     } else {
       (0, import_obsidian5.setIcon)(headerAction, "refresh-cw");
       headerAction.addEventListener("click", async (event) => {
         event.stopPropagation();
-        headerAction.disabled = true;
-        try {
-          await this.refresh();
-        } finally {
-          if (headerAction.isConnected)
-            headerAction.disabled = false;
-        }
+        await this.refreshFromButton(headerAction);
       });
     }
     const statusRow = this.headerContainer.createDiv("git-header-status");
@@ -24698,6 +24807,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   async refresh(options = {}) {
     const generation = ++this.renderGeneration;
     const readRepository = options.readRepository !== false;
+    if (readRepository && options.force)
+      this.sidebarSnapshot = null;
     if (!this.plugin.gitManager) {
       await this.plugin.ensureGitManager();
     }
@@ -24718,6 +24829,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
         } catch (e) {
           log2.warn("GitSidebar", "Failed to read repository snapshot", e);
+          if (options.force)
+            this.sidebarSnapshot = null;
         }
       }
     }
@@ -24929,8 +25042,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     bulkBtn.setAttr("aria-label", bulkLabel);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (bulkBtn.disabled)
+      if (bulkBtn.disabled || this.mutationInFlight)
         return;
+      this.setMutationBusy(true);
       bulkBtn.disabled = true;
       bulkBtn.textContent = "Working\u2026";
       bulkBtn.setAttr("aria-busy", "true");
@@ -24940,6 +25054,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       } catch (err) {
         new import_obsidian5.Notice(`${bulkLabel} failed: ${err.message}`);
       } finally {
+        this.setMutationBusy(false);
         if (bulkBtn.isConnected) {
           bulkBtn.disabled = false;
           bulkBtn.empty();
@@ -25023,15 +25138,44 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         });
         stageBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
+          if (this.mutationInFlight)
+            return;
+          this.setMutationBusy(true);
+          stageBtn.disabled = true;
+          stageBtn.addClass("git-file-stage-busy");
+          stageBtn.setAttr("aria-busy", "true");
           try {
             await onAction(filepath);
             await this.refresh();
           } catch (err) {
             new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
+          } finally {
+            this.setMutationBusy(false);
+            if (stageBtn.isConnected) {
+              stageBtn.disabled = false;
+              stageBtn.removeClass("git-file-stage-busy");
+              stageBtn.removeAttribute("aria-busy");
+              (0, import_obsidian5.setIcon)(stageBtn, sectionClass === "staged" ? "square-check" : "square");
+            }
           }
         });
       }
     }
+  }
+  setMutationBusy(busy) {
+    var _a;
+    this.mutationInFlight = busy;
+    const controls = ((_a = this.contentContainer) == null ? void 0 : _a.querySelectorAll(
+      ".git-file-stage-toggle, .git-status-section-action"
+    )) || [];
+    controls.forEach((control) => {
+      control.disabled = busy;
+      control.setAttr("aria-busy", String(busy));
+      if (busy)
+        control.addClass("git-file-stage-busy");
+      else
+        control.removeClass("git-file-stage-busy");
+    });
   }
   openIgnorePatternModal() {
     const modal = new import_obsidian5.Modal(this.app);
@@ -25104,9 +25248,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           commits = this.localCommitsCache.commits;
         } else {
           commits = await this.plugin.gitManager.getLog(25);
-          if (this.isCurrentRender(generation)) {
-            this.localCommitsCache = { branch: branch2, commits };
-          }
+          this.localCommitsCache = { branch: branch2, commits };
+          getSidebarHistoryCache(this.plugin).localCommits = this.localCommitsCache;
         }
       } else {
         const remoteUrl = this.plugin.settings.repoUrl;
@@ -25120,9 +25263,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
           }
         }
-        if (this.isCurrentRender(generation)) {
-          this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
-        }
+        this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
+        getSidebarHistoryCache(this.plugin).remoteCommits = this.remoteCommitsCache;
       }
       loading == null ? void 0 : loading.remove();
       if (!this.isCurrentRender(generation))
@@ -26165,7 +26307,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "9e9ff9856365792e5fe79904bbf651f3e05a8b99" : "unknown";
+var GIT_COMMIT_HASH = true ? "bb4e4260e445fc65379b11b74c4dbfd534914d6d" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

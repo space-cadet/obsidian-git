@@ -7,6 +7,26 @@ export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
 type SidebarTab = 'status' | 'commits' | 'log';
 
+interface SidebarHistoryCache {
+    remoteCommits: { repoUrl: string; branch: string; commits: GitCommit[] } | null;
+    localCommits: { branch: string; commits: GitCommit[] } | null;
+    commitDetails: Map<string, GitCommit['files']>;
+}
+
+// Keep immutable history data for the lifetime of the plugin, not only for
+// the lifetime of one ItemView instance. Obsidian can recreate a sidebar view
+// when the workspace is backgrounded or its leaf is restored.
+const sidebarHistoryCaches = new WeakMap<GitSyncPlugin, SidebarHistoryCache>();
+
+function getSidebarHistoryCache(plugin: GitSyncPlugin): SidebarHistoryCache {
+    let cache = sidebarHistoryCaches.get(plugin);
+    if (!cache) {
+        cache = { remoteCommits: null, localCommits: null, commitDetails: new Map() };
+        sidebarHistoryCaches.set(plugin, cache);
+    }
+    return cache;
+}
+
 export class GitSidebarView extends ItemView {
     plugin: GitSyncPlugin;
     private contentContainer: HTMLElement;
@@ -26,10 +46,17 @@ export class GitSidebarView extends ItemView {
     private commitDetailsCache = new Map<string, GitCommit['files']>();
     private logEntriesCache: LogEntry[] | null = null;
     private renderGeneration = 0;
+    private logUnsubscribe: (() => void) | null = null;
+    private logRenderScheduled = false;
+    private mutationInFlight = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
         this.plugin = plugin;
+        const cache = getSidebarHistoryCache(plugin);
+        this.remoteCommitsCache = cache.remoteCommits;
+        this.localCommitsCache = cache.localCommits;
+        this.commitDetailsCache = cache.commitDetails;
     }
 
     getViewType(): string {
@@ -87,6 +114,25 @@ export class GitSidebarView extends ItemView {
         // the first asynchronous snapshot is available.
         this.renderLoadingState();
 
+        this.logUnsubscribe = log.subscribe(() => {
+            this.logEntriesCache = null;
+            if (this.activeTab !== 'log' || this.logRenderScheduled) return;
+            this.logRenderScheduled = true;
+            window.setTimeout(() => {
+                this.logRenderScheduled = false;
+                if (this.activeTab === 'log' && this.containerEl.isConnected) {
+                    void this.refresh({ readRepository: false });
+                }
+            }, 0);
+        });
+        // Obsidian emits vault events for deletes made through the file
+        // manager (and for external changes once its watcher notices them).
+        // Refresh the status snapshot immediately instead of waiting for the
+        // periodic timer or requiring a second navigation.
+        this.registerEvent(this.app.vault.on('delete', () => {
+            if (this.containerEl.isConnected) void this.refresh({ force: true });
+        }));
+
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');
         this.renderFooter(footer);
@@ -100,6 +146,8 @@ export class GitSidebarView extends ItemView {
 
     async onClose(): Promise<void> {
         this.stopAutoRefresh();
+        this.logUnsubscribe?.();
+        this.logUnsubscribe = null;
         // Invalidate any in-flight repository/history read before Obsidian
         // detaches the view so late responses cannot render into stale DOM.
         this.renderGeneration += 1;
@@ -135,10 +183,29 @@ export class GitSidebarView extends ItemView {
         this.remoteCommitsCache = null;
         this.localCommitsCache = null;
         this.commitDetailsCache.clear();
+        const cache = getSidebarHistoryCache(this.plugin);
+        cache.remoteCommits = null;
+        cache.localCommits = null;
     }
 
     private isCurrentRender(generation: number): boolean {
         return generation === this.renderGeneration && this.containerEl.isConnected;
+    }
+
+    private async refreshFromButton(button: HTMLButtonElement): Promise<void> {
+        if (button.disabled) return;
+        button.disabled = true;
+        button.addClass('git-header-refreshing');
+        button.setAttr('aria-busy', 'true');
+        try {
+            await this.refresh({ force: true });
+        } finally {
+            if (button.isConnected) {
+                button.disabled = false;
+                button.removeClass('git-header-refreshing');
+                button.removeAttribute('aria-busy');
+            }
+        }
     }
 
     private renderLoadingState(): void {
@@ -218,17 +285,12 @@ export class GitSidebarView extends ItemView {
             setIcon(headerAction, 'chevron-down');
             headerAction.setAttr('title', 'Refresh commit history');
             headerAction.setAttr('aria-label', 'Refresh commit history');
-            headerAction.addEventListener('click', () => void this.refresh());
+            headerAction.addEventListener('click', () => void this.refreshFromButton(headerAction));
         } else {
             setIcon(headerAction, 'refresh-cw');
             headerAction.addEventListener('click', async (event) => {
                 event.stopPropagation();
-                headerAction.disabled = true;
-                try {
-                    await this.refresh();
-                } finally {
-                    if (headerAction.isConnected) headerAction.disabled = false;
-                }
+                await this.refreshFromButton(headerAction);
             });
         }
 
@@ -454,9 +516,14 @@ export class GitSidebarView extends ItemView {
 
     // ─── Main refresh ───
 
-    async refresh(options: { readRepository?: boolean } = {}): Promise<void> {
+    async refresh(options: { readRepository?: boolean; force?: boolean } = {}): Promise<void> {
         const generation = ++this.renderGeneration;
         const readRepository = options.readRepository !== false;
+
+        // A user-requested refresh must not leave the previous file list on
+        // screen if the adapter reports a transient stale-index/path error.
+        // The next successful status scan replaces this snapshot atomically.
+        if (readRepository && options.force) this.sidebarSnapshot = null;
 
         // Manager construction is intentionally read-only. It is also needed
         // for the remote/API history fallback when the vault has no .git.
@@ -483,9 +550,11 @@ export class GitSidebarView extends ItemView {
                     this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
                 } catch (e) {
                     // Keep the last successful view during a transient mobile
-                    // filesystem/index failure instead of making local changes
-                    // disappear while the next refresh is in flight.
+                    // filesystem/index failure during background refreshes. A
+                    // user-requested refresh must not continue showing a stale
+                    // deleted path, so clear it and render an honest error.
                     log.warn('GitSidebar', 'Failed to read repository snapshot', e);
+                    if (options.force) this.sidebarSnapshot = null;
                 }
             }
         }
@@ -754,7 +823,8 @@ export class GitSidebarView extends ItemView {
         bulkBtn.setAttr('aria-label', bulkLabel);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (bulkBtn.disabled) return;
+            if (bulkBtn.disabled || this.mutationInFlight) return;
+            this.setMutationBusy(true);
             bulkBtn.disabled = true;
             bulkBtn.textContent = 'Working…';
             bulkBtn.setAttr('aria-busy', 'true');
@@ -764,6 +834,7 @@ export class GitSidebarView extends ItemView {
             } catch (err: any) {
                 new Notice(`${bulkLabel} failed: ${err.message}`);
             } finally {
+                this.setMutationBusy(false);
                 if (bulkBtn.isConnected) {
                     bulkBtn.disabled = false;
                     bulkBtn.empty();
@@ -874,15 +945,41 @@ export class GitSidebarView extends ItemView {
 
                 stageBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
+                    if (this.mutationInFlight) return;
+                    this.setMutationBusy(true);
+                    stageBtn.disabled = true;
+                    stageBtn.addClass('git-file-stage-busy');
+                    stageBtn.setAttr('aria-busy', 'true');
                     try {
                         await onAction(filepath);
                         await this.refresh();
                     } catch (err: any) {
                         new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
+                    } finally {
+                        this.setMutationBusy(false);
+                        if (stageBtn.isConnected) {
+                            stageBtn.disabled = false;
+                            stageBtn.removeClass('git-file-stage-busy');
+                            stageBtn.removeAttribute('aria-busy');
+                            setIcon(stageBtn, sectionClass === 'staged' ? 'square-check' : 'square');
+                        }
                     }
                 });
             }
         }
+    }
+
+    private setMutationBusy(busy: boolean): void {
+        this.mutationInFlight = busy;
+        const controls = this.contentContainer?.querySelectorAll<HTMLButtonElement>(
+            '.git-file-stage-toggle, .git-status-section-action',
+        ) || [];
+        controls.forEach((control) => {
+            control.disabled = busy;
+            control.setAttr('aria-busy', String(busy));
+            if (busy) control.addClass('git-file-stage-busy');
+            else control.removeClass('git-file-stage-busy');
+        });
     }
 
     private openIgnorePatternModal(): void {
@@ -976,9 +1073,8 @@ export class GitSidebarView extends ItemView {
                     commits = this.localCommitsCache.commits;
                 } else {
                     commits = await this.plugin.gitManager.getLog(25);
-                    if (this.isCurrentRender(generation)) {
-                        this.localCommitsCache = { branch, commits };
-                    }
+                    this.localCommitsCache = { branch, commits };
+                    getSidebarHistoryCache(this.plugin).localCommits = this.localCommitsCache;
                 }
             } else {
                 // Remote history is independent of local repository health.
@@ -999,9 +1095,8 @@ export class GitSidebarView extends ItemView {
                         commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
                     }
                 }
-                if (this.isCurrentRender(generation)) {
-                    this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
-                }
+                this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
+                getSidebarHistoryCache(this.plugin).remoteCommits = this.remoteCommitsCache;
             }
 
             loading?.remove();

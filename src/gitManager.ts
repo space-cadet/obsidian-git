@@ -621,6 +621,12 @@ export class GitManager {
     private statusBarItem: HTMLElement | null = null;
     private app: any;
     private operationSignal: AbortSignal | null = null;
+    private comparisonCache: {
+        branch: string;
+        localOid: string | null;
+        remoteOid: string | null;
+        result: { branch: string; ahead: number; behind: number; comparison: GitComparisonState; comparisonError?: string };
+    } | null = null;
 
     constructor(fs: any, dir: string, credentials: GitCredentials, app?: any, statusBarItem?: HTMLElement) {
         this.fs = fs;
@@ -1607,17 +1613,17 @@ export class GitManager {
             try {
                 startPullTimer();
                 
-                await git.pull({
+                // Fetch first so an up-to-date branch can finish without the
+                // expensive merge/checkout walk. isomorphic-git's pull always
+                // invokes checkout, even when FETCH_HEAD equals HEAD, which is
+                // especially noticeable on mobile vault adapters.
+                await git.fetch({
                     fs: this.fs,
                     http: this.createHttpClient(progress),
                     dir: this.dir,
+                    remote: 'origin',
                     ref: branchName,
                     singleBranch: true,
-                    fastForwardOnly: true,
-                    author: {
-                        name: this.credentials.author.name || 'Obsidian Git',
-                        email: this.credentials.author.email || 'obsidian@example.com'
-                    },
                     onAuth: () => ({
                         username: this.credentials.username,
                         password: this.credentials.password
@@ -1625,6 +1631,37 @@ export class GitManager {
                     onProgress,
                     onMessage
                 });
+
+                const [localOid, fetchHead] = await Promise.all([
+                    git.resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` }),
+                    git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'FETCH_HEAD' }),
+                ]);
+                if (localOid === fetchHead) {
+                    onMessage('Already up to date');
+                } else {
+                    await git.merge({
+                        fs: this.fs,
+                        dir: this.dir,
+                        ours: branchName,
+                        theirs: fetchHead,
+                        fastForward: true,
+                        fastForwardOnly: true,
+                        author: {
+                            name: this.credentials.author.name || 'Obsidian Git',
+                            email: this.credentials.author.email || 'obsidian@example.com'
+                        },
+                        committer: {
+                            name: this.credentials.author.name || 'Obsidian Git',
+                            email: this.credentials.author.email || 'obsidian@example.com'
+                        },
+                    });
+                    await git.checkout({
+                        fs: this.fs,
+                        dir: this.dir,
+                        ref: branchName,
+                        onProgress,
+                    });
+                }
 
                 stopPullTimer();
                 progress.complete();
@@ -2249,20 +2286,38 @@ export class GitManager {
                     comparisonError: error instanceof Error ? error.message : String(error),
                 };
             }
+            let remoteOid: string;
             try {
-                await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+                remoteOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
             } catch (error) {
                 log.info('GitManager', `No tracking ref for ${currentBranch}`);
+                if (
+                    this.comparisonCache?.branch === currentBranch
+                    && this.comparisonCache.localOid === localOid
+                    && this.comparisonCache.remoteOid === null
+                ) {
+                    return this.comparisonCache.result;
+                }
                 const localCommits = localOid
                     ? await git.log({ fs: this.fs, dir: this.dir, ref: localRef }).catch(() => [])
                     : [];
-                return {
+                const result = {
                     branch: currentBranch,
                     ahead: localCommits.length,
                     behind: 0,
-                    comparison: localOid ? 'local-only' : 'unavailable',
+                    comparison: (localOid ? 'local-only' : 'unavailable') as GitComparisonState,
                     comparisonError: error instanceof Error ? error.message : String(error),
                 };
+                this.comparisonCache = { branch: currentBranch, localOid, remoteOid: null, result };
+                return result;
+            }
+
+            if (
+                this.comparisonCache?.branch === currentBranch
+                && this.comparisonCache.localOid === localOid
+                && this.comparisonCache.remoteOid === remoteOid
+            ) {
+                return this.comparisonCache.result;
             }
 
             // isomorphic-git log does not implement Git's dotted range syntax
@@ -2283,15 +2338,11 @@ export class GitManager {
                     : behind > 0
                         ? 'behind'
                         : 'up-to-date';
-            
+
             log.info('GitManager', `Repository status: branch=${currentBranch}, ahead=${ahead}, behind=${behind}`);
-            
-            return {
-                branch: currentBranch,
-                ahead,
-                behind,
-                comparison,
-            };
+            const result = { branch: currentBranch, ahead, behind, comparison };
+            this.comparisonCache = { branch: currentBranch, localOid, remoteOid, result };
+            return result;
         } catch (error) {
             log.error('GitManager', 'Failed to get repository status', error);
             throw error;
