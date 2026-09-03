@@ -200,3 +200,15 @@ On mobile, the existing non-empty `typora-notes` repository fails before the
 index scan when `refs/heads/main` cannot be resolved. The next recovery step is
 read-only inspection of `HEAD`, local refs, remote-tracking refs, and adapter
 visibility before any replacement or checkout is attempted.
+
+## Session Continuation — 2026-09-03
+
+The mobile-copy repository was repaired from the official working repository
+without modifying the official repository. This does not close the separate
+mobile ref-visibility investigation. The next session must preserve the vault
+and existing `.git` state while diagnosing the device-side reads.
+
+Bulk staging now reduces index-write overhead through bounded batches, but the
+broader mutation coordinator and bulk unstage/reset/remove contract remain
+open. Ignore-rule enforcement must be applied consistently before any automatic
+or caller-supplied staging operation.

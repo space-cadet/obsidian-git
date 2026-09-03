@@ -343,6 +343,18 @@ implementation. Cross-cutting hardening is now tracked separately under T35:
 - T35b: operation coordination and lifecycle safety
 - T35c: repository initialization and destructive-operation safety
 - T35d: mobile and remote transport reliability
+
+## Staging Performance and Ignore Enforcement — 2026-09-03
+
+- Tracked deletions are staged through `git.remove()` so missing worktree files
+  do not cause `NotFoundError` failures.
+- Bulk staging uses bounded batches of 64 with parallel filepath processing and
+  per-file fallback. Mobile-sensitive fingerprint reads use bounded concurrency.
+- The implementation still needs a central `.gitignore` enforcement check for
+  caller-supplied staging paths. Plugin-owned-path exclusion is a separate
+  security boundary and cannot replace Git ignore semantics.
+- `unstageAll()` and other single-file mutation paths remain candidates for
+  batching or a future isomorphic-git API extension.
 - T35e: updater integrity and release artifact consistency
 - T35f: test, CI, and documentation alignment
 

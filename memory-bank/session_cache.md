@@ -1,15 +1,15 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-03 13:11:02 IST*
+*Last Updated: 2026-09-03 16:39:34 IST*
 
 ## Current Session
 **Started**: 2026-09-03 13:11:02 IST
-**Focus Task**: T29, T35, T35b, T35c, T35d, T35e, T35f maintenance and diagnostics closeout
+**Focus Task**: T29, T35b, T35c, T35d, T35f, T36 repository repair, Git performance, ignore enforcement, and dependency architecture
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29, T35, T35b, T35c, T35d, T35e, T35f: Add Git maintenance repair, diagnostics, and document updater/mobile recovery
+**Session Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
 
 **Closeout Commit**: Source changes pushed as `b728470`; this Memory Bank update follows
 
@@ -53,6 +53,7 @@ source file was missing.
 - T35d: Mobile and Remote Transport Reliability — 🔄 IN PROGRESS (separate progress telemetry and modal stats implemented)
 - T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (timeouts and stale-folder cleanup shipped; runtime acceptance remains)
 - T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
+- T36: Fork and Maintain isomorphic-git — 🔄 IN PROGRESS (official 1.41.9 evaluated; fork decision open)
 
 ## Active Tasks
 ### T29: obsidian-git Plugin
@@ -115,18 +116,22 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 
 ## Latest Session Handoff — 2026-09-03
 
-- The source implementation is pushed at `b728470` and the worktree is clean
-  before this documentation update.
-- The `.gitignore` editor viewport fix was not accepted on Android; keyboard
-  overlap remains the first fresh-session investigation.
-- Local status now derives from one matrix and survives branch-comparison
-  failure when the working-tree scan succeeds.
-- The next repository step is read-only inspection of mobile `HEAD` and local
-  and remote-tracking refs for the existing non-empty `typora-notes` vault.
-- Do not claim the missing-ref issue is resolved from desktop or test evidence.
+- Deletion-aware staging was pushed in `211342749fb68c0671f4cf173528f681c9fb1e7e`;
+  bounded staging batches and concurrent reads are now recorded locally.
+- The current plugin worktree contains the performance changes and the saved
+  maintenance mockup; they are included in this closeout commit.
+- The plugin still has an urgent unresolved `.gitignore` enforcement issue;
+  reproduce it before the next implementation session and test all staging
+  entry points.
+- The mobile-copy repository is `/Users/deepak/Downloads/typora-notes`; the
+  official working repository is `/Volumes/Data/owncloud/Notes/typora-notes`.
+- T36 is an independent top-level task for the isomorphic-git 1.41.9 upgrade
+  evaluation and possible fork; no fork has been adopted yet.
+- Mobile `refs/heads/main` recovery remains a separate unresolved T35c/T35d
+  investigation and must not be inferred from desktop or automated tests.
 
 ## Session History (Recent)
-1. `sessions/2026-09-03-afternoon.md` — T29, T35, T35b, T35c, T35d, T35e, T35f: Add Git maintenance repair, diagnostics, and document updater/mobile recovery
+1. `sessions/2026-09-03-afternoon.md` — T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
 2. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
 3. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
 4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up

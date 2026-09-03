@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-03 13:11:02 IST*
+*Last Updated: 2026-09-03 16:39:34 IST*
 
 ## Current Tasks
 
@@ -48,6 +48,19 @@
   coordination, then perform mobile acceptance of clone, updater, progress,
   and repository-ref recovery behavior.
 
+### T36: Fork and Maintain isomorphic-git — 🔄 Independent architecture task
+- **Scope**: Evaluate official isomorphic-git 1.41.9, then fork, publish, and
+  maintain only the smallest required changes for bulk Git mutations and
+  Obsidian/mobile compatibility.
+- **Status**: The upstream repository is cloned at
+  `/Users/deepak/code/isomorphic-git` at tag `v1.41.9`; no fork has been
+  adopted. The current plugin still resolves 1.29.0 from its lockfile.
+- **Boundary**: T36 is a separate top-level task, not a T35 child. It must not
+  be used to defer the urgent `.gitignore` enforcement regression or the mobile
+  `refs/heads/main` diagnosis.
+- **Next**: Test official 1.41.9 in a controlled branch before deciding whether
+  a published fork is necessary.
+
 ### T29/T35 Maintenance and Diagnostics — 🔄 Desktop complete, mobile recovery open
 - **Delivered**: Settings Maintenance and Diagnostics panels, health and local
   index repair actions, backup/restore and remote comparison previews, faster
@@ -58,6 +71,16 @@
 - **Next**: Diagnose the existing mobile `typora-notes` failure where
   `refs/heads/main` cannot be resolved, starting with read-only adapter/ref
   inspection and preserving all existing vault and `.git` data.
+
+### Current Session Continuation — 2026-09-03
+- **Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
+- **Completed**: Recorded the mobile-copy Git repair, deletion-aware staging,
+  bounded batch/concurrent reads, official isomorphic-git inspection, and T36
+  architecture plan.
+- **Urgent next session**: Reproduce and fix `.gitignore` enforcement across
+  status, individual staging, bulk staging, and automatic sync.
+- **Remaining**: Commit/push this continuation, then perform official 1.41.9
+  compatibility testing and real mobile acceptance.
 
 ### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.

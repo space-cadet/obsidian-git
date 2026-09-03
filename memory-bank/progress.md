@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-09-03 13:11:02 IST*
+*Last Updated: 2026-09-03 16:39:34 IST*
 
 ## 2026-09-03 Session Closeout
 
@@ -30,6 +30,18 @@
   run and requires read-only ref/adapter diagnosis next session.
 - Verification recorded: 51 Node tests, 10 isomorphic-git checks, production
   build, artifact checks, and `git diff --check`.
+
+## 2026-09-03 Repository Repair, Git Performance, and Dependency Architecture
+
+- Reconstructed the mobile-copy `.git` state from the official working
+  repository without modifying the official repository.
+- Pushed deletion-aware staging in `211342749fb68c0671f4cf173528f681c9fb1e7e`.
+- Added local bounded staging batches, mobile-sensitive concurrent reads, and
+  regression tests; the full test suite and `git diff --check` pass.
+- Recorded the unresolved `.gitignore` enforcement regression as urgent next
+  session work.
+- Created independent top-level task T36 and its isomorphic-git fork/maintenance
+  design document. Official upstream v1.41.9 was inspected but not adopted.
 
 ## 2026-09-02 Updater, Sidebar, and Repository-Recovery Follow-up
 

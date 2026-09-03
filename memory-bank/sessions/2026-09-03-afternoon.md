@@ -1,12 +1,12 @@
 # Session 2026-09-03 - Afternoon
 
 *Created: 2026-09-03 13:11:02 IST*
-*Last Updated: 2026-09-03 13:11:02 IST*
+*Last Updated: 2026-09-03 16:39:34 IST*
 
 ## Focus Task
 
-T29, T35, T35b, T35c, T35d, T35e, T35f: Add Git maintenance repair,
-diagnostics, and document updater/mobile recovery
+T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git
+operations, record gitignore regression, and define isomorphic-git fork plan
 
 **Status**: ✅ CLOSED
 
@@ -48,3 +48,41 @@ diagnostics, and document updater/mobile recovery
   is not complete.
 - Next session: inspect mobile adapter reads for `HEAD`, `refs/heads/main`,
   and `refs/remotes/origin/main` before any repair, ref write, or checkout.
+
+## Post-Closeout Continuation — 2026-09-03 16:39:34 IST
+
+**Session Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository,
+optimize Git operations, record gitignore regression, and define isomorphic-git
+fork plan
+
+### Work Completed
+
+- Confirmed the official working repository and mobile-copy repository
+  boundaries, and recorded the mobile-copy `.git` reconstruction without
+  modifying the official working repository.
+- Recorded the pushed deletion-aware staging fix at
+  `211342749fb68c0671f4cf173528f681c9fb1e7e`.
+- Recorded local bounded staging batches of 64, per-file fallback, bounded
+  mobile read concurrency, concurrent fingerprinting, and status-scan reuse.
+- Cloned and inspected official isomorphic-git v1.41.9 at
+  `89d641a761b56a492270933608df78edd7c9ee33`; the clone remains clean.
+- Created independent top-level task T36 and its implementation-detail record.
+  The official 1.41.9 upgrade must be tested before a fork is adopted.
+- Recorded the urgent unresolved `.gitignore` enforcement regression. Existing
+  ignore controls and plugin-owned-path exclusions do not prove that every
+  status and staging path applies Git ignore rules.
+
+### Verification
+
+- `CI=true pnpm test` passed after the performance changes.
+- `git diff --check` passed.
+- The working tree contains the local performance changes, generated bundle,
+  tests, and saved maintenance mockup pending the closeout commit.
+
+### Next Session
+
+- Reproduce and fix `.gitignore` enforcement across status, individual staging,
+  Stage all, and automatic sync, while preserving tracked-but-ignored behavior.
+- Complete bulk unstage/reset/remove design and coverage.
+- Test official isomorphic-git 1.41.9 before deciding whether T36 needs a fork.
+- Continue mobile `refs/heads/main` diagnosis separately under T35c/T35d.

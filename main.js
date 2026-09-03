@@ -19238,6 +19238,23 @@ function formatProgressBytes(bytes) {
   const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
   return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
 }
+async function mapWithConcurrency(items, concurrency, worker) {
+  if (items.length === 0)
+    return [];
+  const results = new Array(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  const run = async () => {
+    while (true) {
+      const index2 = nextIndex++;
+      if (index2 >= items.length)
+        return;
+      results[index2] = await worker(items[index2], index2);
+    }
+  };
+  await Promise.all(Array.from({ length: workerCount }, () => run()));
+  return results;
+}
 function isTransientMissingPath(error) {
   var _a, _b;
   const value = error;
@@ -19278,7 +19295,7 @@ function compareRepositoryPaths(localFiles, remoteFiles) {
   }
   return { localOnly, remoteOnly, conflicts, unchanged };
 }
-var import_obsidian3, GitHttpClient, GitProgressEmitter, GitManager;
+var import_obsidian3, GitHttpClient, GitProgressEmitter, BULK_STAGE_BATCH_SIZE, MOBILE_IO_CONCURRENCY, GitManager;
 var init_gitManager = __esm({
   "src/gitManager.ts"() {
     init_isomorphic_git();
@@ -19512,6 +19529,8 @@ var init_gitManager = __esm({
       hideNotice() {
       }
     };
+    BULK_STAGE_BATCH_SIZE = 64;
+    MOBILE_IO_CONCURRENCY = 8;
     GitManager = class _GitManager {
       constructor(fs, dir, credentials, app, statusBarItem) {
         this.statusBarItem = null;
@@ -19834,33 +19853,36 @@ var init_gitManager = __esm({
           worktreeFiles: worktreeFiles.size,
           elapsedMs: Date.now() - startedAt
         });
-        let modifiedFiles = 0;
-        let deletedFiles = 0;
-        let unchangedFiles = 0;
         let comparedFiles = 0;
-        for (const [filepath, oid] of headFiles) {
-          this.assertOperationActive();
-          if (!worktreeFiles.has(filepath)) {
-            deletedFiles += 1;
-          } else {
-            const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-            const value = await fs.readFile(fullPath);
-            const localOid = (await hashBlob({ object: value })).oid;
-            if (localOid === oid)
-              unchangedFiles += 1;
-            else
-              modifiedFiles += 1;
+        const comparisonResults = await mapWithConcurrency(
+          [...headFiles.entries()],
+          MOBILE_IO_CONCURRENCY,
+          async ([filepath, oid]) => {
+            this.assertOperationActive();
+            let comparison;
+            if (!worktreeFiles.has(filepath)) {
+              comparison = "deleted";
+            } else {
+              const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
+              const value = await fs.readFile(fullPath);
+              const localOid = (await hashBlob({ object: value })).oid;
+              comparison = localOid === oid ? "unchanged" : "modified";
+            }
+            comparedFiles += 1;
+            if (comparedFiles % 50 === 0) {
+              log2.debug("GitManager", "Git index repair preview comparing tracked files", {
+                comparedFiles,
+                trackedFiles: headFiles.size,
+                elapsedMs: Date.now() - startedAt
+              });
+              await this.yieldToEventLoop();
+            }
+            return comparison;
           }
-          comparedFiles += 1;
-          if (comparedFiles % 50 === 0) {
-            log2.debug("GitManager", "Git index repair preview comparing tracked files", {
-              comparedFiles,
-              trackedFiles: headFiles.size,
-              elapsedMs: Date.now() - startedAt
-            });
-            await this.yieldToEventLoop();
-          }
-        }
+        );
+        const modifiedFiles = comparisonResults.filter((value) => value === "modified").length;
+        const deletedFiles = comparisonResults.filter((value) => value === "deleted").length;
+        const unchangedFiles = comparisonResults.filter((value) => value === "unchanged").length;
         let untrackedFiles = 0;
         for (const filepath of worktreeFiles) {
           if (!trackedPaths.has(filepath))
@@ -20156,12 +20178,9 @@ var init_gitManager = __esm({
           if (remoteOid) {
             const commit2 = await readCommit({ fs: this.fs, dir: temporaryDir, oid: remoteOid });
             const tree = await this.readTreeRecursiveAt(this.fs, temporaryDir, commit2.commit.tree);
-            for (const [filepath, blobOid] of tree) {
-              if (isProtectedRepairPath(filepath))
-                continue;
-              const { blob } = await readBlob({ fs: this.fs, dir: temporaryDir, oid: blobOid });
-              remoteFiles.set(filepath, (await hashBlob({ object: blob })).oid);
-            }
+            const fingerprints = await this.readTreeFingerprints(this.fs, temporaryDir, tree);
+            for (const [filepath, oid] of fingerprints)
+              remoteFiles.set(filepath, oid);
           }
           return {
             branch: branchName,
@@ -20182,22 +20201,42 @@ var init_gitManager = __esm({
           this.assertOperationActive();
           const lookupPath = relativeDir || (this.dir === "." ? "." : this.dir);
           const entries = await fs.readdir(lookupPath, { encoding: "utf8" });
-          for (const entry of entries) {
+          const candidateEntries = entries.filter((entry) => {
             const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
-            if (isProtectedRepairPath(filepath))
-              continue;
+            return !isProtectedRepairPath(filepath);
+          });
+          const classifiedEntries = await mapWithConcurrency(candidateEntries, MOBILE_IO_CONCURRENCY, async (entry) => {
+            const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
             const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
             const stat = await fs.stat(fullPath);
-            if (stat.isDirectory()) {
-              await walk2(filepath);
-            } else if (stat.isFile()) {
-              const value = await fs.readFile(fullPath);
-              result.set(filepath, (await hashBlob({ object: value })).oid);
-            }
-          }
+            return { filepath, fullPath, isDirectory: stat.isDirectory(), isFile: stat.isFile() };
+          });
+          const directories = classifiedEntries.filter((entry) => entry.isDirectory);
+          const files = classifiedEntries.filter((entry) => entry.isFile);
+          const fingerprints = await mapWithConcurrency(files, MOBILE_IO_CONCURRENCY, async ({ filepath, fullPath }) => {
+            const value = await fs.readFile(fullPath);
+            return [filepath, (await hashBlob({ object: value })).oid];
+          });
+          for (const [filepath, oid] of fingerprints)
+            result.set(filepath, oid);
+          for (const entry of directories)
+            await walk2(entry.filepath);
         };
         await walk2("");
         return result;
+      }
+      async readTreeFingerprints(fs, dir, tree) {
+        const entries = await mapWithConcurrency(
+          [...tree.entries()],
+          MOBILE_IO_CONCURRENCY,
+          async ([filepath, blobOid]) => {
+            if (isProtectedRepairPath(filepath))
+              return null;
+            const { blob } = await readBlob({ fs, dir, oid: blobOid });
+            return [filepath, (await hashBlob({ object: blob })).oid];
+          }
+        );
+        return new Map(entries.filter((entry) => entry !== null));
       }
       /**
        * Get remote commit log (from origin/branch)
@@ -20591,13 +20630,7 @@ Try again with a faster connection or smaller repository.`
         const fs = this.fs.promises || this.fs;
         const commit2 = await readCommit({ fs: this.fs, dir: this.dir, oid: remoteOid });
         const remoteTree = await this.readTreeRecursive(commit2.commit.tree);
-        const remoteFiles = /* @__PURE__ */ new Map();
-        for (const [filepath, blobOid] of remoteTree) {
-          if (isProtectedRepairPath(filepath))
-            continue;
-          const { blob } = await readBlob({ fs: this.fs, dir: this.dir, oid: blobOid });
-          remoteFiles.set(filepath, (await hashBlob({ object: blob })).oid);
-        }
+        const remoteFiles = await this.readTreeFingerprints(this.fs, this.dir, remoteTree);
         const localFiles = await this.readLocalFileFingerprints(fs);
         const comparison = compareRepositoryPaths(localFiles, remoteFiles);
         const conflictingPrefixes = [...localFiles.keys()].filter(
@@ -20700,29 +20733,75 @@ Try again with a faster connection or smaller repository.`
       async addAll(files) {
         try {
           this.assertOperationActive();
-          const filesToStage = files ? filterAutomaticallyStagedPaths([...new Set(files)]) : await this.getChangedFiles();
+          let statusMatrixForStaging = null;
+          let filesToStage;
+          if (files) {
+            filesToStage = filterAutomaticallyStagedPaths([...new Set(files)]);
+          } else {
+            statusMatrixForStaging = await statusMatrix({
+              fs: this.fs,
+              dir: this.dir
+            });
+            filesToStage = filterAutomaticallyStagedPaths(
+              statusMatrixForStaging.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0])
+            );
+          }
           const staged = [];
           const failed = [];
           this.updateStatus(filesToStage.length > 0 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? "" : "s"}...` : "No changes to add");
           const statusByPath = /* @__PURE__ */ new Map();
           if (filesToStage.length > 0) {
-            const statusMatrix2 = await statusMatrix({
+            const statusMatrix2 = statusMatrixForStaging || await statusMatrix({
               fs: this.fs,
               dir: this.dir
             });
             for (const row of statusMatrix2)
               statusByPath.set(row[0], row);
           }
-          for (const file of filesToStage) {
+          const stagedPaths = /* @__PURE__ */ new Set();
+          const stageIndividually = async (file) => {
             try {
               this.assertOperationActive();
               await this.stagePath(file, statusByPath);
-              staged.push(file);
+              stagedPaths.add(file);
             } catch (error) {
               const message = error instanceof Error ? error.message : String(error);
               failed.push({ filepath: file, message });
               log2.error("GitManager", `Failed to stage ${file}`, error);
             }
+          };
+          const presentFiles = filesToStage.filter((file) => {
+            const row = statusByPath.get(file);
+            return !(row && row[1] === 1 && row[2] === 0);
+          });
+          const deletedFiles = filesToStage.filter((file) => {
+            const row = statusByPath.get(file);
+            return Boolean(row && row[1] === 1 && row[2] === 0);
+          });
+          for (let start = 0; start < presentFiles.length; start += BULK_STAGE_BATCH_SIZE) {
+            this.assertOperationActive();
+            const batch = presentFiles.slice(start, start + BULK_STAGE_BATCH_SIZE);
+            try {
+              await add({
+                fs: this.fs,
+                dir: this.dir,
+                filepath: batch,
+                parallel: true
+              });
+              for (const file of batch)
+                stagedPaths.add(file);
+            } catch (error) {
+              log2.debug("GitManager", `Bulk staging batch failed; retrying ${batch.length} files individually`, error);
+              for (const file of batch)
+                await stageIndividually(file);
+            }
+          }
+          for (const file of deletedFiles) {
+            await stageIndividually(file);
+          }
+          for (const file of filesToStage) {
+            if (stagedPaths.has(file))
+              staged.push(file);
           }
           const result = { requested: filesToStage.length, staged, failed };
           this.updateStatus(failed.length > 0 ? `Staged ${staged.length}; ${failed.length} failed` : `Staged ${staged.length} change${staged.length === 1 ? "" : "s"}`);
@@ -23498,7 +23577,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "9a45d379a5bcc4cab5bfeb48652a1aaf795a1001" : "unknown";
+var GIT_COMMIT_HASH = true ? "211342749fb68c0671f4cf173528f681c9fb1e7e" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

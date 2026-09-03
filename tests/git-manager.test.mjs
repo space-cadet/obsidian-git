@@ -453,6 +453,44 @@ test('addAll stages more than ten changed files', async () => {
   }
 });
 
+test('addAll stages present files in bounded index batches', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-add-batch-'));
+  let indexWrites = 0;
+  const countedFs = new Proxy(fsPromises, {
+    get(target, property, receiver) {
+      if (property === 'writeFile') {
+        return async (...args) => {
+          if (String(args[0]).endsWith('/.git/index')) indexWrites += 1;
+          return target.writeFile(...args);
+        };
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    for (let index = 1; index <= 25; index += 1) {
+      await fsPromises.writeFile(join(stageDirectory, `changed-${String(index).padStart(2, '0')}.md`), `file ${index}\n`);
+    }
+
+    const manager = new GitManager(countedFs, stageDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    const result = await manager.addAll();
+    assert.equal(result.requested, 25);
+    assert.equal(result.staged.length, 25);
+    assert.deepEqual(result.failed, []);
+    assert.equal(indexWrites, 1);
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
 test('addAll stages tracked deletions without reading the missing file', async () => {
   const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-add-deletion-'));
   try {

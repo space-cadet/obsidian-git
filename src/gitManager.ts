@@ -429,6 +429,34 @@ export interface BulkStageResult {
 
 type GitStatusMatrixRow = [string, number, number, number];
 
+// Keep bulk staging bounded for mobile vaults. isomorphic-git processes a
+// filepath array in parallel, so a batch avoids one index write per file
+// without retaining every file's contents in memory at once.
+const BULK_STAGE_BATCH_SIZE = 64;
+const MOBILE_IO_CONCURRENCY = 8;
+
+async function mapWithConcurrency<T, R>(
+    items: readonly T[],
+    concurrency: number,
+    worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+    if (items.length === 0) return [];
+    const results = new Array<R>(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(Math.max(1, concurrency), items.length);
+
+    const run = async (): Promise<void> => {
+        while (true) {
+            const index = nextIndex++;
+            if (index >= items.length) return;
+            results[index] = await worker(items[index], index);
+        }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, () => run()));
+    return results;
+}
+
 export interface GitCommit {
     oid: string;
     message: string;
@@ -945,31 +973,36 @@ export class GitManager {
             elapsedMs: Date.now() - startedAt,
         });
 
-        let modifiedFiles = 0;
-        let deletedFiles = 0;
-        let unchangedFiles = 0;
         let comparedFiles = 0;
-        for (const [filepath, oid] of headFiles) {
-            this.assertOperationActive();
-            if (!worktreeFiles.has(filepath)) {
-                deletedFiles += 1;
-            } else {
-                const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
-                const value = await fs.readFile(fullPath);
-                const localOid = (await git.hashBlob({ object: value })).oid;
-                if (localOid === oid) unchangedFiles += 1;
-                else modifiedFiles += 1;
-            }
-            comparedFiles += 1;
-            if (comparedFiles % 50 === 0) {
-                log.debug('GitManager', 'Git index repair preview comparing tracked files', {
-                    comparedFiles,
-                    trackedFiles: headFiles.size,
-                    elapsedMs: Date.now() - startedAt,
-                });
-                await this.yieldToEventLoop();
-            }
-        }
+        const comparisonResults = await mapWithConcurrency(
+            [...headFiles.entries()],
+            MOBILE_IO_CONCURRENCY,
+            async ([filepath, oid]) => {
+                this.assertOperationActive();
+                let comparison: 'modified' | 'deleted' | 'unchanged';
+                if (!worktreeFiles.has(filepath)) {
+                    comparison = 'deleted';
+                } else {
+                    const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
+                    const value = await fs.readFile(fullPath);
+                    const localOid = (await git.hashBlob({ object: value })).oid;
+                    comparison = localOid === oid ? 'unchanged' : 'modified';
+                }
+                comparedFiles += 1;
+                if (comparedFiles % 50 === 0) {
+                    log.debug('GitManager', 'Git index repair preview comparing tracked files', {
+                        comparedFiles,
+                        trackedFiles: headFiles.size,
+                        elapsedMs: Date.now() - startedAt,
+                    });
+                    await this.yieldToEventLoop();
+                }
+                return comparison;
+            },
+        );
+        const modifiedFiles = comparisonResults.filter((value) => value === 'modified').length;
+        const deletedFiles = comparisonResults.filter((value) => value === 'deleted').length;
+        const unchangedFiles = comparisonResults.filter((value) => value === 'unchanged').length;
 
         let untrackedFiles = 0;
         for (const filepath of worktreeFiles) {
@@ -1153,7 +1186,7 @@ export class GitManager {
         const walk = async (relativeDir: string): Promise<void> => {
             this.assertOperationActive();
             const lookupPath = relativeDir || (this.dir === '.' ? '.' : this.dir);
-            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' });
+            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' }) as string[];
             for (const entry of entries) {
                 const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
                 if (isProtectedRepairPath(filepath)) continue;
@@ -1299,11 +1332,8 @@ export class GitManager {
             if (remoteOid) {
                 const commit = await git.readCommit({ fs: this.fs, dir: temporaryDir, oid: remoteOid });
                 const tree = await this.readTreeRecursiveAt(this.fs, temporaryDir, commit.commit.tree);
-                for (const [filepath, blobOid] of tree) {
-                    if (isProtectedRepairPath(filepath)) continue;
-                    const { blob } = await git.readBlob({ fs: this.fs, dir: temporaryDir, oid: blobOid });
-                    remoteFiles.set(filepath, (await git.hashBlob({ object: blob })).oid);
-                }
+                const fingerprints = await this.readTreeFingerprints(this.fs, temporaryDir, tree);
+                for (const [filepath, oid] of fingerprints) remoteFiles.set(filepath, oid);
             }
 
             return {
@@ -1325,23 +1355,51 @@ export class GitManager {
         const walk = async (relativeDir: string): Promise<void> => {
             this.assertOperationActive();
             const lookupPath = relativeDir || (this.dir === '.' ? '.' : this.dir);
-            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' });
-            for (const entry of entries) {
+            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' }) as string[];
+            const candidateEntries = entries.filter((entry) => {
                 const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
-                if (isProtectedRepairPath(filepath)) continue;
+                return !isProtectedRepairPath(filepath);
+            });
+            const classifiedEntries: Array<{
+                filepath: string;
+                fullPath: string;
+                isDirectory: boolean;
+                isFile: boolean;
+            }> = await mapWithConcurrency(candidateEntries, MOBILE_IO_CONCURRENCY, async (entry) => {
+                const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
                 const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
                 const stat = await fs.stat(fullPath);
-                if (stat.isDirectory()) {
-                    await walk(filepath);
-                } else if (stat.isFile()) {
-                    const value = await fs.readFile(fullPath);
-                    result.set(filepath, (await git.hashBlob({ object: value })).oid);
-                }
-            }
+                return { filepath, fullPath, isDirectory: stat.isDirectory(), isFile: stat.isFile() };
+            });
+            const directories = classifiedEntries.filter((entry) => entry.isDirectory);
+            const files = classifiedEntries.filter((entry) => entry.isFile);
+            const fingerprints = await mapWithConcurrency(files, MOBILE_IO_CONCURRENCY, async ({ filepath, fullPath }) => {
+                const value = await fs.readFile(fullPath);
+                return [filepath, (await git.hashBlob({ object: value })).oid] as const;
+            });
+            for (const [filepath, oid] of fingerprints) result.set(filepath, oid);
+            for (const entry of directories) await walk(entry.filepath);
         };
 
         await walk('');
         return result;
+    }
+
+    private async readTreeFingerprints(
+        fs: any,
+        dir: string,
+        tree: Map<string, string>,
+    ): Promise<Map<string, string>> {
+        const entries = await mapWithConcurrency(
+            [...tree.entries()],
+            MOBILE_IO_CONCURRENCY,
+            async ([filepath, blobOid]) => {
+                if (isProtectedRepairPath(filepath)) return null;
+                const { blob } = await git.readBlob({ fs, dir, oid: blobOid });
+                return [filepath, (await git.hashBlob({ object: blob })).oid] as const;
+            },
+        );
+        return new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null));
     }
 
     /**
@@ -1785,12 +1843,7 @@ export class GitManager {
         const fs = this.fs.promises || this.fs;
         const commit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: remoteOid });
         const remoteTree = await this.readTreeRecursive(commit.commit.tree);
-        const remoteFiles = new Map<string, string>();
-        for (const [filepath, blobOid] of remoteTree) {
-            if (isProtectedRepairPath(filepath)) continue;
-            const { blob } = await git.readBlob({ fs: this.fs, dir: this.dir, oid: blobOid });
-            remoteFiles.set(filepath, (await git.hashBlob({ object: blob })).oid);
-        }
+        const remoteFiles = await this.readTreeFingerprints(this.fs, this.dir, remoteTree);
         const localFiles = await this.readLocalFileFingerprints(fs);
         const comparison = compareRepositoryPaths(localFiles, remoteFiles);
         const conflictingPrefixes = [...localFiles.keys()].filter((localPath) =>
@@ -1907,9 +1960,23 @@ export class GitManager {
             this.assertOperationActive();
             // When the sidebar supplies a list, use exactly what the user saw.
             // The sync path has no rendered list, so it discovers the files here.
-            const filesToStage = files
-                ? filterAutomaticallyStagedPaths([...new Set(files)])
-                : await this.getChangedFiles();
+            let statusMatrixForStaging: GitStatusMatrixRow[] | null = null;
+            let filesToStage: string[];
+            if (files) {
+                filesToStage = filterAutomaticallyStagedPaths([...new Set(files)]);
+            } else {
+                // The sync path used to scan the complete worktree here and
+                // then scan it again to classify deletions. Reuse one snapshot.
+                statusMatrixForStaging = await git.statusMatrix({
+                    fs: this.fs,
+                    dir: this.dir,
+                }) as GitStatusMatrixRow[];
+                filesToStage = filterAutomaticallyStagedPaths(
+                    statusMatrixForStaging
+                        .filter((row) => row[1] !== row[2] || row[1] !== row[3])
+                        .map((row) => row[0]),
+                );
+            }
             const staged: string[] = [];
             const failed: Array<{ filepath: string; message: string }> = [];
 
@@ -1922,25 +1989,70 @@ export class GitManager {
             // without rescanning the vault once per file.
             const statusByPath = new Map<string, GitStatusMatrixRow>();
             if (filesToStage.length > 0) {
-                const statusMatrix = await git.statusMatrix({
+                const statusMatrix = statusMatrixForStaging || await git.statusMatrix({
                     fs: this.fs,
                     dir: this.dir,
                 }) as GitStatusMatrixRow[];
                 for (const row of statusMatrix) statusByPath.set(row[0], row);
             }
 
+            const stagedPaths = new Set<string>();
+
             // Keep going if one file cannot be staged. A single bad file must
             // not make the user lose the progress made on all the other files.
-            for (const file of filesToStage) {
+            const stageIndividually = async (file: string): Promise<void> => {
                 try {
                     this.assertOperationActive();
                     await this.stagePath(file, statusByPath);
-                    staged.push(file);
+                    stagedPaths.add(file);
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
                     failed.push({ filepath: file, message });
                     log.error('GitManager', `Failed to stage ${file}`, error as Error);
                 }
+            };
+
+            const presentFiles = filesToStage.filter((file) => {
+                const row = statusByPath.get(file);
+                return !(row && row[1] === 1 && row[2] === 0);
+            });
+            const deletedFiles = filesToStage.filter((file) => {
+                const row = statusByPath.get(file);
+                return Boolean(row && row[1] === 1 && row[2] === 0);
+            });
+
+            // isomorphic-git supports adding an array of paths in one index
+            // transaction. Use bounded batches so mobile devices get fewer
+            // index writes while avoiding an unbounded in-memory workload.
+            for (let start = 0; start < presentFiles.length; start += BULK_STAGE_BATCH_SIZE) {
+                this.assertOperationActive();
+                const batch = presentFiles.slice(start, start + BULK_STAGE_BATCH_SIZE);
+                try {
+                    await git.add({
+                        fs: this.fs,
+                        dir: this.dir,
+                        filepath: batch,
+                        parallel: true,
+                    });
+                    for (const file of batch) stagedPaths.add(file);
+                } catch (error) {
+                    // A path may disappear after the status snapshot. Fall
+                    // back to the per-file path so one transient failure does
+                    // not discard successful staging for the whole batch.
+                    log.debug('GitManager', `Bulk staging batch failed; retrying ${batch.length} files individually`, error as Error);
+                    for (const file of batch) await stageIndividually(file);
+                }
+            }
+
+            // remove() currently accepts one filepath and therefore remains
+            // per-file. Unlike add(), it does not read the missing worktree
+            // file, so tracked deletions still stage without NotFoundError.
+            for (const file of deletedFiles) {
+                await stageIndividually(file);
+            }
+
+            for (const file of filesToStage) {
+                if (stagedPaths.has(file)) staged.push(file);
             }
 
             const result = { requested: filesToStage.length, staged, failed };

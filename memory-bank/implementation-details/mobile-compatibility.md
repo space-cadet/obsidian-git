@@ -145,3 +145,14 @@ The next investigation must compare the mobile adapter's reads of `.git/HEAD`,
 `refs/heads/main`, and `refs/remotes/origin/main` with the configured branch and
 remote state. A recovery action must protect the existing vault and `.git`
 state before writing refs or checking out files.
+
+## Session Continuation — 2026-09-03
+
+- The mobile-copy `typora-notes` repository is `/Users/deepak/Downloads/typora-notes`;
+  the official working repository is `/Volumes/Data/owncloud/Notes/typora-notes`.
+- Git metadata was reconstructed for the mobile copy from the official working
+  repository. The official repository was left untouched.
+- Bounded staging and fingerprint reads are implemented locally, but device
+  acceptance is still required.
+- The plugin's unresolved `.gitignore` enforcement problem must be tested on
+  mobile independently of the repository-ref recovery work.

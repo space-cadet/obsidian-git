@@ -83,3 +83,12 @@
   repository or rebuild an existing non-empty vault from the remote.
 - Recorded the unresolved mobile `typora-notes` failure where
   `refs/heads/main` cannot be resolved during the repair dry run.
+
+## 2026-09-03 — T29, T35b, T35c, T35d, T35f, T36 session continuation
+
+- Recorded mobile-copy Git metadata reconstruction and the official/mobile
+  repository boundary.
+- Recorded deletion-aware staging and bounded batch/concurrent Git operations.
+- Recorded the urgent unresolved `.gitignore` enforcement regression.
+- Created independent T36 documentation for an official 1.41.9 evaluation and
+  possible isomorphic-git fork, including packaging and maintenance boundaries.

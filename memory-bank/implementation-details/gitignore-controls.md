@@ -1,7 +1,7 @@
 # Gitignore Controls and Hidden Dotfile Editing
 
 *Created: 2026-08-12 15:59:54 IST*
-*Last Updated: 2026-09-03 02:37:37 IST*
+*Last Updated: 2026-09-03 16:39:34 IST*
 *Tasks: T29, T35b*
 
 ## Purpose
@@ -54,6 +54,20 @@ large change set.
   index.
 - The adapter-backed editor now opens before the file read completes, but the
   Android keyboard still covers part of the dialog in device testing.
+
+## Urgent Enforcement Regression — 2026-09-03
+
+- User testing still reports that the plugin is not consistently respecting
+  `.gitignore` during Git operations.
+- The existing editor and per-file ignore controls do not prove that every
+  status or staging path applies ignore rules.
+- `GitManager.addAll(files)` currently trusts a supplied path list after
+  filtering only plugin-owned paths. The next session must revalidate ignored
+  untracked paths at the staging boundary.
+- Add tests for ignored files, ignored directories, nested/glob/negated rules,
+  automatic sync, Stage all, individual staging, and tracked-but-ignored files.
+- Do not remove tracked files merely because a new ignore rule matches them;
+  that remains an explicit index operation.
 
 ## Related Files
 
