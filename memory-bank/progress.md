@@ -299,3 +299,23 @@ ownership; T35 records and tracks shared hardening work.
 | Mobile bundle clean | ✅ | 2026-05-30 |
 | Mobile tested | ✅ | 2026-05-30 |
 | v1.0 release | ⬜ | - |
+
+### 2026-09-03 — User-Reported Reliability Implementation Plan
+
+- Authorized implementation of first-load/sidebar state, push/pull comparison,
+  tab caching, persistent Log history, opt-in memory metrics, push progress,
+  and `.gitignore` enforcement.
+- `.gitignore` is the first gate. Official isomorphic-git 1.41.9 must be tested
+  with the Obsidian adapter before any fork decision; tracked paths remain
+  stageable and ignored untracked paths must not be claimed as staged.
+- Source fixes, generated artifacts, automated tests, and real Obsidian/mobile
+  acceptance remain separate evidence layers.
+
+### 2026-09-03 — User-Reported Reliability Implementation Result
+
+- Official isomorphic-git 1.41.9 is pinned and the tracked-ignore staging
+  regression is fixed without adopting a fork.
+- The seven source-level fixes are implemented. Verification passed with 57
+  Node tests, production build, artifact identity, smoke checks, and diff
+  validation.
+- Real Obsidian desktop/mobile acceptance remains open.

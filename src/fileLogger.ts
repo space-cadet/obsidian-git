@@ -1,5 +1,6 @@
 import { App, Platform } from 'obsidian';
 import { redactSensitiveData, redactSensitiveText } from './security';
+import type { LogEntry } from './logger';
 
 /**
  * Persistent diagnostic logger modelled on the sibling plugin's debug logger.
@@ -15,6 +16,7 @@ export class FileLogger {
 	private readonly pluginDir: string;
 	private readonly logPath: string;
 	private maxSize: number;
+	private maxEntries = 200;
 	private readonly app: App;
 	private initialized = false;
 	private stopped = false;
@@ -49,12 +51,49 @@ export class FileLogger {
 			this.truncateIfNeeded().catch(() => undefined);
 		}, 5000);
 
-		this.logMemorySnapshot();
-		this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 10000);
 	}
 
 	setMaxSize(bytes: number): void {
 		this.maxSize = bytes;
+	}
+
+	setMaxEntries(entries: number): void {
+		this.maxEntries = Math.max(1, Math.floor(entries));
+		void this.truncateIfNeeded();
+	}
+
+	setMemorySamplingEnabled(enabled: boolean): void {
+		if (this.memoryTimer !== null) {
+			window.clearInterval(this.memoryTimer);
+			this.memoryTimer = null;
+		}
+		if (!enabled || this.stopped || !this.initialized) return;
+		this.logMemorySnapshot();
+		this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 60000);
+	}
+
+	async readEntries(limit = this.maxEntries): Promise<LogEntry[]> {
+		try {
+			const content = await (this.app.vault.adapter as any).read(this.logPath);
+			const entries: LogEntry[] = [];
+			for (const line of String(content || '').split(/\r?\n/)) {
+				const match = line.match(/^\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.*)$/);
+				if (!match) continue;
+				const timestamp = Date.parse(match[1]);
+				if (!Number.isFinite(timestamp)) continue;
+				const body = match[3];
+				const namespaceMatch = body.match(/^\[Git Sync\]\[([^\]]+)\]\s*(.*)$/);
+				entries.push({
+					timestamp,
+					level: match[2].toLowerCase(),
+					namespace: namespaceMatch?.[1] || 'FileLogger',
+					message: namespaceMatch?.[2] || body,
+				});
+			}
+			return entries.slice(-Math.max(1, limit));
+		} catch {
+			return [];
+		}
 	}
 
 	setSensitiveValues(values: readonly unknown[]): void {
@@ -168,9 +207,16 @@ export class FileLogger {
 		} catch {
 			return;
 		}
-		if (existing.length <= this.maxSize) return;
-		const truncated = existing.slice(-Math.floor(this.maxSize / 2));
-		await adapter.write(this.logPath, `...[truncated at ${new Date().toISOString()}]...\n${truncated}`);
+		let output = existing;
+		const lines = output.split(/\r?\n/).filter(Boolean);
+		if (lines.length > this.maxEntries) {
+			output = lines.slice(-this.maxEntries).join('\n') + '\n';
+		}
+		if (output.length > this.maxSize) {
+			const truncated = output.slice(-Math.floor(this.maxSize / 2));
+			output = `...[truncated at ${new Date().toISOString()}]...\n${truncated}`;
+		}
+		if (output !== existing) await adapter.write(this.logPath, output);
 	}
 
 	private async flush(): Promise<void> {

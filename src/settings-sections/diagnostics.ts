@@ -15,6 +15,7 @@ interface DiagnosticsPlugin {
 	saveSettings(): Promise<void>;
 	setDiagnosticLogLevel(level: DiagnosticLogLevel): void;
 	setDiagnosticLogMaxSize(maxSizeMB: number): void;
+	setDiagnosticLogRetention(entries: number): void;
 }
 
 interface DiskUsageBreakdown {
@@ -145,6 +146,7 @@ export function renderDiagnosticsSection(
 			text.inputEl.addEventListener('blur', async () => {
 				const value = Number.parseInt(text.getValue(), 10);
 				plugin.settings.debugLogRetention = Number.isFinite(value) && value > 0 ? value : 200;
+				plugin.setDiagnosticLogRetention(plugin.settings.debugLogRetention);
 				await plugin.saveSettings();
 			});
 		});

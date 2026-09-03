@@ -86,3 +86,36 @@ fork plan
 - Complete bulk unstage/reset/remove design and coverage.
 - Test official isomorphic-git 1.41.9 before deciding whether T36 needs a fork.
 - Continue mobile `refs/heads/main` diagnosis separately under T35c/T35d.
+
+## Implementation Continuation — 2026-09-03 18:26 IST
+
+The user authorized implementation of the complete reported reliability plan.
+The source audit is recorded as one shared view/read/staging architecture with
+seven independently testable fixes: first-load rendering, push/pull comparison
+state, tab caching, persistent Log history, opt-in memory metrics, push progress
+semantics, and `.gitignore` enforcement. `.gitignore` is the first code gate.
+
+The dependency decision is explicit: test official isomorphic-git 1.41.9 with
+the Obsidian adapter first, keep its ignore semantics as the authority, and
+fork only if that release cannot be adopted safely. Tracked-but-ignored files
+must remain stageable; ignored untracked files must be rejected and never
+reported as staged after a no-op add.
+
+### Planned Verification
+
+- Run focused staging, sidebar, logging, metrics, and progress tests after each
+  implementation slice, then run the full Node suite and production build.
+- Keep source, generated bundle, desktop tests, and real Android/Obsidian
+  acceptance as separate evidence layers.
+
+## Implementation Closeout — 2026-09-03 18:45 IST
+
+- Pinned official isomorphic-git 1.41.9 after a passing tracked-and-ignored
+  reproduction with the Node filesystem; no fork was needed.
+- Implemented the staging guard, status comparison states, loading frame,
+  history/detail/log caches, persistent log import and retention wiring,
+  opt-in memory sampling, and push-specific progress phases/timing.
+- Verification passed: 57 Node tests, production build, artifact identity,
+  10 isomorphic-git smoke checks, and `git diff --check`.
+- Remaining evidence is real Obsidian desktop/mobile acceptance, including
+  remote-state freshness, push duration display, and Android rendering.

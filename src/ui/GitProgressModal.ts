@@ -25,12 +25,20 @@ interface ProgressPhase {
     detail?: string;
 }
 
-const PHASE_ORDER = [
+const CLONE_PHASE_ORDER = [
     'Remote communication',
     'Fetching',
     'Receiving objects',
     'Resolving deltas',
     'Checking out',
+];
+
+const PUSH_PHASE_ORDER = [
+    'Connecting to remote',
+    'Preparing upload',
+    'Uploading objects',
+    'Waiting for remote confirmation',
+    'Confirming branch',
 ];
 
 export class GitProgressModal extends Modal {
@@ -41,6 +49,7 @@ export class GitProgressModal extends Modal {
     private phasesEl!: HTMLElement;
     private footerEl!: HTMLElement;
     private operationName: string;
+    private phaseOrder: string[];
     private startTime: number;
     private isComplete = false;
     private abortController = new AbortController();
@@ -54,13 +63,15 @@ export class GitProgressModal extends Modal {
     private filesWritten = 0;
     private filesTotal = 0;
     private bytesWritten = 0;
+    private elapsedTimer: number | null = null;
 
     constructor(app: App, operationName: string) {
         super(app);
         this.operationName = operationName;
+        this.phaseOrder = /push/i.test(operationName) ? PUSH_PHASE_ORDER : CLONE_PHASE_ORDER;
         this.startTime = Date.now();
         this.lastTransferTime = this.startTime;
-        for (const name of PHASE_ORDER) {
+        for (const name of this.phaseOrder) {
             this.phases.set(name, {
                 name,
                 status: 'pending',
@@ -90,6 +101,7 @@ export class GitProgressModal extends Modal {
         this.statsEl = this.container.createDiv('git-progress-statistics');
         this.phasesEl = this.container.createDiv('git-progress-phases');
         this.footerEl = this.container.createDiv('git-progress-footer');
+        this.elapsedTimer = window.setInterval(() => this.render(), 1000);
         this.render();
     }
 
@@ -98,6 +110,10 @@ export class GitProgressModal extends Modal {
         // transport checks this signal before and while consuming responses.
         if (!this.isComplete) {
             this.abortController.abort();
+        }
+        if (this.elapsedTimer !== null) {
+            window.clearInterval(this.elapsedTimer);
+            this.elapsedTimer = null;
         }
         this.contentEl.empty();
     }
@@ -141,7 +157,7 @@ export class GitProgressModal extends Modal {
         this.bytesTotal = Math.max(this.bytesTotal, total);
         this.lastTransferLoaded = loaded;
         this.lastTransferTime = now;
-        this.activatePhase('Fetching', loaded, total);
+        this.activatePhase(this.isPush() ? 'Waiting for remote confirmation' : 'Fetching', loaded, total);
         this.render();
     }
 
@@ -149,7 +165,7 @@ export class GitProgressModal extends Modal {
         this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
         this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
         this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
-        this.activatePhase('Checking out', this.filesWritten, this.filesTotal);
+        this.activatePhase(this.isPush() ? 'Confirming branch' : 'Checking out', this.filesWritten, this.filesTotal);
         this.render();
     }
 
@@ -185,7 +201,6 @@ export class GitProgressModal extends Modal {
             statusEl.addClass('git-progress-status-success');
         }
 
-        setTimeout(() => this.close(), 2000);
     }
 
     fail(error: unknown) {
@@ -209,9 +224,9 @@ export class GitProgressModal extends Modal {
         const phase = this.phases.get(name);
         if (!phase) return;
 
-        const index = PHASE_ORDER.indexOf(name);
+        const index = this.phaseOrder.indexOf(name);
         for (let i = 0; i < index; i++) {
-            const previous = this.phases.get(PHASE_ORDER[i]);
+            const previous = this.phases.get(this.phaseOrder[i]);
             if (previous && previous.status !== 'error') {
                 previous.status = 'completed';
                 previous.percent = 100;
@@ -239,12 +254,12 @@ export class GitProgressModal extends Modal {
         transferTitle.setText('Transfer statistics');
         const transfer = this.statsEl.createDiv('git-progress-stat-card');
         this.addStatRow(transfer, 'Objects', this.countPair(this.objectsLoaded, this.objectsTotal));
-        this.addStatRow(transfer, 'Data', this.bytePair(this.bytesLoaded, this.bytesTotal));
+        this.addStatRow(transfer, this.isPush() ? 'Response data' : 'Data', this.bytePair(this.bytesLoaded, this.bytesTotal));
         this.addStatRow(transfer, 'Rate', this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : '—');
         this.addStatRow(transfer, 'ETA', this.estimateRemaining());
 
         const checkoutTitle = this.statsEl.createDiv('git-progress-section-title');
-        checkoutTitle.setText('Checkout progress');
+        checkoutTitle.setText(this.isPush() ? 'Remote confirmation' : 'Checkout progress');
         const checkout = this.statsEl.createDiv('git-progress-stat-card');
         this.addStatRow(checkout, 'Files', this.countPair(this.filesWritten, this.filesTotal));
         this.addStatRow(
@@ -257,7 +272,7 @@ export class GitProgressModal extends Modal {
     private renderPhases() {
         this.phasesEl.empty();
         const title = this.phasesEl.createDiv('git-progress-section-title');
-        title.setText('Clone phases');
+        title.setText(this.isPush() ? 'Push phases' : 'Clone phases');
 
         const phaseCard = this.phasesEl.createDiv('git-progress-phase-card');
         for (const phase of this.phases.values()) {
@@ -298,7 +313,7 @@ export class GitProgressModal extends Modal {
         const completed = Array.from(this.phases.values()).filter((p) => p.status === 'completed').length;
         const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : 'rate unavailable';
         this.footerEl.empty();
-        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${PHASE_ORDER.length} phases` });
+        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
     }
 
     private countPair(loaded: number, total: number): string {
@@ -324,7 +339,8 @@ export class GitProgressModal extends Modal {
         if (name === 'Checking out') {
             return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : '?'} files`;
         }
-        if (name === 'Fetching' && total > 0) return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
+        if ((name === 'Fetching' || name === 'Uploading objects') && total > 0) return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
+        if (name === 'Waiting for remote confirmation' && total > 0) return `${this.formatBytes(loaded)} / ${this.formatBytes(total)} response`;
         return this.statusLabel('active');
     }
 
@@ -339,6 +355,12 @@ export class GitProgressModal extends Modal {
 
     private inferPhaseFromMessage(message: string): string | null {
         const lower = message.toLowerCase();
+        if (this.isPush()) {
+            if (lower.includes('confirm') || lower.includes('remote result')) return 'Confirming branch';
+            if (lower.includes('upload') || lower.includes('enumerating') || lower.includes('counting') || lower.includes('compressing')) return 'Preparing upload';
+            if (lower.includes('connect') || lower.includes('remote')) return 'Connecting to remote';
+            return 'Uploading objects';
+        }
         if (lower.includes('enumerating') || lower.includes('counting') || lower.includes('compressing')) return 'Fetching';
         if (lower.includes('receiving')) return 'Receiving objects';
         if (lower.includes('resolving deltas')) return 'Resolving deltas';
@@ -349,6 +371,19 @@ export class GitProgressModal extends Modal {
     }
 
     private formatPhaseName(phase: string): string {
+        if (this.isPush()) {
+            const pushMap: Record<string, string> = {
+                connecting: 'Connecting to remote',
+                preparing: 'Preparing upload',
+                enumeratingObjects: 'Preparing upload',
+                countingObjects: 'Preparing upload',
+                compressingObjects: 'Preparing upload',
+                uploading: 'Uploading objects',
+                receivingObjects: 'Waiting for remote confirmation',
+                confirming: 'Confirming branch',
+            };
+            return pushMap[phase] || (this.phaseOrder.includes(phase) ? phase : 'Uploading objects');
+        }
         const phaseMap: Record<string, string> = {
             enumeratingObjects: 'Fetching',
             countingObjects: 'Fetching',
@@ -382,6 +417,10 @@ export class GitProgressModal extends Modal {
             case 'error': return '✗';
             default: return '○';
         }
+    }
+
+    private isPush(): boolean {
+        return this.phaseOrder === PUSH_PHASE_ORDER;
     }
 }
 

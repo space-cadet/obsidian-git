@@ -43,239 +43,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js
-var require_lib = __commonJS({
-  "node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js"(exports, module2) {
-    "use strict";
-    var AsyncLock2 = function(opts) {
-      opts = opts || {};
-      this.Promise = opts.Promise || Promise;
-      this.queues = /* @__PURE__ */ Object.create(null);
-      this.domainReentrant = opts.domainReentrant || false;
-      if (this.domainReentrant) {
-        if (typeof process === "undefined" || typeof process.domain === "undefined") {
-          throw new Error(
-            "Domain-reentrant locks require `process.domain` to exist. Please flip `opts.domainReentrant = false`, use a NodeJS version that still implements Domain, or install a browser polyfill."
-          );
-        }
-        this.domains = /* @__PURE__ */ Object.create(null);
-      }
-      this.timeout = opts.timeout || AsyncLock2.DEFAULT_TIMEOUT;
-      this.maxOccupationTime = opts.maxOccupationTime || AsyncLock2.DEFAULT_MAX_OCCUPATION_TIME;
-      this.maxExecutionTime = opts.maxExecutionTime || AsyncLock2.DEFAULT_MAX_EXECUTION_TIME;
-      if (opts.maxPending === Infinity || Number.isInteger(opts.maxPending) && opts.maxPending >= 0) {
-        this.maxPending = opts.maxPending;
-      } else {
-        this.maxPending = AsyncLock2.DEFAULT_MAX_PENDING;
-      }
-    };
-    AsyncLock2.DEFAULT_TIMEOUT = 0;
-    AsyncLock2.DEFAULT_MAX_OCCUPATION_TIME = 0;
-    AsyncLock2.DEFAULT_MAX_EXECUTION_TIME = 0;
-    AsyncLock2.DEFAULT_MAX_PENDING = 1e3;
-    AsyncLock2.prototype.acquire = function(key, fn, cb, opts) {
-      if (Array.isArray(key)) {
-        return this._acquireBatch(key, fn, cb, opts);
-      }
-      if (typeof fn !== "function") {
-        throw new Error("You must pass a function to execute");
-      }
-      var deferredResolve = null;
-      var deferredReject = null;
-      var deferred = null;
-      if (typeof cb !== "function") {
-        opts = cb;
-        cb = null;
-        deferred = new this.Promise(function(resolve, reject) {
-          deferredResolve = resolve;
-          deferredReject = reject;
-        });
-      }
-      opts = opts || {};
-      var resolved = false;
-      var timer = null;
-      var occupationTimer = null;
-      var executionTimer = null;
-      var self = this;
-      var done = function(locked, err, ret) {
-        if (occupationTimer) {
-          clearTimeout(occupationTimer);
-          occupationTimer = null;
-        }
-        if (executionTimer) {
-          clearTimeout(executionTimer);
-          executionTimer = null;
-        }
-        if (locked) {
-          if (!!self.queues[key] && self.queues[key].length === 0) {
-            delete self.queues[key];
-          }
-          if (self.domainReentrant) {
-            delete self.domains[key];
-          }
-        }
-        if (!resolved) {
-          if (!deferred) {
-            if (typeof cb === "function") {
-              cb(err, ret);
-            }
-          } else {
-            if (err) {
-              deferredReject(err);
-            } else {
-              deferredResolve(ret);
-            }
-          }
-          resolved = true;
-        }
-        if (locked) {
-          if (!!self.queues[key] && self.queues[key].length > 0) {
-            self.queues[key].shift()();
-          }
-        }
-      };
-      var exec = function(locked) {
-        if (resolved) {
-          return done(locked);
-        }
-        if (timer) {
-          clearTimeout(timer);
-          timer = null;
-        }
-        if (self.domainReentrant && locked) {
-          self.domains[key] = process.domain;
-        }
-        var maxExecutionTime = opts.maxExecutionTime || self.maxExecutionTime;
-        if (maxExecutionTime) {
-          executionTimer = setTimeout(function() {
-            if (!!self.queues[key]) {
-              done(locked, new Error("Maximum execution time is exceeded " + key));
-            }
-          }, maxExecutionTime);
-        }
-        if (fn.length === 1) {
-          var called = false;
-          try {
-            fn(function(err, ret) {
-              if (!called) {
-                called = true;
-                done(locked, err, ret);
-              }
-            });
-          } catch (err) {
-            if (!called) {
-              called = true;
-              done(locked, err);
-            }
-          }
-        } else {
-          self._promiseTry(function() {
-            return fn();
-          }).then(function(ret) {
-            done(locked, void 0, ret);
-          }, function(error) {
-            done(locked, error);
-          });
-        }
-      };
-      if (self.domainReentrant && !!process.domain) {
-        exec = process.domain.bind(exec);
-      }
-      var maxPending = opts.maxPending || self.maxPending;
-      if (!self.queues[key]) {
-        self.queues[key] = [];
-        exec(true);
-      } else if (self.domainReentrant && !!process.domain && process.domain === self.domains[key]) {
-        exec(false);
-      } else if (self.queues[key].length >= maxPending) {
-        done(false, new Error("Too many pending tasks in queue " + key));
-      } else {
-        var taskFn = function() {
-          exec(true);
-        };
-        if (opts.skipQueue) {
-          self.queues[key].unshift(taskFn);
-        } else {
-          self.queues[key].push(taskFn);
-        }
-        var timeout = opts.timeout || self.timeout;
-        if (timeout) {
-          timer = setTimeout(function() {
-            timer = null;
-            done(false, new Error("async-lock timed out in queue " + key));
-          }, timeout);
-        }
-      }
-      var maxOccupationTime = opts.maxOccupationTime || self.maxOccupationTime;
-      if (maxOccupationTime) {
-        occupationTimer = setTimeout(function() {
-          if (!!self.queues[key]) {
-            done(false, new Error("Maximum occupation time is exceeded in queue " + key));
-          }
-        }, maxOccupationTime);
-      }
-      if (deferred) {
-        return deferred;
-      }
-    };
-    AsyncLock2.prototype._acquireBatch = function(keys, fn, cb, opts) {
-      if (typeof cb !== "function") {
-        opts = cb;
-        cb = null;
-      }
-      var self = this;
-      var getFn = function(key, fn2) {
-        return function(cb2) {
-          self.acquire(key, fn2, cb2, opts);
-        };
-      };
-      var fnx = keys.reduceRight(function(prev, key) {
-        return getFn(key, prev);
-      }, fn);
-      if (typeof cb === "function") {
-        fnx(cb);
-      } else {
-        return new this.Promise(function(resolve, reject) {
-          if (fnx.length === 1) {
-            fnx(function(err, ret) {
-              if (err) {
-                reject(err);
-              } else {
-                resolve(ret);
-              }
-            });
-          } else {
-            resolve(fnx());
-          }
-        });
-      }
-    };
-    AsyncLock2.prototype.isBusy = function(key) {
-      if (!key) {
-        return Object.keys(this.queues).length > 0;
-      } else {
-        return !!this.queues[key];
-      }
-    };
-    AsyncLock2.prototype._promiseTry = function(fn) {
-      try {
-        return this.Promise.resolve(fn());
-      } catch (e) {
-        return this.Promise.reject(e);
-      }
-    };
-    module2.exports = AsyncLock2;
-  }
-});
-
-// node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/index.js
-var require_async_lock = __commonJS({
-  "node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/index.js"(exports, module2) {
-    "use strict";
-    module2.exports = require_lib();
-  }
-});
-
 // node_modules/.pnpm/inherits@2.0.4/node_modules/inherits/inherits_browser.js
 var require_inherits_browser = __commonJS({
   "node_modules/.pnpm/inherits@2.0.4/node_modules/inherits/inherits_browser.js"(exports, module2) {
@@ -2246,10 +2013,1453 @@ var require_safe_buffer = __commonJS({
   }
 });
 
-// node_modules/.pnpm/sha.js@2.4.11/node_modules/sha.js/hash.js
-var require_hash = __commonJS({
-  "node_modules/.pnpm/sha.js@2.4.11/node_modules/sha.js/hash.js"(exports, module2) {
+// node_modules/.pnpm/isarray@2.0.5/node_modules/isarray/index.js
+var require_isarray = __commonJS({
+  "node_modules/.pnpm/isarray@2.0.5/node_modules/isarray/index.js"(exports, module2) {
+    var toString = {}.toString;
+    module2.exports = Array.isArray || function(arr) {
+      return toString.call(arr) == "[object Array]";
+    };
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/type.js
+var require_type = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/type.js"(exports, module2) {
+    "use strict";
+    module2.exports = TypeError;
+  }
+});
+
+// node_modules/.pnpm/es-object-atoms@1.1.2/node_modules/es-object-atoms/index.js
+var require_es_object_atoms = __commonJS({
+  "node_modules/.pnpm/es-object-atoms@1.1.2/node_modules/es-object-atoms/index.js"(exports, module2) {
+    "use strict";
+    module2.exports = Object;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/index.js
+var require_es_errors = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/index.js"(exports, module2) {
+    "use strict";
+    module2.exports = Error;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/eval.js
+var require_eval = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/eval.js"(exports, module2) {
+    "use strict";
+    module2.exports = EvalError;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/range.js
+var require_range = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/range.js"(exports, module2) {
+    "use strict";
+    module2.exports = RangeError;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/ref.js
+var require_ref = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/ref.js"(exports, module2) {
+    "use strict";
+    module2.exports = ReferenceError;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/syntax.js
+var require_syntax = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/syntax.js"(exports, module2) {
+    "use strict";
+    module2.exports = SyntaxError;
+  }
+});
+
+// node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/uri.js
+var require_uri = __commonJS({
+  "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors/uri.js"(exports, module2) {
+    "use strict";
+    module2.exports = URIError;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/abs.js
+var require_abs = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/abs.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.abs;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/floor.js
+var require_floor = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/floor.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.floor;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/max.js
+var require_max = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/max.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.max;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/min.js
+var require_min = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/min.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.min;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/pow.js
+var require_pow = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/pow.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.pow;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/round.js
+var require_round = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/round.js"(exports, module2) {
+    "use strict";
+    module2.exports = Math.round;
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/isNaN.js
+var require_isNaN = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/isNaN.js"(exports, module2) {
+    "use strict";
+    module2.exports = Number.isNaN || function isNaN2(a) {
+      return a !== a;
+    };
+  }
+});
+
+// node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/sign.js
+var require_sign = __commonJS({
+  "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics/sign.js"(exports, module2) {
+    "use strict";
+    var $isNaN = require_isNaN();
+    module2.exports = function sign(number) {
+      if ($isNaN(number) || number === 0) {
+        return number;
+      }
+      return number < 0 ? -1 : 1;
+    };
+  }
+});
+
+// node_modules/.pnpm/gopd@1.2.0/node_modules/gopd/gOPD.js
+var require_gOPD = __commonJS({
+  "node_modules/.pnpm/gopd@1.2.0/node_modules/gopd/gOPD.js"(exports, module2) {
+    "use strict";
+    module2.exports = Object.getOwnPropertyDescriptor;
+  }
+});
+
+// node_modules/.pnpm/gopd@1.2.0/node_modules/gopd/index.js
+var require_gopd = __commonJS({
+  "node_modules/.pnpm/gopd@1.2.0/node_modules/gopd/index.js"(exports, module2) {
+    "use strict";
+    var $gOPD = require_gOPD();
+    if ($gOPD) {
+      try {
+        $gOPD([], "length");
+      } catch (e) {
+        $gOPD = null;
+      }
+    }
+    module2.exports = $gOPD;
+  }
+});
+
+// node_modules/.pnpm/es-define-property@1.0.1/node_modules/es-define-property/index.js
+var require_es_define_property = __commonJS({
+  "node_modules/.pnpm/es-define-property@1.0.1/node_modules/es-define-property/index.js"(exports, module2) {
+    "use strict";
+    var $defineProperty = Object.defineProperty || false;
+    if ($defineProperty) {
+      try {
+        $defineProperty({}, "a", { value: 1 });
+      } catch (e) {
+        $defineProperty = false;
+      }
+    }
+    module2.exports = $defineProperty;
+  }
+});
+
+// node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols/shams.js
+var require_shams = __commonJS({
+  "node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols/shams.js"(exports, module2) {
+    "use strict";
+    module2.exports = function hasSymbols() {
+      if (typeof Symbol !== "function" || typeof Object.getOwnPropertySymbols !== "function") {
+        return false;
+      }
+      if (typeof Symbol.iterator === "symbol") {
+        return true;
+      }
+      var obj = {};
+      var sym = Symbol("test");
+      var symObj = Object(sym);
+      if (typeof sym === "string") {
+        return false;
+      }
+      if (Object.prototype.toString.call(sym) !== "[object Symbol]") {
+        return false;
+      }
+      if (Object.prototype.toString.call(symObj) !== "[object Symbol]") {
+        return false;
+      }
+      var symVal = 42;
+      obj[sym] = symVal;
+      for (var _ in obj) {
+        return false;
+      }
+      if (typeof Object.keys === "function" && Object.keys(obj).length !== 0) {
+        return false;
+      }
+      if (typeof Object.getOwnPropertyNames === "function" && Object.getOwnPropertyNames(obj).length !== 0) {
+        return false;
+      }
+      var syms = Object.getOwnPropertySymbols(obj);
+      if (syms.length !== 1 || syms[0] !== sym) {
+        return false;
+      }
+      if (!Object.prototype.propertyIsEnumerable.call(obj, sym)) {
+        return false;
+      }
+      if (typeof Object.getOwnPropertyDescriptor === "function") {
+        var descriptor = (
+          /** @type {PropertyDescriptor} */
+          Object.getOwnPropertyDescriptor(obj, sym)
+        );
+        if (descriptor.value !== symVal || descriptor.enumerable !== true) {
+          return false;
+        }
+      }
+      return true;
+    };
+  }
+});
+
+// node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols/index.js
+var require_has_symbols = __commonJS({
+  "node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols/index.js"(exports, module2) {
+    "use strict";
+    var origSymbol = typeof Symbol !== "undefined" && Symbol;
+    var hasSymbolSham = require_shams();
+    module2.exports = function hasNativeSymbols() {
+      if (typeof origSymbol !== "function") {
+        return false;
+      }
+      if (typeof Symbol !== "function") {
+        return false;
+      }
+      if (typeof origSymbol("foo") !== "symbol") {
+        return false;
+      }
+      if (typeof Symbol("bar") !== "symbol") {
+        return false;
+      }
+      return hasSymbolSham();
+    };
+  }
+});
+
+// node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/Reflect.getPrototypeOf.js
+var require_Reflect_getPrototypeOf = __commonJS({
+  "node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/Reflect.getPrototypeOf.js"(exports, module2) {
+    "use strict";
+    module2.exports = typeof Reflect !== "undefined" && Reflect.getPrototypeOf || null;
+  }
+});
+
+// node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/Object.getPrototypeOf.js
+var require_Object_getPrototypeOf = __commonJS({
+  "node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/Object.getPrototypeOf.js"(exports, module2) {
+    "use strict";
+    var $Object = require_es_object_atoms();
+    module2.exports = $Object.getPrototypeOf || null;
+  }
+});
+
+// node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind/implementation.js
+var require_implementation = __commonJS({
+  "node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind/implementation.js"(exports, module2) {
+    "use strict";
+    var ERROR_MESSAGE = "Function.prototype.bind called on incompatible ";
+    var toStr = Object.prototype.toString;
+    var max = Math.max;
+    var funcType = "[object Function]";
+    var concatty = function concatty2(a, b) {
+      var arr = [];
+      for (var i = 0; i < a.length; i += 1) {
+        arr[i] = a[i];
+      }
+      for (var j = 0; j < b.length; j += 1) {
+        arr[j + a.length] = b[j];
+      }
+      return arr;
+    };
+    var slicy = function slicy2(arrLike, offset) {
+      var arr = [];
+      for (var i = offset || 0, j = 0; i < arrLike.length; i += 1, j += 1) {
+        arr[j] = arrLike[i];
+      }
+      return arr;
+    };
+    var joiny = function(arr, joiner) {
+      var str = "";
+      for (var i = 0; i < arr.length; i += 1) {
+        str += arr[i];
+        if (i + 1 < arr.length) {
+          str += joiner;
+        }
+      }
+      return str;
+    };
+    module2.exports = function bind(that) {
+      var target = this;
+      if (typeof target !== "function" || toStr.apply(target) !== funcType) {
+        throw new TypeError(ERROR_MESSAGE + target);
+      }
+      var args = slicy(arguments, 1);
+      var bound;
+      var binder = function() {
+        if (this instanceof bound) {
+          var result = target.apply(
+            this,
+            concatty(args, arguments)
+          );
+          if (Object(result) === result) {
+            return result;
+          }
+          return this;
+        }
+        return target.apply(
+          that,
+          concatty(args, arguments)
+        );
+      };
+      var boundLength = max(0, target.length - args.length);
+      var boundArgs = [];
+      for (var i = 0; i < boundLength; i++) {
+        boundArgs[i] = "$" + i;
+      }
+      bound = Function("binder", "return function (" + joiny(boundArgs, ",") + "){ return binder.apply(this,arguments); }")(binder);
+      if (target.prototype) {
+        var Empty = function Empty2() {
+        };
+        Empty.prototype = target.prototype;
+        bound.prototype = new Empty();
+        Empty.prototype = null;
+      }
+      return bound;
+    };
+  }
+});
+
+// node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind/index.js
+var require_function_bind = __commonJS({
+  "node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind/index.js"(exports, module2) {
+    "use strict";
+    var implementation = require_implementation();
+    module2.exports = Function.prototype.bind || implementation;
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/functionCall.js
+var require_functionCall = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/functionCall.js"(exports, module2) {
+    "use strict";
+    module2.exports = Function.prototype.call;
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/functionApply.js
+var require_functionApply = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/functionApply.js"(exports, module2) {
+    "use strict";
+    module2.exports = Function.prototype.apply;
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/reflectApply.js
+var require_reflectApply = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/reflectApply.js"(exports, module2) {
+    "use strict";
+    module2.exports = typeof Reflect !== "undefined" && Reflect && Reflect.apply;
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/actualApply.js
+var require_actualApply = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/actualApply.js"(exports, module2) {
+    "use strict";
+    var bind = require_function_bind();
+    var $apply = require_functionApply();
+    var $call = require_functionCall();
+    var $reflectApply = require_reflectApply();
+    module2.exports = $reflectApply || bind.call($call, $apply);
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/index.js
+var require_call_bind_apply_helpers = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/index.js"(exports, module2) {
+    "use strict";
+    var bind = require_function_bind();
+    var $TypeError = require_type();
+    var $call = require_functionCall();
+    var $actualApply = require_actualApply();
+    module2.exports = function callBindBasic(args) {
+      if (args.length < 1 || typeof args[0] !== "function") {
+        throw new $TypeError("a function is required");
+      }
+      return $actualApply(bind, $call, args);
+    };
+  }
+});
+
+// node_modules/.pnpm/dunder-proto@1.0.1/node_modules/dunder-proto/get.js
+var require_get = __commonJS({
+  "node_modules/.pnpm/dunder-proto@1.0.1/node_modules/dunder-proto/get.js"(exports, module2) {
+    "use strict";
+    var callBind = require_call_bind_apply_helpers();
+    var gOPD = require_gopd();
+    var hasProtoAccessor;
+    try {
+      hasProtoAccessor = /** @type {{ __proto__?: typeof Array.prototype }} */
+      [].__proto__ === Array.prototype;
+    } catch (e) {
+      if (!e || typeof e !== "object" || !("code" in e) || e.code !== "ERR_PROTO_ACCESS") {
+        throw e;
+      }
+    }
+    var desc = !!hasProtoAccessor && gOPD && gOPD(
+      Object.prototype,
+      /** @type {keyof typeof Object.prototype} */
+      "__proto__"
+    );
+    var $Object = Object;
+    var $getPrototypeOf = $Object.getPrototypeOf;
+    module2.exports = desc && typeof desc.get === "function" ? callBind([desc.get]) : typeof $getPrototypeOf === "function" ? (
+      /** @type {import('./get')} */
+      function getDunder(value) {
+        return $getPrototypeOf(value == null ? value : $Object(value));
+      }
+    ) : false;
+  }
+});
+
+// node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/index.js
+var require_get_proto = __commonJS({
+  "node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto/index.js"(exports, module2) {
+    "use strict";
+    var reflectGetProto = require_Reflect_getPrototypeOf();
+    var originalGetProto = require_Object_getPrototypeOf();
+    var getDunderProto = require_get();
+    module2.exports = reflectGetProto ? function getProto(O) {
+      return reflectGetProto(O);
+    } : originalGetProto ? function getProto(O) {
+      if (!O || typeof O !== "object" && typeof O !== "function") {
+        throw new TypeError("getProto: not an object");
+      }
+      return originalGetProto(O);
+    } : getDunderProto ? function getProto(O) {
+      return getDunderProto(O);
+    } : null;
+  }
+});
+
+// node_modules/.pnpm/hasown@2.0.4/node_modules/hasown/index.js
+var require_hasown = __commonJS({
+  "node_modules/.pnpm/hasown@2.0.4/node_modules/hasown/index.js"(exports, module2) {
+    "use strict";
+    var call = Function.prototype.call;
+    var $hasOwn = Object.prototype.hasOwnProperty;
+    var bind = require_function_bind();
+    module2.exports = bind.call(call, $hasOwn);
+  }
+});
+
+// node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/get-intrinsic/index.js
+var require_get_intrinsic = __commonJS({
+  "node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/get-intrinsic/index.js"(exports, module2) {
+    "use strict";
+    var undefined2;
+    var $Object = require_es_object_atoms();
+    var $Error = require_es_errors();
+    var $EvalError = require_eval();
+    var $RangeError = require_range();
+    var $ReferenceError = require_ref();
+    var $SyntaxError = require_syntax();
+    var $TypeError = require_type();
+    var $URIError = require_uri();
+    var abs = require_abs();
+    var floor = require_floor();
+    var max = require_max();
+    var min = require_min();
+    var pow = require_pow();
+    var round = require_round();
+    var sign = require_sign();
+    var $Function = Function;
+    var getEvalledConstructor = function(expressionSyntax) {
+      try {
+        return $Function('"use strict"; return (' + expressionSyntax + ").constructor;")();
+      } catch (e) {
+      }
+    };
+    var $gOPD = require_gopd();
+    var $defineProperty = require_es_define_property();
+    var throwTypeError = function() {
+      throw new $TypeError();
+    };
+    var ThrowTypeError = $gOPD ? function() {
+      try {
+        arguments.callee;
+        return throwTypeError;
+      } catch (calleeThrows) {
+        try {
+          return $gOPD(arguments, "callee").get;
+        } catch (gOPDthrows) {
+          return throwTypeError;
+        }
+      }
+    }() : throwTypeError;
+    var hasSymbols = require_has_symbols()();
+    var getProto = require_get_proto();
+    var $ObjectGPO = require_Object_getPrototypeOf();
+    var $ReflectGPO = require_Reflect_getPrototypeOf();
+    var $apply = require_functionApply();
+    var $call = require_functionCall();
+    var needsEval = {};
+    var TypedArray = typeof Uint8Array === "undefined" || !getProto ? undefined2 : getProto(Uint8Array);
+    var INTRINSICS = {
+      __proto__: null,
+      "%AggregateError%": typeof AggregateError === "undefined" ? undefined2 : AggregateError,
+      "%Array%": Array,
+      "%ArrayBuffer%": typeof ArrayBuffer === "undefined" ? undefined2 : ArrayBuffer,
+      "%ArrayIteratorPrototype%": hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined2,
+      "%AsyncFromSyncIteratorPrototype%": undefined2,
+      "%AsyncFunction%": needsEval,
+      "%AsyncGenerator%": needsEval,
+      "%AsyncGeneratorFunction%": needsEval,
+      "%AsyncIteratorPrototype%": needsEval,
+      "%Atomics%": typeof Atomics === "undefined" ? undefined2 : Atomics,
+      "%BigInt%": typeof BigInt === "undefined" ? undefined2 : BigInt,
+      "%BigInt64Array%": typeof BigInt64Array === "undefined" ? undefined2 : BigInt64Array,
+      "%BigUint64Array%": typeof BigUint64Array === "undefined" ? undefined2 : BigUint64Array,
+      "%Boolean%": Boolean,
+      "%DataView%": typeof DataView === "undefined" ? undefined2 : DataView,
+      "%Date%": Date,
+      "%decodeURI%": decodeURI,
+      "%decodeURIComponent%": decodeURIComponent,
+      "%encodeURI%": encodeURI,
+      "%encodeURIComponent%": encodeURIComponent,
+      "%Error%": $Error,
+      "%eval%": eval,
+      // eslint-disable-line no-eval
+      "%EvalError%": $EvalError,
+      "%Float16Array%": typeof Float16Array === "undefined" ? undefined2 : Float16Array,
+      "%Float32Array%": typeof Float32Array === "undefined" ? undefined2 : Float32Array,
+      "%Float64Array%": typeof Float64Array === "undefined" ? undefined2 : Float64Array,
+      "%FinalizationRegistry%": typeof FinalizationRegistry === "undefined" ? undefined2 : FinalizationRegistry,
+      "%Function%": $Function,
+      "%GeneratorFunction%": needsEval,
+      "%Int8Array%": typeof Int8Array === "undefined" ? undefined2 : Int8Array,
+      "%Int16Array%": typeof Int16Array === "undefined" ? undefined2 : Int16Array,
+      "%Int32Array%": typeof Int32Array === "undefined" ? undefined2 : Int32Array,
+      "%isFinite%": isFinite,
+      "%isNaN%": isNaN,
+      "%IteratorPrototype%": hasSymbols && getProto ? getProto(getProto([][Symbol.iterator]())) : undefined2,
+      "%JSON%": typeof JSON === "object" ? JSON : undefined2,
+      "%Map%": typeof Map === "undefined" ? undefined2 : Map,
+      "%MapIteratorPrototype%": typeof Map === "undefined" || !hasSymbols || !getProto ? undefined2 : getProto((/* @__PURE__ */ new Map())[Symbol.iterator]()),
+      "%Math%": Math,
+      "%Number%": Number,
+      "%Object%": $Object,
+      "%Object.getOwnPropertyDescriptor%": $gOPD,
+      "%parseFloat%": parseFloat,
+      "%parseInt%": parseInt,
+      "%Promise%": typeof Promise === "undefined" ? undefined2 : Promise,
+      "%Proxy%": typeof Proxy === "undefined" ? undefined2 : Proxy,
+      "%RangeError%": $RangeError,
+      "%ReferenceError%": $ReferenceError,
+      "%Reflect%": typeof Reflect === "undefined" ? undefined2 : Reflect,
+      "%RegExp%": RegExp,
+      "%Set%": typeof Set === "undefined" ? undefined2 : Set,
+      "%SetIteratorPrototype%": typeof Set === "undefined" || !hasSymbols || !getProto ? undefined2 : getProto((/* @__PURE__ */ new Set())[Symbol.iterator]()),
+      "%SharedArrayBuffer%": typeof SharedArrayBuffer === "undefined" ? undefined2 : SharedArrayBuffer,
+      "%String%": String,
+      "%StringIteratorPrototype%": hasSymbols && getProto ? getProto(""[Symbol.iterator]()) : undefined2,
+      "%Symbol%": hasSymbols ? Symbol : undefined2,
+      "%SyntaxError%": $SyntaxError,
+      "%ThrowTypeError%": ThrowTypeError,
+      "%TypedArray%": TypedArray,
+      "%TypeError%": $TypeError,
+      "%Uint8Array%": typeof Uint8Array === "undefined" ? undefined2 : Uint8Array,
+      "%Uint8ClampedArray%": typeof Uint8ClampedArray === "undefined" ? undefined2 : Uint8ClampedArray,
+      "%Uint16Array%": typeof Uint16Array === "undefined" ? undefined2 : Uint16Array,
+      "%Uint32Array%": typeof Uint32Array === "undefined" ? undefined2 : Uint32Array,
+      "%URIError%": $URIError,
+      "%WeakMap%": typeof WeakMap === "undefined" ? undefined2 : WeakMap,
+      "%WeakRef%": typeof WeakRef === "undefined" ? undefined2 : WeakRef,
+      "%WeakSet%": typeof WeakSet === "undefined" ? undefined2 : WeakSet,
+      "%Function.prototype.call%": $call,
+      "%Function.prototype.apply%": $apply,
+      "%Object.defineProperty%": $defineProperty,
+      "%Object.getPrototypeOf%": $ObjectGPO,
+      "%Math.abs%": abs,
+      "%Math.floor%": floor,
+      "%Math.max%": max,
+      "%Math.min%": min,
+      "%Math.pow%": pow,
+      "%Math.round%": round,
+      "%Math.sign%": sign,
+      "%Reflect.getPrototypeOf%": $ReflectGPO
+    };
+    if (getProto) {
+      try {
+        null.error;
+      } catch (e) {
+        errorProto = getProto(getProto(e));
+        INTRINSICS["%Error.prototype%"] = errorProto;
+      }
+    }
+    var errorProto;
+    var doEval = function doEval2(name) {
+      var value;
+      if (name === "%AsyncFunction%") {
+        value = getEvalledConstructor("async function () {}");
+      } else if (name === "%GeneratorFunction%") {
+        value = getEvalledConstructor("function* () {}");
+      } else if (name === "%AsyncGeneratorFunction%") {
+        value = getEvalledConstructor("async function* () {}");
+      } else if (name === "%AsyncGenerator%") {
+        var fn = doEval2("%AsyncGeneratorFunction%");
+        if (fn) {
+          value = fn.prototype;
+        }
+      } else if (name === "%AsyncIteratorPrototype%") {
+        var gen = doEval2("%AsyncGenerator%");
+        if (gen && getProto) {
+          value = getProto(gen.prototype);
+        }
+      }
+      INTRINSICS[name] = value;
+      return value;
+    };
+    var LEGACY_ALIASES = {
+      __proto__: null,
+      "%ArrayBufferPrototype%": ["ArrayBuffer", "prototype"],
+      "%ArrayPrototype%": ["Array", "prototype"],
+      "%ArrayProto_entries%": ["Array", "prototype", "entries"],
+      "%ArrayProto_forEach%": ["Array", "prototype", "forEach"],
+      "%ArrayProto_keys%": ["Array", "prototype", "keys"],
+      "%ArrayProto_values%": ["Array", "prototype", "values"],
+      "%AsyncFunctionPrototype%": ["AsyncFunction", "prototype"],
+      "%AsyncGenerator%": ["AsyncGeneratorFunction", "prototype"],
+      "%AsyncGeneratorPrototype%": ["AsyncGeneratorFunction", "prototype", "prototype"],
+      "%BooleanPrototype%": ["Boolean", "prototype"],
+      "%DataViewPrototype%": ["DataView", "prototype"],
+      "%DatePrototype%": ["Date", "prototype"],
+      "%ErrorPrototype%": ["Error", "prototype"],
+      "%EvalErrorPrototype%": ["EvalError", "prototype"],
+      "%Float32ArrayPrototype%": ["Float32Array", "prototype"],
+      "%Float64ArrayPrototype%": ["Float64Array", "prototype"],
+      "%FunctionPrototype%": ["Function", "prototype"],
+      "%Generator%": ["GeneratorFunction", "prototype"],
+      "%GeneratorPrototype%": ["GeneratorFunction", "prototype", "prototype"],
+      "%Int8ArrayPrototype%": ["Int8Array", "prototype"],
+      "%Int16ArrayPrototype%": ["Int16Array", "prototype"],
+      "%Int32ArrayPrototype%": ["Int32Array", "prototype"],
+      "%JSONParse%": ["JSON", "parse"],
+      "%JSONStringify%": ["JSON", "stringify"],
+      "%MapPrototype%": ["Map", "prototype"],
+      "%NumberPrototype%": ["Number", "prototype"],
+      "%ObjectPrototype%": ["Object", "prototype"],
+      "%ObjProto_toString%": ["Object", "prototype", "toString"],
+      "%ObjProto_valueOf%": ["Object", "prototype", "valueOf"],
+      "%PromisePrototype%": ["Promise", "prototype"],
+      "%PromiseProto_then%": ["Promise", "prototype", "then"],
+      "%Promise_all%": ["Promise", "all"],
+      "%Promise_reject%": ["Promise", "reject"],
+      "%Promise_resolve%": ["Promise", "resolve"],
+      "%RangeErrorPrototype%": ["RangeError", "prototype"],
+      "%ReferenceErrorPrototype%": ["ReferenceError", "prototype"],
+      "%RegExpPrototype%": ["RegExp", "prototype"],
+      "%SetPrototype%": ["Set", "prototype"],
+      "%SharedArrayBufferPrototype%": ["SharedArrayBuffer", "prototype"],
+      "%StringPrototype%": ["String", "prototype"],
+      "%SymbolPrototype%": ["Symbol", "prototype"],
+      "%SyntaxErrorPrototype%": ["SyntaxError", "prototype"],
+      "%TypedArrayPrototype%": ["TypedArray", "prototype"],
+      "%TypeErrorPrototype%": ["TypeError", "prototype"],
+      "%Uint8ArrayPrototype%": ["Uint8Array", "prototype"],
+      "%Uint8ClampedArrayPrototype%": ["Uint8ClampedArray", "prototype"],
+      "%Uint16ArrayPrototype%": ["Uint16Array", "prototype"],
+      "%Uint32ArrayPrototype%": ["Uint32Array", "prototype"],
+      "%URIErrorPrototype%": ["URIError", "prototype"],
+      "%WeakMapPrototype%": ["WeakMap", "prototype"],
+      "%WeakSetPrototype%": ["WeakSet", "prototype"]
+    };
+    var bind = require_function_bind();
+    var hasOwn = require_hasown();
+    var $concat = bind.call($call, Array.prototype.concat);
+    var $spliceApply = bind.call($apply, Array.prototype.splice);
+    var $replace = bind.call($call, String.prototype.replace);
+    var $strSlice = bind.call($call, String.prototype.slice);
+    var $exec = bind.call($call, RegExp.prototype.exec);
+    var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
+    var reEscapeChar = /\\(\\)?/g;
+    var stringToPath = function stringToPath2(string) {
+      var first = $strSlice(string, 0, 1);
+      var last = $strSlice(string, -1);
+      if (first === "%" && last !== "%") {
+        throw new $SyntaxError("invalid intrinsic syntax, expected closing `%`");
+      } else if (last === "%" && first !== "%") {
+        throw new $SyntaxError("invalid intrinsic syntax, expected opening `%`");
+      }
+      var result = [];
+      $replace(string, rePropName, function(match, number, quote, subString) {
+        result[result.length] = quote ? $replace(subString, reEscapeChar, "$1") : number || match;
+      });
+      return result;
+    };
+    var getBaseIntrinsic = function getBaseIntrinsic2(name, allowMissing) {
+      var intrinsicName = name;
+      var alias;
+      if (hasOwn(LEGACY_ALIASES, intrinsicName)) {
+        alias = LEGACY_ALIASES[intrinsicName];
+        intrinsicName = "%" + alias[0] + "%";
+      }
+      if (hasOwn(INTRINSICS, intrinsicName)) {
+        var value = INTRINSICS[intrinsicName];
+        if (value === needsEval) {
+          value = doEval(intrinsicName);
+        }
+        if (typeof value === "undefined" && !allowMissing) {
+          throw new $TypeError("intrinsic " + name + " exists, but is not available. Please file an issue!");
+        }
+        return {
+          alias,
+          name: intrinsicName,
+          value
+        };
+      }
+      throw new $SyntaxError("intrinsic " + name + " does not exist!");
+    };
+    module2.exports = function GetIntrinsic(name, allowMissing) {
+      if (typeof name !== "string" || name.length === 0) {
+        throw new $TypeError("intrinsic name must be a non-empty string");
+      }
+      if (arguments.length > 1 && typeof allowMissing !== "boolean") {
+        throw new $TypeError('"allowMissing" argument must be a boolean');
+      }
+      if ($exec(/^%?[^%]*%?$/, name) === null) {
+        throw new $SyntaxError("`%` may not be present anywhere but at the beginning and end of the intrinsic name");
+      }
+      var parts = stringToPath(name);
+      var intrinsicBaseName = parts.length > 0 ? parts[0] : "";
+      var intrinsic = getBaseIntrinsic("%" + intrinsicBaseName + "%", allowMissing);
+      var intrinsicRealName = intrinsic.name;
+      var value = intrinsic.value;
+      var skipFurtherCaching = false;
+      var alias = intrinsic.alias;
+      if (alias) {
+        intrinsicBaseName = alias[0];
+        $spliceApply(parts, $concat([0, 1], alias));
+      }
+      for (var i = 1, isOwn = true; i < parts.length; i += 1) {
+        var part = parts[i];
+        var first = $strSlice(part, 0, 1);
+        var last = $strSlice(part, -1);
+        if ((first === '"' || first === "'" || first === "`" || (last === '"' || last === "'" || last === "`")) && first !== last) {
+          throw new $SyntaxError("property names with quotes must have matching quotes");
+        }
+        if (part === "constructor" || !isOwn) {
+          skipFurtherCaching = true;
+        }
+        intrinsicBaseName += "." + part;
+        intrinsicRealName = "%" + intrinsicBaseName + "%";
+        if (hasOwn(INTRINSICS, intrinsicRealName)) {
+          value = INTRINSICS[intrinsicRealName];
+        } else if (value != null) {
+          if (!(part in value)) {
+            if (!allowMissing) {
+              throw new $TypeError("base intrinsic for " + name + " exists, but the property is not available.");
+            }
+            return void 0;
+          }
+          if ($gOPD && i + 1 >= parts.length) {
+            var desc = $gOPD(value, part);
+            isOwn = !!desc;
+            if (isOwn && "get" in desc && !("originalValue" in desc.get)) {
+              value = desc.get;
+            } else {
+              value = value[part];
+            }
+          } else {
+            isOwn = hasOwn(value, part);
+            value = value[part];
+          }
+          if (isOwn && !skipFurtherCaching) {
+            INTRINSICS[intrinsicRealName] = value;
+          }
+        }
+      }
+      return value;
+    };
+  }
+});
+
+// node_modules/.pnpm/call-bound@1.0.4/node_modules/call-bound/index.js
+var require_call_bound = __commonJS({
+  "node_modules/.pnpm/call-bound@1.0.4/node_modules/call-bound/index.js"(exports, module2) {
+    "use strict";
+    var GetIntrinsic = require_get_intrinsic();
+    var callBindBasic = require_call_bind_apply_helpers();
+    var $indexOf = callBindBasic([GetIntrinsic("%String.prototype.indexOf%")]);
+    module2.exports = function callBoundIntrinsic(name, allowMissing) {
+      var intrinsic = (
+        /** @type {(this: unknown, ...args: unknown[]) => unknown} */
+        GetIntrinsic(name, !!allowMissing)
+      );
+      if (typeof intrinsic === "function" && $indexOf(name, ".prototype.") > -1) {
+        return callBindBasic(
+          /** @type {const} */
+          [intrinsic]
+        );
+      }
+      return intrinsic;
+    };
+  }
+});
+
+// node_modules/.pnpm/is-callable@1.2.7/node_modules/is-callable/index.js
+var require_is_callable = __commonJS({
+  "node_modules/.pnpm/is-callable@1.2.7/node_modules/is-callable/index.js"(exports, module2) {
+    "use strict";
+    var fnToStr = Function.prototype.toString;
+    var reflectApply = typeof Reflect === "object" && Reflect !== null && Reflect.apply;
+    var badArrayLike;
+    var isCallableMarker;
+    if (typeof reflectApply === "function" && typeof Object.defineProperty === "function") {
+      try {
+        badArrayLike = Object.defineProperty({}, "length", {
+          get: function() {
+            throw isCallableMarker;
+          }
+        });
+        isCallableMarker = {};
+        reflectApply(function() {
+          throw 42;
+        }, null, badArrayLike);
+      } catch (_) {
+        if (_ !== isCallableMarker) {
+          reflectApply = null;
+        }
+      }
+    } else {
+      reflectApply = null;
+    }
+    var constructorRegex = /^\s*class\b/;
+    var isES6ClassFn = function isES6ClassFunction(value) {
+      try {
+        var fnStr = fnToStr.call(value);
+        return constructorRegex.test(fnStr);
+      } catch (e) {
+        return false;
+      }
+    };
+    var tryFunctionObject = function tryFunctionToStr(value) {
+      try {
+        if (isES6ClassFn(value)) {
+          return false;
+        }
+        fnToStr.call(value);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+    var toStr = Object.prototype.toString;
+    var objectClass = "[object Object]";
+    var fnClass = "[object Function]";
+    var genClass = "[object GeneratorFunction]";
+    var ddaClass = "[object HTMLAllCollection]";
+    var ddaClass2 = "[object HTML document.all class]";
+    var ddaClass3 = "[object HTMLCollection]";
+    var hasToStringTag = typeof Symbol === "function" && !!Symbol.toStringTag;
+    var isIE68 = !(0 in [,]);
+    var isDDA = function isDocumentDotAll() {
+      return false;
+    };
+    if (typeof document === "object") {
+      all = document.all;
+      if (toStr.call(all) === toStr.call(document.all)) {
+        isDDA = function isDocumentDotAll(value) {
+          if ((isIE68 || !value) && (typeof value === "undefined" || typeof value === "object")) {
+            try {
+              var str = toStr.call(value);
+              return (str === ddaClass || str === ddaClass2 || str === ddaClass3 || str === objectClass) && value("") == null;
+            } catch (e) {
+            }
+          }
+          return false;
+        };
+      }
+    }
+    var all;
+    module2.exports = reflectApply ? function isCallable(value) {
+      if (isDDA(value)) {
+        return true;
+      }
+      if (!value) {
+        return false;
+      }
+      if (typeof value !== "function" && typeof value !== "object") {
+        return false;
+      }
+      try {
+        reflectApply(value, null, badArrayLike);
+      } catch (e) {
+        if (e !== isCallableMarker) {
+          return false;
+        }
+      }
+      return !isES6ClassFn(value) && tryFunctionObject(value);
+    } : function isCallable(value) {
+      if (isDDA(value)) {
+        return true;
+      }
+      if (!value) {
+        return false;
+      }
+      if (typeof value !== "function" && typeof value !== "object") {
+        return false;
+      }
+      if (hasToStringTag) {
+        return tryFunctionObject(value);
+      }
+      if (isES6ClassFn(value)) {
+        return false;
+      }
+      var strClass = toStr.call(value);
+      if (strClass !== fnClass && strClass !== genClass && !/^\[object HTML/.test(strClass)) {
+        return false;
+      }
+      return tryFunctionObject(value);
+    };
+  }
+});
+
+// node_modules/.pnpm/for-each@0.3.5/node_modules/for-each/index.js
+var require_for_each = __commonJS({
+  "node_modules/.pnpm/for-each@0.3.5/node_modules/for-each/index.js"(exports, module2) {
+    "use strict";
+    var isCallable = require_is_callable();
+    var toStr = Object.prototype.toString;
+    var hasOwnProperty = Object.prototype.hasOwnProperty;
+    var forEachArray = function forEachArray2(array, iterator, receiver) {
+      for (var i = 0, len = array.length; i < len; i++) {
+        if (hasOwnProperty.call(array, i)) {
+          if (receiver == null) {
+            iterator(array[i], i, array);
+          } else {
+            iterator.call(receiver, array[i], i, array);
+          }
+        }
+      }
+    };
+    var forEachString = function forEachString2(string, iterator, receiver) {
+      for (var i = 0, len = string.length; i < len; i++) {
+        if (receiver == null) {
+          iterator(string.charAt(i), i, string);
+        } else {
+          iterator.call(receiver, string.charAt(i), i, string);
+        }
+      }
+    };
+    var forEachObject = function forEachObject2(object, iterator, receiver) {
+      for (var k in object) {
+        if (hasOwnProperty.call(object, k)) {
+          if (receiver == null) {
+            iterator(object[k], k, object);
+          } else {
+            iterator.call(receiver, object[k], k, object);
+          }
+        }
+      }
+    };
+    function isArray(x) {
+      return toStr.call(x) === "[object Array]";
+    }
+    module2.exports = function forEach(list, iterator, thisArg) {
+      if (!isCallable(iterator)) {
+        throw new TypeError("iterator must be a function");
+      }
+      var receiver;
+      if (arguments.length >= 3) {
+        receiver = thisArg;
+      }
+      if (isArray(list)) {
+        forEachArray(list, iterator, receiver);
+      } else if (typeof list === "string") {
+        forEachString(list, iterator, receiver);
+      } else {
+        forEachObject(list, iterator, receiver);
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/possible-typed-array-names@1.1.0/node_modules/possible-typed-array-names/index.js
+var require_possible_typed_array_names = __commonJS({
+  "node_modules/.pnpm/possible-typed-array-names@1.1.0/node_modules/possible-typed-array-names/index.js"(exports, module2) {
+    "use strict";
+    module2.exports = [
+      "Float16Array",
+      "Float32Array",
+      "Float64Array",
+      "Int8Array",
+      "Int16Array",
+      "Int32Array",
+      "Uint8Array",
+      "Uint8ClampedArray",
+      "Uint16Array",
+      "Uint32Array",
+      "BigInt64Array",
+      "BigUint64Array"
+    ];
+  }
+});
+
+// node_modules/.pnpm/available-typed-arrays@1.0.7/node_modules/available-typed-arrays/index.js
+var require_available_typed_arrays = __commonJS({
+  "node_modules/.pnpm/available-typed-arrays@1.0.7/node_modules/available-typed-arrays/index.js"(exports, module2) {
+    "use strict";
+    var possibleNames = require_possible_typed_array_names();
+    var g = typeof globalThis === "undefined" ? global : globalThis;
+    module2.exports = function availableTypedArrays() {
+      var out = [];
+      for (var i = 0; i < possibleNames.length; i++) {
+        if (typeof g[possibleNames[i]] === "function") {
+          out[out.length] = possibleNames[i];
+        }
+      }
+      return out;
+    };
+  }
+});
+
+// node_modules/.pnpm/define-data-property@1.1.4/node_modules/define-data-property/index.js
+var require_define_data_property = __commonJS({
+  "node_modules/.pnpm/define-data-property@1.1.4/node_modules/define-data-property/index.js"(exports, module2) {
+    "use strict";
+    var $defineProperty = require_es_define_property();
+    var $SyntaxError = require_syntax();
+    var $TypeError = require_type();
+    var gopd = require_gopd();
+    module2.exports = function defineDataProperty(obj, property, value) {
+      if (!obj || typeof obj !== "object" && typeof obj !== "function") {
+        throw new $TypeError("`obj` must be an object or a function`");
+      }
+      if (typeof property !== "string" && typeof property !== "symbol") {
+        throw new $TypeError("`property` must be a string or a symbol`");
+      }
+      if (arguments.length > 3 && typeof arguments[3] !== "boolean" && arguments[3] !== null) {
+        throw new $TypeError("`nonEnumerable`, if provided, must be a boolean or null");
+      }
+      if (arguments.length > 4 && typeof arguments[4] !== "boolean" && arguments[4] !== null) {
+        throw new $TypeError("`nonWritable`, if provided, must be a boolean or null");
+      }
+      if (arguments.length > 5 && typeof arguments[5] !== "boolean" && arguments[5] !== null) {
+        throw new $TypeError("`nonConfigurable`, if provided, must be a boolean or null");
+      }
+      if (arguments.length > 6 && typeof arguments[6] !== "boolean") {
+        throw new $TypeError("`loose`, if provided, must be a boolean");
+      }
+      var nonEnumerable = arguments.length > 3 ? arguments[3] : null;
+      var nonWritable = arguments.length > 4 ? arguments[4] : null;
+      var nonConfigurable = arguments.length > 5 ? arguments[5] : null;
+      var loose = arguments.length > 6 ? arguments[6] : false;
+      var desc = !!gopd && gopd(obj, property);
+      if ($defineProperty) {
+        $defineProperty(obj, property, {
+          configurable: nonConfigurable === null && desc ? desc.configurable : !nonConfigurable,
+          enumerable: nonEnumerable === null && desc ? desc.enumerable : !nonEnumerable,
+          value,
+          writable: nonWritable === null && desc ? desc.writable : !nonWritable
+        });
+      } else if (loose || !nonEnumerable && !nonWritable && !nonConfigurable) {
+        obj[property] = value;
+      } else {
+        throw new $SyntaxError("This environment does not support defining a property as non-configurable, non-writable, or non-enumerable.");
+      }
+    };
+  }
+});
+
+// node_modules/.pnpm/has-property-descriptors@1.0.2/node_modules/has-property-descriptors/index.js
+var require_has_property_descriptors = __commonJS({
+  "node_modules/.pnpm/has-property-descriptors@1.0.2/node_modules/has-property-descriptors/index.js"(exports, module2) {
+    "use strict";
+    var $defineProperty = require_es_define_property();
+    var hasPropertyDescriptors = function hasPropertyDescriptors2() {
+      return !!$defineProperty;
+    };
+    hasPropertyDescriptors.hasArrayLengthDefineBug = function hasArrayLengthDefineBug() {
+      if (!$defineProperty) {
+        return null;
+      }
+      try {
+        return $defineProperty([], "length", { value: 1 }).length !== 1;
+      } catch (e) {
+        return true;
+      }
+    };
+    module2.exports = hasPropertyDescriptors;
+  }
+});
+
+// node_modules/.pnpm/set-function-length@1.2.2/node_modules/set-function-length/index.js
+var require_set_function_length = __commonJS({
+  "node_modules/.pnpm/set-function-length@1.2.2/node_modules/set-function-length/index.js"(exports, module2) {
+    "use strict";
+    var GetIntrinsic = require_get_intrinsic();
+    var define2 = require_define_data_property();
+    var hasDescriptors = require_has_property_descriptors()();
+    var gOPD = require_gopd();
+    var $TypeError = require_type();
+    var $floor = GetIntrinsic("%Math.floor%");
+    module2.exports = function setFunctionLength(fn, length) {
+      if (typeof fn !== "function") {
+        throw new $TypeError("`fn` is not a function");
+      }
+      if (typeof length !== "number" || length < 0 || length > 4294967295 || $floor(length) !== length) {
+        throw new $TypeError("`length` must be a positive 32-bit integer");
+      }
+      var loose = arguments.length > 2 && !!arguments[2];
+      var functionLengthIsConfigurable = true;
+      var functionLengthIsWritable = true;
+      if ("length" in fn && gOPD) {
+        var desc = gOPD(fn, "length");
+        if (desc && !desc.configurable) {
+          functionLengthIsConfigurable = false;
+        }
+        if (desc && !desc.writable) {
+          functionLengthIsWritable = false;
+        }
+      }
+      if (functionLengthIsConfigurable || functionLengthIsWritable || !loose) {
+        if (hasDescriptors) {
+          define2(
+            /** @type {Parameters<define>[0]} */
+            fn,
+            "length",
+            length,
+            true,
+            true
+          );
+        } else {
+          define2(
+            /** @type {Parameters<define>[0]} */
+            fn,
+            "length",
+            length
+          );
+        }
+      }
+      return fn;
+    };
+  }
+});
+
+// node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/applyBind.js
+var require_applyBind = __commonJS({
+  "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers/applyBind.js"(exports, module2) {
+    "use strict";
+    var bind = require_function_bind();
+    var $apply = require_functionApply();
+    var actualApply = require_actualApply();
+    module2.exports = function applyBind() {
+      return actualApply(bind, $apply, arguments);
+    };
+  }
+});
+
+// node_modules/.pnpm/call-bind@1.0.9/node_modules/call-bind/index.js
+var require_call_bind = __commonJS({
+  "node_modules/.pnpm/call-bind@1.0.9/node_modules/call-bind/index.js"(exports, module2) {
+    "use strict";
+    var setFunctionLength = require_set_function_length();
+    var $defineProperty = require_es_define_property();
+    var callBindBasic = require_call_bind_apply_helpers();
+    var applyBind = require_applyBind();
+    module2.exports = function callBind(originalFunction) {
+      var func = callBindBasic(arguments);
+      var adjustedLength = 1 + originalFunction.length - (arguments.length - 1);
+      return setFunctionLength(
+        func,
+        adjustedLength > 0 ? adjustedLength : 0,
+        true
+      );
+    };
+    if ($defineProperty) {
+      $defineProperty(module2.exports, "apply", { value: applyBind });
+    } else {
+      module2.exports.apply = applyBind;
+    }
+  }
+});
+
+// node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js
+var require_shams2 = __commonJS({
+  "node_modules/.pnpm/has-tostringtag@1.0.2/node_modules/has-tostringtag/shams.js"(exports, module2) {
+    "use strict";
+    var hasSymbols = require_shams();
+    module2.exports = function hasToStringTagShams() {
+      return hasSymbols() && !!Symbol.toStringTag;
+    };
+  }
+});
+
+// node_modules/.pnpm/which-typed-array@1.1.22/node_modules/which-typed-array/index.js
+var require_which_typed_array = __commonJS({
+  "node_modules/.pnpm/which-typed-array@1.1.22/node_modules/which-typed-array/index.js"(exports, module2) {
+    "use strict";
+    var forEach = require_for_each();
+    var availableTypedArrays = require_available_typed_arrays();
+    var callBind = require_call_bind();
+    var callBound = require_call_bound();
+    var gOPD = require_gopd();
+    var getProto = require_get_proto();
+    var $toString = callBound("Object.prototype.toString");
+    var hasToStringTag = require_shams2()();
+    var g = typeof globalThis === "undefined" ? global : globalThis;
+    var typedArrays = availableTypedArrays();
+    var $slice = callBound("String.prototype.slice");
+    var $indexOf = callBound("Array.prototype.indexOf", true) || function indexOf(array, value) {
+      for (var i = 0; i < array.length; i += 1) {
+        if (array[i] === value) {
+          return i;
+        }
+      }
+      return -1;
+    };
+    var cache = { __proto__: null };
+    if (hasToStringTag && gOPD && getProto) {
+      forEach(typedArrays, function(typedArray) {
+        var arr = new g[typedArray]();
+        if (Symbol.toStringTag in arr && getProto) {
+          var proto = getProto(arr);
+          var descriptor = gOPD(proto, Symbol.toStringTag);
+          if (!descriptor && proto) {
+            var superProto = getProto(proto);
+            descriptor = gOPD(superProto, Symbol.toStringTag);
+          }
+          if (descriptor && descriptor.get) {
+            var bound = callBind(descriptor.get);
+            cache[
+              /** @type {`$${TypedArrayName}`} */
+              "$" + typedArray
+            ] = bound;
+          }
+        }
+      });
+    } else {
+      forEach(typedArrays, function(typedArray) {
+        var arr = new g[typedArray]();
+        var fn = arr.slice || arr.set;
+        if (fn) {
+          var bound = (
+            /** @type {BoundSlice | BoundSet} */
+            // @ts-expect-error TODO FIXME
+            callBind(fn)
+          );
+          cache[
+            /** @type {`$${TypedArrayName}`} */
+            "$" + typedArray
+          ] = bound;
+        }
+      });
+    }
+    function tryTypedArrays(value) {
+      var found = false;
+      forEach(
+        /** @type {Record<`$${TypedArrayName}`, Getter>} */
+        cache,
+        /** @param {Getter} getter @param {`$${TypedArrayName}`} typedArray */
+        function(getter, typedArray) {
+          if (!found) {
+            try {
+              if ("$" + getter(value) === typedArray) {
+                found = /** @type {TypedArrayName} */
+                $slice(typedArray, 1);
+              }
+            } catch (e) {
+            }
+          }
+        }
+      );
+      return found;
+    }
+    function trySlices(value) {
+      var found = false;
+      forEach(
+        /** @type {Record<`$${TypedArrayName}`, Getter>} */
+        cache,
+        /** @param {Getter} getter @param {`$${TypedArrayName}`} name */
+        function(getter, name) {
+          if (!found) {
+            try {
+              getter(value);
+              found = /** @type {TypedArrayName} */
+              $slice(name, 1);
+            } catch (e) {
+            }
+          }
+        }
+      );
+      return found;
+    }
+    function isTATag(tag2) {
+      return $indexOf(typedArrays, tag2) > -1;
+    }
+    module2.exports = function whichTypedArray(value) {
+      if (!value || typeof value !== "object") {
+        return false;
+      }
+      if (!hasToStringTag) {
+        var tag2 = $slice($toString(value), 8, -1);
+        if (isTATag(tag2)) {
+          return tag2;
+        }
+        if (tag2 !== "Object") {
+          return false;
+        }
+        return trySlices(value);
+      }
+      if (!gOPD) {
+        return null;
+      }
+      return tryTypedArrays(value);
+    };
+  }
+});
+
+// node_modules/.pnpm/is-typed-array@1.1.15/node_modules/is-typed-array/index.js
+var require_is_typed_array = __commonJS({
+  "node_modules/.pnpm/is-typed-array@1.1.15/node_modules/is-typed-array/index.js"(exports, module2) {
+    "use strict";
+    var whichTypedArray = require_which_typed_array();
+    module2.exports = function isTypedArray(value) {
+      return !!whichTypedArray(value);
+    };
+  }
+});
+
+// node_modules/.pnpm/typed-array-buffer@1.0.3/node_modules/typed-array-buffer/index.js
+var require_typed_array_buffer = __commonJS({
+  "node_modules/.pnpm/typed-array-buffer@1.0.3/node_modules/typed-array-buffer/index.js"(exports, module2) {
+    "use strict";
+    var $TypeError = require_type();
+    var callBound = require_call_bound();
+    var $typedArrayBuffer = callBound("TypedArray.prototype.buffer", true);
+    var isTypedArray = require_is_typed_array();
+    module2.exports = $typedArrayBuffer || function typedArrayBuffer(x) {
+      if (!isTypedArray(x)) {
+        throw new $TypeError("Not a Typed Array");
+      }
+      return x.buffer;
+    };
+  }
+});
+
+// node_modules/.pnpm/to-buffer@1.2.2/node_modules/to-buffer/index.js
+var require_to_buffer = __commonJS({
+  "node_modules/.pnpm/to-buffer@1.2.2/node_modules/to-buffer/index.js"(exports, module2) {
+    "use strict";
     var Buffer2 = require_safe_buffer().Buffer;
+    var isArray = require_isarray();
+    var typedArrayBuffer = require_typed_array_buffer();
+    var isView = ArrayBuffer.isView || function isView2(obj) {
+      try {
+        typedArrayBuffer(obj);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+    var useUint8Array = typeof Uint8Array !== "undefined";
+    var useArrayBuffer = typeof ArrayBuffer !== "undefined" && typeof Uint8Array !== "undefined";
+    var useFromArrayBuffer = useArrayBuffer && (Buffer2.prototype instanceof Uint8Array || Buffer2.TYPED_ARRAY_SUPPORT);
+    module2.exports = function toBuffer(data, encoding) {
+      if (Buffer2.isBuffer(data)) {
+        if (data.constructor && !("isBuffer" in data)) {
+          return Buffer2.from(data);
+        }
+        return data;
+      }
+      if (typeof data === "string") {
+        return Buffer2.from(data, encoding);
+      }
+      if (useArrayBuffer && isView(data)) {
+        if (data.byteLength === 0) {
+          return Buffer2.alloc(0);
+        }
+        if (useFromArrayBuffer) {
+          var res = Buffer2.from(data.buffer, data.byteOffset, data.byteLength);
+          if (res.byteLength === data.byteLength) {
+            return res;
+          }
+        }
+        var uint8 = data instanceof Uint8Array ? data : new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+        var result = Buffer2.from(uint8);
+        if (result.length === data.byteLength) {
+          return result;
+        }
+      }
+      if (useUint8Array && data instanceof Uint8Array) {
+        return Buffer2.from(data);
+      }
+      var isArr = isArray(data);
+      if (isArr) {
+        for (var i = 0; i < data.length; i += 1) {
+          var x = data[i];
+          if (typeof x !== "number" || x < 0 || x > 255 || ~~x !== x) {
+            throw new RangeError("Array items must be numbers in the range 0-255.");
+          }
+        }
+      }
+      if (isArr || Buffer2.isBuffer(data) && data.constructor && typeof data.constructor.isBuffer === "function" && data.constructor.isBuffer(data)) {
+        return Buffer2.from(data);
+      }
+      throw new TypeError('The "data" argument must be a string, an Array, a Buffer, a Uint8Array, or a DataView.');
+    };
+  }
+});
+
+// node_modules/.pnpm/sha.js@2.4.12/node_modules/sha.js/hash.js
+var require_hash = __commonJS({
+  "node_modules/.pnpm/sha.js@2.4.12/node_modules/sha.js/hash.js"(exports, module2) {
+    "use strict";
+    var Buffer2 = require_safe_buffer().Buffer;
+    var toBuffer = require_to_buffer();
     function Hash2(blockSize, finalSize) {
       this._block = Buffer2.alloc(blockSize);
       this._finalSize = finalSize;
@@ -2257,10 +3467,7 @@ var require_hash = __commonJS({
       this._len = 0;
     }
     Hash2.prototype.update = function(data, enc) {
-      if (typeof data === "string") {
-        enc = enc || "utf8";
-        data = Buffer2.from(data, enc);
-      }
+      data = toBuffer(data, enc || "utf8");
       var block = this._block;
       var blockSize = this._blockSize;
       var length = data.length;
@@ -2308,9 +3515,10 @@ var require_hash = __commonJS({
   }
 });
 
-// node_modules/.pnpm/sha.js@2.4.11/node_modules/sha.js/sha1.js
+// node_modules/.pnpm/sha.js@2.4.12/node_modules/sha.js/sha1.js
 var require_sha1 = __commonJS({
-  "node_modules/.pnpm/sha.js@2.4.11/node_modules/sha.js/sha1.js"(exports, module2) {
+  "node_modules/.pnpm/sha.js@2.4.12/node_modules/sha.js/sha1.js"(exports, module2) {
+    "use strict";
     var inherits = require_inherits_browser();
     var Hash2 = require_hash();
     var Buffer2 = require_safe_buffer().Buffer;
@@ -2345,26 +3553,30 @@ var require_sha1 = __commonJS({
       return num2 << 30 | num2 >>> 2;
     }
     function ft(s, b, c, d) {
-      if (s === 0)
+      if (s === 0) {
         return b & c | ~b & d;
-      if (s === 2)
+      }
+      if (s === 2) {
         return b & c | b & d | c & d;
+      }
       return b ^ c ^ d;
     }
     Sha1.prototype._update = function(M) {
-      var W2 = this._w;
+      var w = this._w;
       var a = this._a | 0;
       var b = this._b | 0;
       var c = this._c | 0;
       var d = this._d | 0;
       var e = this._e | 0;
-      for (var i = 0; i < 16; ++i)
-        W2[i] = M.readInt32BE(i * 4);
-      for (; i < 80; ++i)
-        W2[i] = rotl1(W2[i - 3] ^ W2[i - 8] ^ W2[i - 14] ^ W2[i - 16]);
+      for (var i = 0; i < 16; ++i) {
+        w[i] = M.readInt32BE(i * 4);
+      }
+      for (; i < 80; ++i) {
+        w[i] = rotl1(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]);
+      }
       for (var j = 0; j < 80; ++j) {
         var s = ~~(j / 20);
-        var t = rotl5(a) + ft(s, b, c, d) + e + W2[j] + K[s] | 0;
+        var t = rotl5(a) + ft(s, b, c, d) + e + w[j] + K[s] | 0;
         e = d;
         d = c;
         c = rotl30(b);
@@ -2390,431 +3602,236 @@ var require_sha1 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/path-browserify@1.0.1/node_modules/path-browserify/index.js
-var require_path_browserify = __commonJS({
-  "node_modules/.pnpm/path-browserify@1.0.1/node_modules/path-browserify/index.js"(exports, module2) {
+// node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js
+var require_lib = __commonJS({
+  "node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/lib/index.js"(exports, module2) {
     "use strict";
-    function assertPath(path) {
-      if (typeof path !== "string") {
-        throw new TypeError("Path must be a string. Received " + JSON.stringify(path));
+    var AsyncLock2 = function(opts) {
+      opts = opts || {};
+      this.Promise = opts.Promise || Promise;
+      this.queues = /* @__PURE__ */ Object.create(null);
+      this.domainReentrant = opts.domainReentrant || false;
+      if (this.domainReentrant) {
+        if (typeof process === "undefined" || typeof process.domain === "undefined") {
+          throw new Error(
+            "Domain-reentrant locks require `process.domain` to exist. Please flip `opts.domainReentrant = false`, use a NodeJS version that still implements Domain, or install a browser polyfill."
+          );
+        }
+        this.domains = /* @__PURE__ */ Object.create(null);
       }
-    }
-    function normalizeStringPosix(path, allowAboveRoot) {
-      var res = "";
-      var lastSegmentLength = 0;
-      var lastSlash = -1;
-      var dots = 0;
-      var code;
-      for (var i = 0; i <= path.length; ++i) {
-        if (i < path.length)
-          code = path.charCodeAt(i);
-        else if (code === 47)
-          break;
-        else
-          code = 47;
-        if (code === 47) {
-          if (lastSlash === i - 1 || dots === 1) {
-          } else if (lastSlash !== i - 1 && dots === 2) {
-            if (res.length < 2 || lastSegmentLength !== 2 || res.charCodeAt(res.length - 1) !== 46 || res.charCodeAt(res.length - 2) !== 46) {
-              if (res.length > 2) {
-                var lastSlashIndex = res.lastIndexOf("/");
-                if (lastSlashIndex !== res.length - 1) {
-                  if (lastSlashIndex === -1) {
-                    res = "";
-                    lastSegmentLength = 0;
-                  } else {
-                    res = res.slice(0, lastSlashIndex);
-                    lastSegmentLength = res.length - 1 - res.lastIndexOf("/");
-                  }
-                  lastSlash = i;
-                  dots = 0;
-                  continue;
-                }
-              } else if (res.length === 2 || res.length === 1) {
-                res = "";
-                lastSegmentLength = 0;
-                lastSlash = i;
-                dots = 0;
-                continue;
-              }
-            }
-            if (allowAboveRoot) {
-              if (res.length > 0)
-                res += "/..";
-              else
-                res = "..";
-              lastSegmentLength = 2;
-            }
-          } else {
-            if (res.length > 0)
-              res += "/" + path.slice(lastSlash + 1, i);
-            else
-              res = path.slice(lastSlash + 1, i);
-            lastSegmentLength = i - lastSlash - 1;
-          }
-          lastSlash = i;
-          dots = 0;
-        } else if (code === 46 && dots !== -1) {
-          ++dots;
-        } else {
-          dots = -1;
-        }
+      this.timeout = opts.timeout || AsyncLock2.DEFAULT_TIMEOUT;
+      this.maxOccupationTime = opts.maxOccupationTime || AsyncLock2.DEFAULT_MAX_OCCUPATION_TIME;
+      this.maxExecutionTime = opts.maxExecutionTime || AsyncLock2.DEFAULT_MAX_EXECUTION_TIME;
+      if (opts.maxPending === Infinity || Number.isInteger(opts.maxPending) && opts.maxPending >= 0) {
+        this.maxPending = opts.maxPending;
+      } else {
+        this.maxPending = AsyncLock2.DEFAULT_MAX_PENDING;
       }
-      return res;
-    }
-    function _format(sep, pathObject) {
-      var dir = pathObject.dir || pathObject.root;
-      var base = pathObject.base || (pathObject.name || "") + (pathObject.ext || "");
-      if (!dir) {
-        return base;
-      }
-      if (dir === pathObject.root) {
-        return dir + base;
-      }
-      return dir + sep + base;
-    }
-    var posix = {
-      // path.resolve([from ...], to)
-      resolve: function resolve() {
-        var resolvedPath = "";
-        var resolvedAbsolute = false;
-        var cwd;
-        for (var i = arguments.length - 1; i >= -1 && !resolvedAbsolute; i--) {
-          var path;
-          if (i >= 0)
-            path = arguments[i];
-          else {
-            if (cwd === void 0)
-              cwd = process.cwd();
-            path = cwd;
-          }
-          assertPath(path);
-          if (path.length === 0) {
-            continue;
-          }
-          resolvedPath = path + "/" + resolvedPath;
-          resolvedAbsolute = path.charCodeAt(0) === 47;
-        }
-        resolvedPath = normalizeStringPosix(resolvedPath, !resolvedAbsolute);
-        if (resolvedAbsolute) {
-          if (resolvedPath.length > 0)
-            return "/" + resolvedPath;
-          else
-            return "/";
-        } else if (resolvedPath.length > 0) {
-          return resolvedPath;
-        } else {
-          return ".";
-        }
-      },
-      normalize: function normalize(path) {
-        assertPath(path);
-        if (path.length === 0)
-          return ".";
-        var isAbsolute = path.charCodeAt(0) === 47;
-        var trailingSeparator = path.charCodeAt(path.length - 1) === 47;
-        path = normalizeStringPosix(path, !isAbsolute);
-        if (path.length === 0 && !isAbsolute)
-          path = ".";
-        if (path.length > 0 && trailingSeparator)
-          path += "/";
-        if (isAbsolute)
-          return "/" + path;
-        return path;
-      },
-      isAbsolute: function isAbsolute(path) {
-        assertPath(path);
-        return path.length > 0 && path.charCodeAt(0) === 47;
-      },
-      join: function join2() {
-        if (arguments.length === 0)
-          return ".";
-        var joined;
-        for (var i = 0; i < arguments.length; ++i) {
-          var arg = arguments[i];
-          assertPath(arg);
-          if (arg.length > 0) {
-            if (joined === void 0)
-              joined = arg;
-            else
-              joined += "/" + arg;
-          }
-        }
-        if (joined === void 0)
-          return ".";
-        return posix.normalize(joined);
-      },
-      relative: function relative(from, to) {
-        assertPath(from);
-        assertPath(to);
-        if (from === to)
-          return "";
-        from = posix.resolve(from);
-        to = posix.resolve(to);
-        if (from === to)
-          return "";
-        var fromStart = 1;
-        for (; fromStart < from.length; ++fromStart) {
-          if (from.charCodeAt(fromStart) !== 47)
-            break;
-        }
-        var fromEnd = from.length;
-        var fromLen = fromEnd - fromStart;
-        var toStart = 1;
-        for (; toStart < to.length; ++toStart) {
-          if (to.charCodeAt(toStart) !== 47)
-            break;
-        }
-        var toEnd = to.length;
-        var toLen = toEnd - toStart;
-        var length = fromLen < toLen ? fromLen : toLen;
-        var lastCommonSep = -1;
-        var i = 0;
-        for (; i <= length; ++i) {
-          if (i === length) {
-            if (toLen > length) {
-              if (to.charCodeAt(toStart + i) === 47) {
-                return to.slice(toStart + i + 1);
-              } else if (i === 0) {
-                return to.slice(toStart + i);
-              }
-            } else if (fromLen > length) {
-              if (from.charCodeAt(fromStart + i) === 47) {
-                lastCommonSep = i;
-              } else if (i === 0) {
-                lastCommonSep = 0;
-              }
-            }
-            break;
-          }
-          var fromCode = from.charCodeAt(fromStart + i);
-          var toCode = to.charCodeAt(toStart + i);
-          if (fromCode !== toCode)
-            break;
-          else if (fromCode === 47)
-            lastCommonSep = i;
-        }
-        var out = "";
-        for (i = fromStart + lastCommonSep + 1; i <= fromEnd; ++i) {
-          if (i === fromEnd || from.charCodeAt(i) === 47) {
-            if (out.length === 0)
-              out += "..";
-            else
-              out += "/..";
-          }
-        }
-        if (out.length > 0)
-          return out + to.slice(toStart + lastCommonSep);
-        else {
-          toStart += lastCommonSep;
-          if (to.charCodeAt(toStart) === 47)
-            ++toStart;
-          return to.slice(toStart);
-        }
-      },
-      _makeLong: function _makeLong(path) {
-        return path;
-      },
-      dirname: function dirname2(path) {
-        assertPath(path);
-        if (path.length === 0)
-          return ".";
-        var code = path.charCodeAt(0);
-        var hasRoot = code === 47;
-        var end = -1;
-        var matchedSlash = true;
-        for (var i = path.length - 1; i >= 1; --i) {
-          code = path.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              end = i;
-              break;
-            }
-          } else {
-            matchedSlash = false;
-          }
-        }
-        if (end === -1)
-          return hasRoot ? "/" : ".";
-        if (hasRoot && end === 1)
-          return "//";
-        return path.slice(0, end);
-      },
-      basename: function basename2(path, ext) {
-        if (ext !== void 0 && typeof ext !== "string")
-          throw new TypeError('"ext" argument must be a string');
-        assertPath(path);
-        var start = 0;
-        var end = -1;
-        var matchedSlash = true;
-        var i;
-        if (ext !== void 0 && ext.length > 0 && ext.length <= path.length) {
-          if (ext.length === path.length && ext === path)
-            return "";
-          var extIdx = ext.length - 1;
-          var firstNonSlashEnd = -1;
-          for (i = path.length - 1; i >= 0; --i) {
-            var code = path.charCodeAt(i);
-            if (code === 47) {
-              if (!matchedSlash) {
-                start = i + 1;
-                break;
-              }
-            } else {
-              if (firstNonSlashEnd === -1) {
-                matchedSlash = false;
-                firstNonSlashEnd = i + 1;
-              }
-              if (extIdx >= 0) {
-                if (code === ext.charCodeAt(extIdx)) {
-                  if (--extIdx === -1) {
-                    end = i;
-                  }
-                } else {
-                  extIdx = -1;
-                  end = firstNonSlashEnd;
-                }
-              }
-            }
-          }
-          if (start === end)
-            end = firstNonSlashEnd;
-          else if (end === -1)
-            end = path.length;
-          return path.slice(start, end);
-        } else {
-          for (i = path.length - 1; i >= 0; --i) {
-            if (path.charCodeAt(i) === 47) {
-              if (!matchedSlash) {
-                start = i + 1;
-                break;
-              }
-            } else if (end === -1) {
-              matchedSlash = false;
-              end = i + 1;
-            }
-          }
-          if (end === -1)
-            return "";
-          return path.slice(start, end);
-        }
-      },
-      extname: function extname(path) {
-        assertPath(path);
-        var startDot = -1;
-        var startPart = 0;
-        var end = -1;
-        var matchedSlash = true;
-        var preDotState = 0;
-        for (var i = path.length - 1; i >= 0; --i) {
-          var code = path.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              startPart = i + 1;
-              break;
-            }
-            continue;
-          }
-          if (end === -1) {
-            matchedSlash = false;
-            end = i + 1;
-          }
-          if (code === 46) {
-            if (startDot === -1)
-              startDot = i;
-            else if (preDotState !== 1)
-              preDotState = 1;
-          } else if (startDot !== -1) {
-            preDotState = -1;
-          }
-        }
-        if (startDot === -1 || end === -1 || // We saw a non-dot character immediately before the dot
-        preDotState === 0 || // The (right-most) trimmed path component is exactly '..'
-        preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
-          return "";
-        }
-        return path.slice(startDot, end);
-      },
-      format: function format(pathObject) {
-        if (pathObject === null || typeof pathObject !== "object") {
-          throw new TypeError('The "pathObject" argument must be of type Object. Received type ' + typeof pathObject);
-        }
-        return _format("/", pathObject);
-      },
-      parse: function parse(path) {
-        assertPath(path);
-        var ret = { root: "", dir: "", base: "", ext: "", name: "" };
-        if (path.length === 0)
-          return ret;
-        var code = path.charCodeAt(0);
-        var isAbsolute = code === 47;
-        var start;
-        if (isAbsolute) {
-          ret.root = "/";
-          start = 1;
-        } else {
-          start = 0;
-        }
-        var startDot = -1;
-        var startPart = 0;
-        var end = -1;
-        var matchedSlash = true;
-        var i = path.length - 1;
-        var preDotState = 0;
-        for (; i >= start; --i) {
-          code = path.charCodeAt(i);
-          if (code === 47) {
-            if (!matchedSlash) {
-              startPart = i + 1;
-              break;
-            }
-            continue;
-          }
-          if (end === -1) {
-            matchedSlash = false;
-            end = i + 1;
-          }
-          if (code === 46) {
-            if (startDot === -1)
-              startDot = i;
-            else if (preDotState !== 1)
-              preDotState = 1;
-          } else if (startDot !== -1) {
-            preDotState = -1;
-          }
-        }
-        if (startDot === -1 || end === -1 || // We saw a non-dot character immediately before the dot
-        preDotState === 0 || // The (right-most) trimmed path component is exactly '..'
-        preDotState === 1 && startDot === end - 1 && startDot === startPart + 1) {
-          if (end !== -1) {
-            if (startPart === 0 && isAbsolute)
-              ret.base = ret.name = path.slice(1, end);
-            else
-              ret.base = ret.name = path.slice(startPart, end);
-          }
-        } else {
-          if (startPart === 0 && isAbsolute) {
-            ret.name = path.slice(1, startDot);
-            ret.base = path.slice(1, end);
-          } else {
-            ret.name = path.slice(startPart, startDot);
-            ret.base = path.slice(startPart, end);
-          }
-          ret.ext = path.slice(startDot, end);
-        }
-        if (startPart > 0)
-          ret.dir = path.slice(0, startPart - 1);
-        else if (isAbsolute)
-          ret.dir = "/";
-        return ret;
-      },
-      sep: "/",
-      delimiter: ":",
-      win32: null,
-      posix: null
     };
-    posix.posix = posix;
-    module2.exports = posix;
+    AsyncLock2.DEFAULT_TIMEOUT = 0;
+    AsyncLock2.DEFAULT_MAX_OCCUPATION_TIME = 0;
+    AsyncLock2.DEFAULT_MAX_EXECUTION_TIME = 0;
+    AsyncLock2.DEFAULT_MAX_PENDING = 1e3;
+    AsyncLock2.prototype.acquire = function(key, fn, cb, opts) {
+      if (Array.isArray(key)) {
+        return this._acquireBatch(key, fn, cb, opts);
+      }
+      if (typeof fn !== "function") {
+        throw new Error("You must pass a function to execute");
+      }
+      var deferredResolve = null;
+      var deferredReject = null;
+      var deferred = null;
+      if (typeof cb !== "function") {
+        opts = cb;
+        cb = null;
+        deferred = new this.Promise(function(resolve, reject) {
+          deferredResolve = resolve;
+          deferredReject = reject;
+        });
+      }
+      opts = opts || {};
+      var resolved = false;
+      var timer = null;
+      var occupationTimer = null;
+      var executionTimer = null;
+      var self = this;
+      var done = function(locked, err, ret) {
+        if (occupationTimer) {
+          clearTimeout(occupationTimer);
+          occupationTimer = null;
+        }
+        if (executionTimer) {
+          clearTimeout(executionTimer);
+          executionTimer = null;
+        }
+        if (locked) {
+          if (!!self.queues[key] && self.queues[key].length === 0) {
+            delete self.queues[key];
+          }
+          if (self.domainReentrant) {
+            delete self.domains[key];
+          }
+        }
+        if (!resolved) {
+          if (!deferred) {
+            if (typeof cb === "function") {
+              cb(err, ret);
+            }
+          } else {
+            if (err) {
+              deferredReject(err);
+            } else {
+              deferredResolve(ret);
+            }
+          }
+          resolved = true;
+        }
+        if (locked) {
+          if (!!self.queues[key] && self.queues[key].length > 0) {
+            self.queues[key].shift()();
+          }
+        }
+      };
+      var exec = function(locked) {
+        if (resolved) {
+          return done(locked);
+        }
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (self.domainReentrant && locked) {
+          self.domains[key] = process.domain;
+        }
+        var maxExecutionTime = opts.maxExecutionTime || self.maxExecutionTime;
+        if (maxExecutionTime) {
+          executionTimer = setTimeout(function() {
+            if (!!self.queues[key]) {
+              done(locked, new Error("Maximum execution time is exceeded " + key));
+            }
+          }, maxExecutionTime);
+        }
+        if (fn.length === 1) {
+          var called = false;
+          try {
+            fn(function(err, ret) {
+              if (!called) {
+                called = true;
+                done(locked, err, ret);
+              }
+            });
+          } catch (err) {
+            if (!called) {
+              called = true;
+              done(locked, err);
+            }
+          }
+        } else {
+          self._promiseTry(function() {
+            return fn();
+          }).then(function(ret) {
+            done(locked, void 0, ret);
+          }, function(error) {
+            done(locked, error);
+          });
+        }
+      };
+      if (self.domainReentrant && !!process.domain) {
+        exec = process.domain.bind(exec);
+      }
+      var maxPending = opts.maxPending || self.maxPending;
+      if (!self.queues[key]) {
+        self.queues[key] = [];
+        exec(true);
+      } else if (self.domainReentrant && !!process.domain && process.domain === self.domains[key]) {
+        exec(false);
+      } else if (self.queues[key].length >= maxPending) {
+        done(false, new Error("Too many pending tasks in queue " + key));
+      } else {
+        var taskFn = function() {
+          exec(true);
+        };
+        if (opts.skipQueue) {
+          self.queues[key].unshift(taskFn);
+        } else {
+          self.queues[key].push(taskFn);
+        }
+        var timeout = opts.timeout || self.timeout;
+        if (timeout) {
+          timer = setTimeout(function() {
+            timer = null;
+            done(false, new Error("async-lock timed out in queue " + key));
+          }, timeout);
+        }
+      }
+      var maxOccupationTime = opts.maxOccupationTime || self.maxOccupationTime;
+      if (maxOccupationTime) {
+        occupationTimer = setTimeout(function() {
+          if (!!self.queues[key]) {
+            done(false, new Error("Maximum occupation time is exceeded in queue " + key));
+          }
+        }, maxOccupationTime);
+      }
+      if (deferred) {
+        return deferred;
+      }
+    };
+    AsyncLock2.prototype._acquireBatch = function(keys, fn, cb, opts) {
+      if (typeof cb !== "function") {
+        opts = cb;
+        cb = null;
+      }
+      var self = this;
+      var getFn = function(key, fn2) {
+        return function(cb2) {
+          self.acquire(key, fn2, cb2, opts);
+        };
+      };
+      var fnx = keys.reduceRight(function(prev, key) {
+        return getFn(key, prev);
+      }, fn);
+      if (typeof cb === "function") {
+        fnx(cb);
+      } else {
+        return new this.Promise(function(resolve, reject) {
+          if (fnx.length === 1) {
+            fnx(function(err, ret) {
+              if (err) {
+                reject(err);
+              } else {
+                resolve(ret);
+              }
+            });
+          } else {
+            resolve(fnx());
+          }
+        });
+      }
+    };
+    AsyncLock2.prototype.isBusy = function(key) {
+      if (!key) {
+        return Object.keys(this.queues).length > 0;
+      } else {
+        return !!this.queues[key];
+      }
+    };
+    AsyncLock2.prototype._promiseTry = function(fn) {
+      try {
+        return this.Promise.resolve(fn());
+      } catch (e) {
+        return this.Promise.reject(e);
+      }
+    };
+    module2.exports = AsyncLock2;
+  }
+});
+
+// node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/index.js
+var require_async_lock = __commonJS({
+  "node_modules/.pnpm/async-lock@1.4.1/node_modules/async-lock/index.js"(exports, module2) {
+    "use strict";
+    module2.exports = require_lib();
   }
 });
 
@@ -7943,7 +8960,7 @@ var require_diff3 = __commonJS({
   }
 });
 
-// node_modules/.pnpm/isomorphic-git@1.29.0/node_modules/isomorphic-git/index.js
+// node_modules/.pnpm/isomorphic-git@1.41.9/node_modules/isomorphic-git/index.js
 var isomorphic_git_exports = {};
 __export(isomorphic_git_exports, {
   Errors: () => Errors,
@@ -7957,6 +8974,7 @@ __export(isomorphic_git_exports, {
   annotatedTag: () => annotatedTag,
   branch: () => branch,
   checkout: () => checkout,
+  cherryPick: () => cherryPick,
   clone: () => clone,
   commit: () => commit,
   currentBranch: () => currentBranch,
@@ -8008,7 +9026,7 @@ __export(isomorphic_git_exports, {
   status: () => status,
   statusMatrix: () => statusMatrix,
   tag: () => tag,
-  updateIndex: () => updateIndex,
+  updateIndex: () => updateIndex$1,
   version: () => version,
   walk: () => walk,
   writeBlob: () => writeBlob,
@@ -8103,8 +9121,7 @@ async function subtleSHA1(buffer) {
 async function testSubtleSHA1() {
   try {
     const hash = await subtleSHA1(new Uint8Array([]));
-    if (hash === "da39a3ee5e6b4b0d3255bfef95601890afd80709")
-      return true;
+    return hash === "da39a3ee5e6b4b0d3255bfef95601890afd80709";
   } catch (_) {
   }
   return false;
@@ -8129,6 +9146,14 @@ function compareStats(entry, stats, filemode = true, trustino = true) {
   const staleness = filemode && e.mode !== s.mode || e.mtimeSeconds !== s.mtimeSeconds || e.ctimeSeconds !== s.ctimeSeconds || e.uid !== s.uid || e.gid !== s.gid || trustino && e.ino !== s.ino || e.size !== s.size;
   return staleness;
 }
+function getLock() {
+  if (lock === void 0)
+    lock = new import_async_lock.default({ maxPending: Infinity });
+  return lock;
+}
+function acquireLock(key, callback) {
+  return getLock().acquire(key, callback);
+}
 function createCache() {
   return {
     map: /* @__PURE__ */ new Map(),
@@ -8136,8 +9161,10 @@ function createCache() {
   };
 }
 async function updateCachedIndexFile(fs, filepath, cache) {
-  const stat = await fs.lstat(filepath);
-  const rawIndexFile = await fs.read(filepath);
+  const [stat, rawIndexFile] = await Promise.all([
+    fs.lstat(filepath),
+    fs.read(filepath)
+  ]);
   const index2 = await GitIndex.from(rawIndexFile);
   cache.map.set(filepath, index2);
   cache.stats.set(filepath, stat);
@@ -8146,9 +9173,9 @@ async function isIndexStale(fs, filepath, cache) {
   const savedStats = cache.stats.get(filepath);
   if (savedStats === void 0)
     return true;
-  const currStats = await fs.lstat(filepath);
   if (savedStats === null)
     return false;
+  const currStats = await fs.lstat(filepath);
   if (currStats === null)
     return false;
   return compareStats(savedStats, currStats);
@@ -8243,10 +9270,115 @@ function compareRefNames(a, b) {
   }
   return tmp;
 }
-async function acquireLock(ref, callback) {
-  if (lock$1 === void 0)
-    lock$1 = new import_async_lock.default();
-  return lock$1.acquire(ref, callback);
+function normalizeString(path, aar) {
+  let res = "";
+  let lastSegmentLength = 0;
+  let lastSlash = -1;
+  let dots = 0;
+  let char = "\0";
+  for (let i = 0; i <= path.length; ++i) {
+    if (i < path.length)
+      char = path[i];
+    else if (char === "/")
+      break;
+    else
+      char = "/";
+    if (char === "/") {
+      if (lastSlash === i - 1 || dots === 1) {
+      } else if (dots === 2) {
+        if (res.length < 2 || lastSegmentLength !== 2 || res.at(-1) !== "." || res.at(-2) !== ".") {
+          if (res.length > 2) {
+            const lastSlashIndex = res.lastIndexOf("/");
+            if (lastSlashIndex === -1) {
+              res = "";
+              lastSegmentLength = 0;
+            } else {
+              res = res.slice(0, lastSlashIndex);
+              lastSegmentLength = res.length - 1 - res.lastIndexOf("/");
+            }
+            lastSlash = i;
+            dots = 0;
+            continue;
+          } else if (res.length !== 0) {
+            res = "";
+            lastSegmentLength = 0;
+            lastSlash = i;
+            dots = 0;
+            continue;
+          }
+        }
+        if (aar) {
+          res += res.length > 0 ? "/.." : "..";
+          lastSegmentLength = 2;
+        }
+      } else {
+        if (res.length > 0)
+          res += "/" + path.slice(lastSlash + 1, i);
+        else
+          res = path.slice(lastSlash + 1, i);
+        lastSegmentLength = i - lastSlash - 1;
+      }
+      lastSlash = i;
+      dots = 0;
+    } else if (char === "." && dots !== -1) {
+      ++dots;
+    } else {
+      dots = -1;
+    }
+  }
+  return res;
+}
+function getWindowsDrivePrefix(path) {
+  if (path.length >= 2 && /^[a-zA-Z]:/.test(path)) {
+    return path.slice(0, 2);
+  }
+  return null;
+}
+function normalize(path) {
+  if (!path.length)
+    return ".";
+  path = path.replace(/\\/g, "/");
+  const drivePrefix = getWindowsDrivePrefix(path);
+  const isAbsolute2 = path[0] === "/" || drivePrefix !== null && path[2] === "/";
+  const trailingSeparator = path.at(-1) === "/";
+  const pathBody = drivePrefix ? path.slice(2) : path;
+  let normalized = normalizeString(pathBody, !isAbsolute2);
+  if (!normalized.length) {
+    const root = drivePrefix ? isAbsolute2 ? drivePrefix + "/" : drivePrefix : isAbsolute2 ? "/" : ".";
+    return trailingSeparator && !isAbsolute2 ? root + "/" : root;
+  }
+  if (trailingSeparator)
+    normalized += "/";
+  if (drivePrefix) {
+    return isAbsolute2 ? `${drivePrefix}/${normalized}` : `${drivePrefix}${normalized}`;
+  }
+  return isAbsolute2 ? `/${normalized}` : normalized;
+}
+function join(...args) {
+  if (args.length === 0)
+    return ".";
+  let joined;
+  for (let i = 0; i < args.length; ++i) {
+    const arg = args[i].replace(/\\/g, "/");
+    if (arg.length === 0)
+      continue;
+    if (/^[a-zA-Z]:\//.test(arg)) {
+      joined = arg;
+    } else {
+      if (joined === void 0)
+        joined = arg;
+      else
+        joined += "/" + arg;
+    }
+  }
+  if (joined === void 0)
+    return ".";
+  return normalize(joined);
+}
+function assertWritableRef(ref) {
+  if (GIT_FILES.includes(ref)) {
+    throw new InvalidRefNameError(ref, `refs/heads/${ref}`);
+  }
 }
 function compareTreeEntryPath(a, b) {
   return compareStrings(appendSlashIfDir(a), appendSlashIfDir(b));
@@ -8290,7 +9422,13 @@ function parseBuffer(buffer) {
       mode = "040000";
     const type = mode2type$1(mode);
     const path = buffer.slice(space + 1, nullchar).toString("utf8");
-    if (path.includes("\\") || path.includes("/")) {
+    const hfsClean = path.replace(
+      /[\u200C-\u200F\u202A-\u202E\u206A-\u206F\uFEFF]/g,
+      ""
+    );
+    const ntfsClean = hfsClean.split(":")[0];
+    const normalized = ntfsClean.toLowerCase().replace(/[. ]+$/, "");
+    if (path.includes("\\") || path.includes("/") || hfsClean === "." || hfsClean === ".." || normalized === ".git" || /^\.?git~[1-9]$/.test(normalized)) {
       throw new UnsafeFilepathError(path);
     }
     const oid = buffer.slice(nullchar + 1, nullchar + 21).toString("hex");
@@ -8347,18 +9485,19 @@ function applyDelta(delta, source) {
   if (firstOp.byteLength === targetSize) {
     target = firstOp;
   } else {
-    target = Buffer.alloc(targetSize);
-    const writer = new BufferCursor(target);
-    writer.copy(firstOp);
+    const chunks = [firstOp];
+    let tell = firstOp.byteLength;
     while (!reader.eof()) {
-      writer.copy(readOp(reader, source));
+      const op = readOp(reader, source);
+      chunks.push(op);
+      tell += op.byteLength;
     }
-    const tell = writer.tell();
     if (targetSize !== tell) {
       throw new InternalError(
         `applyDelta expected target buffer to be ${targetSize} bytes but the resulting buffer was ${tell} bytes`
       );
     }
+    target = Buffer.concat(chunks, targetSize);
   }
   return target;
 }
@@ -8588,6 +9727,9 @@ function readPackIndex({
   }
   return p;
 }
+async function shasumRange(buffer, { start = 0, end = buffer.length } = {}) {
+  return shasum(buffer.subarray(start, end));
+}
 async function readObjectPacked({
   fs,
   cache,
@@ -8596,7 +9738,7 @@ async function readObjectPacked({
   format = "content",
   getExternalRefDelta
 }) {
-  let list = await fs.readdir((0, import_path_browserify.join)(gitdir, "objects/pack"));
+  let list = await fs.readdir(join(gitdir, "objects/pack"));
   list = list.filter((x) => x.endsWith(".idx"));
   for (const filename of list) {
     const indexFile = `${gitdir}/objects/pack/${filename}`;
@@ -8609,9 +9751,36 @@ async function readObjectPacked({
     if (p.error)
       throw new InternalError(p.error);
     if (p.offsets.has(oid)) {
+      const packFile = indexFile.replace(/idx$/, "pack");
       if (!p.pack) {
-        const packFile = indexFile.replace(/idx$/, "pack");
         p.pack = fs.read(packFile);
+      }
+      const pack = await p.pack;
+      if (!pack) {
+        p.pack = null;
+        throw new InternalError(
+          `Could not read packfile at ${packFile}. The file may be missing, corrupted, or too large to read into memory.`
+        );
+      }
+      if (!p._checksumVerified) {
+        const expectedShaFromIndex = p.packfileSha;
+        const packTrailer = pack.subarray(-20);
+        const packTrailerSha = Array.from(packTrailer).map((b) => b.toString(16).padStart(2, "0")).join("");
+        if (packTrailerSha !== expectedShaFromIndex) {
+          throw new InternalError(
+            `Packfile trailer mismatch: expected ${expectedShaFromIndex}, got ${packTrailerSha}. The packfile may be corrupted.`
+          );
+        }
+        const actualPayloadSha = await shasumRange(pack, {
+          start: 0,
+          end: pack.length - 20
+        });
+        if (actualPayloadSha !== expectedShaFromIndex) {
+          throw new InternalError(
+            `Packfile payload corrupted: calculated ${actualPayloadSha} but expected ${expectedShaFromIndex}. The packfile may have been tampered with.`
+          );
+        }
+        p._checksumVerified = true;
       }
       const result = await p.read({ oid, getExternalRefDelta });
       result.format = "content";
@@ -8628,6 +9797,9 @@ async function _readObject({
   oid,
   format = "content"
 }) {
+  if (!["deflated", "wrapped", "content"].includes(format)) {
+    throw new InternalError(`invalid requested format "${format}"`);
+  }
   const getExternalRefDelta = (oid2) => _readObject({ fs, cache, gitdir, oid: oid2 });
   let result;
   if (oid === "4b825dc642cb6eb9a060e54bf8d69288fbee4904") {
@@ -8669,10 +9841,7 @@ async function _readObject({
   result.type = type;
   result.object = object;
   result.format = "content";
-  if (format === "content") {
-    return result;
-  }
-  throw new InternalError(`invalid requested format "${format}"`);
+  return result;
 }
 function formatAuthor({ name, email, timestamp, timezoneOffset }) {
   timezoneOffset = formatTimezoneOffset(timezoneOffset);
@@ -8756,11 +9925,11 @@ function TREE({ ref = "HEAD" } = {}) {
   Object.freeze(o);
   return o;
 }
-function WORKDIR() {
+function WORKDIR({ refresh = true } = {}) {
   const o = /* @__PURE__ */ Object.create(null);
   Object.defineProperty(o, GitWalkSymbol, {
     value: function({ fs, dir, gitdir, cache }) {
-      return new GitWalkerFs({ fs, dir, gitdir, cache });
+      return new GitWalkerFs({ fs, dir, gitdir, cache, refresh });
     }
   });
   Object.freeze(o);
@@ -8827,13 +9996,19 @@ async function _walk({
   const root = new Array(walkers.length).fill(".");
   const range = arrayRange(0, walkers.length);
   const unionWalkerFromReaddir = async (entries) => {
-    range.map((i) => {
-      entries[i] = entries[i] && new walkers[i].ConstructEntry(entries[i]);
+    range.forEach((i) => {
+      const entry = entries[i];
+      entries[i] = entry && new walkers[i].ConstructEntry(entry);
     });
     const subdirs = await Promise.all(
-      range.map((i) => entries[i] ? walkers[i].readdir(entries[i]) : [])
+      range.map((i) => {
+        const entry = entries[i];
+        return entry ? walkers[i].readdir(entry) : [];
+      })
     );
-    const iterators = subdirs.map((array) => array === null ? [] : array).map((array) => array[Symbol.iterator]());
+    const iterators = subdirs.map((array) => {
+      return (array === null ? [] : array)[Symbol.iterator]();
+    });
     return {
       entries,
       children: unionOfIterators(iterators)
@@ -8851,6 +10026,36 @@ async function _walk({
   };
   return walk2(root);
 }
+async function mkdirp(mkdir, filepath, retries = 10) {
+  try {
+    await mkdir(filepath);
+  } catch (err) {
+    if (err === null)
+      return;
+    if (err.code === "EEXIST")
+      return;
+    if (err.code !== "ENOENT")
+      throw err;
+    const parent = dirname(filepath);
+    if (parent === "." || parent === "/" || parent === filepath)
+      throw err;
+    await mkdirp(mkdir, parent, retries);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await mkdir(filepath);
+        return;
+      } catch (err2) {
+        if (err2 === null || err2.code === "EEXIST")
+          return;
+        if (err2.code === "ENOENT" && attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          continue;
+        }
+        throw err2;
+      }
+    }
+  }
+}
 async function rmRecursive(fs, filepath) {
   const entries = await fs.readdir(filepath);
   if (entries == null) {
@@ -8858,7 +10063,7 @@ async function rmRecursive(fs, filepath) {
   } else if (entries.length) {
     await Promise.all(
       entries.map((entry) => {
-        const subpath = (0, import_path_browserify.join)(filepath, entry);
+        const subpath = join(filepath, entry);
         return fs.lstat(subpath).then((stat) => {
           if (!stat)
             return;
@@ -8900,6 +10105,8 @@ function bindFs(target, fs) {
     }
   }
   if (isPromiseFs(fs)) {
+    if (fs.cp)
+      target._cp = fs.cp.bind(fs);
     if (fs.rm)
       target._rm = fs.rm.bind(fs);
     else if (fs.rmdir.length > 1)
@@ -8907,6 +10114,8 @@ function bindFs(target, fs) {
     else
       target._rm = rmRecursive.bind(null, target);
   } else {
+    if (fs.cp)
+      target._cp = (0, import_pify.default)(fs.cp.bind(fs));
     if (fs.rm)
       target._rm = (0, import_pify.default)(fs.rm.bind(fs));
     else if (fs.rmdir.length > 2)
@@ -8918,6 +10127,27 @@ function bindFs(target, fs) {
 function assertParameter(name, value) {
   if (value === void 0) {
     throw new MissingParameterError(name);
+  }
+}
+function isAbsolute(filepath) {
+  return filepath.startsWith("/") || /^[a-zA-Z]:[\\/]/.test(filepath);
+}
+async function discoverGitdir({ fsp, dotgit }) {
+  assertParameter("fsp", fsp);
+  assertParameter("dotgit", dotgit);
+  const dotgitStat = await fsp._stat(dotgit).catch(() => ({ isFile: () => false, isDirectory: () => false }));
+  if (dotgitStat.isDirectory()) {
+    return dotgit;
+  } else if (dotgitStat.isFile()) {
+    return fsp._readFile(dotgit, "utf8").then((contents) => contents.trimRight().substr(8)).then((submoduleGitdir) => {
+      if (isAbsolute(submoduleGitdir)) {
+        return submoduleGitdir;
+      }
+      const gitdir = join(dirname(dotgit), submoduleGitdir);
+      return gitdir;
+    });
+  } else {
+    return dotgit;
   }
 }
 async function modified(entry, base) {
@@ -8938,7 +10168,7 @@ async function modified(entry, base) {
 async function abortMerge({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   commit: commit2 = "HEAD",
   cache = {}
 }) {
@@ -8949,14 +10179,18 @@ async function abortMerge({
     const fs = new FileSystem(_fs);
     const trees = [TREE({ ref: commit2 }), WORKDIR(), STAGE()];
     let unmergedPaths = [];
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      unmergedPaths = index2.unmergedPaths;
-    });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        unmergedPaths = index2.unmergedPaths;
+      }
+    );
     const results = await _walk({
       fs,
       cache,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       trees,
       map: async function(path, [head, workdir, index2]) {
         const staged = !await modified(workdir, index2);
@@ -8977,26 +10211,31 @@ async function abortMerge({
           throw new IndexResetError(path);
       }
     });
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      for (const entry of results) {
-        if (entry === false)
-          continue;
-        if (!entry) {
-          await fs.rmdir(`${dir}/${entry.path}`, { recursive: true });
-          index2.delete({ filepath: entry.path });
-          continue;
-        }
-        if (entry.type === "blob") {
-          const content = new TextDecoder().decode(entry.content);
-          await fs.write(`${dir}/${entry.path}`, content, { mode: entry.mode });
-          index2.insert({
-            filepath: entry.path,
-            oid: entry.oid,
-            stage: 0
-          });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        for (const entry of results) {
+          if (entry === false)
+            continue;
+          if (!entry) {
+            await fs.rmdir(`${dir}/${entry.path}`, { recursive: true });
+            index2.delete({ filepath: entry.path });
+            continue;
+          }
+          if (entry.type === "blob") {
+            const content = new TextDecoder().decode(entry.content);
+            await fs.write(`${dir}/${entry.path}`, content, {
+              mode: entry.mode
+            });
+            index2.insert({
+              filepath: entry.path,
+              oid: entry.oid,
+              stage: 0
+            });
+          }
         }
       }
-    });
+    );
   } catch (err) {
     err.caller = "git.abortMerge";
     throw err;
@@ -9065,7 +10304,7 @@ function posixifyPathBuffer(buffer) {
 async function add({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
   cache = {},
   force = false,
@@ -9077,21 +10316,38 @@ async function add({
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
     const fs = new FileSystem(_fs);
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async (index2) => {
-      return addToIndex({
-        dir,
-        gitdir,
-        fs,
-        filepath,
-        index: index2,
-        force,
-        parallel
-      });
-    });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async (index2) => {
+        const config = await GitConfigManager.get({ fs, gitdir: updatedGitdir });
+        const autocrlf = await config.get("core.autocrlf");
+        return addToIndex({
+          dir,
+          gitdir: updatedGitdir,
+          fs,
+          filepath,
+          index: index2,
+          force,
+          parallel,
+          autocrlf
+        });
+      }
+    );
   } catch (err) {
     err.caller = "git.add";
     throw err;
   }
+}
+function isTracked(index2, filepath) {
+  if (index2.has({ filepath }))
+    return true;
+  const prefix = `${filepath}/`;
+  for (const entry of index2.entriesMap.keys()) {
+    if (entry.startsWith(prefix))
+      return true;
+  }
+  return false;
 }
 async function addToIndex({
   dir,
@@ -9100,11 +10356,12 @@ async function addToIndex({
   filepath,
   index: index2,
   force,
-  parallel
+  parallel,
+  autocrlf
 }) {
   filepath = Array.isArray(filepath) ? filepath : [filepath];
   const promises = filepath.map(async (currentFilepath) => {
-    if (!force) {
+    if (!force && !isTracked(index2, currentFilepath)) {
       const ignored = await GitIgnoreManager.isIgnored({
         fs,
         dir,
@@ -9114,21 +10371,22 @@ async function addToIndex({
       if (ignored)
         return;
     }
-    const stats = await fs.lstat((0, import_path_browserify.join)(dir, currentFilepath));
+    const stats = await fs.lstat(join(dir, currentFilepath));
     if (!stats)
       throw new NotFoundError(currentFilepath);
     if (stats.isDirectory()) {
-      const children = await fs.readdir((0, import_path_browserify.join)(dir, currentFilepath));
+      const children = await fs.readdir(join(dir, currentFilepath));
       if (parallel) {
         const promises2 = children.map(
           (child) => addToIndex({
             dir,
             gitdir,
             fs,
-            filepath: [(0, import_path_browserify.join)(currentFilepath, child)],
+            filepath: [join(currentFilepath, child)],
             index: index2,
             force,
-            parallel
+            parallel,
+            autocrlf
           })
         );
         await Promise.all(promises2);
@@ -9138,17 +10396,16 @@ async function addToIndex({
             dir,
             gitdir,
             fs,
-            filepath: [(0, import_path_browserify.join)(currentFilepath, child)],
+            filepath: [join(currentFilepath, child)],
             index: index2,
             force,
-            parallel
+            parallel,
+            autocrlf
           });
         }
       }
     } else {
-      const config = await GitConfigManager.get({ fs, gitdir });
-      const autocrlf = await config.get("core.autocrlf");
-      const object = stats.isSymbolicLink() ? await fs.readlink((0, import_path_browserify.join)(dir, currentFilepath)).then(posixifyPathBuffer) : await fs.read((0, import_path_browserify.join)(dir, currentFilepath), { autocrlf });
+      const object = stats.isSymbolicLink() ? await fs.readlink(join(dir, currentFilepath)).then(posixifyPathBuffer) : await fs.read(join(dir, currentFilepath), { autocrlf });
       if (object === null)
         throw new NotFoundError(currentFilepath);
       const oid = await _writeObject({ fs, gitdir, type: "blob", object });
@@ -9267,12 +10524,16 @@ async function _commit({
   amend = false,
   dryRun = false,
   noUpdateBranch = false,
+  disallowEmpty = false,
   ref,
   parent,
   tree
 }) {
   let initialCommit = false;
+  let detachedHead = false;
   if (!ref) {
+    const headContent = await fs.read(`${gitdir}/HEAD`, { encoding: "utf8" });
+    detachedHead = !headContent.startsWith("ref:");
     ref = await GitRefManager.resolve({
       fs,
       gitdir,
@@ -9337,6 +10598,9 @@ async function _commit({
           })
         );
       }
+      if (disallowEmpty && !amend && (initialCommit && tree === EMPTY_TREE_OID || !initialCommit && tree === refCommit.commit.tree)) {
+        throw new EmptyCommitError();
+      }
       if (!message) {
         if (!amend) {
           throw new MissingParameterError("message");
@@ -9365,7 +10629,7 @@ async function _commit({
         await GitRefManager.writeRef({
           fs,
           gitdir,
-          ref,
+          ref: detachedHead ? "HEAD" : ref,
           value: oid
         });
       }
@@ -9398,6 +10662,22 @@ async function constructTree({ fs, gitdir, inode, dryRun }) {
   return oid;
 }
 async function resolveFilepath({ fs, cache, gitdir, oid, filepath }) {
+  const entry = await resolveFilepathEntry({
+    fs,
+    cache,
+    gitdir,
+    oid,
+    filepath
+  });
+  return entry.oid;
+}
+async function resolveFilepathEntry({
+  fs,
+  cache,
+  gitdir,
+  oid,
+  filepath
+}) {
   if (filepath.startsWith("/")) {
     throw new InvalidFilepathError("leading-slash");
   } else if (filepath.endsWith("/")) {
@@ -9407,10 +10687,10 @@ async function resolveFilepath({ fs, cache, gitdir, oid, filepath }) {
   const result = await resolveTree({ fs, cache, gitdir, oid });
   const tree = result.tree;
   if (filepath === "") {
-    oid = result.oid;
+    return { mode: "040000", oid: result.oid, path: "", type: "tree" };
   } else {
     const pathArray = filepath.split("/");
-    oid = await _resolveFilepath({
+    return _resolveFilepath({
       fs,
       cache,
       gitdir,
@@ -9420,7 +10700,6 @@ async function resolveFilepath({ fs, cache, gitdir, oid, filepath }) {
       filepath
     });
   }
-  return oid;
 }
 async function _resolveFilepath({
   fs,
@@ -9435,7 +10714,7 @@ async function _resolveFilepath({
   for (const entry of tree) {
     if (entry.path === name) {
       if (pathArray.length === 0) {
-        return entry.oid;
+        return entry;
       } else {
         const { type, object } = await _readObject({
           fs,
@@ -9562,7 +10841,7 @@ async function addNote({
   fs: _fs,
   onSign,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref = "refs/notes/commits",
   oid,
   note,
@@ -9592,11 +10871,12 @@ async function addNote({
     });
     if (!committer)
       throw new MissingNameError("committer");
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     return await _addNote({
-      fs: new FileSystem(fs),
+      fs,
       cache,
       onSign,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       oid,
       note,
@@ -9610,8 +10890,13 @@ async function addNote({
     throw err;
   }
 }
+function isValidRef(name, onelevel) {
+  if (typeof name !== "string")
+    throw new TypeError("Reference name must be a string");
+  return !bad.test(name) && (!!onelevel || name.includes("/"));
+}
 async function _addRemote({ fs, gitdir, remote, url, force }) {
-  if (remote !== import_clean_git_ref.default.clean(remote)) {
+  if (!isValidRef(remote, true)) {
     throw new InvalidRefNameError(remote, import_clean_git_ref.default.clean(remote));
   }
   const config = await GitConfigManager.get({ fs, gitdir });
@@ -9633,7 +10918,7 @@ async function _addRemote({ fs, gitdir, remote, url, force }) {
 async function addRemote({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   remote,
   url,
   force = false
@@ -9643,9 +10928,11 @@ async function addRemote({
     assertParameter("gitdir", gitdir);
     assertParameter("remote", remote);
     assertParameter("url", url);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _addRemote({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       remote,
       url,
       force
@@ -9701,7 +10988,7 @@ async function annotatedTag({
   fs: _fs,
   onSign,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   tagger: _tagger,
   message = ref,
@@ -9719,14 +11006,19 @@ async function annotatedTag({
       assertParameter("onSign", onSign);
     }
     const fs = new FileSystem(_fs);
-    const tagger = await normalizeAuthorObject({ fs, gitdir, author: _tagger });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const tagger = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _tagger
+    });
     if (!tagger)
       throw new MissingNameError("tagger");
     return await _annotatedTag({
       fs,
       cache,
       onSign,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       tagger,
       message,
@@ -9748,7 +11040,7 @@ async function _branch({
   checkout: checkout2 = false,
   force = false
 }) {
-  if (ref !== import_clean_git_ref.default.clean(ref)) {
+  if (!isValidRef(ref, true)) {
     throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
   }
   const fullref = `refs/heads/${ref}`;
@@ -9778,7 +11070,7 @@ async function _branch({
 async function branch({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   object,
   checkout: checkout2 = false,
@@ -9788,9 +11080,11 @@ async function branch({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _branch({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref,
       object,
       checkout: checkout2,
@@ -9799,6 +11093,20 @@ async function branch({
   } catch (err) {
     err.caller = "git.branch";
     throw err;
+  }
+}
+async function assertNoSymlinkInLeadingPath(fs, dir, fullpath) {
+  const parts = fullpath.split("/");
+  parts.pop();
+  let current = dir;
+  for (const part of parts) {
+    if (part === "" || part === ".")
+      continue;
+    current = `${current}/${part}`;
+    const stats = await fs.lstat(current);
+    if (stats && stats.isSymbolicLink()) {
+      throw new UnsafeFilepathError(fullpath);
+    }
   }
 }
 async function _checkout({
@@ -9815,7 +11123,10 @@ async function _checkout({
   noUpdateHead,
   dryRun,
   force,
-  track = true
+  track = true,
+  restoreFromIndex = false,
+  nonBlocking = false,
+  batchSize = 100
 }) {
   let oldOid;
   if (onPostCheckout) {
@@ -9861,7 +11172,8 @@ async function _checkout({
         gitdir,
         ref,
         force,
-        filepaths
+        filepaths,
+        restoreFromIndex
       });
     } catch (err) {
       if (err instanceof NotFoundError && err.data.what === oid) {
@@ -9890,35 +11202,18 @@ async function _checkout({
     }
     let count = 0;
     const total = ops.length;
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      await Promise.all(
-        ops.filter(
-          ([method]) => method === "delete" || method === "delete-index"
-        ).map(async function([method, fullpath]) {
-          const filepath = `${dir}/${fullpath}`;
-          if (method === "delete") {
-            await fs.rm(filepath);
-          }
-          index2.delete({ filepath: fullpath });
-          if (onProgress) {
-            await onProgress({
-              phase: "Updating workdir",
-              loaded: ++count,
-              total
-            });
-          }
-        })
-      );
-    });
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      for (const [method, fullpath] of ops) {
-        if (method === "rmdir" || method === "rmdir-index") {
-          const filepath = `${dir}/${fullpath}`;
-          try {
-            if (method === "rmdir-index") {
-              index2.delete({ filepath: fullpath });
+    await GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        await Promise.all(
+          ops.filter(
+            ([method]) => method === "delete" || method === "delete-index"
+          ).map(async function([method, fullpath]) {
+            const filepath = `${dir}/${fullpath}`;
+            if (method === "delete") {
+              await fs.rm(filepath);
             }
-            await fs.rmdir(filepath);
+            index2.delete({ filepath: fullpath });
             if (onProgress) {
               await onProgress({
                 phase: "Updating workdir",
@@ -9926,21 +11221,45 @@ async function _checkout({
                 total
               });
             }
-          } catch (e) {
-            if (e.code === "ENOTEMPTY") {
-              console.log(
-                `Did not delete ${fullpath} because directory is not empty`
-              );
-            } else {
-              throw e;
+          })
+        );
+      }
+    );
+    await GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        for (const [method, fullpath] of ops) {
+          if (method === "rmdir" || method === "rmdir-index") {
+            const filepath = `${dir}/${fullpath}`;
+            try {
+              if (method === "rmdir") {
+                await fs.rmdir(filepath);
+              }
+              index2.delete({ filepath: fullpath });
+              if (onProgress) {
+                await onProgress({
+                  phase: "Updating workdir",
+                  loaded: ++count,
+                  total
+                });
+              }
+            } catch (e) {
+              if (e.code === "ENOTEMPTY") {
+                console.log(
+                  `Did not delete ${fullpath} because directory is not empty`
+                );
+              } else {
+                throw e;
+              }
             }
           }
         }
       }
-    });
+    );
     await Promise.all(
       ops.filter(([method]) => method === "mkdir" || method === "mkdir-index").map(async function([_, fullpath]) {
         const filepath = `${dir}/${fullpath}`;
+        await assertNoSymlinkInLeadingPath(fs, dir, fullpath);
         await fs.mkdir(filepath);
         if (onProgress) {
           await onProgress({
@@ -9951,55 +11270,109 @@ async function _checkout({
         }
       })
     );
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      await Promise.all(
-        ops.filter(
-          ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
-        ).map(async function([method, fullpath, oid2, mode, chmod]) {
-          const filepath = `${dir}/${fullpath}`;
-          try {
-            if (method !== "create-index" && method !== "mkdir-index") {
-              const { object } = await _readObject({ fs, cache, gitdir, oid: oid2 });
-              if (chmod) {
-                await fs.rm(filepath);
-              }
-              if (mode === 33188) {
-                await fs.write(filepath, object);
-              } else if (mode === 33261) {
-                await fs.write(filepath, object, { mode: 511 });
-              } else if (mode === 40960) {
-                await fs.writelink(filepath, object);
-              } else {
-                throw new InternalError(
-                  `Invalid mode 0o${mode.toString(8)} detected in blob ${oid2}`
-                );
-              }
-            }
-            const stats = await fs.lstat(filepath);
-            if (mode === 33261) {
-              stats.mode = 493;
-            }
-            if (method === "mkdir-index") {
-              stats.mode = 57344;
-            }
-            index2.insert({
-              filepath: fullpath,
-              stats,
-              oid: oid2
-            });
-            if (onProgress) {
-              await onProgress({
-                phase: "Updating workdir",
-                loaded: ++count,
-                total
-              });
-            }
-          } catch (e) {
-            console.log(e);
-          }
-        })
+    if (nonBlocking) {
+      const eligibleOps = ops.filter(
+        ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
       );
-    });
+      const updateWorkingDirResults = await batchAllSettled(
+        "Update Working Dir",
+        eligibleOps.map(
+          ([method, fullpath, oid2, mode, chmod]) => () => updateWorkingDir({ fs, cache, gitdir, dir }, [
+            method,
+            fullpath,
+            oid2,
+            mode,
+            chmod
+          ])
+        ),
+        onProgress,
+        batchSize
+      );
+      await GitIndexManager.acquire(
+        { fs, gitdir, cache, allowUnmerged: true },
+        async function(index2) {
+          await batchAllSettled(
+            "Update Index",
+            updateWorkingDirResults.map(
+              ([fullpath, oid2, stats]) => () => updateIndex({ index: index2, fullpath, oid: oid2, stats })
+            ),
+            onProgress,
+            batchSize
+          );
+        }
+      );
+    } else {
+      await GitIndexManager.acquire(
+        { fs, gitdir, cache, allowUnmerged: true },
+        async function(index2) {
+          var _a, _b;
+          const settled = await Promise.allSettled(
+            ops.filter(
+              ([method]) => method === "create" || method === "create-index" || method === "update" || method === "mkdir-index"
+            ).map(async function([method, fullpath, oid2, mode, chmod]) {
+              const filepath = `${dir}/${fullpath}`;
+              if (method !== "create-index" && method !== "mkdir-index") {
+                await assertNoSymlinkInLeadingPath(fs, dir, fullpath);
+                const { object } = await _readObject({
+                  fs,
+                  cache,
+                  gitdir,
+                  oid: oid2
+                });
+                if (chmod) {
+                  await fs.rm(filepath);
+                }
+                if (mode === 33188) {
+                  await fs.write(filepath, object);
+                } else if (mode === 33261) {
+                  await fs.write(filepath, object, { mode: 511 });
+                } else if (mode === 40960) {
+                  await fs.writelink(filepath, object);
+                } else {
+                  throw new InternalError(
+                    `Invalid mode 0o${mode.toString(
+                      8
+                    )} detected in blob ${oid2}`
+                  );
+                }
+              }
+              const stats = await fs.lstat(filepath);
+              if (mode === 33261) {
+                stats.mode = 493;
+              }
+              if (method === "mkdir-index") {
+                stats.mode = 57344;
+              }
+              index2.insert({
+                filepath: fullpath,
+                stats,
+                oid: oid2
+              });
+              if (onProgress) {
+                await onProgress({
+                  phase: "Updating workdir",
+                  loaded: ++count,
+                  total
+                });
+              }
+            })
+          );
+          const rejections = [];
+          for (const result of settled) {
+            if (result.status === "rejected") {
+              rejections.push(result.reason);
+              console.error(
+                "[isomorphic-git checkout] task rejected:",
+                (_b = (_a = result.reason) == null ? void 0 : _a.stack) != null ? _b : result.reason
+              );
+            }
+          }
+          if (rejections.length > 0) {
+            throw new MultipleGitError(rejections);
+          }
+        }
+      );
+    }
     if (onPostCheckout) {
       await onPostCheckout({
         previousHead: oldOid,
@@ -10030,7 +11403,8 @@ async function analyze({
   gitdir,
   ref,
   force,
-  filepaths
+  filepaths,
+  restoreFromIndex
 }) {
   let count = 0;
   return _walk({
@@ -10038,7 +11412,7 @@ async function analyze({
     cache,
     dir,
     gitdir,
-    trees: [TREE({ ref }), WORKDIR(), STAGE()],
+    trees: [restoreFromIndex ? STAGE() : TREE({ ref }), WORKDIR(), STAGE()],
     map: async function(fullpath, [commit2, workdir, stage]) {
       if (fullpath === ".")
         return;
@@ -10053,7 +11427,7 @@ async function analyze({
         case "000":
           return;
         case "001":
-          if (force && filepaths && filepaths.includes(fullpath)) {
+          if (!restoreFromIndex && force && filepaths && filepaths.includes(fullpath)) {
             return ["delete", fullpath];
           }
           return;
@@ -10148,7 +11522,7 @@ async function analyze({
         case "101": {
           switch (await stage.type()) {
             case "tree": {
-              return ["rmdir", fullpath];
+              return ["rmdir-index", fullpath];
             }
             case "blob": {
               if (await stage.oid() !== await workdir.oid()) {
@@ -10265,12 +11639,83 @@ async function analyze({
     }
   });
 }
+async function updateIndex({ index: index2, fullpath, stats, oid }) {
+  try {
+    index2.insert({
+      filepath: fullpath,
+      stats,
+      oid
+    });
+  } catch (e) {
+    console.warn(`Error inserting ${fullpath} into index:`, e);
+  }
+}
+async function updateWorkingDir({ fs, cache, gitdir, dir }, [method, fullpath, oid, mode, chmod]) {
+  const filepath = `${dir}/${fullpath}`;
+  if (method !== "create-index" && method !== "mkdir-index") {
+    await assertNoSymlinkInLeadingPath(fs, dir, fullpath);
+    const { object } = await _readObject({ fs, cache, gitdir, oid });
+    if (chmod) {
+      await fs.rm(filepath);
+    }
+    if (mode === 33188) {
+      await fs.write(filepath, object);
+    } else if (mode === 33261) {
+      await fs.write(filepath, object, { mode: 511 });
+    } else if (mode === 40960) {
+      await fs.writelink(filepath, object);
+    } else {
+      throw new InternalError(
+        `Invalid mode 0o${mode.toString(8)} detected in blob ${oid}`
+      );
+    }
+  }
+  const stats = await fs.lstat(filepath);
+  if (mode === 33261) {
+    stats.mode = 493;
+  }
+  if (method === "mkdir-index") {
+    stats.mode = 57344;
+  }
+  return [fullpath, oid, stats];
+}
+async function batchAllSettled(operationName, tasks, onProgress, batchSize) {
+  const results = [];
+  const rejections = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize).map((task) => task());
+    const batchResults = await Promise.allSettled(batch);
+    batchResults.forEach((result) => {
+      var _a, _b;
+      if (result.status === "fulfilled") {
+        results.push(result.value);
+      } else {
+        rejections.push(result.reason);
+        console.error(
+          `[isomorphic-git ${operationName}] task rejected:`,
+          (_b = (_a = result.reason) == null ? void 0 : _a.stack) != null ? _b : result.reason
+        );
+      }
+    });
+    if (onProgress) {
+      await onProgress({
+        phase: "Updating workdir",
+        loaded: i + batch.length,
+        total: tasks.length
+      });
+    }
+  }
+  if (rejections.length > 0) {
+    throw new MultipleGitError(rejections);
+  }
+  return results;
+}
 async function checkout({
   fs,
   onProgress,
   onPostCheckout,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   remote = "origin",
   ref: _ref,
   filepaths,
@@ -10279,20 +11724,25 @@ async function checkout({
   dryRun = false,
   force = false,
   track = true,
-  cache = {}
+  cache = {},
+  nonBlocking = false,
+  batchSize = 100
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("dir", dir);
     assertParameter("gitdir", gitdir);
     const ref = _ref || "HEAD";
+    const restoreFromIndex = _ref === void 0 && filepaths != null && filepaths.length > 0;
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _checkout({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       onProgress,
       onPostCheckout,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       remote,
       ref,
       filepaths,
@@ -10300,10 +11750,694 @@ async function checkout({
       noUpdateHead,
       dryRun,
       force,
-      track
+      track,
+      restoreFromIndex,
+      nonBlocking,
+      batchSize
     });
   } catch (err) {
     err.caller = "git.checkout";
+    throw err;
+  }
+}
+function mergeFile({ branches, contents }) {
+  const ourName = branches[1];
+  const theirName = branches[2];
+  const baseContent = contents[0];
+  const ourContent = contents[1];
+  const theirContent = contents[2];
+  const ours = ourContent.match(LINEBREAKS);
+  const base = baseContent.match(LINEBREAKS);
+  const theirs = theirContent.match(LINEBREAKS);
+  const result = (0, import_diff3.default)(ours, base, theirs);
+  const markerSize = 7;
+  let mergedText = "";
+  let cleanMerge = true;
+  for (const item of result) {
+    if (item.ok) {
+      mergedText += item.ok.join("");
+    }
+    if (item.conflict) {
+      cleanMerge = false;
+      mergedText += `${"<".repeat(markerSize)} ${ourName}
+`;
+      mergedText += item.conflict.a.join("");
+      mergedText += `${"=".repeat(markerSize)}
+`;
+      mergedText += item.conflict.b.join("");
+      mergedText += `${">".repeat(markerSize)} ${theirName}
+`;
+    }
+  }
+  return { cleanMerge, mergedText };
+}
+async function mergeTree({
+  fs,
+  cache,
+  dir,
+  gitdir = join(dir, ".git"),
+  index: index2,
+  ourOid,
+  baseOid,
+  theirOid,
+  ourName = "ours",
+  baseName = "base",
+  theirName = "theirs",
+  dryRun = false,
+  abortOnConflict = true,
+  mergeDriver
+}) {
+  const ourTree = TREE({ ref: ourOid });
+  const baseTree = TREE({ ref: baseOid });
+  const theirTree = TREE({ ref: theirOid });
+  const unmergedFiles = [];
+  const bothModified = [];
+  const deleteByUs = [];
+  const deleteByTheirs = [];
+  const results = await _walk({
+    fs,
+    cache,
+    dir,
+    gitdir,
+    trees: [ourTree, baseTree, theirTree],
+    map: async function(filepath, [ours, base, theirs]) {
+      const path = basename(filepath);
+      const ourChange = await modified(ours, base);
+      const theirChange = await modified(theirs, base);
+      switch (`${ourChange}-${theirChange}`) {
+        case "false-false": {
+          return {
+            mode: await base.mode(),
+            path,
+            oid: await base.oid(),
+            type: await base.type()
+          };
+        }
+        case "false-true": {
+          if (!theirs && await ours.type() === "tree") {
+            return {
+              mode: await ours.mode(),
+              path,
+              oid: await ours.oid(),
+              type: await ours.type()
+            };
+          }
+          return theirs ? {
+            mode: await theirs.mode(),
+            path,
+            oid: await theirs.oid(),
+            type: await theirs.type()
+          } : void 0;
+        }
+        case "true-false": {
+          if (!ours && await theirs.type() === "tree") {
+            return {
+              mode: await theirs.mode(),
+              path,
+              oid: await theirs.oid(),
+              type: await theirs.type()
+            };
+          }
+          return ours ? {
+            mode: await ours.mode(),
+            path,
+            oid: await ours.oid(),
+            type: await ours.type()
+          } : void 0;
+        }
+        case "true-true": {
+          if (ours && theirs && await ours.type() === "tree" && await theirs.type() === "tree") {
+            return {
+              mode: await ours.mode(),
+              path,
+              oid: await ours.oid(),
+              type: "tree"
+            };
+          }
+          if (ours && theirs && await ours.type() === "blob" && await theirs.type() === "blob") {
+            return mergeBlobs({
+              fs,
+              gitdir,
+              path,
+              ours,
+              base,
+              theirs,
+              ourName,
+              baseName,
+              theirName,
+              mergeDriver
+            }).then(async (r) => {
+              if (!r.cleanMerge) {
+                unmergedFiles.push(filepath);
+                bothModified.push(filepath);
+                if (!abortOnConflict) {
+                  let baseOid2 = "";
+                  if (base && await base.type() === "blob") {
+                    baseOid2 = await base.oid();
+                  }
+                  const ourOid2 = await ours.oid();
+                  const theirOid2 = await theirs.oid();
+                  index2.delete({ filepath });
+                  if (baseOid2) {
+                    index2.insert({ filepath, oid: baseOid2, stage: 1 });
+                  }
+                  index2.insert({ filepath, oid: ourOid2, stage: 2 });
+                  index2.insert({ filepath, oid: theirOid2, stage: 3 });
+                }
+              } else if (!abortOnConflict) {
+                index2.insert({ filepath, oid: r.mergeResult.oid, stage: 0 });
+              }
+              return r.mergeResult;
+            });
+          }
+          if (base && !ours && theirs && await base.type() === "blob" && await theirs.type() === "blob") {
+            unmergedFiles.push(filepath);
+            deleteByUs.push(filepath);
+            if (!abortOnConflict) {
+              const baseOid2 = await base.oid();
+              const theirOid2 = await theirs.oid();
+              index2.delete({ filepath });
+              index2.insert({ filepath, oid: baseOid2, stage: 1 });
+              index2.insert({ filepath, oid: theirOid2, stage: 3 });
+            }
+            return {
+              mode: await theirs.mode(),
+              oid: await theirs.oid(),
+              type: "blob",
+              path
+            };
+          }
+          if (base && ours && !theirs && await base.type() === "blob" && await ours.type() === "blob") {
+            unmergedFiles.push(filepath);
+            deleteByTheirs.push(filepath);
+            if (!abortOnConflict) {
+              const baseOid2 = await base.oid();
+              const ourOid2 = await ours.oid();
+              index2.delete({ filepath });
+              index2.insert({ filepath, oid: baseOid2, stage: 1 });
+              index2.insert({ filepath, oid: ourOid2, stage: 2 });
+            }
+            return {
+              mode: await ours.mode(),
+              oid: await ours.oid(),
+              type: "blob",
+              path
+            };
+          }
+          if (base && !ours && !theirs && (await base.type() === "blob" || await base.type() === "tree")) {
+            return void 0;
+          }
+          throw new MergeNotSupportedError();
+        }
+      }
+    },
+    /**
+     * @param {TreeEntry} [parent]
+     * @param {Array<TreeEntry>} children
+     */
+    reduce: unmergedFiles.length !== 0 && (!dir || abortOnConflict) ? void 0 : async (parent, children) => {
+      const entries = children.filter(Boolean);
+      if (!parent)
+        return;
+      if (parent && parent.type === "tree" && entries.length === 0 && parent.path !== ".")
+        return;
+      if (entries.length > 0 || parent.path === "." && entries.length === 0) {
+        const tree = new GitTree(entries);
+        const object = tree.toObject();
+        const oid = await _writeObject({
+          fs,
+          gitdir,
+          type: "tree",
+          object,
+          dryRun
+        });
+        parent.oid = oid;
+      }
+      return parent;
+    }
+  });
+  if (unmergedFiles.length !== 0) {
+    if (dir && !abortOnConflict) {
+      await _walk({
+        fs,
+        cache,
+        dir,
+        gitdir,
+        trees: [TREE({ ref: results.oid })],
+        map: async function(filepath, [entry]) {
+          const path = `${dir}/${filepath}`;
+          if (await entry.type() === "blob") {
+            const mode = await entry.mode();
+            const content = await entry.content();
+            await fs.write(path, content, { mode });
+          }
+          return true;
+        }
+      });
+    }
+    return new MergeConflictError(
+      unmergedFiles,
+      bothModified,
+      deleteByUs,
+      deleteByTheirs
+    );
+  }
+  return results.oid;
+}
+async function mergeBlobs({
+  fs,
+  gitdir,
+  path,
+  ours,
+  base,
+  theirs,
+  ourName,
+  theirName,
+  baseName,
+  dryRun,
+  mergeDriver = mergeFile
+}) {
+  const type = "blob";
+  let baseMode = "100755";
+  let baseOid = "";
+  let baseContent = "";
+  if (base && await base.type() === "blob") {
+    baseMode = await base.mode();
+    baseOid = await base.oid();
+    baseContent = Buffer.from(await base.content()).toString("utf8");
+  }
+  const mode = baseMode === await ours.mode() ? await theirs.mode() : await ours.mode();
+  if (await ours.oid() === await theirs.oid()) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await ours.oid(), type }
+    };
+  }
+  if (await ours.oid() === baseOid) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await theirs.oid(), type }
+    };
+  }
+  if (await theirs.oid() === baseOid) {
+    return {
+      cleanMerge: true,
+      mergeResult: { mode, path, oid: await ours.oid(), type }
+    };
+  }
+  const ourContent = Buffer.from(await ours.content()).toString("utf8");
+  const theirContent = Buffer.from(await theirs.content()).toString("utf8");
+  const { mergedText, cleanMerge } = await mergeDriver({
+    branches: [baseName, ourName, theirName],
+    contents: [baseContent, ourContent, theirContent],
+    path
+  });
+  const oid = await _writeObject({
+    fs,
+    gitdir,
+    type: "blob",
+    object: Buffer.from(mergedText, "utf8"),
+    dryRun
+  });
+  return { cleanMerge, mergeResult: { mode, path, oid, type } };
+}
+async function checkAndWriteBlob(fs, gitdir, dir, filepath, oid = null) {
+  const currentFilepath = join(dir, filepath);
+  const stats = await fs.lstat(currentFilepath);
+  if (!stats)
+    throw new NotFoundError(currentFilepath);
+  if (stats.isDirectory())
+    throw new InternalError(
+      `${currentFilepath}: file expected, but found directory`
+    );
+  const objContent = oid ? await readObjectLoose({ fs, gitdir, oid }) : void 0;
+  let retOid = objContent ? oid : void 0;
+  if (!objContent) {
+    await acquireLock(currentFilepath, async () => {
+      const object = stats.isSymbolicLink() ? await fs.readlink(currentFilepath).then(posixifyPathBuffer) : await fs.read(currentFilepath);
+      if (object === null)
+        throw new NotFoundError(currentFilepath);
+      retOid = await _writeObject({ fs, gitdir, type: "blob", object });
+    });
+  }
+  return retOid;
+}
+async function processTreeEntries({ fs, dir, gitdir, entries }) {
+  async function processTreeEntry(entry) {
+    if (entry.type === "tree") {
+      if (!entry.oid) {
+        const children = await Promise.all(entry.children.map(processTreeEntry));
+        entry.oid = await _writeTree({
+          fs,
+          gitdir,
+          tree: children
+        });
+        entry.mode = 16384;
+      }
+    } else if (entry.type === "blob") {
+      entry.oid = await checkAndWriteBlob(
+        fs,
+        gitdir,
+        dir,
+        entry.path,
+        entry.oid
+      );
+      entry.mode = 33188;
+    }
+    entry.path = entry.path.split("/").pop();
+    return entry;
+  }
+  return Promise.all(entries.map(processTreeEntry));
+}
+async function writeTreeChanges({
+  fs,
+  dir,
+  gitdir,
+  treePair
+  // [TREE({ ref: 'HEAD' }), 'STAGE'] would be the equivalent of `git write-tree`
+}) {
+  const isStage = treePair[1] === "stage";
+  const trees = treePair.map((t) => typeof t === "string" ? _TreeMap[t]() : t);
+  const changedEntries = [];
+  const map = async (filepath, [head, stage]) => {
+    if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
+      return;
+    }
+    if (stage) {
+      if (!head || await head.oid() !== await stage.oid() && await stage.oid() !== void 0) {
+        changedEntries.push([head, stage]);
+      }
+      return {
+        mode: await stage.mode(),
+        path: filepath,
+        oid: await stage.oid(),
+        type: await stage.type()
+      };
+    }
+  };
+  const reduce = async (parent, children) => {
+    children = children.filter(Boolean);
+    if (!parent) {
+      return children.length > 0 ? children : void 0;
+    } else {
+      parent.children = children;
+      return parent;
+    }
+  };
+  const iterate = async (walk2, children) => {
+    const filtered = [];
+    for (const child of children) {
+      const [head, stage] = child;
+      if (isStage) {
+        if (stage) {
+          if (await fs.exists(`${dir}/${stage.toString()}`)) {
+            filtered.push(child);
+          } else {
+            changedEntries.push([null, stage]);
+          }
+        }
+      } else if (head) {
+        if (!stage) {
+          changedEntries.push([head, null]);
+        } else {
+          filtered.push(child);
+        }
+      }
+    }
+    return filtered.length ? Promise.all(filtered.map(walk2)) : [];
+  };
+  const entries = await _walk({
+    fs,
+    cache: {},
+    dir,
+    gitdir,
+    trees,
+    map,
+    reduce,
+    iterate
+  });
+  if (changedEntries.length === 0 || entries.length === 0) {
+    return null;
+  }
+  const processedEntries = await processTreeEntries({
+    fs,
+    dir,
+    gitdir,
+    entries
+  });
+  const treeEntries = processedEntries.filter(Boolean).map((entry) => ({
+    mode: entry.mode,
+    path: entry.path,
+    oid: entry.oid,
+    type: entry.type
+  }));
+  return _writeTree({ fs, gitdir, tree: treeEntries });
+}
+async function applyTreeChanges({
+  fs,
+  dir,
+  gitdir,
+  stashCommit,
+  parentCommit,
+  wasStaged
+}) {
+  const dirRemoved = [];
+  const stageUpdated = [];
+  const ops = await _walk({
+    fs,
+    cache: {},
+    dir,
+    gitdir,
+    trees: [TREE({ ref: parentCommit }), TREE({ ref: stashCommit })],
+    map: async (filepath, [parent, stash2]) => {
+      if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
+        return;
+      }
+      const type = stash2 ? await stash2.type() : await parent.type();
+      if (type !== "tree" && type !== "blob") {
+        return;
+      }
+      if (!stash2 && parent) {
+        const method = type === "tree" ? "rmdir" : "rm";
+        if (type === "tree")
+          dirRemoved.push(filepath);
+        if (type === "blob" && wasStaged)
+          stageUpdated.push({ filepath, oid: await parent.oid() });
+        return { method, filepath };
+      }
+      const oid = await stash2.oid();
+      if (!parent || await parent.oid() !== oid) {
+        if (type === "tree") {
+          return { method: "mkdir", filepath };
+        } else {
+          if (wasStaged)
+            stageUpdated.push({
+              filepath,
+              oid,
+              stats: await fs.lstat(join(dir, filepath))
+            });
+          return {
+            method: "write",
+            filepath,
+            oid
+          };
+        }
+      }
+    }
+  });
+  await acquireLock(gitdir, async () => {
+    for (const op of ops) {
+      const currentFilepath = join(dir, op.filepath);
+      switch (op.method) {
+        case "rmdir":
+          await fs.rmdir(currentFilepath);
+          break;
+        case "mkdir":
+          await assertNoSymlinkInLeadingPath(fs, dir, op.filepath);
+          await fs.mkdir(currentFilepath);
+          break;
+        case "rm":
+          await fs.rm(currentFilepath);
+          break;
+        case "write":
+          if (!dirRemoved.some(
+            (removedDir) => currentFilepath.startsWith(removedDir)
+          )) {
+            await assertNoSymlinkInLeadingPath(fs, dir, op.filepath);
+            const { object } = await _readObject({
+              fs,
+              cache: {},
+              gitdir,
+              oid: op.oid
+            });
+            if (await fs.exists(currentFilepath)) {
+              await fs.rm(currentFilepath);
+            }
+            await fs.write(currentFilepath, object);
+          }
+          break;
+      }
+    }
+  });
+  await GitIndexManager.acquire({ fs, gitdir, cache: {} }, async (index2) => {
+    stageUpdated.forEach(({ filepath, stats, oid }) => {
+      index2.insert({ filepath, stats, oid });
+    });
+  });
+}
+async function _cherryPick({
+  fs,
+  cache,
+  dir,
+  gitdir,
+  oid,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  committer,
+  mergeDriver
+}) {
+  const { commit: cherryCommit, oid: cherryOid } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid
+  });
+  if (cherryCommit.parent.length > 1) {
+    throw new CherryPickMergeCommitError(cherryOid, cherryCommit.parent.length);
+  }
+  if (cherryCommit.parent.length === 0) {
+    throw new CherryPickRootCommitError(cherryOid);
+  }
+  const currentOid = await GitRefManager.resolve({
+    fs,
+    gitdir,
+    ref: "HEAD"
+  });
+  const { commit: currentCommit } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid: currentOid
+  });
+  const cherryParentOid = cherryCommit.parent[0];
+  const { commit: cherryParent } = await _readCommit({
+    fs,
+    cache,
+    gitdir,
+    oid: cherryParentOid
+  });
+  const mergedTreeOid = await GitIndexManager.acquire(
+    { fs, gitdir, cache, allowUnmerged: false },
+    async (index2) => {
+      return mergeTree({
+        fs,
+        cache,
+        dir,
+        gitdir,
+        index: index2,
+        ourOid: currentCommit.tree,
+        baseOid: cherryParent.tree,
+        theirOid: cherryCommit.tree,
+        ourName: "HEAD",
+        baseName: `parent of ${cherryOid.slice(0, 7)}`,
+        theirName: cherryOid.slice(0, 7),
+        dryRun,
+        abortOnConflict,
+        mergeDriver
+      });
+    }
+  );
+  if (mergedTreeOid instanceof MergeConflictError) {
+    throw mergedTreeOid;
+  }
+  const newOid = await _commit({
+    fs,
+    cache,
+    gitdir,
+    message: cherryCommit.message,
+    tree: mergedTreeOid,
+    parent: [currentOid],
+    // Single parent: current HEAD
+    author: cherryCommit.author,
+    // Preserve original author
+    committer,
+    // New committer
+    dryRun,
+    noUpdateBranch
+  });
+  if (dir && !dryRun && !noUpdateBranch) {
+    await applyTreeChanges({
+      fs,
+      dir,
+      gitdir,
+      stashCommit: newOid,
+      parentCommit: currentOid,
+      wasStaged: true
+    });
+  }
+  return newOid;
+}
+async function cherryPick({
+  fs: _fs,
+  dir,
+  gitdir = join(dir, ".git"),
+  oid,
+  cache = {},
+  committer,
+  dryRun = false,
+  noUpdateBranch = false,
+  abortOnConflict = true,
+  mergeDriver
+}) {
+  try {
+    assertParameter("fs", _fs);
+    assertParameter("gitdir", gitdir);
+    assertParameter("oid", oid);
+    const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const { commit: cherryCommit } = await _readCommit({
+      fs,
+      cache,
+      gitdir: updatedGitdir,
+      oid
+    });
+    if (cherryCommit.parent && cherryCommit.parent.length > 1) {
+      return await _cherryPick({
+        fs,
+        cache,
+        dir,
+        gitdir: updatedGitdir,
+        oid,
+        dryRun,
+        noUpdateBranch,
+        abortOnConflict,
+        committer: void 0,
+        mergeDriver
+      });
+    }
+    const normalizedCommitter = await normalizeCommitterObject({
+      fs,
+      gitdir: updatedGitdir,
+      committer
+    });
+    if (!normalizedCommitter) {
+      throw new MissingNameError("committer");
+    }
+    return await _cherryPick({
+      fs,
+      cache,
+      dir,
+      gitdir: updatedGitdir,
+      oid,
+      dryRun,
+      noUpdateBranch,
+      abortOnConflict,
+      committer: normalizedCommitter,
+      mergeDriver
+    });
+  } catch (err) {
+    err.caller = "git.cherryPick";
     throw err;
   }
 }
@@ -10342,7 +12476,7 @@ async function _currentBranch({
   return fullname ? ref : abbreviateRef(ref);
 }
 function translateSSHtoHTTP(url) {
-  url = url.replace(/^git@([^:]+):/, "https://$1/");
+  url = url.replace(/^[^/@:]+@([^/@:]+):/, "https://$1/");
   url = url.replace(/^ssh:\/\//, "https://");
   return url;
 }
@@ -10377,13 +12511,44 @@ async function collect(iterable) {
   return result;
 }
 function extractAuthFromUrl(url) {
-  let userpass = url.match(/^https?:\/\/([^/]+)@/);
-  if (userpass == null)
+  const credentials = url.match(CREDENTIALS);
+  if (credentials == null)
     return { url, auth: {} };
-  userpass = userpass[1];
-  const [username, password] = userpass.split(":");
-  url = url.replace(`${userpass}@`, "");
-  return { url, auth: { username, password } };
+  return {
+    url: url.replace(CREDENTIALS, "$1"),
+    auth: parseUserinfo(url, credentials[2])
+  };
+}
+function parseUserinfo(url, userpass) {
+  const parsed = parseUrl(url);
+  const hasPassword = userpass.indexOf(":") !== -1;
+  if (parsed !== null) {
+    return {
+      username: decodeUserinfo(parsed.username),
+      password: hasPassword ? decodeUserinfo(parsed.password) : void 0
+    };
+  }
+  const separatorIndex = userpass.indexOf(":");
+  return {
+    username: hasPassword ? userpass.slice(0, separatorIndex) : userpass,
+    password: hasPassword ? userpass.slice(separatorIndex + 1) : void 0
+  };
+}
+function parseUrl(url) {
+  if (typeof URL !== "function")
+    return null;
+  try {
+    return new URL(url);
+  } catch (_) {
+    return null;
+  }
+}
+function decodeUserinfo(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch (_) {
+    return value;
+  }
 }
 function padHex(b, n) {
   const s = n.toString(16);
@@ -10471,7 +12636,7 @@ function splitAndAssert(line, sep, expected) {
   return split;
 }
 function parseRemoteUrl({ url }) {
-  if (url.startsWith("git@")) {
+  if (scpLike.test(url)) {
     return {
       transport: "ssh",
       address: url
@@ -10504,7 +12669,7 @@ async function hasObjectPacked({
   oid,
   getExternalRefDelta
 }) {
-  let list = await fs.readdir((0, import_path_browserify.join)(gitdir, "objects/pack"));
+  let list = await fs.readdir(join(gitdir, "objects/pack"));
   list = list.filter((x) => x.endsWith(".idx"));
   for (const filename of list) {
     const indexFile = `${gitdir}/objects/pack/${filename}`;
@@ -10541,6 +12706,14 @@ async function hasObject({
     });
   }
   return result;
+}
+function addCredentialUsername({ config, onAuth }) {
+  if (!onAuth)
+    return onAuth;
+  return async (url, auth) => {
+    const username = auth.username || await config.get(`credential.${url}.username`);
+    return onAuth(url, username ? { ...auth, username } : auth);
+  };
 }
 function emptyPackfile(pack) {
   const pheader = "5041434b";
@@ -10579,6 +12752,8 @@ function splitLines(input) {
       while (true) {
         const i = findSplit(tmp);
         if (i === -1)
+          break;
+        if (i === tmp.length && tmp[i - 1] === "\r")
           break;
         output.write(tmp.slice(0, i));
         tmp = tmp.slice(i);
@@ -10718,9 +12893,9 @@ async function _fetch({
   const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
   const remoteHTTP = await GitRemoteHTTP2.discover({
     http,
-    onAuth,
+    onAuth: addCredentialUsername({ config, onAuth }),
     onAuthSuccess,
-    onAuthFailure,
+    onAuthFailure: addCredentialUsername({ config, onAuth: onAuthFailure }),
     corsProxy,
     service: "git-upload-pack",
     url,
@@ -10935,7 +13110,7 @@ async function _fetch({
   }
   if (packfileSha !== "" && !emptyPackfile(packfile)) {
     res.packfile = `objects/pack/pack-${packfileSha}.pack`;
-    const fullpath = (0, import_path_browserify.join)(gitdir, res.packfile);
+    const fullpath = join(gitdir, res.packfile);
     await fs.write(fullpath, packfile);
     const getExternalRefDelta = (oid2) => _readObject({ fs, cache, gitdir, oid: oid2 });
     const idx = await GitPackIndex.fromPack({
@@ -10951,7 +13126,7 @@ async function _init({
   fs,
   bare = false,
   dir,
-  gitdir = bare ? dir : (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = bare ? dir : join(dir, ".git"),
   defaultBranch = "master"
 }) {
   if (await fs.exists(gitdir + "/config"))
@@ -11002,7 +13177,9 @@ async function _clone({
   singleBranch,
   noCheckout,
   noTags,
-  headers
+  headers,
+  nonBlocking,
+  batchSize = 100
 }) {
   try {
     await _init({ fs, gitdir });
@@ -11046,7 +13223,9 @@ async function _clone({
       gitdir,
       ref,
       remote,
-      noCheckout
+      noCheckout,
+      nonBlocking,
+      batchSize
     });
   } catch (err) {
     await fs.rmdir(gitdir, { recursive: true, maxRetries: 10 }).catch(() => void 0);
@@ -11063,7 +13242,7 @@ async function clone({
   onAuthFailure,
   onPostCheckout,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   url,
   corsProxy = void 0,
   ref = void 0,
@@ -11076,7 +13255,9 @@ async function clone({
   noCheckout = false,
   noTags = false,
   headers = {},
-  cache = {}
+  cache = {},
+  nonBlocking = false,
+  batchSize = 100
 }) {
   try {
     assertParameter("fs", fs);
@@ -11086,8 +13267,10 @@ async function clone({
       assertParameter("dir", dir);
     }
     assertParameter("url", url);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _clone({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       http,
       onProgress,
@@ -11097,7 +13280,7 @@ async function clone({
       onAuthFailure,
       onPostCheckout,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       url,
       corsProxy,
       ref,
@@ -11109,7 +13292,9 @@ async function clone({
       singleBranch,
       noCheckout,
       noTags,
-      headers
+      headers,
+      nonBlocking,
+      batchSize
     });
   } catch (err) {
     err.caller = "git.clone";
@@ -11120,7 +13305,7 @@ async function commit({
   fs: _fs,
   onSign,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   message,
   author,
   committer,
@@ -11128,6 +13313,7 @@ async function commit({
   amend = false,
   dryRun = false,
   noUpdateBranch = false,
+  disallowEmpty = false,
   ref,
   parent,
   tree,
@@ -11142,11 +13328,12 @@ async function commit({
       assertParameter("onSign", onSign);
     }
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     return await _commit({
       fs,
       cache,
       onSign,
-      gitdir,
+      gitdir: updatedGitdir,
       message,
       author,
       committer,
@@ -11154,6 +13341,7 @@ async function commit({
       amend,
       dryRun,
       noUpdateBranch,
+      disallowEmpty,
       ref,
       parent,
       tree
@@ -11166,16 +13354,18 @@ async function commit({
 async function currentBranch({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   fullname = false,
   test = false
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _currentBranch({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       fullname,
       test
     });
@@ -11205,15 +13395,17 @@ async function _deleteBranch({ fs, gitdir, ref }) {
 async function deleteBranch({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _deleteBranch({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref
     });
   } catch (err) {
@@ -11221,11 +13413,13 @@ async function deleteBranch({
     throw err;
   }
 }
-async function deleteRef({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), ref }) {
+async function deleteRef({ fs, dir, gitdir = join(dir, ".git"), ref }) {
   try {
     assertParameter("fs", fs);
     assertParameter("ref", ref);
-    await GitRefManager.deleteRef({ fs: new FileSystem(fs), gitdir, ref });
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    await GitRefManager.deleteRef({ fs: fsp, gitdir: updatedGitdir, ref });
   } catch (err) {
     err.caller = "git.deleteRef";
     throw err;
@@ -11239,15 +13433,17 @@ async function _deleteRemote({ fs, gitdir, remote }) {
 async function deleteRemote({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   remote
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("remote", remote);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _deleteRemote({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       remote
     });
   } catch (err) {
@@ -11259,13 +13455,15 @@ async function _deleteTag({ fs, gitdir, ref }) {
   ref = ref.startsWith("refs/tags/") ? ref : `refs/tags/${ref}`;
   await GitRefManager.deleteRef({ fs, gitdir, ref });
 }
-async function deleteTag({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), ref }) {
+async function deleteTag({ fs, dir, gitdir = join(dir, ".git"), ref }) {
   try {
     assertParameter("fs", fs);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _deleteTag({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref
     });
   } catch (err) {
@@ -11286,7 +13484,7 @@ async function expandOidPacked({
   getExternalRefDelta
 }) {
   const results = [];
-  let list = await fs.readdir((0, import_path_browserify.join)(gitdir, "objects/pack"));
+  let list = await fs.readdir(join(gitdir, "objects/pack"));
   list = list.filter((x) => x.endsWith(".idx"));
   for (const filename of list) {
     const indexFile = `${gitdir}/objects/pack/${filename}`;
@@ -11331,7 +13529,7 @@ async function _expandOid({ fs, cache, gitdir, oid: short }) {
 async function expandOid({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   cache = {}
 }) {
@@ -11339,10 +13537,12 @@ async function expandOid({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _expandOid({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid
     });
   } catch (err) {
@@ -11350,14 +13550,16 @@ async function expandOid({
     throw err;
   }
 }
-async function expandRef({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), ref }) {
+async function expandRef({ fs, dir, gitdir = join(dir, ".git"), ref }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await GitRefManager.expand({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref
     });
   } catch (err) {
@@ -11368,302 +13570,64 @@ async function expandRef({ fs, dir, gitdir = (0, import_path_browserify.join)(di
 async function _findMergeBase({ fs, cache, gitdir, oids }) {
   const visits = {};
   const passes = oids.length;
+  const common = /* @__PURE__ */ new Set();
+  const parents = /* @__PURE__ */ new Map();
+  const shallows = await GitShallowManager.read({ fs, gitdir });
+  const readParents = async (oid) => {
+    if (parents.has(oid))
+      return parents.get(oid);
+    const { object, type } = await _readObject({ fs, cache, gitdir, oid });
+    if (type !== "commit") {
+      throw new ObjectTypeError(oid, type, "commit");
+    }
+    const commit2 = GitCommit.from(object);
+    const { parent } = commit2.parseHeaders();
+    const result = shallows.has(oid) ? [] : parent;
+    parents.set(oid, result);
+    return result;
+  };
   let heads = oids.map((oid, index2) => ({ index: index2, oid }));
   while (heads.length) {
-    const result = /* @__PURE__ */ new Set();
     for (const { oid, index: index2 } of heads) {
+      await readParents(oid);
       if (!visits[oid])
         visits[oid] = /* @__PURE__ */ new Set();
       visits[oid].add(index2);
       if (visits[oid].size === passes) {
-        result.add(oid);
+        common.add(oid);
       }
-    }
-    if (result.size > 0) {
-      return [...result];
     }
     const newheads = /* @__PURE__ */ new Map();
     for (const { oid, index: index2 } of heads) {
-      try {
-        const { object } = await _readObject({ fs, cache, gitdir, oid });
-        const commit2 = GitCommit.from(object);
-        const { parent } = commit2.parseHeaders();
-        for (const oid2 of parent) {
-          if (!visits[oid2] || !visits[oid2].has(index2)) {
-            newheads.set(oid2 + ":" + index2, { oid: oid2, index: index2 });
-          }
+      if (common.has(oid))
+        continue;
+      for (const parent of await readParents(oid)) {
+        if (!visits[parent] || !visits[parent].has(index2)) {
+          newheads.set(parent + ":" + index2, { oid: parent, index: index2 });
         }
-      } catch (err) {
       }
     }
     heads = Array.from(newheads.values());
   }
-  return [];
-}
-function mergeFile({ branches, contents }) {
-  const ourName = branches[1];
-  const theirName = branches[2];
-  const baseContent = contents[0];
-  const ourContent = contents[1];
-  const theirContent = contents[2];
-  const ours = ourContent.match(LINEBREAKS);
-  const base = baseContent.match(LINEBREAKS);
-  const theirs = theirContent.match(LINEBREAKS);
-  const result = (0, import_diff3.default)(ours, base, theirs);
-  const markerSize = 7;
-  let mergedText = "";
-  let cleanMerge = true;
-  for (const item of result) {
-    if (item.ok) {
-      mergedText += item.ok.join("");
-    }
-    if (item.conflict) {
-      cleanMerge = false;
-      mergedText += `${"<".repeat(markerSize)} ${ourName}
-`;
-      mergedText += item.conflict.a.join("");
-      mergedText += `${"=".repeat(markerSize)}
-`;
-      mergedText += item.conflict.b.join("");
-      mergedText += `${">".repeat(markerSize)} ${theirName}
-`;
-    }
-  }
-  return { cleanMerge, mergedText };
-}
-async function mergeTree({
-  fs,
-  cache,
-  dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
-  index: index2,
-  ourOid,
-  baseOid,
-  theirOid,
-  ourName = "ours",
-  baseName = "base",
-  theirName = "theirs",
-  dryRun = false,
-  abortOnConflict = true,
-  mergeDriver
-}) {
-  const ourTree = TREE({ ref: ourOid });
-  const baseTree = TREE({ ref: baseOid });
-  const theirTree = TREE({ ref: theirOid });
-  const unmergedFiles = [];
-  const bothModified = [];
-  const deleteByUs = [];
-  const deleteByTheirs = [];
-  const results = await _walk({
-    fs,
-    cache,
-    dir,
-    gitdir,
-    trees: [ourTree, baseTree, theirTree],
-    map: async function(filepath, [ours, base, theirs]) {
-      const path = basename(filepath);
-      const ourChange = await modified(ours, base);
-      const theirChange = await modified(theirs, base);
-      switch (`${ourChange}-${theirChange}`) {
-        case "false-false": {
-          return {
-            mode: await base.mode(),
-            path,
-            oid: await base.oid(),
-            type: await base.type()
-          };
-        }
-        case "false-true": {
-          return theirs ? {
-            mode: await theirs.mode(),
-            path,
-            oid: await theirs.oid(),
-            type: await theirs.type()
-          } : void 0;
-        }
-        case "true-false": {
-          return ours ? {
-            mode: await ours.mode(),
-            path,
-            oid: await ours.oid(),
-            type: await ours.type()
-          } : void 0;
-        }
-        case "true-true": {
-          if (ours && base && theirs && await ours.type() === "blob" && await base.type() === "blob" && await theirs.type() === "blob") {
-            return mergeBlobs({
-              fs,
-              gitdir,
-              path,
-              ours,
-              base,
-              theirs,
-              ourName,
-              baseName,
-              theirName,
-              mergeDriver
-            }).then(async (r) => {
-              if (!r.cleanMerge) {
-                unmergedFiles.push(filepath);
-                bothModified.push(filepath);
-                if (!abortOnConflict) {
-                  const baseOid2 = await base.oid();
-                  const ourOid2 = await ours.oid();
-                  const theirOid2 = await theirs.oid();
-                  index2.delete({ filepath });
-                  index2.insert({ filepath, oid: baseOid2, stage: 1 });
-                  index2.insert({ filepath, oid: ourOid2, stage: 2 });
-                  index2.insert({ filepath, oid: theirOid2, stage: 3 });
-                }
-              } else if (!abortOnConflict) {
-                index2.insert({ filepath, oid: r.mergeResult.oid, stage: 0 });
-              }
-              return r.mergeResult;
-            });
-          }
-          if (base && !ours && theirs && await base.type() === "blob" && await theirs.type() === "blob") {
-            unmergedFiles.push(filepath);
-            deleteByUs.push(filepath);
-            if (!abortOnConflict) {
-              const baseOid2 = await base.oid();
-              const theirOid2 = await theirs.oid();
-              index2.delete({ filepath });
-              index2.insert({ filepath, oid: baseOid2, stage: 1 });
-              index2.insert({ filepath, oid: theirOid2, stage: 3 });
-            }
-            return {
-              mode: await theirs.mode(),
-              oid: await theirs.oid(),
-              type: "blob",
-              path
-            };
-          }
-          if (base && ours && !theirs && await base.type() === "blob" && await ours.type() === "blob") {
-            unmergedFiles.push(filepath);
-            deleteByTheirs.push(filepath);
-            if (!abortOnConflict) {
-              const baseOid2 = await base.oid();
-              const ourOid2 = await ours.oid();
-              index2.delete({ filepath });
-              index2.insert({ filepath, oid: baseOid2, stage: 1 });
-              index2.insert({ filepath, oid: ourOid2, stage: 2 });
-            }
-            return {
-              mode: await ours.mode(),
-              oid: await ours.oid(),
-              type: "blob",
-              path
-            };
-          }
-          if (base && !ours && !theirs && await base.type() === "blob") {
-            return void 0;
-          }
-          throw new MergeNotSupportedError();
-        }
+  if (common.size < 2)
+    return [...common];
+  const redundant = /* @__PURE__ */ new Set();
+  for (const oid of common) {
+    const ancestors = [...await readParents(oid)];
+    const seen = /* @__PURE__ */ new Set();
+    while (ancestors.length) {
+      const ancestor = ancestors.pop();
+      if (seen.has(ancestor))
+        continue;
+      seen.add(ancestor);
+      if (common.has(ancestor)) {
+        redundant.add(ancestor);
+      } else {
+        ancestors.push(...await readParents(ancestor));
       }
-    },
-    /**
-     * @param {TreeEntry} [parent]
-     * @param {Array<TreeEntry>} children
-     */
-    reduce: unmergedFiles.length !== 0 && (!dir || abortOnConflict) ? void 0 : async (parent, children) => {
-      const entries = children.filter(Boolean);
-      if (!parent)
-        return;
-      if (parent && parent.type === "tree" && entries.length === 0)
-        return;
-      if (entries.length > 0) {
-        const tree = new GitTree(entries);
-        const object = tree.toObject();
-        const oid = await _writeObject({
-          fs,
-          gitdir,
-          type: "tree",
-          object,
-          dryRun
-        });
-        parent.oid = oid;
-      }
-      return parent;
     }
-  });
-  if (unmergedFiles.length !== 0) {
-    if (dir && !abortOnConflict) {
-      await _walk({
-        fs,
-        cache,
-        dir,
-        gitdir,
-        trees: [TREE({ ref: results.oid })],
-        map: async function(filepath, [entry]) {
-          const path = `${dir}/${filepath}`;
-          if (await entry.type() === "blob") {
-            const mode = await entry.mode();
-            const content = new TextDecoder().decode(await entry.content());
-            await fs.write(path, content, { mode });
-          }
-          return true;
-        }
-      });
-    }
-    return new MergeConflictError(
-      unmergedFiles,
-      bothModified,
-      deleteByUs,
-      deleteByTheirs
-    );
   }
-  return results.oid;
-}
-async function mergeBlobs({
-  fs,
-  gitdir,
-  path,
-  ours,
-  base,
-  theirs,
-  ourName,
-  theirName,
-  baseName,
-  dryRun,
-  mergeDriver = mergeFile
-}) {
-  const type = "blob";
-  const mode = await base.mode() === await ours.mode() ? await theirs.mode() : await ours.mode();
-  if (await ours.oid() === await theirs.oid()) {
-    return {
-      cleanMerge: true,
-      mergeResult: { mode, path, oid: await ours.oid(), type }
-    };
-  }
-  if (await ours.oid() === await base.oid()) {
-    return {
-      cleanMerge: true,
-      mergeResult: { mode, path, oid: await theirs.oid(), type }
-    };
-  }
-  if (await theirs.oid() === await base.oid()) {
-    return {
-      cleanMerge: true,
-      mergeResult: { mode, path, oid: await ours.oid(), type }
-    };
-  }
-  const ourContent = Buffer.from(await ours.content()).toString("utf8");
-  const baseContent = Buffer.from(await base.content()).toString("utf8");
-  const theirContent = Buffer.from(await theirs.content()).toString("utf8");
-  const { mergedText, cleanMerge } = await mergeDriver({
-    branches: [baseName, ourName, theirName],
-    contents: [baseContent, ourContent, theirContent],
-    path
-  });
-  const oid = await _writeObject({
-    fs,
-    gitdir,
-    type: "blob",
-    object: Buffer.from(mergedText, "utf8"),
-    dryRun
-  });
-  return { cleanMerge, mergeResult: { mode, path, oid, type } };
+  return [...common].filter((oid) => !redundant.has(oid));
 }
 async function _merge({
   fs,
@@ -11682,7 +13646,8 @@ async function _merge({
   committer,
   signingKey,
   onSign,
-  mergeDriver
+  mergeDriver,
+  allowUnrelatedHistories = false
 }) {
   if (ours === void 0) {
     ours = await _currentBranch({ fs, gitdir, fullname: true });
@@ -11714,7 +13679,11 @@ async function _merge({
     oids: [ourOid, theirOid]
   });
   if (baseOids.length !== 1) {
-    throw new MergeNotSupportedError();
+    if (baseOids.length === 0 && allowUnrelatedHistories) {
+      baseOids.push("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+    } else {
+      throw new MergeNotSupportedError();
+    }
   }
   const baseOid = baseOids[0];
   if (baseOid === theirOid) {
@@ -11878,7 +13847,7 @@ async function fastForward({
   onAuthSuccess,
   onAuthFailure,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   url,
   remote,
@@ -11898,8 +13867,10 @@ async function fastForward({
       timestamp: Date.now(),
       timezoneOffset: 0
     };
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _pull({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       http,
       onProgress,
@@ -11908,7 +13879,7 @@ async function fastForward({
       onAuthSuccess,
       onAuthFailure,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       url,
       remote,
@@ -11934,7 +13905,7 @@ async function fetch({
   onAuthSuccess,
   onAuthFailure,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   remote,
   remoteRef,
@@ -11955,8 +13926,10 @@ async function fetch({
     assertParameter("fs", fs);
     assertParameter("http", http);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _fetch({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       http,
       onProgress,
@@ -11964,7 +13937,7 @@ async function fetch({
       onAuth,
       onAuthSuccess,
       onAuthFailure,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       remote,
       remoteRef,
@@ -11988,7 +13961,7 @@ async function fetch({
 async function findMergeBase({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oids,
   cache = {}
 }) {
@@ -11996,10 +13969,12 @@ async function findMergeBase({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oids", oids);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _findMergeBase({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oids
     });
   } catch (err) {
@@ -12008,7 +13983,7 @@ async function findMergeBase({
   }
 }
 async function _findRoot({ fs, filepath }) {
-  if (await fs.exists((0, import_path_browserify.join)(filepath, ".git"))) {
+  if (await fs.exists(join(filepath, ".git"))) {
     return filepath;
   } else {
     const parent = dirname(filepath);
@@ -12028,14 +14003,16 @@ async function findRoot({ fs, filepath }) {
     throw err;
   }
 }
-async function getConfig({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), path }) {
+async function getConfig({ fs, dir, gitdir = join(dir, ".git"), path }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("path", path);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _getConfig({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       path
     });
   } catch (err) {
@@ -12050,16 +14027,18 @@ async function _getConfigAll({ fs, gitdir, path }) {
 async function getConfigAll({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   path
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("path", path);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _getConfigAll({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       path
     });
   } catch (err) {
@@ -12130,11 +14109,10 @@ function formatInfoRefs(remote, prefix, symrefs, peelTags) {
       if (peelTags) {
         const _key = key.replace("^{}", "");
         const last = refs[refs.length - 1];
-        const r = last.ref === _key ? last : refs.find((x) => x.ref === _key);
-        if (r === void 0) {
-          throw new Error("I did not expect this to happen");
+        const r = (last == null ? void 0 : last.ref) === _key ? last : refs.find((x) => x.ref === _key);
+        if (r !== void 0) {
+          r.peeled = value;
         }
-        r.peeled = value;
       }
       continue;
     }
@@ -12218,16 +14196,16 @@ async function hashBlob({ object }) {
     assertParameter("object", object);
     if (typeof object === "string") {
       object = Buffer.from(object, "utf8");
-    } else {
-      object = Buffer.from(object);
+    } else if (!(object instanceof Uint8Array)) {
+      object = new Uint8Array(object);
     }
     const type = "blob";
     const { oid, object: _object } = await hashObject({
-      type: "blob",
+      type,
       format: "content",
       object
     });
-    return { oid, type, object: new Uint8Array(_object), format: "wrapped" };
+    return { oid, type, object: _object, format: "wrapped" };
   } catch (err) {
     err.caller = "git.hashBlob";
     throw err;
@@ -12242,7 +14220,7 @@ async function _indexPack({
   filepath
 }) {
   try {
-    filepath = (0, import_path_browserify.join)(dir, filepath);
+    filepath = join(dir, filepath);
     const pack = await fs.read(filepath);
     const getExternalRefDelta = (oid) => _readObject({ fs, cache, gitdir, oid });
     const idx = await GitPackIndex.fromPack({
@@ -12263,7 +14241,7 @@ async function indexPack({
   fs,
   onProgress,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
   cache = {}
 }) {
@@ -12272,12 +14250,14 @@ async function indexPack({
     assertParameter("dir", dir);
     assertParameter("gitdir", dir);
     assertParameter("filepath", filepath);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _indexPack({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       onProgress,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       filepath
     });
   } catch (err) {
@@ -12289,7 +14269,7 @@ async function init({
   fs,
   bare = false,
   dir,
-  gitdir = bare ? dir : (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = bare ? dir : join(dir, ".git"),
   defaultBranch = "master"
 }) {
   try {
@@ -12298,11 +14278,13 @@ async function init({
     if (!bare) {
       assertParameter("dir", dir);
     }
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _init({
-      fs: new FileSystem(fs),
+      fs: fsp,
       bare,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       defaultBranch
     });
   } catch (err) {
@@ -12363,7 +14345,7 @@ async function _isDescendent({
 async function isDescendent({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   ancestor,
   depth = -1,
@@ -12374,10 +14356,12 @@ async function isDescendent({
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
     assertParameter("ancestor", ancestor);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _isDescendent({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid,
       ancestor,
       depth
@@ -12390,7 +14374,7 @@ async function isDescendent({
 async function isIgnored({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath
 }) {
   try {
@@ -12398,10 +14382,12 @@ async function isIgnored({
     assertParameter("dir", dir);
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return GitIgnoreManager.isIgnored({
-      fs: new FileSystem(fs),
+      fs: fsp,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       filepath
     });
   } catch (err) {
@@ -12412,15 +14398,17 @@ async function isIgnored({
 async function listBranches({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   remote
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return GitRefManager.listBranches({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       remote
     });
   } catch (err) {
@@ -12442,9 +14430,12 @@ async function _listFiles({ fs, gitdir, ref, cache }) {
     });
     return filenames;
   } else {
-    return GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      return index2.entries.map((x) => x.path);
-    });
+    return GitIndexManager.acquire(
+      { fs, gitdir, cache },
+      async function(index2) {
+        return index2.entries.map((x) => x.path);
+      }
+    );
   }
 }
 async function accumulateFilesFromOid({
@@ -12464,27 +14455,29 @@ async function accumulateFilesFromOid({
         gitdir,
         oid: entry.oid,
         filenames,
-        prefix: (0, import_path_browserify.join)(prefix, entry.path)
+        prefix: join(prefix, entry.path)
       });
     } else {
-      filenames.push((0, import_path_browserify.join)(prefix, entry.path));
+      filenames.push(join(prefix, entry.path));
     }
   }
 }
 async function listFiles({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   cache = {}
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _listFiles({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       ref
     });
   } catch (err) {
@@ -12516,7 +14509,7 @@ async function _listNotes({ fs, cache, gitdir, ref }) {
 async function listNotes({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref = "refs/notes/commits",
   cache = {}
 }) {
@@ -12524,10 +14517,12 @@ async function listNotes({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _listNotes({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       ref
     });
   } catch (err) {
@@ -12538,13 +14533,15 @@ async function listNotes({
 async function listRefs({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
-    return GitRefManager.listRefs({ fs: new FileSystem(fs), gitdir, filepath });
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitRefManager.listRefs({ fs: fsp, gitdir: updatedGitdir, filepath });
   } catch (err) {
     err.caller = "git.listRefs";
     throw err;
@@ -12561,13 +14558,15 @@ async function _listRemotes({ fs, gitdir }) {
   );
   return remotes;
 }
-async function listRemotes({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git") }) {
+async function listRemotes({ fs, dir, gitdir = join(dir, ".git") }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _listRemotes({
-      fs: new FileSystem(fs),
-      gitdir
+      fs: fsp,
+      gitdir: updatedGitdir
     });
   } catch (err) {
     err.caller = "git.listRemotes";
@@ -12663,11 +14662,13 @@ async function listServerRefs({
     throw err;
   }
 }
-async function listTags({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git") }) {
+async function listTags({ fs, dir, gitdir = join(dir, ".git") }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
-    return GitRefManager.listTags({ fs: new FileSystem(fs), gitdir });
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
+    return GitRefManager.listTags({ fs: fsp, gitdir: updatedGitdir });
   } catch (err) {
     err.caller = "git.listTags";
     throw err;
@@ -12716,7 +14717,7 @@ async function _resolveFileId({
   const walks = tree.entries().map(function(entry) {
     let result;
     if (entry.oid === fileId) {
-      result = (0, import_path_browserify.join)(parentPath, entry.path);
+      result = join(parentPath, entry.path);
       filepaths.push(result);
     } else if (entry.type === "tree") {
       result = _readObject({
@@ -12733,7 +14734,7 @@ async function _resolveFileId({
           fileId,
           oid,
           filepaths,
-          parentPath: (0, import_path_browserify.join)(parentPath, entry.path)
+          parentPath: join(parentPath, entry.path)
         });
       });
     }
@@ -12751,7 +14752,8 @@ async function _log({
   depth,
   since,
   force,
-  follow
+  follow,
+  includeChanges
 }) {
   const sinceTimestamp = typeof since === "undefined" ? void 0 : Math.floor(since.valueOf() / 1e3);
   const commits = [];
@@ -12759,6 +14761,7 @@ async function _log({
   const oid = await GitRefManager.resolve({ fs, gitdir, ref });
   const tips = [await _readCommit({ fs, cache, gitdir, oid })];
   let lastFileOid;
+  let lastFileMode;
   let lastCommit;
   let isOk;
   function endCommit(commit2) {
@@ -12771,19 +14774,20 @@ async function _log({
       break;
     }
     if (filepath) {
-      let vFileOid;
+      let vFileEntry;
       try {
-        vFileOid = await resolveFilepath({
+        vFileEntry = await resolveFilepathEntry({
           fs,
           cache,
           gitdir,
           oid: commit2.commit.tree,
           filepath
         });
-        if (lastCommit && lastFileOid !== vFileOid) {
+        if (lastCommit && (lastFileOid !== vFileEntry.oid || lastFileMode !== vFileEntry.mode)) {
           commits.push(lastCommit);
         }
-        lastFileOid = vFileOid;
+        lastFileOid = vFileEntry.oid;
+        lastFileMode = vFileEntry.mode;
         lastCommit = commit2;
         isOk = true;
       } catch (e) {
@@ -12863,12 +14867,57 @@ async function _log({
     }
     tips.sort((a, b) => compareAge(a.commit, b.commit));
   }
+  if (includeChanges) {
+    for (const commit2 of commits) {
+      commit2.commit.changes = await getChanges({
+        fs,
+        cache,
+        gitdir,
+        commit: commit2,
+        shallow: shallowCommits.has(commit2.oid)
+      });
+    }
+  }
   return commits;
+}
+async function getChanges({ fs, cache, gitdir, commit: commit2, shallow }) {
+  const parent = shallow || !commit2.commit.parent[0] ? "4b825dc642cb6eb9a060e54bf8d69288fbee4904" : commit2.commit.parent[0];
+  return _walk({
+    fs,
+    cache,
+    gitdir,
+    trees: [TREE({ ref: commit2.oid }), TREE({ ref: parent })],
+    map: async (filepath, [current, previous]) => {
+      const [currentType, previousType] = await Promise.all([
+        current && current.type(),
+        previous && previous.type()
+      ]);
+      if (currentType === "tree") {
+        if (previousType && previousType !== "tree") {
+          return [null, await previous.oid(), filepath];
+        }
+        return;
+      }
+      if (previousType === "tree") {
+        if (currentType) {
+          return [await current.oid(), null, filepath];
+        }
+        return;
+      }
+      const [newOid, oldOid] = await Promise.all([
+        current ? current.oid() : null,
+        previous ? previous.oid() : null
+      ]);
+      if (newOid === oldOid)
+        return;
+      return [newOid, oldOid, filepath];
+    }
+  });
 }
 async function log({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
   ref = "HEAD",
   depth,
@@ -12876,22 +14925,26 @@ async function log({
   // Date
   force,
   follow,
+  includeChanges = false,
   cache = {}
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _log({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       filepath,
       ref,
       depth,
       since,
       force,
-      follow
+      follow,
+      includeChanges
     });
   } catch (err) {
     err.caller = "git.log";
@@ -12902,7 +14955,7 @@ async function merge({
   fs: _fs,
   onSign,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ours,
   theirs,
   fastForward: fastForward2 = true,
@@ -12915,7 +14968,8 @@ async function merge({
   committer: _committer,
   signingKey,
   cache = {},
-  mergeDriver
+  mergeDriver,
+  allowUnrelatedHistories = false
 }) {
   try {
     assertParameter("fs", _fs);
@@ -12923,13 +14977,18 @@ async function merge({
       assertParameter("onSign", onSign);
     }
     const fs = new FileSystem(_fs);
-    const author = await normalizeAuthorObject({ fs, gitdir, author: _author });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
     if (!author && (!fastForwardOnly || !fastForward2)) {
       throw new MissingNameError("author");
     }
     const committer = await normalizeCommitterObject({
       fs,
-      gitdir,
+      gitdir: updatedGitdir,
       author,
       committer: _committer
     });
@@ -12940,7 +14999,7 @@ async function merge({
       fs,
       cache,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       ours,
       theirs,
       fastForward: fastForward2,
@@ -12953,7 +15012,8 @@ async function merge({
       committer,
       signingKey,
       onSign,
-      mergeDriver
+      mergeDriver,
+      allowUnrelatedHistories
     });
   } catch (err) {
     err.caller = "git.merge";
@@ -12964,7 +15024,7 @@ async function _pack({
   fs,
   cache,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oids
 }) {
   const hash = new import_sha1.default();
@@ -13007,7 +15067,7 @@ async function _packObjects({ fs, cache, gitdir, oids, write }) {
   const packfileSha = packfile.slice(-20).toString("hex");
   const filename = `pack-${packfileSha}.pack`;
   if (write) {
-    await fs.write((0, import_path_browserify.join)(gitdir, `objects/pack/${filename}`), packfile);
+    await fs.write(join(gitdir, `objects/pack/${filename}`), packfile);
     return { filename };
   }
   return {
@@ -13018,7 +15078,7 @@ async function _packObjects({ fs, cache, gitdir, oids, write }) {
 async function packObjects({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oids,
   write = false,
   cache = {}
@@ -13027,10 +15087,12 @@ async function packObjects({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oids", oids);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _packObjects({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oids,
       write
     });
@@ -13048,7 +15110,7 @@ async function pull({
   onAuthSuccess,
   onAuthFailure,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   url,
   remote,
@@ -13069,12 +15131,17 @@ async function pull({
     assertParameter("fs", _fs);
     assertParameter("gitdir", gitdir);
     const fs = new FileSystem(_fs);
-    const author = await normalizeAuthorObject({ fs, gitdir, author: _author });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
     if (!author)
       throw new MissingNameError("author");
     const committer = await normalizeCommitterObject({
       fs,
-      gitdir,
+      gitdir: updatedGitdir,
       author,
       committer: _committer
     });
@@ -13090,7 +15157,7 @@ async function pull({
       onAuthSuccess,
       onAuthFailure,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       url,
       remote,
@@ -13115,7 +15182,7 @@ async function listCommitsAndTags({
   fs,
   cache,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   start,
   finish
 }) {
@@ -13163,7 +15230,7 @@ async function listObjects({
   fs,
   cache,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oids
 }) {
   const visited = /* @__PURE__ */ new Set();
@@ -13294,9 +15361,9 @@ async function _push({
   const GitRemoteHTTP2 = GitRemoteManager.getRemoteHelperFor({ url });
   const httpRemote = await GitRemoteHTTP2.discover({
     http,
-    onAuth,
+    onAuth: addCredentialUsername({ config, onAuth }),
     onAuthSuccess,
-    onAuthFailure,
+    onAuthFailure: addCredentialUsername({ config, onAuth: onAuthFailure }),
     corsProxy,
     service: "git-receive-pack",
     url,
@@ -13465,7 +15532,7 @@ async function push({
   onAuthFailure,
   onPrePush,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   remoteRef,
   remote = "origin",
@@ -13480,8 +15547,10 @@ async function push({
     assertParameter("fs", fs);
     assertParameter("http", http);
     assertParameter("gitdir", gitdir);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _push({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       http,
       onProgress,
@@ -13490,7 +15559,7 @@ async function push({
       onAuthSuccess,
       onAuthFailure,
       onPrePush,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       remoteRef,
       remote,
@@ -13537,7 +15606,7 @@ async function _readBlob({
 async function readBlob({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   filepath,
   cache = {}
@@ -13546,10 +15615,12 @@ async function readBlob({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _readBlob({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid,
       filepath
     });
@@ -13561,7 +15632,7 @@ async function readBlob({
 async function readCommit({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   cache = {}
 }) {
@@ -13569,10 +15640,12 @@ async function readCommit({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _readCommit({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid
     });
   } catch (err) {
@@ -13600,7 +15673,7 @@ async function _readNote({
 async function readNote({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref = "refs/notes/commits",
   oid,
   cache = {}
@@ -13610,10 +15683,12 @@ async function readNote({
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _readNote({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       oid
     });
@@ -13625,7 +15700,7 @@ async function readNote({
 async function readObject({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   format = "parsed",
   filepath = void 0,
@@ -13637,11 +15712,12 @@ async function readObject({
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     if (filepath !== void 0) {
       oid = await resolveFilepath({
         fs,
         cache,
-        gitdir,
+        gitdir: updatedGitdir,
         oid,
         filepath
       });
@@ -13650,7 +15726,7 @@ async function readObject({
     const result = await _readObject({
       fs,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid,
       format: _format
     });
@@ -13713,7 +15789,7 @@ async function _readTag({ fs, cache, gitdir, oid }) {
 async function readTag({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   cache = {}
 }) {
@@ -13721,10 +15797,12 @@ async function readTag({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _readTag({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid
     });
   } catch (err) {
@@ -13735,7 +15813,7 @@ async function readTag({
 async function readTree({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   oid,
   filepath = void 0,
   cache = {}
@@ -13744,10 +15822,12 @@ async function readTree({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _readTree({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       oid,
       filepath
     });
@@ -13759,7 +15839,7 @@ async function readTree({
 async function remove({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
   cache = {}
 }) {
@@ -13767,8 +15847,10 @@ async function remove({
     assertParameter("fs", _fs);
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
+    const fsp = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     await GitIndexManager.acquire(
-      { fs: new FileSystem(_fs), gitdir, cache },
+      { fs: fsp, gitdir: updatedGitdir, cache },
       async function(index2) {
         index2.delete({ filepath });
       }
@@ -13799,6 +15881,7 @@ async function _removeNote({
   }
   const result = await _readTree({
     fs,
+    cache,
     gitdir,
     oid: parent || "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
   });
@@ -13829,7 +15912,7 @@ async function removeNote({
   fs: _fs,
   onSign,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref = "refs/notes/commits",
   oid,
   author: _author,
@@ -13842,12 +15925,17 @@ async function removeNote({
     assertParameter("gitdir", gitdir);
     assertParameter("oid", oid);
     const fs = new FileSystem(_fs);
-    const author = await normalizeAuthorObject({ fs, gitdir, author: _author });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const author = await normalizeAuthorObject({
+      fs,
+      gitdir: updatedGitdir,
+      author: _author
+    });
     if (!author)
       throw new MissingNameError("author");
     const committer = await normalizeCommitterObject({
       fs,
-      gitdir,
+      gitdir: updatedGitdir,
       author,
       committer: _committer
     });
@@ -13857,7 +15945,7 @@ async function removeNote({
       fs,
       cache,
       onSign,
-      gitdir,
+      gitdir: updatedGitdir,
       ref,
       oid,
       author,
@@ -13876,10 +15964,10 @@ async function _renameBranch({
   ref,
   checkout: checkout2 = false
 }) {
-  if (ref !== import_clean_git_ref.default.clean(ref)) {
+  if (!isValidRef(ref, true)) {
     throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
   }
-  if (oldref !== import_clean_git_ref.default.clean(oldref)) {
+  if (!isValidRef(oldref, true)) {
     throw new InvalidRefNameError(oldref, import_clean_git_ref.default.clean(oldref));
   }
   const fulloldref = `refs/heads/${oldref}`;
@@ -13914,7 +16002,7 @@ async function _renameBranch({
 async function renameBranch({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   oldref,
   checkout: checkout2 = false
@@ -13924,9 +16012,11 @@ async function renameBranch({
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
     assertParameter("oldref", oldref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _renameBranch({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref,
       oldref,
       checkout: checkout2
@@ -13942,7 +16032,7 @@ async function hashObject$1({ gitdir, type, object }) {
 async function resetIndex({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
   ref,
   cache = {}
@@ -13952,10 +16042,15 @@ async function resetIndex({
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     let oid;
     let workdirOid;
     try {
-      oid = await GitRefManager.resolve({ fs, gitdir, ref: ref || "HEAD" });
+      oid = await GitRefManager.resolve({
+        fs,
+        gitdir: updatedGitdir,
+        ref: ref || "HEAD"
+      });
     } catch (e) {
       if (ref) {
         throw e;
@@ -13966,7 +16061,7 @@ async function resetIndex({
         oid = await resolveFilepath({
           fs,
           cache,
-          gitdir,
+          gitdir: updatedGitdir,
           oid,
           filepath
         });
@@ -13984,23 +16079,26 @@ async function resetIndex({
       gid: 0,
       size: 0
     };
-    const object = dir && await fs.read((0, import_path_browserify.join)(dir, filepath));
+    const object = dir && await fs.read(join(dir, filepath));
     if (object) {
       workdirOid = await hashObject$1({
-        gitdir,
+        gitdir: updatedGitdir,
         type: "blob",
         object
       });
       if (oid === workdirOid) {
-        stats = await fs.lstat((0, import_path_browserify.join)(dir, filepath));
+        stats = await fs.lstat(join(dir, filepath));
       }
     }
-    await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      index2.delete({ filepath });
-      if (oid) {
-        index2.insert({ filepath, stats, oid });
+    await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        index2.delete({ filepath });
+        if (oid) {
+          index2.insert({ filepath, stats, oid });
+        }
       }
-    });
+    );
   } catch (err) {
     err.caller = "git.reset";
     throw err;
@@ -14009,7 +16107,7 @@ async function resetIndex({
 async function resolveRef({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   depth
 }) {
@@ -14017,9 +16115,11 @@ async function resolveRef({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     const oid = await GitRefManager.resolve({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       ref,
       depth
     });
@@ -14032,7 +16132,7 @@ async function resolveRef({
 async function setConfig({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   path,
   value,
   append = false
@@ -14042,13 +16142,14 @@ async function setConfig({
     assertParameter("gitdir", gitdir);
     assertParameter("path", path);
     const fs = new FileSystem(_fs);
-    const config = await GitConfigManager.get({ fs, gitdir });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const config = await GitConfigManager.get({ fs, gitdir: updatedGitdir });
     if (append) {
       await config.append(path, value);
     } else {
       await config.set(path, value);
     }
-    await GitConfigManager.save({ fs, gitdir, config });
+    await GitConfigManager.save({ fs, gitdir: updatedGitdir, config });
   } catch (err) {
     err.caller = "git.setConfig";
     throw err;
@@ -14065,234 +16166,7 @@ async function _writeCommit({ fs, gitdir, commit: commit2 }) {
   });
   return oid;
 }
-async function acquireLock$1(ref, callback) {
-  if (lock$3 === void 0)
-    lock$3 = new import_async_lock.default();
-  return lock$3.acquire(ref, callback);
-}
-async function checkAndWriteBlob(fs, gitdir, dir, filepath, oid = null) {
-  const currentFilepath = (0, import_path_browserify.join)(dir, filepath);
-  const stats = await fs.lstat(currentFilepath);
-  if (!stats)
-    throw new NotFoundError(currentFilepath);
-  if (stats.isDirectory())
-    throw new InternalError(
-      `${currentFilepath}: file expected, but found directory`
-    );
-  const objContent = oid ? await readObjectLoose({ fs, gitdir, oid }) : void 0;
-  let retOid = objContent ? oid : void 0;
-  if (!objContent) {
-    await acquireLock$1({ fs, gitdir, currentFilepath }, async () => {
-      const object = stats.isSymbolicLink() ? await fs.readlink(currentFilepath).then(posixifyPathBuffer) : await fs.read(currentFilepath);
-      if (object === null)
-        throw new NotFoundError(currentFilepath);
-      retOid = await _writeObject({ fs, gitdir, type: "blob", object });
-    });
-  }
-  return retOid;
-}
-async function processTreeEntries({ fs, dir, gitdir, entries }) {
-  async function processTreeEntry(entry) {
-    if (entry.type === "tree") {
-      if (!entry.oid) {
-        const children = await Promise.all(entry.children.map(processTreeEntry));
-        entry.oid = await _writeTree({
-          fs,
-          gitdir,
-          tree: children
-        });
-        entry.mode = 16384;
-      }
-    } else if (entry.type === "blob") {
-      entry.oid = await checkAndWriteBlob(
-        fs,
-        gitdir,
-        dir,
-        entry.path,
-        entry.oid
-      );
-      entry.mode = 33188;
-    }
-    entry.path = entry.path.split("/").pop();
-    return entry;
-  }
-  return Promise.all(entries.map(processTreeEntry));
-}
-async function writeTreeChanges({
-  fs,
-  dir,
-  gitdir,
-  treePair
-  // [TREE({ ref: 'HEAD' }), 'STAGE'] would be the equivalent of `git write-tree`
-}) {
-  const isStage = treePair[1] === "stage";
-  const trees = treePair.map((t) => typeof t === "string" ? _TreeMap[t]() : t);
-  const changedEntries = [];
-  const map = async (filepath, [head, stage]) => {
-    if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
-      return;
-    }
-    if (stage) {
-      if (!head || await head.oid() !== await stage.oid() && await stage.oid() !== void 0) {
-        changedEntries.push([head, stage]);
-      }
-      return {
-        mode: await stage.mode(),
-        path: filepath,
-        oid: await stage.oid(),
-        type: await stage.type()
-      };
-    }
-  };
-  const reduce = async (parent, children) => {
-    children = children.filter(Boolean);
-    if (!parent) {
-      return children.length > 0 ? children : void 0;
-    } else {
-      parent.children = children;
-      return parent;
-    }
-  };
-  const iterate = async (walk2, children) => {
-    const filtered = [];
-    for (const child of children) {
-      const [head, stage] = child;
-      if (isStage) {
-        if (stage) {
-          if (await fs.exists(`${dir}/${stage.toString()}`)) {
-            filtered.push(child);
-          } else {
-            changedEntries.push([null, stage]);
-          }
-        }
-      } else if (head) {
-        if (!stage) {
-          changedEntries.push([head, null]);
-        } else {
-          filtered.push(child);
-        }
-      }
-    }
-    return filtered.length ? Promise.all(filtered.map(walk2)) : [];
-  };
-  const entries = await _walk({
-    fs,
-    cache: {},
-    dir,
-    gitdir,
-    trees,
-    map,
-    reduce,
-    iterate
-  });
-  if (changedEntries.length === 0 || entries.length === 0) {
-    return null;
-  }
-  const processedEntries = await processTreeEntries({
-    fs,
-    dir,
-    gitdir,
-    entries
-  });
-  const treeEntries = processedEntries.filter(Boolean).map((entry) => ({
-    mode: entry.mode,
-    path: entry.path,
-    oid: entry.oid,
-    type: entry.type
-  }));
-  return _writeTree({ fs, gitdir, tree: treeEntries });
-}
-async function applyTreeChanges({
-  fs,
-  dir,
-  gitdir,
-  stashCommit,
-  parentCommit,
-  wasStaged
-}) {
-  const dirRemoved = [];
-  const stageUpdated = [];
-  const ops = await _walk({
-    fs,
-    cache: {},
-    dir,
-    gitdir,
-    trees: [TREE({ ref: parentCommit }), TREE({ ref: stashCommit })],
-    map: async (filepath, [parent, stash2]) => {
-      if (filepath === "." || await GitIgnoreManager.isIgnored({ fs, dir, gitdir, filepath })) {
-        return;
-      }
-      const type = stash2 ? await stash2.type() : await parent.type();
-      if (type !== "tree" && type !== "blob") {
-        return;
-      }
-      if (!stash2 && parent) {
-        const method = type === "tree" ? "rmdir" : "rm";
-        if (type === "tree")
-          dirRemoved.push(filepath);
-        if (type === "blob" && wasStaged)
-          stageUpdated.push({ filepath, oid: await parent.oid() });
-        return { method, filepath };
-      }
-      const oid = await stash2.oid();
-      if (!parent || await parent.oid() !== oid) {
-        if (type === "tree") {
-          return { method: "mkdir", filepath };
-        } else {
-          if (wasStaged)
-            stageUpdated.push({
-              filepath,
-              oid,
-              stats: await fs.lstat((0, import_path_browserify.join)(dir, filepath))
-            });
-          return {
-            method: "write",
-            filepath,
-            oid
-          };
-        }
-      }
-    }
-  });
-  await acquireLock$1({ fs, gitdir, dirRemoved, ops }, async () => {
-    for (const op of ops) {
-      const currentFilepath = (0, import_path_browserify.join)(dir, op.filepath);
-      switch (op.method) {
-        case "rmdir":
-          await fs.rmdir(currentFilepath);
-          break;
-        case "mkdir":
-          await fs.mkdir(currentFilepath);
-          break;
-        case "rm":
-          await fs.rm(currentFilepath);
-          break;
-        case "write":
-          if (!dirRemoved.some(
-            (removedDir) => currentFilepath.startsWith(removedDir)
-          )) {
-            const { object } = await _readObject({
-              fs,
-              cache: {},
-              gitdir,
-              oid: op.oid
-            });
-            if (await fs.exists(currentFilepath)) {
-              await fs.rm(currentFilepath);
-            }
-            await fs.write(currentFilepath, object);
-          }
-          break;
-      }
-    }
-  });
-  await GitIndexManager.acquire({ fs, gitdir, cache: {} }, async (index2) => {
-    stageUpdated.forEach(({ filepath, stats, oid }) => {
-      index2.insert({ filepath, stats, oid });
-    });
-  });
-}
-async function _stashPush({ fs, dir, gitdir, message = "" }) {
+async function _createStashCommit({ fs, dir, gitdir, message = "" }) {
   const stashMgr = new GitStashManager({ fs, dir, gitdir });
   await stashMgr.getAuthor();
   const branch2 = await _currentBranch({
@@ -14320,7 +16194,6 @@ async function _stashPush({ fs, dir, gitdir, message = "" }) {
     const stashCommitOne = await stashMgr.writeStashCommit({
       message: `stash-Index: WIP on ${branch2} - ${(/* @__PURE__ */ new Date()).toISOString()}`,
       tree: indexTree,
-      // stashCommitTree
       parent: stashCommitParents
     });
     stashCommitParents.push(stashCommitOne);
@@ -14351,6 +16224,15 @@ async function _stashPush({ fs, dir, gitdir, message = "" }) {
     tree: stashCommitTree,
     parent: stashCommitParents
   });
+  return { stashCommit, stashMsg, branch: branch2, stashMgr };
+}
+async function _stashPush({ fs, dir, gitdir, message = "" }) {
+  const { stashCommit, stashMsg, branch: branch2, stashMgr } = await _createStashCommit({
+    fs,
+    dir,
+    gitdir,
+    message
+  });
   await stashMgr.writeStashRef(stashCommit);
   await stashMgr.writeStashReflogEntry({
     stashCommit,
@@ -14364,6 +16246,15 @@ async function _stashPush({ fs, dir, gitdir, message = "" }) {
     track: false,
     force: true
     // force checkout to discard changes
+  });
+  return stashCommit;
+}
+async function _stashCreate({ fs, dir, gitdir, message = "" }) {
+  const { stashCommit } = await _createStashCommit({
+    fs,
+    dir,
+    gitdir,
+    message
   });
   return stashCommit;
 }
@@ -14399,7 +16290,7 @@ async function _stashDrop({ fs, dir, gitdir, refIdx = 0 }) {
     return;
   }
   const stashRefPath = stashMgr.refStashPath;
-  await acquireLock$1(stashRefPath, async () => {
+  await acquireLock(stashRefPath, async () => {
     if (await fs.exists(stashRefPath)) {
       await fs.rm(stashRefPath);
     }
@@ -14410,12 +16301,14 @@ async function _stashDrop({ fs, dir, gitdir, refIdx = 0 }) {
   }
   reflogEntries.splice(refIdx, 1);
   const stashReflogPath = stashMgr.refLogsStashPath;
-  await acquireLock$1({ reflogEntries, stashReflogPath, stashMgr }, async () => {
+  await acquireLock(stashReflogPath, async () => {
     if (reflogEntries.length) {
-      await fs.write(stashReflogPath, reflogEntries.join("\n"), "utf8");
-      const lastStashCommit = reflogEntries[reflogEntries.length - 1].split(
-        " "
-      )[1];
+      await fs.write(
+        stashReflogPath,
+        reflogEntries.reverse().join("\n") + "\n",
+        "utf8"
+      );
+      const lastStashCommit = reflogEntries[reflogEntries.length - 1].split(" ")[1];
       await stashMgr.writeStashRef(lastStashCommit);
     } else {
       await fs.rm(stashReflogPath);
@@ -14429,7 +16322,7 @@ async function _stashList({ fs, dir, gitdir }) {
 async function _stashClear({ fs, dir, gitdir }) {
   const stashMgr = new GitStashManager({ fs, dir, gitdir });
   const stashRefPath = [stashMgr.refStashPath, stashMgr.refLogsStashPath];
-  await acquireLock$1(stashRefPath, async () => {
+  await acquireLock(stashRefPath, async () => {
     await Promise.all(
       stashRefPath.map(async (path) => {
         if (await fs.exists(path)) {
@@ -14446,7 +16339,7 @@ async function _stashPop({ fs, dir, gitdir, refIdx = 0 }) {
 async function stash({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   op = "push",
   message = "",
   refIdx = 0
@@ -14461,13 +16354,15 @@ async function stash({
     drop: _stashDrop,
     list: _stashList,
     clear: _stashClear,
-    pop: _stashPop
+    pop: _stashPop,
+    create: _stashCreate
   };
   const opsNeedRefIdx = ["apply", "drop", "pop"];
   try {
     const _fs = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp: _fs, dotgit: gitdir });
     const folders = ["refs", "logs", "logs/refs"];
-    folders.map((f) => (0, import_path_browserify.join)(gitdir, f)).forEach(async (folder) => {
+    folders.map((f) => join(updatedGitdir, f)).forEach(async (folder) => {
       if (!await _fs.exists(folder)) {
         await _fs.mkdir(folder);
       }
@@ -14480,7 +16375,13 @@ async function stash({
           "number that is in range of [0, num of stash pushed]"
         );
       }
-      return await opFunc({ fs: _fs, dir, gitdir, message, refIdx });
+      return await opFunc({
+        fs: _fs,
+        dir,
+        gitdir: updatedGitdir,
+        message,
+        refIdx
+      });
     }
     throw new Error(`To be implemented: ${op}`);
   } catch (err) {
@@ -14491,34 +16392,27 @@ async function stash({
 async function status({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   filepath,
-  cache = {}
+  cache = {},
+  refresh = true
 }) {
   try {
     assertParameter("fs", _fs);
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
     const fs = new FileSystem(_fs);
-    const ignored = await GitIgnoreManager.isIgnored({
-      fs,
-      gitdir,
-      dir,
-      filepath
-    });
-    if (ignored) {
-      return "ignored";
-    }
-    const headTree = await getHeadTree({ fs, cache, gitdir });
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    const headTree = await getHeadTree({ fs, cache, gitdir: updatedGitdir });
     const treeOid = await getOidAtPath({
       fs,
       cache,
-      gitdir,
+      gitdir: updatedGitdir,
       tree: headTree,
       path: filepath
     });
     const indexEntry = await GitIndexManager.acquire(
-      { fs, gitdir, cache },
+      { fs, gitdir: updatedGitdir, cache },
       async function(index2) {
         for (const entry of index2) {
           if (entry.path === filepath)
@@ -14527,7 +16421,18 @@ async function status({
         return null;
       }
     );
-    const stats = await fs.lstat((0, import_path_browserify.join)(dir, filepath));
+    if (treeOid === null && indexEntry === null) {
+      const ignored = await GitIgnoreManager.isIgnored({
+        fs,
+        gitdir: updatedGitdir,
+        dir,
+        filepath
+      });
+      if (ignored) {
+        return "ignored";
+      }
+    }
+    const stats = await fs.lstat(join(dir, filepath));
     const H = treeOid !== null;
     const I = indexEntry !== null;
     const W = stats !== null;
@@ -14535,17 +16440,22 @@ async function status({
       if (I && !compareStats(indexEntry, stats)) {
         return indexEntry.oid;
       } else {
-        const object = await fs.read((0, import_path_browserify.join)(dir, filepath));
+        const config = await GitConfigManager.get({ fs, gitdir: updatedGitdir });
+        const autocrlf = await config.get("core.autocrlf");
+        const object = await fs.read(join(dir, filepath), { autocrlf });
         const workdirOid = await hashObject$1({
-          gitdir,
+          gitdir: updatedGitdir,
           type: "blob",
           object
         });
-        if (I && indexEntry.oid === workdirOid) {
+        if (refresh && I && indexEntry.oid === workdirOid) {
           if (stats.size !== -1) {
-            GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-              index2.insert({ filepath, stats, oid: workdirOid });
-            });
+            GitIndexManager.acquire(
+              { fs, gitdir: updatedGitdir, cache },
+              async function(index2) {
+                index2.insert({ filepath, stats, oid: workdirOid });
+              }
+            );
           }
         }
         return workdirOid;
@@ -14583,7 +16493,7 @@ async function status({
     throw err;
   }
 }
-async function getOidAtPath({ fs, cache, gitdir, tree, path }) {
+async function getOidAtPath({ fs, cache, gitdir: updatedGitdir, tree, path }) {
   if (typeof path === "string")
     path = path.split("/");
   const dirname2 = path.shift();
@@ -14595,12 +16505,12 @@ async function getOidAtPath({ fs, cache, gitdir, tree, path }) {
       const { type, object } = await _readObject({
         fs,
         cache,
-        gitdir,
+        gitdir: updatedGitdir,
         oid: entry.oid
       });
       if (type === "tree") {
         const tree2 = GitTree.from(object);
-        return getOidAtPath({ fs, cache, gitdir, tree: tree2, path });
+        return getOidAtPath({ fs, cache, gitdir: updatedGitdir, tree: tree2, path });
       }
       if (type === "blob") {
         throw new ObjectTypeError(entry.oid, type, "blob", path.join("/"));
@@ -14609,39 +16519,45 @@ async function getOidAtPath({ fs, cache, gitdir, tree, path }) {
   }
   return null;
 }
-async function getHeadTree({ fs, cache, gitdir }) {
+async function getHeadTree({ fs, cache, gitdir: updatedGitdir }) {
   let oid;
   try {
-    oid = await GitRefManager.resolve({ fs, gitdir, ref: "HEAD" });
+    oid = await GitRefManager.resolve({
+      fs,
+      gitdir: updatedGitdir,
+      ref: "HEAD"
+    });
   } catch (e) {
     if (e instanceof NotFoundError) {
       return [];
     }
   }
-  const { tree } = await _readTree({ fs, cache, gitdir, oid });
+  const { tree } = await _readTree({ fs, cache, gitdir: updatedGitdir, oid });
   return tree;
 }
 async function statusMatrix({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref = "HEAD",
   filepaths = ["."],
   filter,
   cache = {},
-  ignored: shouldIgnore = false
+  ignored: shouldIgnore = false,
+  refresh = true
 }) {
   try {
     assertParameter("fs", _fs);
     assertParameter("gitdir", gitdir);
     assertParameter("ref", ref);
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     return await _walk({
       fs,
       cache,
       dir,
-      gitdir,
-      trees: [TREE({ ref }), WORKDIR(), STAGE()],
+      gitdir: updatedGitdir,
+      trees: [TREE({ ref }), WORKDIR({ refresh }), STAGE()],
       map: async function(filepath, [head, workdir, stage]) {
         if (!head && !stage && workdir) {
           if (!shouldIgnore) {
@@ -14700,7 +16616,7 @@ async function statusMatrix({
 async function tag({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   object,
   force = false
@@ -14714,24 +16630,25 @@ async function tag({
       throw new MissingParameterError("ref");
     }
     ref = ref.startsWith("refs/tags/") ? ref : `refs/tags/${ref}`;
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     const value = await GitRefManager.resolve({
       fs,
-      gitdir,
+      gitdir: updatedGitdir,
       ref: object || "HEAD"
     });
-    if (!force && await GitRefManager.exists({ fs, gitdir, ref })) {
+    if (!force && await GitRefManager.exists({ fs, gitdir: updatedGitdir, ref })) {
       throw new AlreadyExistsError("tag", ref);
     }
-    await GitRefManager.writeRef({ fs, gitdir, ref, value });
+    await GitRefManager.writeRef({ fs, gitdir: updatedGitdir, ref, value });
   } catch (err) {
     err.caller = "git.tag";
     throw err;
   }
 }
-async function updateIndex({
+async function updateIndex$1({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   cache = {},
   filepath,
   oid,
@@ -14745,13 +16662,13 @@ async function updateIndex({
     assertParameter("gitdir", gitdir);
     assertParameter("filepath", filepath);
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     if (remove2) {
       return await GitIndexManager.acquire(
-        { fs, gitdir, cache },
+        { fs, gitdir: updatedGitdir, cache },
         async function(index2) {
-          let fileStats2;
           if (!force) {
-            fileStats2 = await fs.lstat((0, import_path_browserify.join)(dir, filepath));
+            const fileStats2 = await fs.lstat(join(dir, filepath));
             if (fileStats2) {
               if (fileStats2.isDirectory()) {
                 throw new InvalidFilepathError("directory");
@@ -14769,7 +16686,7 @@ async function updateIndex({
     }
     let fileStats;
     if (!oid) {
-      fileStats = await fs.lstat((0, import_path_browserify.join)(dir, filepath));
+      fileStats = await fs.lstat(join(dir, filepath));
       if (!fileStats) {
         throw new NotFoundError(
           `file at "${filepath}" on disk and "remove" not set`
@@ -14779,40 +16696,45 @@ async function updateIndex({
         throw new InvalidFilepathError("directory");
       }
     }
-    return await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-      if (!add2 && !index2.has({ filepath })) {
-        throw new NotFoundError(
-          `file at "${filepath}" in index and "add" not set`
-        );
-      }
-      let stats = {
-        ctime: /* @__PURE__ */ new Date(0),
-        mtime: /* @__PURE__ */ new Date(0),
-        dev: 0,
-        ino: 0,
-        mode,
-        uid: 0,
-        gid: 0,
-        size: 0
-      };
-      if (!oid) {
-        stats = fileStats;
-        const object = stats.isSymbolicLink() ? await fs.readlink((0, import_path_browserify.join)(dir, filepath)) : await fs.read((0, import_path_browserify.join)(dir, filepath));
-        oid = await _writeObject({
-          fs,
-          gitdir,
-          type: "blob",
-          format: "content",
-          object
+    return await GitIndexManager.acquire(
+      { fs, gitdir: updatedGitdir, cache },
+      async function(index2) {
+        if (!add2 && !index2.has({ filepath })) {
+          throw new NotFoundError(
+            `file at "${filepath}" in index and "add" not set`
+          );
+        }
+        let stats;
+        if (!oid) {
+          stats = fileStats;
+          const object = stats.isSymbolicLink() ? await fs.readlink(join(dir, filepath)) : await fs.read(join(dir, filepath));
+          oid = await _writeObject({
+            fs,
+            gitdir: updatedGitdir,
+            type: "blob",
+            format: "content",
+            object
+          });
+        } else {
+          stats = {
+            ctime: /* @__PURE__ */ new Date(0),
+            mtime: /* @__PURE__ */ new Date(0),
+            dev: 0,
+            ino: 0,
+            mode,
+            uid: 0,
+            gid: 0,
+            size: 0
+          };
+        }
+        index2.insert({
+          filepath,
+          oid,
+          stats
         });
+        return oid;
       }
-      index2.insert({
-        filepath,
-        oid,
-        stats
-      });
-      return oid;
-    });
+    );
   } catch (err) {
     err.caller = "git.updateIndex";
     throw err;
@@ -14829,7 +16751,7 @@ function version() {
 async function walk({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   trees,
   map,
   reduce,
@@ -14840,11 +16762,13 @@ async function walk({
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("trees", trees);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _walk({
-      fs: new FileSystem(fs),
+      fs: fsp,
       cache,
       dir,
-      gitdir,
+      gitdir: updatedGitdir,
       trees,
       map,
       reduce,
@@ -14855,14 +16779,16 @@ async function walk({
     throw err;
   }
 }
-async function writeBlob({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), blob }) {
+async function writeBlob({ fs, dir, gitdir = join(dir, ".git"), blob }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("blob", blob);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _writeObject({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       type: "blob",
       object: blob,
       format: "content"
@@ -14875,16 +16801,18 @@ async function writeBlob({ fs, dir, gitdir = (0, import_path_browserify.join)(di
 async function writeCommit({
   fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   commit: commit2
 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("commit", commit2);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _writeCommit({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       commit: commit2
     });
   } catch (err) {
@@ -14895,7 +16823,7 @@ async function writeCommit({
 async function writeObject({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   type,
   object,
   format = "parsed",
@@ -14904,6 +16832,7 @@ async function writeObject({
 }) {
   try {
     const fs = new FileSystem(_fs);
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
     if (format === "parsed") {
       switch (type) {
         case "commit":
@@ -14925,7 +16854,7 @@ async function writeObject({
     }
     oid = await _writeObject({
       fs,
-      gitdir,
+      gitdir: updatedGitdir,
       type,
       object,
       oid,
@@ -14940,7 +16869,7 @@ async function writeObject({
 async function writeRef({
   fs: _fs,
   dir,
-  gitdir = (0, import_path_browserify.join)(dir, ".git"),
+  gitdir = join(dir, ".git"),
   ref,
   value,
   force = false,
@@ -14952,28 +16881,29 @@ async function writeRef({
     assertParameter("ref", ref);
     assertParameter("value", value);
     const fs = new FileSystem(_fs);
-    if (ref !== import_clean_git_ref.default.clean(ref)) {
+    if (!isValidRef(ref, true)) {
       throw new InvalidRefNameError(ref, import_clean_git_ref.default.clean(ref));
     }
-    if (!force && await GitRefManager.exists({ fs, gitdir, ref })) {
+    const updatedGitdir = await discoverGitdir({ fsp: fs, dotgit: gitdir });
+    if (!force && await GitRefManager.exists({ fs, gitdir: updatedGitdir, ref })) {
       throw new AlreadyExistsError("ref", ref);
     }
     if (symbolic) {
       await GitRefManager.writeSymbolicRef({
         fs,
-        gitdir,
+        gitdir: updatedGitdir,
         ref,
         value
       });
     } else {
       value = await GitRefManager.resolve({
         fs,
-        gitdir,
+        gitdir: updatedGitdir,
         ref: value
       });
       await GitRefManager.writeRef({
         fs,
-        gitdir,
+        gitdir: updatedGitdir,
         ref,
         value
       });
@@ -14994,14 +16924,16 @@ async function _writeTag({ fs, gitdir, tag: tag2 }) {
   });
   return oid;
 }
-async function writeTag({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), tag: tag2 }) {
+async function writeTag({ fs, dir, gitdir = join(dir, ".git"), tag: tag2 }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("tag", tag2);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _writeTag({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       tag: tag2
     });
   } catch (err) {
@@ -15009,14 +16941,16 @@ async function writeTag({ fs, dir, gitdir = (0, import_path_browserify.join)(dir
     throw err;
   }
 }
-async function writeTree({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), tree }) {
+async function writeTree({ fs, dir, gitdir = join(dir, ".git"), tree }) {
   try {
     assertParameter("fs", fs);
     assertParameter("gitdir", gitdir);
     assertParameter("tree", tree);
+    const fsp = new FileSystem(fs);
+    const updatedGitdir = await discoverGitdir({ fsp, dotgit: gitdir });
     return await _writeTree({
-      fs: new FileSystem(fs),
-      gitdir,
+      fs: fsp,
+      gitdir: updatedGitdir,
       tree
     });
   } catch (err) {
@@ -15024,12 +16958,11 @@ async function writeTree({ fs, dir, gitdir = (0, import_path_browserify.join)(di
     throw err;
   }
 }
-var import_async_lock, import_sha1, import_path_browserify, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, lock$1, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CommitNotFetchedError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, InvalidRefNameError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, worthWalking, abbreviateRx, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, lock$2, GitShallowManager, pkg, FIFO, GitSideBand, LINEBREAKS, EMPTY_OID, types, GitRefStash, _TreeMap, lock$3, GitStashManager, index, isomorphic_git_default;
+var import_sha1, import_async_lock, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, InvalidRefNameError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyCommitError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, EMPTY_TREE_OID, bad, worthWalking, LINEBREAKS, _TreeMap, abbreviateRx, CREDENTIALS, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, scpLike, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
 var init_isomorphic_git = __esm({
-  "node_modules/.pnpm/isomorphic-git@1.29.0/node_modules/isomorphic-git/index.js"() {
-    import_async_lock = __toESM(require_async_lock(), 1);
+  "node_modules/.pnpm/isomorphic-git@1.41.9/node_modules/isomorphic-git/index.js"() {
     import_sha1 = __toESM(require_sha1(), 1);
-    import_path_browserify = __toESM(require_path_browserify(), 1);
+    import_async_lock = __toESM(require_async_lock(), 1);
     import_crc_32 = __toESM(require_crc32(), 1);
     import_pako = __toESM(require_pako(), 1);
     import_pify = __toESM(require_pify(), 1);
@@ -15081,7 +17014,11 @@ var init_isomorphic_git = __esm({
        */
       constructor(message) {
         super(
-          `An internal error caused this command to fail. Please file a bug report at https://github.com/isomorphic-git/isomorphic-git/issues with this error message: ${message}`
+          `An internal error caused this command to fail.
+
+If you're using an application that depends on isomorphic-git, please report this error to that application's developers.
+
+If you're a developer and you believe this is a bug in isomorphic-git, please file an issue at https://github.com/isomorphic-git/isomorphic-git/issues with a minimal reproduction, version and environment details, and this error message: ${message}`
         );
         this.code = this.name = _InternalError.code;
         this.data = { message };
@@ -15398,31 +17335,33 @@ var init_isomorphic_git = __esm({
         return Buffer.concat([main, Buffer.from(sum, "hex")]);
       }
     };
-    lock = null;
     IndexCache = Symbol("IndexCache");
     GitIndexManager = class {
       /**
+       * Manages access to the Git index file, ensuring thread-safe operations and caching.
        *
-       * @param {object} opts
-       * @param {import('../models/FileSystem.js').FileSystem} opts.fs
-       * @param {string} opts.gitdir
-       * @param {object} opts.cache
-       * @param {bool} opts.allowUnmerged
-       * @param {function(GitIndex): any} closure
+       * @param {object} opts - Options for acquiring the Git index.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @param {object} opts.cache - A shared cache object for storing index data.
+       * @param {boolean} [opts.allowUnmerged=true] - Whether to allow unmerged paths in the index.
+       * @param {function(GitIndex): any} closure - A function to execute with the Git index.
+       * @returns {Promise<any>} The result of the closure function.
+       * @throws {UnmergedPathsError} If unmerged paths exist and `allowUnmerged` is `false`.
        */
       static async acquire({ fs, gitdir, cache, allowUnmerged = true }, closure) {
-        if (!cache[IndexCache])
+        if (!cache[IndexCache]) {
           cache[IndexCache] = createCache();
+        }
         const filepath = `${gitdir}/index`;
-        if (lock === null)
-          lock = new import_async_lock.default({ maxPending: Infinity });
         let result;
         let unmergedPaths = [];
-        await lock.acquire(filepath, async () => {
-          if (await isIndexStale(fs, filepath, cache[IndexCache])) {
-            await updateCachedIndexFile(fs, filepath, cache[IndexCache]);
+        await acquireLock(filepath, async () => {
+          const theIndexCache = cache[IndexCache];
+          if (await isIndexStale(fs, filepath, theIndexCache)) {
+            await updateCachedIndexFile(fs, filepath, theIndexCache);
           }
-          const index2 = cache[IndexCache].map.get(filepath);
+          const index2 = theIndexCache.map.get(filepath);
           unmergedPaths = index2.unmergedPaths;
           if (unmergedPaths.length && !allowUnmerged)
             throw new UnmergedPathsError(unmergedPaths);
@@ -15430,7 +17369,7 @@ var init_isomorphic_git = __esm({
           if (index2._dirty) {
             const buffer = await index2.toObject();
             await fs.write(filepath, buffer);
-            cache[IndexCache].stats.set(filepath, await fs.lstat(filepath));
+            theIndexCache.stats.set(filepath, await fs.lstat(filepath));
             index2._dirty = false;
           }
         });
@@ -15568,6 +17507,21 @@ var init_isomorphic_git = __esm({
       }
     };
     InvalidOidError.code = "InvalidOidError";
+    InvalidRefNameError = class _InvalidRefNameError extends BaseError {
+      /**
+       * @param {string} ref
+       * @param {string} suggestion
+       * @param {boolean} canForce
+       */
+      constructor(ref, suggestion) {
+        super(
+          `"${ref}" would be an invalid git reference. (Hint: a valid alternative would be "${suggestion}".)`
+        );
+        this.code = this.name = _InvalidRefNameError.code;
+        this.data = { ref, suggestion };
+      }
+    };
+    InvalidRefNameError.code = "InvalidRefNameError";
     NoRefspecError = class _NoRefspecError extends BaseError {
       /**
        * @param {string} remote
@@ -15628,13 +17582,7 @@ var init_isomorphic_git = __esm({
         });
       }
       static from(refspec) {
-        const [
-          forceMatch,
-          remotePath,
-          remoteGlobMatch,
-          localPath,
-          localGlobMatch
-        ] = refspec.match(/^(\+?)(.*?)(\*?):(.*?)(\*?)$/).slice(1);
+        const [forceMatch, remotePath, remoteGlobMatch, localPath, localGlobMatch] = refspec.match(/^(\+?)(.*?)(\*?):(.*?)(\*?)$/).slice(1);
         const force = forceMatch === "+";
         const remoteIsGlob = remoteGlobMatch === "*";
         const localIsGlob = localGlobMatch === "*";
@@ -15713,6 +17661,9 @@ var init_isomorphic_git = __esm({
       }
     };
     num = (val) => {
+      if (typeof val === "number") {
+        return val;
+      }
       val = val.toLowerCase();
       let n = parseInt(val);
       if (val.endsWith("k"))
@@ -15724,6 +17675,9 @@ var init_isomorphic_git = __esm({
       return n;
     };
     bool = (val) => {
+      if (typeof val === "boolean") {
+        return val;
+      }
       val = val.trim().toLowerCase();
       if (val === "true" || val === "yes" || val === "on")
         return true;
@@ -15807,7 +17761,8 @@ var init_isomorphic_git = __esm({
         subsection,
         name,
         path: getPath(section, subsection, name),
-        sectionPath: getPath(section, subsection, null)
+        sectionPath: getPath(section, subsection, null),
+        isSection: !!section
       };
     };
     findLastIndex = (array, callback) => {
@@ -15855,7 +17810,7 @@ var init_isomorphic_git = __esm({
         return this.get(path, true);
       }
       async getSubsections(section) {
-        return this.parsedConfig.filter((config) => config.section === section && config.isSection).map((config) => config.subsection);
+        return this.parsedConfig.filter((config) => config.isSection && config.section === section).map((config) => config.subsection);
       }
       async deleteSection(section, subsection) {
         this.parsedConfig = this.parsedConfig.filter(
@@ -15871,7 +17826,8 @@ var init_isomorphic_git = __esm({
           subsection,
           name,
           path: normalizedPath,
-          sectionPath
+          sectionPath,
+          isSection
         } = normalizePath(path);
         const configIndex = findLastIndex(
           this.parsedConfig,
@@ -15911,6 +17867,7 @@ var init_isomorphic_git = __esm({
                 this.parsedConfig.splice(sectionIndex + 1, 0, newConfig);
               } else {
                 const newSection = {
+                  isSection,
                   section,
                   subsection,
                   modified: true,
@@ -15941,10 +17898,27 @@ var init_isomorphic_git = __esm({
       }
     };
     GitConfigManager = class {
+      /**
+       * Reads the Git configuration file from the specified `.git` directory.
+       *
+       * @param {object} opts - Options for reading the Git configuration.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @returns {Promise<GitConfig>} A `GitConfig` object representing the parsed configuration.
+       */
       static async get({ fs, gitdir }) {
         const text = await fs.read(`${gitdir}/config`, { encoding: "utf8" });
         return GitConfig.from(text);
       }
+      /**
+       * Saves the provided Git configuration to the specified `.git` directory.
+       *
+       * @param {object} opts - Options for saving the Git configuration.
+       * @param {FSClient} opts.fs - A file system implementation.
+       * @param {string} opts.gitdir - The path to the `.git` directory.
+       * @param {GitConfig} opts.config - The `GitConfig` object to save.
+       * @returns {Promise<void>} Resolves when the configuration has been successfully saved.
+       */
       static async save({ fs, gitdir, config }) {
         await fs.write(`${gitdir}/config`, config.toString(), {
           encoding: "utf8"
@@ -15961,6 +17935,21 @@ var init_isomorphic_git = __esm({
     ];
     GIT_FILES = ["config", "description", "index", "shallow", "commondir"];
     GitRefManager = class _GitRefManager {
+      /**
+       * Updates remote refs based on the provided refspecs and options.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.remote - The name of the remote.
+       * @param {Map<string, string>} args.refs - A map of refs to their object IDs.
+       * @param {Map<string, string>} args.symrefs - A map of symbolic refs.
+       * @param {boolean} args.tags - Whether to fetch tags.
+       * @param {string[]} [args.refspecs = undefined] - The refspecs to use.
+       * @param {boolean} [args.prune = false] - Whether to prune stale refs.
+       * @param {boolean} [args.pruneTags = false] - Whether to prune tags.
+       * @returns {Promise<Object>} - An object containing pruned refs.
+       */
       static async updateRemoteRefs({
         fs,
         gitdir,
@@ -15987,6 +17976,22 @@ var init_isomorphic_git = __esm({
         }
         const refspec = GitRefSpecSet.from(refspecs);
         const actualRefsToWrite = /* @__PURE__ */ new Map();
+        const refTranslations = refspec.translate([...refs.keys()]);
+        const symrefTranslations = [];
+        for (const [serverRef, translatedRef] of refspec.translate([
+          ...symrefs.keys()
+        ])) {
+          const symtarget = refspec.translateOne(symrefs.get(serverRef));
+          if (symtarget) {
+            symrefTranslations.push([translatedRef, `ref: ${symtarget}`]);
+          }
+        }
+        for (const [, translatedRef] of refTranslations) {
+          assertWritableRef(translatedRef);
+        }
+        for (const [translatedRef] of symrefTranslations) {
+          assertWritableRef(translatedRef);
+        }
         if (pruneTags) {
           const tags2 = await _GitRefManager.listRefs({
             fs,
@@ -16009,18 +18014,12 @@ var init_isomorphic_git = __esm({
             }
           }
         }
-        const refTranslations = refspec.translate([...refs.keys()]);
         for (const [serverRef, translatedRef] of refTranslations) {
           const value = refs.get(serverRef);
           actualRefsToWrite.set(translatedRef, value);
         }
-        const symrefTranslations = refspec.translate([...symrefs.keys()]);
-        for (const [serverRef, translatedRef] of symrefTranslations) {
-          const value = symrefs.get(serverRef);
-          const symtarget = refspec.translateOne(value);
-          if (symtarget) {
-            actualRefsToWrite.set(translatedRef, `ref: ${symtarget}`);
-          }
+        for (const [translatedRef, value] of symrefTranslations) {
+          actualRefsToWrite.set(translatedRef, value);
         }
         const pruned = [];
         if (prune) {
@@ -16043,35 +18042,76 @@ var init_isomorphic_git = __esm({
         for (const [key, value] of actualRefsToWrite) {
           await acquireLock(
             key,
-            async () => fs.write((0, import_path_browserify.join)(gitdir, key), `${value.trim()}
+            async () => fs.write(join(gitdir, key), `${value.trim()}
 `, "utf8")
           );
         }
         return { pruned };
       }
+      /**
+       * Writes a ref to the file system.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to write.
+       * @param {string} args.value - The object ID to write.
+       * @returns {Promise<void>}
+       */
       // TODO: make this less crude?
       static async writeRef({ fs, gitdir, ref, value }) {
+        assertWritableRef(ref);
         if (!value.match(/[0-9a-f]{40}/)) {
           throw new InvalidOidError(value);
         }
         await acquireLock(
           ref,
-          async () => fs.write((0, import_path_browserify.join)(gitdir, ref), `${value.trim()}
+          async () => fs.write(join(gitdir, ref), `${value.trim()}
 `, "utf8")
         );
       }
+      /**
+       * Writes a symbolic ref to the file system.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to write.
+       * @param {string} args.value - The target ref.
+       * @returns {Promise<void>}
+       */
       static async writeSymbolicRef({ fs, gitdir, ref, value }) {
+        assertWritableRef(ref);
         await acquireLock(
           ref,
-          async () => fs.write((0, import_path_browserify.join)(gitdir, ref), `ref: ${value.trim()}
+          async () => fs.write(join(gitdir, ref), `ref: ${value.trim()}
 `, "utf8")
         );
       }
+      /**
+       * Deletes a single ref.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to delete.
+       * @returns {Promise<void>}
+       */
       static async deleteRef({ fs, gitdir, ref }) {
         return _GitRefManager.deleteRefs({ fs, gitdir, refs: [ref] });
       }
+      /**
+       * Deletes multiple refs.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string[]} args.refs - The refs to delete.
+       * @returns {Promise<void>}
+       */
       static async deleteRefs({ fs, gitdir, refs }) {
-        await Promise.all(refs.map((ref) => fs.rm((0, import_path_browserify.join)(gitdir, ref))));
+        refs.forEach(assertWritableRef);
+        await Promise.all(refs.map((ref) => fs.rm(join(gitdir, ref))));
         let text = await acquireLock(
           "packed-refs",
           async () => fs.read(`${gitdir}/packed-refs`, { encoding: "utf8" })
@@ -16092,14 +18132,22 @@ var init_isomorphic_git = __esm({
         }
       }
       /**
-       * @param {object} args
-       * @param {import('../models/FileSystem.js').FileSystem} args.fs
-       * @param {string} args.gitdir
-       * @param {string} args.ref
-       * @param {number} [args.depth]
-       * @returns {Promise<string>}
+       * Resolves a ref to its object ID.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to resolve.
+       * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
+       * @returns {Promise<string>} - The resolved object ID.
        */
-      static async resolve({ fs, gitdir, ref, depth = void 0 }) {
+      static async resolve({
+        fs,
+        gitdir,
+        ref,
+        depth = void 0,
+        visited = /* @__PURE__ */ new Set()
+      }) {
         if (depth !== void 0) {
           depth--;
           if (depth === -1) {
@@ -16108,7 +18156,7 @@ var init_isomorphic_git = __esm({
         }
         if (ref.startsWith("ref: ")) {
           ref = ref.slice("ref: ".length);
-          return _GitRefManager.resolve({ fs, gitdir, ref, depth });
+          return _GitRefManager.resolve({ fs, gitdir, ref, depth, visited });
         }
         if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
           return ref;
@@ -16121,11 +18169,63 @@ var init_isomorphic_git = __esm({
             async () => await fs.read(`${gitdir}/${ref2}`, { encoding: "utf8" }) || packedMap.get(ref2)
           );
           if (sha) {
-            return _GitRefManager.resolve({ fs, gitdir, ref: sha.trim(), depth });
+            if (visited.has(ref2)) {
+              throw new InternalError(
+                `Circular reference detected while resolving ref "${ref2}"`
+              );
+            }
+            visited.add(ref2);
+            return _GitRefManager.resolve({
+              fs,
+              gitdir,
+              ref: sha.trim(),
+              depth,
+              visited
+            });
           }
         }
         throw new NotFoundError(ref);
       }
+      /**
+       * Checks whether a ref names the branch HEAD points at in a repository where
+       * that branch has no commits yet.
+       *
+       * A repository created by `git init` has a HEAD pointing at a branch that
+       * does not exist on disk. Resolving that branch fails the same way resolving
+       * a misspelled ref does, so callers that want to treat the two differently
+       * need this to tell them apart.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to check.
+       * @returns {Promise<boolean>} - True if the ref names an unborn branch.
+       */
+      static async isUnbornBranch({ fs, gitdir, ref }) {
+        let target;
+        try {
+          target = await _GitRefManager.resolve({
+            fs,
+            gitdir,
+            ref: "HEAD",
+            depth: 2
+          });
+        } catch (_) {
+          return false;
+        }
+        if (!target.startsWith("refs/heads/"))
+          return false;
+        return ref === "HEAD" || refpaths(ref).includes(target);
+      }
+      /**
+       * Checks if a ref exists.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to check.
+       * @returns {Promise<boolean>} - True if the ref exists, false otherwise.
+       */
       static async exists({ fs, gitdir, ref }) {
         try {
           await _GitRefManager.expand({ fs, gitdir, ref });
@@ -16134,12 +18234,21 @@ var init_isomorphic_git = __esm({
           return false;
         }
       }
+      /**
+       * Expands a ref to its full name.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.ref - The ref to expand.
+       * @returns {Promise<string>} - The full ref name.
+       */
       static async expand({ fs, gitdir, ref }) {
         if (ref.length === 40 && /[0-9a-f]{40}/.test(ref)) {
           return ref;
         }
         const packedMap = await _GitRefManager.packedRefs({ fs, gitdir });
-        const allpaths = refpaths(ref);
+        const allpaths = refpaths(ref).filter((p) => !GIT_FILES.includes(p));
         for (const ref2 of allpaths) {
           const refExists = await acquireLock(
             ref2,
@@ -16152,6 +18261,14 @@ var init_isomorphic_git = __esm({
         }
         throw new NotFoundError(ref);
       }
+      /**
+       * Expands a ref against a provided map.
+       *
+       * @param {Object} args
+       * @param {string} args.ref - The ref to expand.
+       * @param {Map<string, string>} args.map - The map of refs.
+       * @returns {Promise<string>} - The expanded ref.
+       */
       static async expandAgainstMap({ ref, map }) {
         const allpaths = refpaths(ref);
         for (const ref2 of allpaths) {
@@ -16160,6 +18277,16 @@ var init_isomorphic_git = __esm({
         }
         throw new NotFoundError(ref);
       }
+      /**
+       * Resolves a ref against a provided map.
+       *
+       * @param {Object} args
+       * @param {string} args.ref - The ref to resolve.
+       * @param {string} [args.fullref = args.ref] - The full ref name.
+       * @param {number} [args.depth = undefined] - The maximum depth to resolve symbolic refs.
+       * @param {Map<string, string>} args.map - The map of refs.
+       * @returns {Object} - An object containing the full ref and its object ID.
+       */
       static resolveAgainstMap({ ref, fullref = ref, depth = void 0, map }) {
         if (depth !== void 0) {
           depth--;
@@ -16188,6 +18315,14 @@ var init_isomorphic_git = __esm({
         }
         throw new NotFoundError(ref);
       }
+      /**
+       * Reads the packed refs file and returns a map of refs.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<Map<string, string>>} - A map of packed refs.
+       */
       static async packedRefs({ fs, gitdir }) {
         const text = await acquireLock(
           "packed-refs",
@@ -16196,7 +18331,15 @@ var init_isomorphic_git = __esm({
         const packed = GitPackedRefs.from(text);
         return packed.refs;
       }
-      // List all the refs that match the `filepath` prefix
+      /**
+       * Lists all refs matching a given filepath prefix.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.filepath - The filepath prefix to match.
+       * @returns {Promise<string[]>} - A sorted list of refs.
+       */
       static async listRefs({ fs, gitdir, filepath }) {
         const packedMap = _GitRefManager.packedRefs({ fs, gitdir });
         let files = null;
@@ -16217,6 +18360,15 @@ var init_isomorphic_git = __esm({
         files.sort(compareRefNames);
         return files;
       }
+      /**
+       * Lists all branches, optionally filtered by remote.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} [args.remote] - The remote to filter branches by.
+       * @returns {Promise<string[]>} - A list of branch names.
+       */
       static async listBranches({ fs, gitdir, remote }) {
         if (remote) {
           return _GitRefManager.listRefs({
@@ -16228,6 +18380,14 @@ var init_isomorphic_git = __esm({
           return _GitRefManager.listRefs({ fs, gitdir, filepath: `refs/heads` });
         }
       }
+      /**
+       * Lists all tags.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<string[]>} - A list of tag names.
+       */
       static async listTags({ fs, gitdir }) {
         const tags = await _GitRefManager.listRefs({
           fs,
@@ -16281,12 +18441,32 @@ var init_isomorphic_git = __esm({
       }
     };
     GitObject = class {
+      /**
+       * Wraps a raw object with a Git header.
+       *
+       * @param {Object} params - The parameters for wrapping.
+       * @param {string} params.type - The type of the Git object (e.g., 'blob', 'tree', 'commit').
+       * @param {Uint8Array} params.object - The raw object data to wrap.
+       * @returns {Uint8Array} The wrapped Git object as a single buffer.
+       */
       static wrap({ type, object }) {
-        return Buffer.concat([
-          Buffer.from(`${type} ${object.byteLength.toString()}\0`),
-          Buffer.from(object)
-        ]);
+        const header = `${type} ${object.length}\0`;
+        const headerLen = header.length;
+        const totalLength = headerLen + object.length;
+        const wrappedObject = new Uint8Array(totalLength);
+        for (let i = 0; i < headerLen; i++) {
+          wrappedObject[i] = header.charCodeAt(i);
+        }
+        wrappedObject.set(object, headerLen);
+        return wrappedObject;
       }
+      /**
+       * Unwraps a Git object buffer into its type and raw object data.
+       *
+       * @param {Buffer|Uint8Array} buffer - The buffer containing the wrapped Git object.
+       * @returns {{ type: string, object: Buffer }} An object containing the type and the raw object data.
+       * @throws {InternalError} If the length specified in the header does not match the actual object length.
+       */
       static unwrap(buffer) {
         const s = buffer.indexOf(32);
         const i = buffer.indexOf(0);
@@ -16638,12 +18818,13 @@ var init_isomorphic_git = __esm({
           96: "ofs_delta",
           112: "ref_delta"
         };
-        if (!this.pack) {
+        const pack = await this.pack;
+        if (!pack) {
           throw new InternalError(
-            "Tried to read from a GitPackIndex with no packfile loaded into memory"
+            "Could not read packfile data. The packfile may be missing, corrupted, or too large to read into memory."
           );
         }
-        const raw = (await this.pack).slice(start);
+        const raw = pack.slice(start);
         const reader = new BufferCursor(raw);
         const byte = reader.readUInt8();
         const btype = byte & 112;
@@ -16732,6 +18913,33 @@ var init_isomorphic_git = __esm({
       }
     };
     CheckoutConflictError.code = "CheckoutConflictError";
+    CherryPickMergeCommitError = class _CherryPickMergeCommitError extends BaseError {
+      /**
+       * @param {string} oid
+       * @param {number} parentCount
+       */
+      constructor(oid, parentCount) {
+        super(
+          `Cannot cherry-pick merge commit ${oid}. Merge commits have ${parentCount} parents and require specifying which parent to use as the base.`
+        );
+        this.code = this.name = _CherryPickMergeCommitError.code;
+        this.data = { oid, parentCount };
+      }
+    };
+    CherryPickMergeCommitError.code = "CherryPickMergeCommitError";
+    CherryPickRootCommitError = class _CherryPickRootCommitError extends BaseError {
+      /**
+       * @param {string} oid
+       */
+      constructor(oid) {
+        super(
+          `Cannot cherry-pick root commit ${oid}. Root commits have no parents.`
+        );
+        this.code = this.name = _CherryPickRootCommitError.code;
+        this.data = { oid };
+      }
+    };
+    CherryPickRootCommitError.code = "CherryPickRootCommitError";
     CommitNotFetchedError = class _CommitNotFetchedError extends BaseError {
       /**
        * @param {string} ref
@@ -16746,6 +18954,14 @@ var init_isomorphic_git = __esm({
       }
     };
     CommitNotFetchedError.code = "CommitNotFetchedError";
+    EmptyCommitError = class _EmptyCommitError extends BaseError {
+      constructor() {
+        super("Cannot create an empty commit when disallowEmpty is true.");
+        this.code = this.name = _EmptyCommitError.code;
+        this.data = {};
+      }
+    };
+    EmptyCommitError.code = "EmptyCommitError";
     EmptyServerResponseError = class _EmptyServerResponseError extends BaseError {
       constructor() {
         super(`Empty response from git server.`);
@@ -16804,21 +19020,6 @@ var init_isomorphic_git = __esm({
       }
     };
     InvalidFilepathError.code = "InvalidFilepathError";
-    InvalidRefNameError = class _InvalidRefNameError extends BaseError {
-      /**
-       * @param {string} ref
-       * @param {string} suggestion
-       * @param {boolean} canForce
-       */
-      constructor(ref, suggestion) {
-        super(
-          `"${ref}" would be an invalid git reference. (Hint: a valid alternative would be "${suggestion}".)`
-        );
-        this.code = this.name = _InvalidRefNameError.code;
-        this.data = { ref, suggestion };
-      }
-    };
-    InvalidRefNameError.code = "InvalidRefNameError";
     MaxDepthError = class _MaxDepthError extends BaseError {
       /**
        * @param {number} depth
@@ -17017,7 +19218,10 @@ var init_isomorphic_git = __esm({
       AlreadyExistsError,
       AmbiguousError,
       CheckoutConflictError,
+      CherryPickMergeCommitError,
+      CherryPickRootCommitError,
       CommitNotFetchedError,
+      EmptyCommitError,
       EmptyServerResponseError,
       FastForwardError,
       GitPushError,
@@ -17292,8 +19496,10 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           try {
             oid = await GitRefManager.resolve({ fs, gitdir, ref });
           } catch (e) {
-            if (e instanceof NotFoundError) {
+            if (e instanceof NotFoundError && await GitRefManager.isUnbornBranch({ fs, gitdir, ref })) {
               oid = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+            } else {
+              throw e;
             }
           }
           const tree = await resolveTree({ fs, cache: this.cache, gitdir, oid });
@@ -17348,9 +19554,9 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         }
         const tree = GitTree.from(object);
         for (const entry2 of tree) {
-          map.set((0, import_path_browserify.join)(filepath, entry2.path), entry2);
+          map.set(join(filepath, entry2.path), entry2);
         }
-        return tree.entries().map((entry2) => (0, import_path_browserify.join)(filepath, entry2.path));
+        return tree.entries().map((entry2) => join(filepath, entry2.path));
       }
       async type(entry) {
         if (entry._type === false) {
@@ -17395,11 +19601,13 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
     };
     GitWalkerFs = class {
-      constructor({ fs, dir, gitdir, cache }) {
+      constructor({ fs, dir, gitdir, cache, refresh = true }) {
         this.fs = fs;
         this.cache = cache;
         this.dir = dir;
         this.gitdir = gitdir;
+        this.refresh = refresh;
+        this.config = null;
         const walker = this;
         this.ConstructEntry = class WorkdirEntry {
           constructor(fullpath) {
@@ -17428,12 +19636,14 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         };
       }
       async readdir(entry) {
+        if (await entry.type() !== "tree")
+          return null;
         const filepath = entry._fullpath;
         const { fs, dir } = this;
-        const names = await fs.readdir((0, import_path_browserify.join)(dir, filepath));
+        const names = await fs.readdir(join(dir, filepath));
         if (names === null)
           return null;
-        return names.map((name) => (0, import_path_browserify.join)(filepath, name));
+        return names.map((name) => join(filepath, name));
       }
       async type(entry) {
         if (entry._type === false) {
@@ -17476,9 +19686,14 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           if (await entry.type() === "tree") {
             entry._content = void 0;
           } else {
-            const config = await GitConfigManager.get({ fs, gitdir });
-            const autocrlf = await config.get("core.autocrlf");
-            const content = await fs.read(`${dir}/${entry._fullpath}`, { autocrlf });
+            let content;
+            if (await entry.mode() >> 12 === 10) {
+              content = await fs.readlink(`${dir}/${entry._fullpath}`);
+            } else {
+              const config = await this._getGitConfig(fs, gitdir);
+              const autocrlf = await config.get("core.autocrlf");
+              content = await fs.read(`${dir}/${entry._fullpath}`, { autocrlf });
+            }
             entry._actualSize = content.length;
             if (entry._stat && entry._stat.size === -1) {
               entry._stat.size = entry._actualSize;
@@ -17490,37 +19705,48 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
       async oid(entry) {
         if (entry._oid === false) {
+          const self = this;
           const { fs, gitdir, cache } = this;
           let oid;
-          await GitIndexManager.acquire({ fs, gitdir, cache }, async function(index2) {
-            const stage = index2.entriesMap.get(entry._fullpath);
-            const stats = await entry.stat();
-            const config = await GitConfigManager.get({ fs, gitdir });
-            const filemode = await config.get("core.filemode");
-            const trustino = typeof process !== "undefined" ? !(process.platform === "win32") : true;
-            if (!stage || compareStats(stats, stage, filemode, trustino)) {
-              const content = await entry.content();
-              if (content === void 0) {
-                oid = void 0;
-              } else {
-                oid = await shasum(
-                  GitObject.wrap({ type: "blob", object: await entry.content() })
-                );
-                if (stage && oid === stage.oid && (!filemode || stats.mode === stage.mode) && compareStats(stats, stage, filemode, trustino)) {
-                  index2.insert({
-                    filepath: entry._fullpath,
-                    stats,
-                    oid
-                  });
+          await GitIndexManager.acquire(
+            { fs, gitdir, cache },
+            async function(index2) {
+              const stage = index2.entriesMap.get(entry._fullpath);
+              const stats = await entry.stat();
+              const config = await self._getGitConfig(fs, gitdir);
+              const filemode = await config.get("core.filemode");
+              const trustino = typeof process !== "undefined" ? !(process.platform === "win32") : true;
+              if (!stage || compareStats(stats, stage, filemode, trustino)) {
+                const content = await entry.content();
+                if (content === void 0) {
+                  oid = void 0;
+                } else {
+                  oid = await shasum(
+                    GitObject.wrap({ type: "blob", object: content })
+                  );
+                  if (self.refresh && stage && oid === stage.oid && (!filemode || stats.mode === stage.mode) && compareStats(stats, stage, filemode, trustino)) {
+                    index2.insert({
+                      filepath: entry._fullpath,
+                      stats,
+                      oid
+                    });
+                  }
                 }
+              } else {
+                oid = stage.oid;
               }
-            } else {
-              oid = stage.oid;
             }
-          });
+          );
           entry._oid = oid;
         }
         return entry._oid;
+      }
+      async _getGitConfig(fs, gitdir) {
+        if (this.config) {
+          return this.config;
+        }
+        this.config = await GitConfigManager.get({ fs, gitdir });
+        return this.config;
       }
     };
     flat = typeof Array.prototype.flat === "undefined" ? (entries) => entries.reduce((acc, x) => acc.concat(x), []) : (entries) => entries.flat();
@@ -17554,6 +19780,11 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       "symlink"
     ];
     FileSystem = class {
+      /**
+       * Creates an instance of FileSystem.
+       *
+       * @param {Object} fs - A file system implementation to wrap.
+       */
       constructor(fs) {
         if (typeof fs._original_unwrapped_fs !== "undefined")
           return fs;
@@ -17568,6 +19799,10 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       /**
        * Return true if a file exists, false if it doesn't exist.
        * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filepath - The path to the file.
+       * @param {Object} [options] - Additional options.
+       * @returns {Promise<boolean>} - `true` if the file exists, `false` otherwise.
        */
       async exists(filepath, options = {}) {
         try {
@@ -17585,10 +19820,9 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       /**
        * Return the contents of a file if it exists, otherwise returns null.
        *
-       * @param {string} filepath
-       * @param {object} [options]
-       *
-       * @returns {Promise<Buffer|string|null>}
+       * @param {string} filepath - The path to the file.
+       * @param {Object} [options] - Options for reading the file.
+       * @returns {Promise<Buffer|string|null>} - The file contents, or `null` if the file doesn't exist.
        */
       async read(filepath, options = {}) {
         try {
@@ -17612,14 +19846,14 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       /**
        * Write a file (creating missing directories if need be) without throwing errors.
        *
-       * @param {string} filepath
-       * @param {Buffer|Uint8Array|string} contents
-       * @param {object|string} [options]
+       * @param {string} filepath - The path to the file.
+       * @param {Buffer|Uint8Array|string} contents - The data to write.
+       * @param {Object|string} [options] - Options for writing the file.
+       * @returns {Promise<void>}
        */
       async write(filepath, contents, options = {}) {
         try {
           await this._writeFile(filepath, contents, options);
-          return;
         } catch (err) {
           await this.mkdir(dirname(filepath));
           await this._writeFile(filepath, contents, options);
@@ -17627,29 +19861,18 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
       /**
        * Make a directory (or series of nested directories) without throwing an error if it already exists.
+       *
+       * @param {string} filepath - The path to the directory.
+       * @returns {Promise<void>}
        */
-      async mkdir(filepath, _selfCall = false) {
-        try {
-          await this._mkdir(filepath);
-          return;
-        } catch (err) {
-          if (err === null)
-            return;
-          if (err.code === "EEXIST")
-            return;
-          if (_selfCall)
-            throw err;
-          if (err.code === "ENOENT") {
-            const parent = dirname(filepath);
-            if (parent === "." || parent === "/" || parent === filepath)
-              throw err;
-            await this.mkdir(parent);
-            await this.mkdir(filepath, true);
-          }
-        }
+      async mkdir(filepath) {
+        await mkdirp(this._mkdir, filepath);
       }
       /**
        * Delete a file without throwing an error if it is already deleted.
+       *
+       * @param {string} filepath - The path to the file.
+       * @returns {Promise<void>}
        */
       async rm(filepath) {
         try {
@@ -17661,6 +19884,10 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
       /**
        * Delete a directory without throwing an error if it is already deleted.
+       *
+       * @param {string} filepath - The path to the directory.
+       * @param {Object} [opts] - Options for deleting the directory.
+       * @returns {Promise<void>}
        */
       async rmdir(filepath, opts) {
         try {
@@ -17676,6 +19903,9 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
       /**
        * Read a directory without throwing an error is the directory doesn't exist
+       *
+       * @param {string} filepath - The path to the directory.
+       * @returns {Promise<string[]|null>} - An array of file names, or `null` if the path is not a directory.
        */
       async readdir(filepath) {
         try {
@@ -17689,10 +19919,13 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         }
       }
       /**
-       * Return a flast list of all the files nested inside a directory
+       * Return a flat list of all the files nested inside a directory
        *
        * Based on an elegant concurrent recursive solution from SO
        * https://stackoverflow.com/a/45130990/2168416
+       *
+       * @param {string} dir - The directory to read.
+       * @returns {Promise<string[]>} - A flat list of all files in the directory.
        */
       async readdirDeep(dir) {
         const subdirs = await this._readdir(dir);
@@ -17707,6 +19940,9 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       /**
        * Return the Stats of a file/symlink if it exists, otherwise returns null.
        * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filename - The path to the file or symlink.
+       * @returns {Promise<Object|null>} - The stats object, or `null` if the file doesn't exist.
        */
       async lstat(filename) {
         try {
@@ -17722,6 +19958,10 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       /**
        * Reads the contents of a symlink if it exists, otherwise returns null.
        * Rethrows errors that aren't related to file existence.
+       *
+       * @param {string} filename - The path to the symlink.
+       * @param {Object} [opts={ encoding: 'buffer' }] - Options for reading the symlink.
+       * @returns {Promise<Buffer|null>} - The symlink target, or `null` if it doesn't exist.
        */
       async readlink(filename, opts = { encoding: "buffer" }) {
         try {
@@ -17736,25 +19976,39 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
       /**
        * Write the contents of buffer to a symlink.
+       *
+       * @param {string} filename - The path to the symlink.
+       * @param {Buffer} buffer - The symlink target.
+       * @returns {Promise<void>}
        */
       async writelink(filename, buffer) {
         return this._symlink(buffer.toString("utf8"), filename);
       }
     };
     GitIgnoreManager = class {
-      static async isIgnored({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git"), filepath }) {
+      /**
+       * Determines whether a given file is ignored based on `.gitignore` rules and exclusion files.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} args.dir - The working directory.
+       * @param {string} [args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {string} args.filepath - The path of the file to check.
+       * @returns {Promise<boolean>} - `true` if the file is ignored, `false` otherwise.
+       */
+      static async isIgnored({ fs, dir, gitdir = join(dir, ".git"), filepath }) {
         if (basename(filepath) === ".git")
           return true;
         if (filepath === ".")
           return false;
         let excludes = "";
-        const excludesFile = (0, import_path_browserify.join)(gitdir, "info", "exclude");
+        const excludesFile = join(gitdir, "info", "exclude");
         if (await fs.exists(excludesFile)) {
           excludes = await fs.read(excludesFile, "utf8");
         }
         const pairs = [
           {
-            gitignore: (0, import_path_browserify.join)(dir, ".gitignore"),
+            gitignore: join(dir, ".gitignore"),
             filepath
           }
         ];
@@ -17763,7 +20017,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           const folder = pieces.slice(0, i).join("/");
           const file = pieces.slice(i).join("/");
           pairs.push({
-            gitignore: (0, import_path_browserify.join)(dir, folder, ".gitignore"),
+            gitignore: join(dir, folder, ".gitignore"),
             filepath: file
           });
         }
@@ -17791,17 +20045,28 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
     };
     supportsCompressionStream = null;
+    EMPTY_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    bad = /(^|[/.])([/.]|$)|^@$|@{|[\x00-\x20\x7f~^:?*[\\]|\.lock(\/|$)/;
     worthWalking = (filepath, root) => {
       if (filepath === "." || root == null || root.length === 0 || root === ".") {
         return true;
       }
-      if (root.length >= filepath.length) {
-        return root.startsWith(filepath);
-      } else {
-        return filepath.startsWith(root);
+      const base = root.endsWith("/") ? root.slice(0, -1) : root;
+      if (base === ".") {
+        return true;
       }
+      if (base.length >= filepath.length) {
+        return base === filepath || base.startsWith(`${filepath}/`);
+      }
+      return filepath.startsWith(`${base}/`);
     };
-    abbreviateRx = new RegExp("^refs/(heads/|tags/|remotes/)?(.*)");
+    LINEBREAKS = /^.*(\r?\n|$)/gm;
+    _TreeMap = {
+      stage: STAGE,
+      workdir: WORKDIR
+    };
+    abbreviateRx = /^refs\/(heads\/|tags\/|remotes\/)?(.*)/;
+    CREDENTIALS = /^(https?:\/\/)([^/?#]+)@/i;
     GitPktLine = class {
       static flush() {
         return Buffer.from("0000", "utf8");
@@ -17860,21 +20125,32 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
     };
     GitRemoteHTTP = class {
+      /**
+       * Returns the capabilities of the GitRemoteHTTP class.
+       *
+       * @returns {Promise<string[]>} - An array of supported capabilities.
+       */
       static async capabilities() {
         return ["discover", "connect"];
       }
       /**
+       * Discovers references from a remote Git repository.
+       *
        * @param {Object} args
-       * @param {HttpClient} args.http
-       * @param {ProgressCallback} [args.onProgress]
-       * @param {AuthCallback} [args.onAuth]
-       * @param {AuthFailureCallback} [args.onAuthFailure]
-       * @param {AuthSuccessCallback} [args.onAuthSuccess]
-       * @param {string} [args.corsProxy]
-       * @param {string} args.service
-       * @param {string} args.url
-       * @param {Object<string, string>} args.headers
-       * @param {1 | 2} args.protocolVersion - Git Protocol Version
+       * @param {HttpClient} args.http - The HTTP client to use for requests.
+       * @param {ProgressCallback} [args.onProgress] - Callback for progress updates.
+       * @param {AuthCallback} [args.onAuth] - Callback for providing authentication credentials.
+       * @param {AuthFailureCallback} [args.onAuthFailure] - Callback for handling authentication failures.
+       * @param {AuthSuccessCallback} [args.onAuthSuccess] - Callback for handling successful authentication.
+       * @param {string} [args.corsProxy] - Optional CORS proxy URL.
+       * @param {string} args.service - The Git service (e.g., "git-upload-pack").
+       * @param {string} args.url - The URL of the remote repository.
+       * @param {Object<string, string>} args.headers - HTTP headers to include in the request.
+       * @param {1 | 2} args.protocolVersion - The Git protocol version to use.
+       * @returns {Promise<Object>} - The parsed response from the remote repository.
+       * @throws {HttpError} - If the HTTP request fails.
+       * @throws {SmartHttpError} - If the response cannot be parsed.
+       * @throws {UserCanceledError} - If the user cancels the operation.
        */
       static async discover({
         http,
@@ -17946,15 +20222,19 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         }
       }
       /**
+       * Connects to a remote Git repository and sends a request.
+       *
        * @param {Object} args
-       * @param {HttpClient} args.http
-       * @param {ProgressCallback} [args.onProgress]
-       * @param {string} [args.corsProxy]
-       * @param {string} args.service
-       * @param {string} args.url
-       * @param {Object<string, string>} [args.headers]
-       * @param {any} args.body
-       * @param {any} args.auth
+       * @param {HttpClient} args.http - The HTTP client to use for requests.
+       * @param {ProgressCallback} [args.onProgress] - Callback for progress updates.
+       * @param {string} [args.corsProxy] - Optional CORS proxy URL.
+       * @param {string} args.service - The Git service (e.g., "git-upload-pack").
+       * @param {string} args.url - The URL of the remote repository.
+       * @param {Object<string, string>} [args.headers] - HTTP headers to include in the request.
+       * @param {any} args.body - The request body to send.
+       * @param {any} args.auth - Authentication credentials.
+       * @returns {Promise<GitHttpResponse>} - The HTTP response from the remote repository.
+       * @throws {HttpError} - If the HTTP request fails.
        */
       static async connect({
         http,
@@ -17989,6 +20269,15 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       }
     };
     GitRemoteManager = class {
+      /**
+       * Determines the appropriate remote helper for the given URL.
+       *
+       * @param {Object} args
+       * @param {string} args.url - The URL of the remote repository.
+       * @returns {Object} - The remote helper class for the specified transport.
+       * @throws {UrlParseError} - If the URL cannot be parsed.
+       * @throws {UnknownTransportError} - If the transport is not supported.
+       */
       static getRemoteHelperFor({ url }) {
         const remoteHelpers = /* @__PURE__ */ new Map();
         remoteHelpers.set("http", GitRemoteHTTP);
@@ -18007,14 +20296,20 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         );
       }
     };
-    lock$2 = null;
+    scpLike = /^[^/@:]+@[^/@:]+:/;
     GitShallowManager = class {
+      /**
+       * Reads the `shallow` file in the Git repository and returns a set of object IDs (OIDs).
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @returns {Promise<Set<string>>} - A set of shallow object IDs.
+       */
       static async read({ fs, gitdir }) {
-        if (lock$2 === null)
-          lock$2 = new import_async_lock.default();
-        const filepath = (0, import_path_browserify.join)(gitdir, "shallow");
+        const filepath = join(gitdir, "shallow");
         const oids = /* @__PURE__ */ new Set();
-        await lock$2.acquire(filepath, async function() {
+        await acquireLock(filepath, async function() {
           const text = await fs.read(filepath, { encoding: "utf8" });
           if (text === null)
             return oids;
@@ -18024,19 +20319,27 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         });
         return oids;
       }
+      /**
+       * Writes a set of object IDs (OIDs) to the `shallow` file in the Git repository.
+       * If the set is empty, the `shallow` file is removed.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} [args.gitdir] - [required] The [git directory](dir-vs-gitdir.md) path
+       * @param {Set<string>} args.oids - A set of shallow object IDs to write.
+       * @returns {Promise<void>}
+       */
       static async write({ fs, gitdir, oids }) {
-        if (lock$2 === null)
-          lock$2 = new import_async_lock.default();
-        const filepath = (0, import_path_browserify.join)(gitdir, "shallow");
+        const filepath = join(gitdir, "shallow");
         if (oids.size > 0) {
           const text = [...oids].join("\n") + "\n";
-          await lock$2.acquire(filepath, async function() {
+          await acquireLock(filepath, async function() {
             await fs.write(filepath, text, {
               encoding: "utf8"
             });
           });
         } else {
-          await lock$2.acquire(filepath, async function() {
+          await acquireLock(filepath, async function() {
             await fs.rm(filepath);
           });
         }
@@ -18044,8 +20347,8 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
     };
     pkg = {
       name: "isomorphic-git",
-      version: "1.29.0",
-      agent: "git/isomorphic-git@1.29.0"
+      version: "1.41.9",
+      agent: "git/isomorphic-git@1.41.9"
     };
     FIFO = class {
       constructor() {
@@ -18206,7 +20509,6 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       //   return output
       // }
     };
-    LINEBREAKS = /^.*(\r?\n|$)/gm;
     EMPTY_OID = "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391";
     types = {
       commit: 16,
@@ -18241,12 +20543,16 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         return entries;
       }
     };
-    _TreeMap = {
-      stage: STAGE,
-      workdir: WORKDIR
-    };
     GitStashManager = class _GitStashManager {
-      constructor({ fs, dir, gitdir = (0, import_path_browserify.join)(dir, ".git") }) {
+      /**
+       * Creates an instance of GitStashManager.
+       *
+       * @param {Object} args
+       * @param {FSClient} args.fs - A file system implementation.
+       * @param {string} args.dir - The working directory.
+       * @param {string}[args.gitdir=join(dir, '.git')] - [required] The [git directory](dir-vs-gitdir.md) path
+       */
+      constructor({ fs, dir, gitdir = join(dir, ".git") }) {
         Object.assign(this, {
           fs,
           dir,
@@ -18254,18 +20560,44 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           _author: null
         });
       }
+      /**
+       * Gets the reference name for the stash.
+       *
+       * @returns {string} - The stash reference name.
+       */
       static get refStash() {
         return "refs/stash";
       }
+      /**
+       * Gets the reference name for the stash reflogs.
+       *
+       * @returns {string} - The stash reflogs reference name.
+       */
       static get refLogsStash() {
         return "logs/refs/stash";
       }
+      /**
+       * Gets the file path for the stash reference.
+       *
+       * @returns {string} - The file path for the stash reference.
+       */
       get refStashPath() {
-        return (0, import_path_browserify.join)(this.gitdir, _GitStashManager.refStash);
+        return join(this.gitdir, _GitStashManager.refStash);
       }
+      /**
+       * Gets the file path for the stash reflogs.
+       *
+       * @returns {string} - The file path for the stash reflogs.
+       */
       get refLogsStashPath() {
-        return (0, import_path_browserify.join)(this.gitdir, _GitStashManager.refLogsStash);
+        return join(this.gitdir, _GitStashManager.refLogsStash);
       }
+      /**
+       * Retrieves the author information for the stash.
+       *
+       * @returns {Promise<Object>} - The author object.
+       * @throws {MissingNameError} - If the author name is missing.
+       */
       async getAuthor() {
         if (!this._author) {
           this._author = await normalizeAuthorObject({
@@ -18278,6 +20610,13 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         }
         return this._author;
       }
+      /**
+       * Gets the SHA of a stash entry by its index.
+       *
+       * @param {number} refIdx - The index of the stash entry.
+       * @param {string[]} [stashEntries] - Optional preloaded stash entries.
+       * @returns {Promise<string|null>} - The SHA of the stash entry or `null` if not found.
+       */
       async getStashSHA(refIdx, stashEntries) {
         if (!await this.fs.exists(this.refStashPath)) {
           return null;
@@ -18285,6 +20624,15 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
         const entries = stashEntries || await this.readStashReflogs({ parsed: false });
         return entries[refIdx].split(" ")[1];
       }
+      /**
+       * Writes a stash commit to the repository.
+       *
+       * @param {Object} args
+       * @param {string} args.message - The commit message.
+       * @param {string} args.tree - The tree object ID.
+       * @param {string[]} args.parent - The parent commit object IDs.
+       * @returns {Promise<string>} - The object ID of the written commit.
+       */
       async writeStashCommit({ message, tree, parent }) {
         return _writeCommit({
           fs: this.fs,
@@ -18298,6 +20646,13 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           }
         });
       }
+      /**
+       * Reads a stash commit by its index.
+       *
+       * @param {number} refIdx - The index of the stash entry.
+       * @returns {Promise<Object>} - The stash commit object.
+       * @throws {InvalidRefNameError} - If the index is invalid.
+       */
       async readStashCommit(refIdx) {
         const stashEntries = await this.readStashReflogs({ parsed: false });
         if (refIdx !== 0) {
@@ -18319,6 +20674,12 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           oid: stashSHA
         });
       }
+      /**
+       * Writes a stash reference to the repository.
+       *
+       * @param {string} stashCommit - The object ID of the stash commit.
+       * @returns {Promise<void>}
+       */
       async writeStashRef(stashCommit) {
         return GitRefManager.writeRef({
           fs: this.fs,
@@ -18327,6 +20688,14 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           value: stashCommit
         });
       }
+      /**
+       * Writes a reflog entry for a stash commit.
+       *
+       * @param {Object} args
+       * @param {string} args.stashCommit - The object ID of the stash commit.
+       * @param {string} args.message - The reflog message.
+       * @returns {Promise<void>}
+       */
       async writeStashReflogEntry({ stashCommit, message }) {
         const author = await this.getAuthor();
         const entry = GitRefStash.createStashReflogEntry(
@@ -18335,17 +20704,23 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
           message
         );
         const filepath = this.refLogsStashPath;
-        await acquireLock$1({ filepath, entry }, async () => {
+        await acquireLock(filepath, async () => {
           const appendTo = await this.fs.exists(filepath) ? await this.fs.read(filepath, "utf8") : "";
           await this.fs.write(filepath, appendTo + entry, "utf8");
         });
       }
+      /**
+       * Reads the stash reflogs.
+       *
+       * @param {Object} args
+       * @param {boolean} [args.parsed=false] - Whether to parse the reflog entries.
+       * @returns {Promise<string[]|Object[]>} - The reflog entries as strings or parsed objects.
+       */
       async readStashReflogs({ parsed = false }) {
         if (!await this.fs.exists(this.refLogsStashPath)) {
           return [];
         }
-        const reflogBuffer = await this.fs.read(this.refLogsStashPath);
-        const reflogString = reflogBuffer.toString();
+        const reflogString = await this.fs.read(this.refLogsStashPath, "utf8");
         return GitRefStash.getStashReflogEntry(reflogString, parsed);
       }
     };
@@ -18360,6 +20735,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       addRemote,
       annotatedTag,
       branch,
+      cherryPick,
       checkout,
       clone,
       commit,
@@ -18406,7 +20782,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       removeNote,
       renameBranch,
       resetIndex,
-      updateIndex,
+      updateIndex: updateIndex$1,
       resolveRef,
       status,
       statusMatrix,
@@ -18516,6 +20892,7 @@ var init_logger = __esm({
         this.logLevel = 1 /* INFO */;
         this.showNotices = true;
         this.entries = [];
+        this.persistedEntries = [];
         this.maxEntries = 500;
         this.sensitiveValues = [];
         this.recentNoticeTimes = /* @__PURE__ */ new Map();
@@ -18535,11 +20912,19 @@ var init_logger = __esm({
        * Get recent log entries for display
        */
       getEntries() {
-        return this.entries;
+        const merged = /* @__PURE__ */ new Map();
+        for (const entry of [...this.persistedEntries, ...this.entries]) {
+          merged.set(`${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`, entry);
+        }
+        return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
+      }
+      mergePersistedEntries(entries) {
+        this.persistedEntries = [...entries].slice(-this.maxEntries);
       }
       /** Clear the in-memory activity log shown in the sidebar. */
       clear() {
         this.entries = [];
+        this.persistedEntries = [];
       }
       /**
        * Export logs to a markdown file in the vault
@@ -18563,13 +20948,13 @@ var init_logger = __esm({
           "# Obsidian Git Sync \u2014 Debug Log",
           "",
           `**Generated:** ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
-          `**Entries:** ${this.entries.length}`,
+          `**Entries:** ${this.getEntries().length}`,
           `**Log Level:** ${LogLevel[this.logLevel]}`,
           "",
           "---",
           ""
         ];
-        for (const entry of this.entries) {
+        for (const entry of this.getEntries()) {
           const time = new Date(entry.timestamp).toLocaleTimeString();
           const emoji = entry.level === "error" ? "\u{1F534}" : entry.level === "warn" ? "\u26A0\uFE0F" : entry.level === "debug" ? "\u{1F50D}" : "\u2139\uFE0F";
           lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} \u2014 ${time}`);
@@ -18793,16 +21178,23 @@ function createProgressModal(app, operationName) {
     signal: modal.signal
   };
 }
-var import_obsidian2, PHASE_ORDER, GitProgressModal;
+var import_obsidian2, CLONE_PHASE_ORDER, PUSH_PHASE_ORDER, GitProgressModal;
 var init_GitProgressModal = __esm({
   "src/ui/GitProgressModal.ts"() {
     import_obsidian2 = require("obsidian");
-    PHASE_ORDER = [
+    CLONE_PHASE_ORDER = [
       "Remote communication",
       "Fetching",
       "Receiving objects",
       "Resolving deltas",
       "Checking out"
+    ];
+    PUSH_PHASE_ORDER = [
+      "Connecting to remote",
+      "Preparing upload",
+      "Uploading objects",
+      "Waiting for remote confirmation",
+      "Confirming branch"
     ];
     GitProgressModal = class extends import_obsidian2.Modal {
       constructor(app, operationName) {
@@ -18820,10 +21212,12 @@ var init_GitProgressModal = __esm({
         this.filesWritten = 0;
         this.filesTotal = 0;
         this.bytesWritten = 0;
+        this.elapsedTimer = null;
         this.operationName = operationName;
+        this.phaseOrder = /push/i.test(operationName) ? PUSH_PHASE_ORDER : CLONE_PHASE_ORDER;
         this.startTime = Date.now();
         this.lastTransferTime = this.startTime;
-        for (const name of PHASE_ORDER) {
+        for (const name of this.phaseOrder) {
           this.phases.set(name, {
             name,
             status: "pending",
@@ -18849,11 +21243,16 @@ var init_GitProgressModal = __esm({
         this.statsEl = this.container.createDiv("git-progress-statistics");
         this.phasesEl = this.container.createDiv("git-progress-phases");
         this.footerEl = this.container.createDiv("git-progress-footer");
+        this.elapsedTimer = window.setInterval(() => this.render(), 1e3);
         this.render();
       }
       onClose() {
         if (!this.isComplete) {
           this.abortController.abort();
+        }
+        if (this.elapsedTimer !== null) {
+          window.clearInterval(this.elapsedTimer);
+          this.elapsedTimer = null;
         }
         this.contentEl.empty();
       }
@@ -18891,14 +21290,14 @@ var init_GitProgressModal = __esm({
         this.bytesTotal = Math.max(this.bytesTotal, total);
         this.lastTransferLoaded = loaded;
         this.lastTransferTime = now;
-        this.activatePhase("Fetching", loaded, total);
+        this.activatePhase(this.isPush() ? "Waiting for remote confirmation" : "Fetching", loaded, total);
         this.render();
       }
       updateCheckout(event) {
         this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
         this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
         this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
-        this.activatePhase("Checking out", this.filesWritten, this.filesTotal);
+        this.activatePhase(this.isPush() ? "Confirming branch" : "Checking out", this.filesWritten, this.filesTotal);
         this.render();
       }
       updateMessage(text) {
@@ -18931,7 +21330,6 @@ var init_GitProgressModal = __esm({
           statusEl.setText(message);
           statusEl.addClass("git-progress-status-success");
         }
-        setTimeout(() => this.close(), 2e3);
       }
       fail(error) {
         var _a;
@@ -18954,9 +21352,9 @@ var init_GitProgressModal = __esm({
         const phase = this.phases.get(name);
         if (!phase)
           return;
-        const index2 = PHASE_ORDER.indexOf(name);
+        const index2 = this.phaseOrder.indexOf(name);
         for (let i = 0; i < index2; i++) {
-          const previous = this.phases.get(PHASE_ORDER[i]);
+          const previous = this.phases.get(this.phaseOrder[i]);
           if (previous && previous.status !== "error") {
             previous.status = "completed";
             previous.percent = 100;
@@ -18981,11 +21379,11 @@ var init_GitProgressModal = __esm({
         transferTitle.setText("Transfer statistics");
         const transfer = this.statsEl.createDiv("git-progress-stat-card");
         this.addStatRow(transfer, "Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
-        this.addStatRow(transfer, "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
+        this.addStatRow(transfer, this.isPush() ? "Response data" : "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
         this.addStatRow(transfer, "Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
         this.addStatRow(transfer, "ETA", this.estimateRemaining());
         const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
-        checkoutTitle.setText("Checkout progress");
+        checkoutTitle.setText(this.isPush() ? "Remote confirmation" : "Checkout progress");
         const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
         this.addStatRow(checkout2, "Files", this.countPair(this.filesWritten, this.filesTotal));
         this.addStatRow(
@@ -18997,7 +21395,7 @@ var init_GitProgressModal = __esm({
       renderPhases() {
         this.phasesEl.empty();
         const title = this.phasesEl.createDiv("git-progress-section-title");
-        title.setText("Clone phases");
+        title.setText(this.isPush() ? "Push phases" : "Clone phases");
         const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
         for (const phase of this.phases.values()) {
           const phaseEl = phaseCard.createDiv("git-progress-phase");
@@ -19033,7 +21431,7 @@ var init_GitProgressModal = __esm({
         const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
         const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
         this.footerEl.empty();
-        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${PHASE_ORDER.length} phases` });
+        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
       }
       countPair(loaded, total) {
         if (loaded === 0 && total === 0)
@@ -19058,8 +21456,10 @@ var init_GitProgressModal = __esm({
         if (name === "Checking out") {
           return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} files`;
         }
-        if (name === "Fetching" && total > 0)
+        if ((name === "Fetching" || name === "Uploading objects") && total > 0)
           return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
+        if (name === "Waiting for remote confirmation" && total > 0)
+          return `${this.formatBytes(loaded)} / ${this.formatBytes(total)} response`;
         return this.statusLabel("active");
       }
       statusLabel(status2) {
@@ -19076,6 +21476,15 @@ var init_GitProgressModal = __esm({
       }
       inferPhaseFromMessage(message) {
         const lower2 = message.toLowerCase();
+        if (this.isPush()) {
+          if (lower2.includes("confirm") || lower2.includes("remote result"))
+            return "Confirming branch";
+          if (lower2.includes("upload") || lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
+            return "Preparing upload";
+          if (lower2.includes("connect") || lower2.includes("remote"))
+            return "Connecting to remote";
+          return "Uploading objects";
+        }
         if (lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
           return "Fetching";
         if (lower2.includes("receiving"))
@@ -19091,6 +21500,19 @@ var init_GitProgressModal = __esm({
         return null;
       }
       formatPhaseName(phase) {
+        if (this.isPush()) {
+          const pushMap = {
+            connecting: "Connecting to remote",
+            preparing: "Preparing upload",
+            enumeratingObjects: "Preparing upload",
+            countingObjects: "Preparing upload",
+            compressingObjects: "Preparing upload",
+            uploading: "Uploading objects",
+            receivingObjects: "Waiting for remote confirmation",
+            confirming: "Confirming branch"
+          };
+          return pushMap[phase] || (this.phaseOrder.includes(phase) ? phase : "Uploading objects");
+        }
         const phaseMap = {
           enumeratingObjects: "Fetching",
           countingObjects: "Fetching",
@@ -19126,6 +21548,9 @@ var init_GitProgressModal = __esm({
           default:
             return "\u25CB";
         }
+      }
+      isPush() {
+        return this.phaseOrder === PUSH_PHASE_ORDER;
       }
     };
   }
@@ -20140,6 +22565,7 @@ var init_gitManager = __esm({
         this.assertOperationActive();
         const temporaryDir = `${this.dir === "." ? "." : this.dir}/.git-sync-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const fs = this.fs.promises || this.fs;
+        let remoteOid = null;
         try {
           await fs.mkdir(temporaryDir, { recursive: true });
           await init({ fs: this.fs, dir: temporaryDir, defaultBranch: branchName });
@@ -20149,7 +22575,6 @@ var init_gitManager = __esm({
             remote: "origin",
             url: normalizeRemoteUrl(repoUrl)
           });
-          let remoteOid = null;
           try {
             await fetch({
               fs: this.fs,
@@ -20733,31 +23158,28 @@ Try again with a faster connection or smaller repository.`
       async addAll(files) {
         try {
           this.assertOperationActive();
-          let statusMatrixForStaging = null;
-          let filesToStage;
-          if (files) {
-            filesToStage = filterAutomaticallyStagedPaths([...new Set(files)]);
-          } else {
-            statusMatrixForStaging = await statusMatrix({
-              fs: this.fs,
-              dir: this.dir
-            });
-            filesToStage = filterAutomaticallyStagedPaths(
-              statusMatrixForStaging.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0])
-            );
+          const statusMatrixForStaging = await statusMatrix({
+            fs: this.fs,
+            dir: this.dir
+          });
+          const statusByPath = /* @__PURE__ */ new Map();
+          for (const row of statusMatrixForStaging)
+            statusByPath.set(row[0], row);
+          const requestedFiles = files ? filterAutomaticallyStagedPaths([...new Set(files)]) : filterAutomaticallyStagedPaths(
+            statusMatrixForStaging.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0])
+          );
+          const filesToStage = [];
+          const failed = [];
+          for (const filepath of requestedFiles) {
+            const row = statusByPath.get(filepath);
+            if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
+              failed.push({ filepath, message: `Path "${filepath}" is ignored by .gitignore` });
+              continue;
+            }
+            filesToStage.push(filepath);
           }
           const staged = [];
-          const failed = [];
           this.updateStatus(filesToStage.length > 0 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? "" : "s"}...` : "No changes to add");
-          const statusByPath = /* @__PURE__ */ new Map();
-          if (filesToStage.length > 0) {
-            const statusMatrix2 = statusMatrixForStaging || await statusMatrix({
-              fs: this.fs,
-              dir: this.dir
-            });
-            for (const row of statusMatrix2)
-              statusByPath.set(row[0], row);
-          }
           const stagedPaths = /* @__PURE__ */ new Set();
           const stageIndividually = async (file) => {
             try {
@@ -20799,11 +23221,28 @@ Try again with a faster connection or smaller repository.`
           for (const file of deletedFiles) {
             await stageIndividually(file);
           }
+          if (stagedPaths.size > 0) {
+            const finalMatrix = await statusMatrix({
+              fs: this.fs,
+              dir: this.dir
+            });
+            const finalByPath = new Map(finalMatrix.map((row) => [row[0], row]));
+            for (const file of [...stagedPaths]) {
+              const before = statusByPath.get(file);
+              const after = finalByPath.get(file);
+              const deletion = (before == null ? void 0 : before[1]) === 1 && (before == null ? void 0 : before[2]) === 0;
+              const stagedInIndex = deletion ? (after == null ? void 0 : after[3]) === 0 : (after == null ? void 0 : after[3]) === 2;
+              if (!stagedInIndex) {
+                stagedPaths.delete(file);
+                failed.push({ filepath: file, message: `Path "${file}" was not written to the Git index` });
+              }
+            }
+          }
           for (const file of filesToStage) {
             if (stagedPaths.has(file))
               staged.push(file);
           }
-          const result = { requested: filesToStage.length, staged, failed };
+          const result = { requested: requestedFiles.length, staged, failed };
           this.updateStatus(failed.length > 0 ? `Staged ${staged.length}; ${failed.length} failed` : `Staged ${staged.length} change${staged.length === 1 ? "" : "s"}`);
           return result;
         } catch (error) {
@@ -20869,6 +23308,7 @@ Try again with a faster connection or smaller repository.`
           }
           progress = this.createProgress("Pushing to remote");
           const { onProgress, onMessage } = progress;
+          onMessage("Connecting to remote...");
           await push({
             fs: this.fs,
             http: this.createHttpClient(progress),
@@ -20886,6 +23326,13 @@ Try again with a faster connection or smaller repository.`
             onProgress,
             onMessage
           });
+          onMessage("Confirming branch...");
+          try {
+            const localOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` });
+            await writeRef({ fs: this.fs, dir: this.dir, ref: `refs/remotes/origin/${branchName}`, value: localOid });
+          } catch (error) {
+            log2.warn("GitManager", "Push succeeded but tracking metadata could not be updated", error);
+          }
           progress.complete();
           this.updateStatus("Push completed");
           log2.info("GitManager", `Successfully pushed changes to remote branch: ${branchName}`);
@@ -20923,23 +23370,48 @@ Try again with a faster connection or smaller repository.`
             throw new Error("Not on a branch");
           }
           log2.debug("GitManager", `Current branch: ${currentBranch2}`);
-          const [ahead, behind] = await Promise.all([
-            log({
-              fs: this.fs,
-              dir: this.dir,
-              ref: `origin/${currentBranch2}..${currentBranch2}`
-            }).then((commits) => commits.length).catch(() => 0),
-            log({
-              fs: this.fs,
-              dir: this.dir,
-              ref: `${currentBranch2}..origin/${currentBranch2}`
-            }).then((commits) => commits.length).catch(() => 0)
+          const localRef = `refs/heads/${currentBranch2}`;
+          const remoteRef = `refs/remotes/origin/${currentBranch2}`;
+          let localOid = null;
+          try {
+            localOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: localRef });
+          } catch (error) {
+            return {
+              branch: currentBranch2,
+              ahead: 0,
+              behind: 0,
+              comparison: "unavailable",
+              comparisonError: error instanceof Error ? error.message : String(error)
+            };
+          }
+          try {
+            await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+          } catch (error) {
+            log2.info("GitManager", `No tracking ref for ${currentBranch2}`);
+            const localCommits2 = localOid ? await log({ fs: this.fs, dir: this.dir, ref: localRef }).catch(() => []) : [];
+            return {
+              branch: currentBranch2,
+              ahead: localCommits2.length,
+              behind: 0,
+              comparison: localOid ? "local-only" : "unavailable",
+              comparisonError: error instanceof Error ? error.message : String(error)
+            };
+          }
+          const [localCommits, remoteCommits] = await Promise.all([
+            log({ fs: this.fs, dir: this.dir, ref: localRef }),
+            log({ fs: this.fs, dir: this.dir, ref: remoteRef })
           ]);
+          const remoteOids = new Set(remoteCommits.map((commit2) => commit2.oid));
+          const localOids = new Set(localCommits.map((commit2) => commit2.oid));
+          const ahead = localCommits.filter((commit2) => !remoteOids.has(commit2.oid)).length;
+          const behind = remoteCommits.filter((commit2) => !localOids.has(commit2.oid)).length;
+          const comparison = ahead > 0 && behind > 0 ? "diverged" : ahead > 0 ? "ahead" : behind > 0 ? "behind" : "up-to-date";
           log2.info("GitManager", `Repository status: branch=${currentBranch2}, ahead=${ahead}, behind=${behind}`);
           return {
             branch: currentBranch2,
             ahead,
-            behind
+            behind,
+            comparison
           };
         } catch (error) {
           log2.error("GitManager", "Failed to get repository status", error);
@@ -20992,6 +23464,8 @@ Try again with a faster connection or smaller repository.`
             branch: "local",
             ahead: 0,
             behind: 0,
+            comparison: "unavailable",
+            comparisonError: error instanceof Error ? error.message : String(error),
             repositoryStatusAvailable: false
           };
         });
@@ -21081,7 +23555,23 @@ Try again with a faster connection or smaller repository.`
           await remove({ fs: this.fs, dir: this.dir, filepath });
           return;
         }
+        if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
+          throw new Error(`Path "${filepath}" is ignored by .gitignore`);
+        }
         await add({ fs: this.fs, dir: this.dir, filepath });
+      }
+      /**
+       * Ask isomorphic-git for ignore semantics at the staging boundary. A
+       * missing .gitignore is a normal non-ignored result; other read failures
+       * are logged and left to git.add() to report with its original error.
+       */
+      async isIgnoredPath(filepath) {
+        try {
+          return await isIgnored({ fs: this.fs, dir: this.dir, filepath });
+        } catch (error) {
+          log2.debug("GitManager", `Unable to evaluate .gitignore for ${filepath}`, error);
+          return false;
+        }
       }
       /**
        * Unstage a single file (reset to HEAD, or remove from index for new files)
@@ -21637,6 +24127,7 @@ var _FileLogger = class _FileLogger {
     this.memoryTimer = null;
     this.flushInProgress = null;
     this.flushQueued = false;
+    this.maxEntries = 200;
     this.initialized = false;
     this.stopped = false;
     this.bytesWrittenSinceCheck = 0;
@@ -21662,11 +24153,48 @@ var _FileLogger = class _FileLogger {
     window.setTimeout(() => {
       this.truncateIfNeeded().catch(() => void 0);
     }, 5e3);
-    this.logMemorySnapshot();
-    this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 1e4);
   }
   setMaxSize(bytes) {
     this.maxSize = bytes;
+  }
+  setMaxEntries(entries) {
+    this.maxEntries = Math.max(1, Math.floor(entries));
+    void this.truncateIfNeeded();
+  }
+  setMemorySamplingEnabled(enabled) {
+    if (this.memoryTimer !== null) {
+      window.clearInterval(this.memoryTimer);
+      this.memoryTimer = null;
+    }
+    if (!enabled || this.stopped || !this.initialized)
+      return;
+    this.logMemorySnapshot();
+    this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 6e4);
+  }
+  async readEntries(limit = this.maxEntries) {
+    try {
+      const content = await this.app.vault.adapter.read(this.logPath);
+      const entries = [];
+      for (const line of String(content || "").split(/\r?\n/)) {
+        const match = line.match(/^\[([^\]]+)\]\s+\[([^\]]+)\]\s+(.*)$/);
+        if (!match)
+          continue;
+        const timestamp = Date.parse(match[1]);
+        if (!Number.isFinite(timestamp))
+          continue;
+        const body = match[3];
+        const namespaceMatch = body.match(/^\[Git Sync\]\[([^\]]+)\]\s*(.*)$/);
+        entries.push({
+          timestamp,
+          level: match[2].toLowerCase(),
+          namespace: (namespaceMatch == null ? void 0 : namespaceMatch[1]) || "FileLogger",
+          message: (namespaceMatch == null ? void 0 : namespaceMatch[2]) || body
+        });
+      }
+      return entries.slice(-Math.max(1, limit));
+    } catch (e) {
+      return [];
+    }
   }
   setSensitiveValues(values) {
     this.sensitiveValues = values.filter(
@@ -21770,11 +24298,18 @@ var _FileLogger = class _FileLogger {
     } catch (e) {
       return;
     }
-    if (existing.length <= this.maxSize)
-      return;
-    const truncated = existing.slice(-Math.floor(this.maxSize / 2));
-    await adapter.write(this.logPath, `...[truncated at ${(/* @__PURE__ */ new Date()).toISOString()}]...
-${truncated}`);
+    let output = existing;
+    const lines = output.split(/\r?\n/).filter(Boolean);
+    if (lines.length > this.maxEntries) {
+      output = lines.slice(-this.maxEntries).join("\n") + "\n";
+    }
+    if (output.length > this.maxSize) {
+      const truncated = output.slice(-Math.floor(this.maxSize / 2));
+      output = `...[truncated at ${(/* @__PURE__ */ new Date()).toISOString()}]...
+${truncated}`;
+    }
+    if (output !== existing)
+      await adapter.write(this.logPath, output);
   }
   async flush() {
     if (this.flushInProgress) {
@@ -21837,6 +24372,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.hasRealRepo = false;
     this.sidebarSnapshot = null;
     this.remoteCommitsCache = null;
+    this.localCommitsCache = null;
+    this.commitDetailsCache = /* @__PURE__ */ new Map();
+    this.logEntriesCache = null;
     this.renderGeneration = 0;
     this.plugin = plugin;
   }
@@ -21876,6 +24414,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("role", "tabpanel");
     this.contentContainer.setAttr("tabindex", "0");
     this.contentContainer.setAttr("aria-label", "Git Sync content");
+    this.renderLoadingState();
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     await this.refresh();
@@ -21909,9 +24448,21 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   }
   invalidateRemoteCommitsCache() {
     this.remoteCommitsCache = null;
+    this.localCommitsCache = null;
+    this.commitDetailsCache.clear();
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
+  }
+  renderLoadingState() {
+    this.headerContainer.empty();
+    this.headerContainer.addClass("git-repository-header");
+    const row = this.headerContainer.createDiv("git-header-branch");
+    const icon = row.createSpan({ cls: "git-branch-icon", attr: { "aria-hidden": "true" } });
+    (0, import_obsidian5.setIcon)(icon, "git-branch");
+    row.createSpan({ text: "Loading repository\u2026", cls: "git-branch-name git-branch-uninit" });
+    this.contentContainer.empty();
+    this.contentContainer.createEl("p", { text: "Loading Git status\u2026", cls: "git-empty-state" });
   }
   // ─── Tabs ───
   renderTabs() {
@@ -21940,7 +24491,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     }
   }
   // ─── Header ───
-  renderHeader(branch2, ahead, behind, initialized, hasRealRepo, repositoryStatusAvailable = true) {
+  renderHeader(branch2, ahead, behind, initialized, hasRealRepo, repositoryStatusAvailable = true, comparison = "up-to-date") {
     this.headerContainer.empty();
     this.headerContainer.addClass("git-repository-header");
     this.headerContainer.addClass(`git-header-${this.activeTab}`);
@@ -21989,13 +24540,16 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     } else if (this.isLocalOnly) {
       (0, import_obsidian5.setIcon)(statusIcon, "circle-alert");
       statusRow.createSpan({ text: "Local only \u2014 no remote", cls: "git-local-only" });
-    } else if (!repositoryStatusAvailable) {
+    } else if (!repositoryStatusAvailable || comparison === "unavailable") {
       (0, import_obsidian5.setIcon)(statusIcon, "circle-alert");
       statusRow.createSpan({ text: "Repository comparison unavailable", cls: "git-header-hint" });
+    } else if (comparison === "local-only") {
+      (0, import_obsidian5.setIcon)(statusIcon, "cloud-off");
+      statusRow.createSpan({ text: ahead > 0 ? `${ahead} local commit${ahead === 1 ? "" : "s"} not pushed` : "No upstream branch", cls: "git-header-hint" });
     } else if (ahead > 0 || behind > 0) {
       (0, import_obsidian5.setIcon)(statusIcon, "arrow-up-down");
       statusRow.createSpan({
-        text: `\u2B06 ${ahead} \u2B07 ${behind}`,
+        text: `${ahead > 0 ? `\u2B06 ${ahead} to push` : ""}${ahead > 0 && behind > 0 ? " \xB7 " : ""}${behind > 0 ? `\u2B07 ${behind} to pull` : ""}`,
         cls: "git-ahead-behind" + (ahead > 0 ? " git-ahead" : "") + (behind > 0 ? " git-behind" : "")
       });
     } else {
@@ -22086,6 +24640,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         });
         modal.close();
         new import_obsidian5.Notice("Changes committed");
+        this.invalidateRemoteCommitsCache();
         await this.refresh();
       } catch (e) {
         commitButton.setDisabled(false).setButtonText("Commit");
@@ -22179,7 +24734,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const ahead = (snapshot == null ? void 0 : snapshot.ahead) || 0;
     const behind = (snapshot == null ? void 0 : snapshot.behind) || 0;
     const repositoryStatusAvailable = (snapshot == null ? void 0 : snapshot.repositoryStatusAvailable) !== false;
-    this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable);
+    const comparison = (snapshot == null ? void 0 : snapshot.comparison) || (repositoryStatusAvailable ? "up-to-date" : "unavailable");
+    this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
     this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
     this.contentContainer.empty();
     const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
@@ -22194,7 +24750,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           await this.renderCommitsTab(generation);
           break;
         case "log":
-          this.renderLogTab();
+          await this.renderLogTab();
           break;
       }
     }
@@ -22510,7 +25066,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     window.setTimeout(() => input.inputEl.focus(), 0);
   }
   async renderCommitsTab(generation) {
-    var _a;
+    var _a, _b;
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
@@ -22544,11 +25100,18 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           return;
         }
         branch2 = await this.plugin.gitManager.getCurrentBranch();
-        commits = await this.plugin.gitManager.getLog(25);
+        if (((_a = this.localCommitsCache) == null ? void 0 : _a.branch) === branch2) {
+          commits = this.localCommitsCache.commits;
+        } else {
+          commits = await this.plugin.gitManager.getLog(25);
+          if (this.isCurrentRender(generation)) {
+            this.localCommitsCache = { branch: branch2, commits };
+          }
+        }
       } else {
         const remoteUrl = this.plugin.settings.repoUrl;
-        const cached = ((_a = this.remoteCommitsCache) == null ? void 0 : _a.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
-        if (cached && cached.length > 0) {
+        const cached = ((_b = this.remoteCommitsCache) == null ? void 0 : _b.repoUrl) === this.plugin.settings.repoUrl && this.remoteCommitsCache.branch === branch2 ? this.remoteCommitsCache.commits : null;
+        if (cached !== null) {
           commits = cached;
         } else {
           const password = await this.plugin.resolveGitPassword();
@@ -22558,11 +25121,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           }
         }
         if (this.isCurrentRender(generation)) {
-          if (commits.length > 0) {
-            this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
-          } else {
-            this.invalidateRemoteCommitsCache();
-          }
+          this.remoteCommitsCache = { repoUrl: remoteUrl, branch: branch2, commits };
         }
       }
       loading == null ? void 0 : loading.remove();
@@ -22575,7 +25134,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
       for (const commit2 of commits) {
         const isExpanded = this.expandedCommitOids.has(commit2.oid);
-        const row = listContainer.createDiv("git-commit-row" + (this.commitsViewMode === "remote" ? " git-commit-remote" : ""));
+        const row = listContainer.createDiv("git-commit-row" + (this.commitsViewMode === "remote" ? " git-commit-remote" : " git-commit-local"));
         row.setAttr("data-oid", commit2.oid);
         row.setAttr("data-expanded", String(isExpanded));
         row.setAttr("role", "article");
@@ -22600,9 +25159,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         const hash = meta.createSpan({ text: commit2.oid.slice(0, 7), cls: "git-commit-hash" });
         hash.setAttr("title", commit2.oid);
         meta.createSpan({ text: commit2.author, cls: "git-commit-author" });
-        if (this.commitsViewMode === "remote") {
-          meta.createSpan({ text: "origin", cls: "git-commit-remote-badge" });
-        }
+        meta.createSpan({
+          text: this.commitsViewMode === "remote" ? "origin" : "local",
+          cls: this.commitsViewMode === "remote" ? "git-commit-remote-badge" : "git-commit-local-badge"
+        });
         const toggle = meta.createSpan({ cls: "git-commit-toggle", attr: { "aria-hidden": "true" } });
         toggle.setText(isExpanded ? "\u2304" : "\u203A");
         row.addEventListener("click", async (e) => {
@@ -22655,7 +25215,11 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     detail.createDiv("git-commit-detail-loading").setText("Loading...");
     try {
       let files = [];
-      if (this.commitsViewMode === "remote" && this.plugin.settings.repoUrl && !this.hasRealRepo) {
+      const cachedFiles = this.commitDetailsCache.get(oid);
+      if (cachedFiles)
+        files = cachedFiles;
+      if (cachedFiles) {
+      } else if (this.commitsViewMode === "remote" && this.plugin.settings.repoUrl && !this.hasRealRepo) {
         (_a = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _a.setText("Fetching from GitHub...");
         const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
           this.plugin.settings.repoUrl,
@@ -22683,6 +25247,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           files = remoteFiles;
         }
       }
+      this.commitDetailsCache.set(oid, files);
       detail.empty();
       if (files.length === 0) {
         const isRemoteMode = this.commitsViewMode === "remote";
@@ -22715,10 +25280,18 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     await this.renderCommitsTab(this.renderGeneration);
   }
   async renderLogTab() {
+    var _a;
     const listContainer = this.contentContainer.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
-    const entries = log2.getEntries();
+    const currentLogEntries = log2.getEntries();
+    const cacheStale = this.logEntriesCache && currentLogEntries.length !== this.logEntriesCache.length;
+    if (!this.logEntriesCache || cacheStale) {
+      const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+      log2.mergePersistedEntries(persisted);
+      this.logEntriesCache = log2.getEntries();
+    }
+    const entries = this.logEntriesCache;
     if (entries.length === 0) {
       listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
       return;
@@ -22748,21 +25321,36 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   openLogMenu(event) {
     const menu = new import_obsidian5.Menu();
     menu.addItem((item) => item.setTitle("Export log").setIcon("download").onClick(async () => {
+      var _a;
       try {
+        if (!this.logEntriesCache) {
+          const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+          log2.mergePersistedEntries(persisted);
+          this.logEntriesCache = log2.getEntries();
+        }
         const path = await log2.exportToFile(this.app.vault);
         new import_obsidian5.Notice(`Log exported to ${path}`);
       } catch (e) {
         new import_obsidian5.Notice("Could not export log: " + e.message);
       }
     }));
-    menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(() => {
+    menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(async () => {
+      var _a;
       log2.clear();
+      await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
+      this.logEntriesCache = [];
       new import_obsidian5.Notice("Activity log cleared");
       this.contentContainer.empty();
-      void this.renderLogTab();
+      await this.renderLogTab();
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
-      const entries = [...log2.getEntries()].reverse().slice(0, 50);
+      var _a;
+      if (!this.logEntriesCache) {
+        const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+        log2.mergePersistedEntries(persisted);
+        this.logEntriesCache = log2.getEntries();
+      }
+      const entries = [...this.logEntriesCache].reverse().slice(0, 50);
       const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
         const time = new Date(entry.timestamp).toISOString();
         const data = entry.data ? `
@@ -23230,7 +25818,7 @@ var PluginUpdater = class {
         return { hasUpdate: false, currentVersion, latestVersion: currentVersion, release: null, isPrerelease: false };
       }
       const latestVersion = release.tag_name.replace(/^v/, "");
-      const latestCommit = includePrerelease ? (_a = commitInfoFromRelease(release)) != null ? _a : await fetchLatestCommit(branchFromRelease(release), logger) : await fetchLatestCommit("main", logger);
+      const latestCommit = includePrerelease ? (_a = commitInfoFromRelease(release)) != null ? _a : await fetchLatestCommit(branchFromRelease(release), logger) : null;
       this.log("info", "latestCommit:", (_b = latestCommit == null ? void 0 : latestCommit.sha) == null ? void 0 : _b.slice(0, 7));
       let commitMatch = false;
       if (includePrerelease && currentCommitHash && latestCommit) {
@@ -23577,7 +26165,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "211342749fb68c0671f4cf173528f681c9fb1e7e" : "unknown";
+var GIT_COMMIT_HASH = true ? "9e9ff9856365792e5fe79904bbf651f3e05a8b99" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -23768,6 +26356,7 @@ function renderDiagnosticsSection(containerEl, plugin) {
     text.inputEl.addEventListener("blur", async () => {
       const value = Number.parseInt(text.getValue(), 10);
       plugin.settings.debugLogRetention = Number.isFinite(value) && value > 0 ? value : 200;
+      plugin.setDiagnosticLogRetention(plugin.settings.debugLogRetention);
       await plugin.saveSettings();
     });
   });
@@ -24007,15 +26596,17 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.operationCoordinator = new OperationCoordinator();
   }
   async onload() {
+    var _a;
     this.fileLogger = new FileLogger(this.app, this.manifest.id);
     await this.fileLogger.init();
     log2.setFileLogSink((level, ...args) => {
-      var _a;
-      return (_a = this.fileLogger) == null ? void 0 : _a.log(level, ...args);
+      var _a2;
+      return (_a2 = this.fileLogger) == null ? void 0 : _a2.log(level, ...args);
     });
     await this.loadSettings();
     this.setDiagnosticLogLevel(this.settings.debugLogLevel);
     this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
+    (_a = this.fileLogger) == null ? void 0 : _a.setMaxEntries(this.settings.debugLogRetention);
     if (this.credentialStorageError) {
       new import_obsidian9.Notice(this.credentialStorageError.message);
     }
@@ -24222,8 +26813,8 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-clear-debug-log",
       name: "Clear debug log file",
       callback: async () => {
-        var _a;
-        await ((_a = this.fileLogger) == null ? void 0 : _a.clear());
+        var _a2;
+        await ((_a2 = this.fileLogger) == null ? void 0 : _a2.clear());
         new import_obsidian9.Notice("Debug log cleared.");
       }
     });
@@ -24279,6 +26870,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     await this.saveData(this.settings);
   }
   setDiagnosticLogLevel(level) {
+    var _a;
     const levels = {
       off: 3 /* ERROR */,
       error: 3 /* ERROR */,
@@ -24286,10 +26878,15 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       debug: 0 /* DEBUG */
     };
     log2.setLogLevel(levels[level]);
+    (_a = this.fileLogger) == null ? void 0 : _a.setMemorySamplingEnabled(level === "debug");
   }
   setDiagnosticLogMaxSize(maxSizeMB) {
     var _a;
     (_a = this.fileLogger) == null ? void 0 : _a.setMaxSize(maxSizeMB * 1024 * 1024);
+  }
+  setDiagnosticLogRetention(entries) {
+    var _a;
+    (_a = this.fileLogger) == null ? void 0 : _a.setMaxEntries(entries);
   }
   requireCredentialStore() {
     if (!this.credentialStore) {
@@ -25059,4 +27656,23 @@ safe-buffer/index.js:
 
 crc-32/crc32.js:
   (*! crc32.js (C) 2014-present SheetJS -- http://sheetjs.com *)
+
+isomorphic-git/index.js:
+  (*!
+   * This code for `path.join` is directly copied from @zenfs/core/path for bundle size improvements.
+   * SPDX-License-Identifier: LGPL-3.0-or-later
+   * Copyright (c) James Prevett and other ZenFS contributors.
+   *
+   * Windows support added:
+   *   - Backslashes are normalised to forward slashes before processing.
+   *   - Drive-letter prefixes (e.g. "C:") are detected and preserved through
+   *     normalisation, so absolute Windows paths are handled correctly.
+   *   - An absolute argument passed to join() resets the accumulated path,
+   *     matching Node behaviour and handling worktree gitdir paths properly.
+   *
+   * Limitation: UNC paths (e.g. \\server\share) are not supported. The leading
+   *   backslashes are normalised to forward slashes and then collapsed by
+   *   normalizeString, losing the UNC root. Git on Windows works with
+   *   drive-letter paths, so this is not expected to be a practical issue.
+   *)
 */

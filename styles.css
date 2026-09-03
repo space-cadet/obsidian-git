@@ -807,6 +807,22 @@
     letter-spacing: 0.3px;
 }
 
+.git-commit-local {
+    border-left: 2px solid var(--interactive-accent);
+}
+
+.git-commit-local-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--background-modifier-border);
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    letter-spacing: 0.3px;
+}
+
 .git-commit-meta {
     display: flex;
     gap: 8px;

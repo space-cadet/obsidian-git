@@ -144,6 +144,21 @@ Progress helpers must expose separate `complete()` and `fail(error)` paths.
 Every caller must use a `finally` block to stop timers and release the progress
 owner. A failure must never pass through the success completion function.
 
+## User-Reported Sidebar and Push Symptoms — 2026-09-03
+
+The first-load blank, repeated tab reads, false "Up to date" status, and
+session-only Log view all come from view reads being owned by a full DOM rebuild
+instead of a retained immutable view model. The target is one shared repository
+snapshot plus tab-specific caches, explicit loading/error states, and generation
+checks before any render.
+
+The push dialog is also using the clone progress vocabulary for a push request.
+Its byte counter measures the buffered response after `requestUrl` returns, not
+upload progress; callback silence therefore freezes the visible phase. The
+target is an operation-specific push contract, an independent elapsed timer,
+indeterminate transfer state when native streaming is unavailable, and a
+user-dismissed success state.
+
 ## Target Service Boundaries
 
 - `SettingsStore`: validated settings and secret references.

@@ -92,3 +92,20 @@
 - Recorded the urgent unresolved `.gitignore` enforcement regression.
 - Created independent T36 documentation for an official 1.41.9 evaluation and
   possible isomorphic-git fork, including packaging and maintenance boundaries.
+
+## 2026-09-03 — T29/T35b/T35d/T36 implementation plan
+
+- Recorded the confirmed architecture diagnosis for first-load rendering,
+  comparison state, tab cache invalidation, persistent logs, memory metrics,
+  and push progress.
+- Recorded `.gitignore` enforcement as the first implementation gate and the
+  official 1.41.9-before-fork dependency decision.
+
+## 2026-09-03 — T29/T35b/T35d/T36 implementation result
+
+- Pinned official isomorphic-git 1.41.9 and fixed staging-boundary ignore
+  enforcement while preserving tracked-but-ignored files.
+- Implemented the sidebar loading/comparison/cache changes, persistent Log
+  history, opt-in memory metrics, and honest timed push progress.
+- Automated verification passed; real Obsidian desktop/mobile acceptance is
+  still open.

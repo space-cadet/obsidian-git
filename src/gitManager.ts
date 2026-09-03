@@ -495,11 +495,21 @@ export interface GitSidebarStatusSnapshot {
     branch: string;
     ahead: number;
     behind: number;
+    comparison: GitComparisonState;
+    comparisonError?: string;
     repositoryStatusAvailable?: boolean;
     detailedStatus: GitFileStatus[];
     staged: string[];
     unstaged: string[];
 }
+
+export type GitComparisonState =
+    | 'up-to-date'
+    | 'ahead'
+    | 'behind'
+    | 'diverged'
+    | 'local-only'
+    | 'unavailable';
 
 export interface GitCommitFile {
     filepath: string;
@@ -1292,6 +1302,7 @@ export class GitManager {
         this.assertOperationActive();
         const temporaryDir = `${this.dir === '.' ? '.' : this.dir}/.git-sync-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
         const fs = this.fs.promises || this.fs;
+        let remoteOid: string | null = null;
 
         try {
             await fs.mkdir(temporaryDir, { recursive: true });
@@ -1303,7 +1314,6 @@ export class GitManager {
                 url: normalizeRemoteUrl(repoUrl),
             });
 
-            let remoteOid: string | null = null;
             try {
                 await git.fetch({
                     fs: this.fs,
@@ -1958,27 +1968,33 @@ export class GitManager {
     async addAll(files?: readonly string[]): Promise<BulkStageResult> {
         try {
             this.assertOperationActive();
-            // When the sidebar supplies a list, use exactly what the user saw.
-            // The sync path has no rendered list, so it discovers the files here.
-            let statusMatrixForStaging: GitStatusMatrixRow[] | null = null;
-            let filesToStage: string[];
-            if (files) {
-                filesToStage = filterAutomaticallyStagedPaths([...new Set(files)]);
-            } else {
-                // The sync path used to scan the complete worktree here and
-                // then scan it again to classify deletions. Reuse one snapshot.
-                statusMatrixForStaging = await git.statusMatrix({
-                    fs: this.fs,
-                    dir: this.dir,
-                }) as GitStatusMatrixRow[];
-                filesToStage = filterAutomaticallyStagedPaths(
+            // Always classify the caller's paths against one status snapshot.
+            // statusMatrix omits ignored untracked files, so isIgnored() is
+            // also required before accepting a stale or hand-supplied path.
+            const statusMatrixForStaging = await git.statusMatrix({
+                fs: this.fs,
+                dir: this.dir,
+            }) as GitStatusMatrixRow[];
+            const statusByPath = new Map<string, GitStatusMatrixRow>();
+            for (const row of statusMatrixForStaging) statusByPath.set(row[0], row);
+            const requestedFiles = files
+                ? filterAutomaticallyStagedPaths([...new Set(files)])
+                : filterAutomaticallyStagedPaths(
                     statusMatrixForStaging
                         .filter((row) => row[1] !== row[2] || row[1] !== row[3])
                         .map((row) => row[0]),
                 );
+            const filesToStage: string[] = [];
+            const failed: Array<{ filepath: string; message: string }> = [];
+            for (const filepath of requestedFiles) {
+                const row = statusByPath.get(filepath);
+                if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
+                    failed.push({ filepath, message: `Path "${filepath}" is ignored by .gitignore` });
+                    continue;
+                }
+                filesToStage.push(filepath);
             }
             const staged: string[] = [];
-            const failed: Array<{ filepath: string; message: string }> = [];
 
             this.updateStatus(filesToStage.length > 0
                 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? '' : 's'}...`
@@ -1987,15 +2003,6 @@ export class GitManager {
             // isomorphic-git.add() expects a file to exist in the working tree.
             // Build one status snapshot so tracked deletions can use remove()
             // without rescanning the vault once per file.
-            const statusByPath = new Map<string, GitStatusMatrixRow>();
-            if (filesToStage.length > 0) {
-                const statusMatrix = statusMatrixForStaging || await git.statusMatrix({
-                    fs: this.fs,
-                    dir: this.dir,
-                }) as GitStatusMatrixRow[];
-                for (const row of statusMatrix) statusByPath.set(row[0], row);
-            }
-
             const stagedPaths = new Set<string>();
 
             // Keep going if one file cannot be staged. A single bad file must
@@ -2051,11 +2058,32 @@ export class GitManager {
                 await stageIndividually(file);
             }
 
+            // Never report success solely because git.add() returned. Older
+            // isomorphic-git releases can silently skip an ignored path, so
+            // confirm the resulting index state from a fresh status matrix.
+            if (stagedPaths.size > 0) {
+                const finalMatrix = await git.statusMatrix({
+                    fs: this.fs,
+                    dir: this.dir,
+                }) as GitStatusMatrixRow[];
+                const finalByPath = new Map(finalMatrix.map((row) => [row[0], row]));
+                for (const file of [...stagedPaths]) {
+                    const before = statusByPath.get(file);
+                    const after = finalByPath.get(file);
+                    const deletion = before?.[1] === 1 && before?.[2] === 0;
+                    const stagedInIndex = deletion ? after?.[3] === 0 : after?.[3] === 2;
+                    if (!stagedInIndex) {
+                        stagedPaths.delete(file);
+                        failed.push({ filepath: file, message: `Path "${file}" was not written to the Git index` });
+                    }
+                }
+            }
+
             for (const file of filesToStage) {
                 if (stagedPaths.has(file)) staged.push(file);
             }
 
-            const result = { requested: filesToStage.length, staged, failed };
+            const result = { requested: requestedFiles.length, staged, failed };
             this.updateStatus(failed.length > 0
                 ? `Staged ${staged.length}; ${failed.length} failed`
                 : `Staged ${staged.length} change${staged.length === 1 ? '' : 's'}`);
@@ -2134,6 +2162,7 @@ export class GitManager {
             
             progress = this.createProgress('Pushing to remote');
             const { onProgress, onMessage } = progress;
+            onMessage('Connecting to remote...');
             
             await git.push({
                 fs: this.fs,
@@ -2152,7 +2181,15 @@ export class GitManager {
                 onProgress,
                 onMessage
             });
-            
+            onMessage('Confirming branch...');
+            // Keep the local comparison ref in sync with a successful push so
+            // the next sidebar refresh does not report a stale ahead count.
+            try {
+                const localOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` });
+                await git.writeRef({ fs: this.fs, dir: this.dir, ref: `refs/remotes/origin/${branchName}`, value: localOid });
+            } catch (error) {
+                log.warn('GitManager', 'Push succeeded but tracking metadata could not be updated', error as Error);
+            }
             progress.complete();
             this.updateStatus('Push completed');
             log.info('GitManager', `Successfully pushed changes to remote branch: ${branchName}`);
@@ -2182,7 +2219,7 @@ export class GitManager {
     /**
      * Get the current status of the repository
      */
-    async getStatus(): Promise<{ branch: string; ahead: number; behind: number; }> {
+    async getStatus(): Promise<{ branch: string; ahead: number; behind: number; comparison: GitComparisonState; comparisonError?: string; }> {
         try {
             log.debug('GitManager', 'Getting repository status');
             const currentBranch = await git.currentBranch({
@@ -2198,26 +2235,62 @@ export class GitManager {
             
             log.debug('GitManager', `Current branch: ${currentBranch}`);
             
-            // Get ahead/behind counts
-            const [ahead, behind] = await Promise.all([
-                git.log({
-                    fs: this.fs,
-                    dir: this.dir,
-                    ref: `origin/${currentBranch}..${currentBranch}`
-                }).then(commits => commits.length).catch(() => 0),
-                git.log({
-                    fs: this.fs,
-                    dir: this.dir,
-                    ref: `${currentBranch}..origin/${currentBranch}`
-                }).then(commits => commits.length).catch(() => 0)
+            const localRef = `refs/heads/${currentBranch}`;
+            const remoteRef = `refs/remotes/origin/${currentBranch}`;
+            let localOid: string | null = null;
+            try {
+                localOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: localRef });
+            } catch (error) {
+                return {
+                    branch: currentBranch,
+                    ahead: 0,
+                    behind: 0,
+                    comparison: 'unavailable',
+                    comparisonError: error instanceof Error ? error.message : String(error),
+                };
+            }
+            try {
+                await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
+            } catch (error) {
+                log.info('GitManager', `No tracking ref for ${currentBranch}`);
+                const localCommits = localOid
+                    ? await git.log({ fs: this.fs, dir: this.dir, ref: localRef }).catch(() => [])
+                    : [];
+                return {
+                    branch: currentBranch,
+                    ahead: localCommits.length,
+                    behind: 0,
+                    comparison: localOid ? 'local-only' : 'unavailable',
+                    comparisonError: error instanceof Error ? error.message : String(error),
+                };
+            }
+
+            // isomorphic-git log does not implement Git's dotted range syntax
+            // consistently across releases. Compare the two reachable OID
+            // sets instead, which also gives a real diverged state.
+            const [localCommits, remoteCommits] = await Promise.all([
+                git.log({ fs: this.fs, dir: this.dir, ref: localRef }),
+                git.log({ fs: this.fs, dir: this.dir, ref: remoteRef }),
             ]);
+            const remoteOids = new Set(remoteCommits.map((commit) => commit.oid));
+            const localOids = new Set(localCommits.map((commit) => commit.oid));
+            const ahead = localCommits.filter((commit) => !remoteOids.has(commit.oid)).length;
+            const behind = remoteCommits.filter((commit) => !localOids.has(commit.oid)).length;
+            const comparison: GitComparisonState = ahead > 0 && behind > 0
+                ? 'diverged'
+                : ahead > 0
+                    ? 'ahead'
+                    : behind > 0
+                        ? 'behind'
+                        : 'up-to-date';
             
             log.info('GitManager', `Repository status: branch=${currentBranch}, ahead=${ahead}, behind=${behind}`);
             
             return {
                 branch: currentBranch,
                 ahead,
-                behind
+                behind,
+                comparison,
             };
         } catch (error) {
             log.error('GitManager', 'Failed to get repository status', error);
@@ -2279,6 +2352,8 @@ export class GitManager {
                 branch: 'local',
                 ahead: 0,
                 behind: 0,
+                comparison: 'unavailable' as const,
+                comparisonError: error instanceof Error ? error.message : String(error),
                 repositoryStatusAvailable: false,
             };
         });
@@ -2375,7 +2450,24 @@ export class GitManager {
             return;
         }
 
+        if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
+            throw new Error(`Path "${filepath}" is ignored by .gitignore`);
+        }
         await git.add({ fs: this.fs, dir: this.dir, filepath });
+    }
+
+    /**
+     * Ask isomorphic-git for ignore semantics at the staging boundary. A
+     * missing .gitignore is a normal non-ignored result; other read failures
+     * are logged and left to git.add() to report with its original error.
+     */
+    private async isIgnoredPath(filepath: string): Promise<boolean> {
+        try {
+            return await git.isIgnored({ fs: this.fs, dir: this.dir, filepath });
+        } catch (error) {
+            log.debug('GitManager', `Unable to evaluate .gitignore for ${filepath}`, error as Error);
+            return false;
+        }
     }
 
     /**

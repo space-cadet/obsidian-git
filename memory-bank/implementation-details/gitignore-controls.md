@@ -1,7 +1,7 @@
 # Gitignore Controls and Hidden Dotfile Editing
 
 *Created: 2026-08-12 15:59:54 IST*
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 18:50:21 IST*
 *Tasks: T29, T35b*
 
 ## Purpose
@@ -68,6 +68,27 @@ large change set.
   automatic sync, Stage all, individual staging, and tracked-but-ignored files.
 - Do not remove tracked files merely because a new ignore rule matches them;
   that remains an explicit index operation.
+
+## Confirmed Source Diagnosis and Implementation Order — 2026-09-03
+
+- The installed lockfile version is isomorphic-git 1.29.0. Its `add()` path
+  checks `isIgnored()` without checking index membership first, so a tracked
+  file that later matches `.gitignore` is silently skipped. This is contrary
+  to normal Git behavior.
+- `GitManager.addAll()` filters only plugin-owned paths, trusts caller-supplied
+  paths, and marks each batch member staged after `git.add()` returns. A
+  skipped ignored path can therefore be reported as staged even when the index
+  did not change. `stageFile()` has the same no-op reporting risk.
+- `statusMatrix()` correctly keeps tracked-but-ignored modifications visible;
+  the fix must preserve that behavior while omitting ignored untracked files.
+- Official isomorphic-git v1.41.9 has the tracked-path guard in `add()`. Test
+  that release with `ObsidianFsAdapter` before considering a fork.
+
+The code change will centralize candidate classification, use isomorphic-git
+ignore evaluation, reject ignored untracked paths, preserve tracked paths,
+and verify index membership/OID changes before reporting staging success. The
+test matrix includes single-file, bulk, automatic-sync, nested, glob,
+negated, ignored-directory, tracked-but-ignored, and deletion cases.
 
 ## Related Files
 

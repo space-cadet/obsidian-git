@@ -28,6 +28,7 @@ export class Logger {
   private logLevel: LogLevel = LogLevel.INFO;
   private showNotices: boolean = true;
   private entries: LogEntry[] = [];
+  private persistedEntries: LogEntry[] = [];
   private maxEntries: number = 500;
   private sensitiveValues: string[] = [];
   private recentNoticeTimes = new Map<string, number>();
@@ -50,12 +51,21 @@ export class Logger {
    * Get recent log entries for display
    */
   public getEntries(): LogEntry[] {
-    return this.entries;
+    const merged = new Map<string, LogEntry>();
+    for (const entry of [...this.persistedEntries, ...this.entries]) {
+      merged.set(`${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`, entry);
+    }
+    return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
+  }
+
+  public mergePersistedEntries(entries: readonly LogEntry[]): void {
+    this.persistedEntries = [...entries].slice(-this.maxEntries);
   }
 
   /** Clear the in-memory activity log shown in the sidebar. */
   public clear(): void {
     this.entries = [];
+    this.persistedEntries = [];
   }
 
   /**
@@ -83,14 +93,14 @@ export class Logger {
       '# Obsidian Git Sync — Debug Log',
       '',
       `**Generated:** ${new Date().toLocaleString()}`,
-      `**Entries:** ${this.entries.length}`,
+      `**Entries:** ${this.getEntries().length}`,
       `**Log Level:** ${LogLevel[this.logLevel]}`,
       '',
       '---',
       '',
     ];
 
-    for (const entry of this.entries) {
+    for (const entry of this.getEntries()) {
       const time = new Date(entry.timestamp).toLocaleTimeString();
       const emoji = entry.level === 'error' ? '🔴' : entry.level === 'warn' ? '⚠️' : entry.level === 'debug' ? '🔍' : 'ℹ️';
       lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} — ${time}`);

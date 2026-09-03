@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
-import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot } from '../gitManager';
+import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../gitManager';
 import { log, LogEntry } from '../logger';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
@@ -22,6 +22,9 @@ export class GitSidebarView extends ItemView {
     private hasRealRepo: boolean = false;
     private sidebarSnapshot: GitSidebarStatusSnapshot | null = null;
     private remoteCommitsCache: { repoUrl: string; branch: string; commits: GitCommit[] } | null = null;
+    private localCommitsCache: { branch: string; commits: GitCommit[] } | null = null;
+    private commitDetailsCache = new Map<string, GitCommit['files']>();
+    private logEntriesCache: LogEntry[] | null = null;
     private renderGeneration = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
@@ -79,6 +82,11 @@ export class GitSidebarView extends ItemView {
         this.contentContainer.setAttr('tabindex', '0');
         this.contentContainer.setAttr('aria-label', 'Git Sync content');
 
+        // Do not leave the first frame blank while adapter/index reads run.
+        // The loading state also establishes the branch/header region before
+        // the first asynchronous snapshot is available.
+        this.renderLoadingState();
+
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');
         this.renderFooter(footer);
@@ -125,10 +133,23 @@ export class GitSidebarView extends ItemView {
 
     private invalidateRemoteCommitsCache(): void {
         this.remoteCommitsCache = null;
+        this.localCommitsCache = null;
+        this.commitDetailsCache.clear();
     }
 
     private isCurrentRender(generation: number): boolean {
         return generation === this.renderGeneration && this.containerEl.isConnected;
+    }
+
+    private renderLoadingState(): void {
+        this.headerContainer.empty();
+        this.headerContainer.addClass('git-repository-header');
+        const row = this.headerContainer.createDiv('git-header-branch');
+        const icon = row.createSpan({ cls: 'git-branch-icon', attr: { 'aria-hidden': 'true' } });
+        setIcon(icon, 'git-branch');
+        row.createSpan({ text: 'Loading repository…', cls: 'git-branch-name git-branch-uninit' });
+        this.contentContainer.empty();
+        this.contentContainer.createEl('p', { text: 'Loading Git status…', cls: 'git-empty-state' });
     }
 
     // ─── Tabs ───
@@ -170,6 +191,7 @@ export class GitSidebarView extends ItemView {
         initialized: boolean,
         hasRealRepo: boolean,
         repositoryStatusAvailable = true,
+        comparison: GitComparisonState = 'up-to-date',
     ): void {
         this.headerContainer.empty();
         this.headerContainer.addClass('git-repository-header');
@@ -223,13 +245,16 @@ export class GitSidebarView extends ItemView {
         } else if (this.isLocalOnly) {
             setIcon(statusIcon, 'circle-alert');
             statusRow.createSpan({ text: 'Local only — no remote', cls: 'git-local-only' });
-        } else if (!repositoryStatusAvailable) {
+        } else if (!repositoryStatusAvailable || comparison === 'unavailable') {
             setIcon(statusIcon, 'circle-alert');
             statusRow.createSpan({ text: 'Repository comparison unavailable', cls: 'git-header-hint' });
+        } else if (comparison === 'local-only') {
+            setIcon(statusIcon, 'cloud-off');
+            statusRow.createSpan({ text: ahead > 0 ? `${ahead} local commit${ahead === 1 ? '' : 's'} not pushed` : 'No upstream branch', cls: 'git-header-hint' });
         } else if (ahead > 0 || behind > 0) {
             setIcon(statusIcon, 'arrow-up-down');
             statusRow.createSpan({
-                text: `⬆ ${ahead} ⬇ ${behind}`,
+                text: `${ahead > 0 ? `⬆ ${ahead} to push` : ''}${ahead > 0 && behind > 0 ? ' · ' : ''}${behind > 0 ? `⬇ ${behind} to pull` : ''}`,
                 cls: 'git-ahead-behind' + (ahead > 0 ? ' git-ahead' : '') + (behind > 0 ? ' git-behind' : '')
             });
         } else {
@@ -360,6 +385,7 @@ export class GitSidebarView extends ItemView {
                 });
                 modal.close();
                 new Notice('Changes committed');
+                this.invalidateRemoteCommitsCache();
                 await this.refresh();
             } catch (e: any) {
                 commitButton.setDisabled(false).setButtonText('Commit');
@@ -477,8 +503,9 @@ export class GitSidebarView extends ItemView {
         const ahead = snapshot?.ahead || 0;
         const behind = snapshot?.behind || 0;
         const repositoryStatusAvailable = snapshot?.repositoryStatusAvailable !== false;
+        const comparison = snapshot?.comparison || (repositoryStatusAvailable ? 'up-to-date' : 'unavailable');
 
-        this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable);
+        this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
         this.stagedCount = snapshot?.staged.length || 0;
         this.contentContainer.empty();
 
@@ -499,7 +526,7 @@ export class GitSidebarView extends ItemView {
                     await this.renderCommitsTab(generation);
                     break;
                 case 'log':
-                    this.renderLogTab();
+                    await this.renderLogTab();
                     break;
             }
         }
@@ -945,7 +972,14 @@ export class GitSidebarView extends ItemView {
                     return;
                 }
                 branch = await this.plugin.gitManager.getCurrentBranch();
-                commits = await this.plugin.gitManager.getLog(25);
+                if (this.localCommitsCache?.branch === branch) {
+                    commits = this.localCommitsCache.commits;
+                } else {
+                    commits = await this.plugin.gitManager.getLog(25);
+                    if (this.isCurrentRender(generation)) {
+                        this.localCommitsCache = { branch, commits };
+                    }
+                }
             } else {
                 // Remote history is independent of local repository health.
                 // Use the configured branch and query GitHub first so stale or
@@ -955,7 +989,7 @@ export class GitSidebarView extends ItemView {
                     && this.remoteCommitsCache.branch === branch
                     ? this.remoteCommitsCache.commits
                     : null;
-                if (cached && cached.length > 0) {
+                if (cached !== null) {
                     commits = cached;
                 } else {
                     const password = await this.plugin.resolveGitPassword();
@@ -966,11 +1000,7 @@ export class GitSidebarView extends ItemView {
                     }
                 }
                 if (this.isCurrentRender(generation)) {
-                    if (commits.length > 0) {
-                        this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
-                    } else {
-                        this.invalidateRemoteCommitsCache();
-                    }
+                    this.remoteCommitsCache = { repoUrl: remoteUrl, branch, commits };
                 }
             }
 
@@ -990,7 +1020,7 @@ export class GitSidebarView extends ItemView {
 
             for (const commit of commits) {
                 const isExpanded = this.expandedCommitOids.has(commit.oid);
-                const row = listContainer.createDiv('git-commit-row' + (this.commitsViewMode === 'remote' ? ' git-commit-remote' : ''));
+                const row = listContainer.createDiv('git-commit-row' + (this.commitsViewMode === 'remote' ? ' git-commit-remote' : ' git-commit-local'));
                 row.setAttr('data-oid', commit.oid);
                 row.setAttr('data-expanded', String(isExpanded));
                 row.setAttr('role', 'article');
@@ -1017,9 +1047,10 @@ export class GitSidebarView extends ItemView {
                 const hash = meta.createSpan({ text: commit.oid.slice(0, 7), cls: 'git-commit-hash' });
                 hash.setAttr('title', commit.oid);
                 meta.createSpan({ text: commit.author, cls: 'git-commit-author' });
-                if (this.commitsViewMode === 'remote') {
-                    meta.createSpan({ text: 'origin', cls: 'git-commit-remote-badge' });
-                }
+                meta.createSpan({
+                    text: this.commitsViewMode === 'remote' ? 'origin' : 'local',
+                    cls: this.commitsViewMode === 'remote' ? 'git-commit-remote-badge' : 'git-commit-local-badge',
+                });
                 const toggle = meta.createSpan({ cls: 'git-commit-toggle', attr: { 'aria-hidden': 'true' } });
                 toggle.setText(isExpanded ? '⌄' : '›');
 
@@ -1078,11 +1109,16 @@ export class GitSidebarView extends ItemView {
 
         try {
             let files: { filepath: string; status: 'added' | 'modified' | 'deleted' }[] = [];
+            const cachedFiles = this.commitDetailsCache.get(oid);
+            if (cachedFiles) files = cachedFiles;
             
             // Use the API directly when remote history is being viewed without
             // a healthy local repository. Otherwise prefer the local object
             // database and retain the shallow-history fallback.
-            if (this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl && !this.hasRealRepo) {
+            if (cachedFiles) {
+                // Details are immutable for a commit; avoid repeating local or
+                // GitHub reads when a row is collapsed and expanded again.
+            } else if (this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl && !this.hasRealRepo) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
                 const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
                     this.plugin.settings.repoUrl,
@@ -1115,6 +1151,8 @@ export class GitSidebarView extends ItemView {
                     files = remoteFiles;
                 }
             }
+
+            this.commitDetailsCache.set(oid, files);
             
             detail.empty();
 
@@ -1161,7 +1199,15 @@ export class GitSidebarView extends ItemView {
         const toolbar = listContainer.createDiv('git-log-toolbar');
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
         
-        const entries = log.getEntries();
+        const currentLogEntries = log.getEntries();
+        const cacheStale = this.logEntriesCache
+            && currentLogEntries.length !== this.logEntriesCache.length;
+        if (!this.logEntriesCache || cacheStale) {
+            const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+            log.mergePersistedEntries(persisted);
+            this.logEntriesCache = log.getEntries();
+        }
+        const entries = this.logEntriesCache;
         
         if (entries.length === 0) {
             listContainer.createEl('p', { text: 'No activity yet', cls: 'git-empty-state' });
@@ -1203,6 +1249,11 @@ export class GitSidebarView extends ItemView {
             .setIcon('download')
             .onClick(async () => {
                 try {
+                    if (!this.logEntriesCache) {
+                        const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+                        log.mergePersistedEntries(persisted);
+                        this.logEntriesCache = log.getEntries();
+                    }
                     const path = await log.exportToFile(this.app.vault);
                     new Notice(`Log exported to ${path}`);
                 } catch (e: any) {
@@ -1212,17 +1263,24 @@ export class GitSidebarView extends ItemView {
         menu.addItem((item) => item
             .setTitle('Clear log')
             .setIcon('trash-2')
-            .onClick(() => {
+            .onClick(async () => {
                 log.clear();
+                await this.plugin.fileLogger?.clear();
+                this.logEntriesCache = [];
                 new Notice('Activity log cleared');
                 this.contentContainer.empty();
-                void this.renderLogTab();
+                await this.renderLogTab();
             }));
         menu.addItem((item) => item
             .setTitle('Copy details')
             .setIcon('copy')
             .onClick(async () => {
-                const entries = [...log.getEntries()].reverse().slice(0, 50);
+                if (!this.logEntriesCache) {
+                    const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+                    log.mergePersistedEntries(persisted);
+                    this.logEntriesCache = log.getEntries();
+                }
+                const entries = [...this.logEntriesCache].reverse().slice(0, 50);
                 const details = entries.length === 0
                     ? 'No activity yet'
                     : entries.map((entry) => {

@@ -311,6 +311,36 @@ test('repository health distinguishes missing, empty, healthy, and damaged metad
   }
 });
 
+test('repository comparison reports a missing upstream instead of false up-to-date', async () => {
+  const repositoryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-comparison-'));
+  try {
+    await git.init({ fs: fsPromises, dir: repositoryDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(repositoryDirectory, 'README.md'), 'one\n');
+    await git.add({ fs: fsPromises, dir: repositoryDirectory, filepath: 'README.md' });
+    const oid = await git.commit({
+      fs: fsPromises,
+      dir: repositoryDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    const manager = new GitManager(fsPromises, repositoryDirectory, {
+      repoUrl: '', username: '', password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    assert.deepEqual(await manager.getStatus(), {
+      branch: 'main', ahead: 1, behind: 0, comparison: 'local-only',
+      comparisonError: 'Could not find refs/remotes/origin/main.',
+    });
+    await git.writeRef({ fs: fsPromises, dir: repositoryDirectory, ref: 'refs/remotes/origin/main', value: oid });
+    const upToDate = await manager.getStatus();
+    assert.equal(upToDate.comparison, 'up-to-date');
+    assert.equal(upToDate.ahead, 0);
+    assert.equal(upToDate.behind, 0);
+  } finally {
+    rmSync(repositoryDirectory, { recursive: true, force: true });
+  }
+});
+
 test('repository health detects an empty index and repair rebuilds it without changing vault files', async () => {
   const repositoryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-index-repair-'));
   try {
@@ -550,6 +580,61 @@ test('stageFile stages a tracked deletion without reading the missing file', asy
 
     const matrix = await git.statusMatrix({ fs: fsPromises, dir: stageDirectory });
     assert.deepEqual(matrix, [['deleted.md', 1, 0, 0]]);
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
+test('staging rejects ignored untracked paths but preserves tracked paths matching a new rule', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-ignore-stage-'));
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(stageDirectory, 'tracked.tmp'), 'initial\n');
+    await git.add({ fs: fsPromises, dir: stageDirectory, filepath: 'tracked.tmp' });
+    await git.commit({
+      fs: fsPromises,
+      dir: stageDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    await fsPromises.writeFile(join(stageDirectory, '.gitignore'), '*.tmp\nignored-dir/\n');
+    await fsPromises.writeFile(join(stageDirectory, 'tracked.tmp'), 'modified\n');
+    await fsPromises.writeFile(join(stageDirectory, 'ignored.tmp'), 'secret\n');
+    await fsPromises.mkdir(join(stageDirectory, 'ignored-dir'));
+    await fsPromises.writeFile(join(stageDirectory, 'ignored-dir/nested.md'), 'secret\n');
+
+    const manager = new GitManager(fsPromises, stageDirectory, {
+      repoUrl: '', username: '', password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    const result = await manager.addAll(['tracked.tmp', 'ignored.tmp', 'ignored-dir/nested.md', '.gitignore']);
+    assert.deepEqual(result.staged.sort(), ['.gitignore', 'tracked.tmp']);
+    assert.deepEqual(result.failed.map(({ filepath }) => filepath).sort(), ['ignored-dir/nested.md', 'ignored.tmp']);
+    assert.match(result.failed[0].message, /ignored by \.gitignore/);
+
+    const matrix = new Map((await git.statusMatrix({ fs: fsPromises, dir: stageDirectory })).map((row) => [row[0], row]));
+    assert.equal(matrix.get('tracked.tmp')[3], 2);
+    assert.equal(matrix.get('.gitignore')[3], 2);
+    assert.equal(matrix.has('ignored.tmp'), false);
+    assert.equal(matrix.has('ignored-dir/nested.md'), false);
+  } finally {
+    rmSync(stageDirectory, { recursive: true, force: true });
+  }
+});
+
+test('stageFile rejects a directly supplied ignored untracked path', async () => {
+  const stageDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-ignore-single-'));
+  try {
+    await git.init({ fs: fsPromises, dir: stageDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(stageDirectory, '.gitignore'), 'private/**\n');
+    await fsPromises.mkdir(join(stageDirectory, 'private'));
+    await fsPromises.writeFile(join(stageDirectory, 'private/note.md'), 'secret\n');
+    const manager = new GitManager(fsPromises, stageDirectory, {
+      repoUrl: '', username: '', password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    await assert.rejects(manager.stageFile('private/note.md'), /ignored by \.gitignore/);
+    assert.equal((await git.statusMatrix({ fs: fsPromises, dir: stageDirectory })).some(([filepath]) => filepath === 'private/note.md'), false);
   } finally {
     rmSync(stageDirectory, { recursive: true, force: true });
   }

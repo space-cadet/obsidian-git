@@ -1,11 +1,39 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 18:50:21 IST*
 
 ---
 
 ## 2026-09-03
+
+#### 18:50:21 IST - T29/T35b/T35d/T36: Implement reported sidebar, ignore, logging, metrics, comparison, and push-progress fixes
+- Modified `package.json` - Pinned official isomorphic-git 1.41.9.
+- Modified `pnpm-lock.yaml` - Resolved the official dependency and lockfile graph.
+- Modified `src/gitManager.ts` - Enforced ignore checks at staging boundaries, verified index results, added comparison states, and refreshed tracking metadata after push.
+- Modified `src/views/GitSidebarView.ts` - Added first-frame loading, history/detail/log caches, comparison labels, provenance badges, persistent log loading, and consistent log actions.
+- Modified `src/fileLogger.ts` - Added persistent entry reads, line retention, opt-in memory sampling, and a one-minute diagnostic interval.
+- Modified `src/logger.ts` - Merged persisted entries into display/export and cleared both memory layers.
+- Modified `src/main.ts` - Wired diagnostic level and retention settings to file logging and sampling.
+- Modified `src/settings-sections/diagnostics.ts` - Applied retention changes immediately.
+- Modified `src/ui/GitProgressModal.ts` - Added push-specific phases, honest response labels, independent elapsed timing, and user-dismissed completion.
+- Modified `src/updater/PluginUpdater.ts` - Avoided an unnecessary stable-channel commit request exposed by full-suite verification.
+- Modified `styles.css` - Added visible local commit provenance styling.
+- Modified `tests/git-manager.test.mjs` - Added ignore-enforcement and comparison regressions.
+- Modified `main.js` - Regenerated the production bundle and artifact identity.
+
+#### 18:29:43 IST - T29/T35b/T35d/T36: Record user-reported reliability implementation plan
+- Modified `memory-bank/tasks/T29.md` - Recorded the seven-item implementation scope and shared architecture diagnosis.
+- Modified `memory-bank/tasks/T35b.md` - Recorded loading, comparison, caching, logging, metrics, and push-progress follow-ups.
+- Modified `memory-bank/tasks/T36.md` - Recorded the official 1.41.9-before-fork ignore-enforcement plan.
+- Modified `memory-bank/implementation-details/gitignore-controls.md` - Recorded the confirmed tracked-ignore staging regression and test order.
+- Modified `memory-bank/implementation-details/reliability-and-lifecycle.md` - Recorded the shared sidebar-read and push-progress architecture target.
+- Modified `memory-bank/implementation-details/clone-resume-and-progress.md` - Recorded the push-specific progress contract.
+- Modified `memory-bank/activeContext.md` - Opened the implementation continuation and first gate.
+- Modified `memory-bank/session_cache.md` - Recorded the active implementation session and ordered plan.
+- Modified `memory-bank/sessions/2026-09-03-afternoon.md` - Appended the authorized scope and verification boundaries.
+- Modified `memory-bank/progress.md` - Recorded the implementation milestone and evidence separation.
+- Modified `memory-bank/changelog.md` - Recorded the reliability plan and dependency decision.
 
 #### 16:39:34 IST - T29/T35b/T35c/T35d/T35f/T36: Record repository repair, Git performance, ignore regression, and independent isomorphic-git fork plan
 - Created `memory-bank/tasks/T36.md` - Defined the independent top-level isomorphic-git fork and maintenance task.

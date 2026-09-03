@@ -516,9 +516,9 @@ export class PluginUpdater {
 			}
 
 			const latestVersion = release.tag_name.replace(/^v/, '');
-			const latestCommit = includePrerelease
-				? commitInfoFromRelease(release) ?? await fetchLatestCommit(branchFromRelease(release), logger)
-				: await fetchLatestCommit('main', logger);
+            const latestCommit = includePrerelease
+                ? commitInfoFromRelease(release) ?? await fetchLatestCommit(branchFromRelease(release), logger)
+                : null;
 			this.log('info', 'latestCommit:', latestCommit?.sha?.slice(0, 7));
 			let commitMatch = false;
 			if (includePrerelease && currentCommitHash && latestCommit) {

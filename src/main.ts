@@ -92,6 +92,7 @@ export default class GitSyncPlugin extends Plugin {
 		await this.loadSettings();
 		this.setDiagnosticLogLevel(this.settings.debugLogLevel);
 		this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
+		this.fileLogger?.setMaxEntries(this.settings.debugLogRetention);
 		if (this.credentialStorageError) {
 			new Notice(this.credentialStorageError.message);
 		}
@@ -406,10 +407,17 @@ export default class GitSyncPlugin extends Plugin {
 			debug: LogLevel.DEBUG,
 		};
 		log.setLogLevel(levels[level]);
+		// Memory telemetry is deliberately opt-in: it is useful while debugging,
+		// but must not write a metric every interval for ordinary users.
+		this.fileLogger?.setMemorySamplingEnabled(level === 'debug');
 	}
 
 	setDiagnosticLogMaxSize(maxSizeMB: number): void {
 		this.fileLogger?.setMaxSize(maxSizeMB * 1024 * 1024);
+	}
+
+	setDiagnosticLogRetention(entries: number): void {
+		this.fileLogger?.setMaxEntries(entries);
 	}
 
 	private requireCredentialStore(): CredentialStore {

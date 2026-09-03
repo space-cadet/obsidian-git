@@ -1,7 +1,7 @@
 # Clone Recovery and Progress Telemetry
 
 *Created: 2026-08-12 13:13:05 IST*
-*Last Updated: 2026-08-12 13:59:20 IST*
+*Last Updated: 2026-09-03 18:50:21 IST*
 *Tasks: T35b, T35c, T35d*
 
 ## Purpose
@@ -90,6 +90,15 @@ Rules:
 - Show files written and total files only when checkout instrumentation can
   support them.
 - Preserve the last valid metrics while text messages change the current phase.
+
+### Push-specific follow-up — 2026-09-03
+
+Push must not reuse the clone phase list. Its visible phases are connecting,
+preparing upload, uploading, waiting for remote confirmation, and confirming
+the branch. `requestUrl` buffers the request/response, so upload bytes remain
+indeterminate unless the transport supplies a trustworthy callback. The modal
+must keep a one-second elapsed timer independent of Git callbacks and retain a
+successful result until the user dismisses it.
 
 ## Recovery Contract
 

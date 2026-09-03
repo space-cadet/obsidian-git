@@ -1,21 +1,19 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 18:26:33 IST*
 
 ## Current Session
-**Started**: 2026-09-03 13:11:02 IST
-**Focus Task**: T29, T35b, T35c, T35d, T35f, T36 repository repair, Git performance, ignore enforcement, and dependency architecture
+**Started**: 2026-09-03 18:26:33 IST
+**Focus Task**: T29, T35b, T35d, T36 sidebar reliability, ignore enforcement, persistent logs, metrics, and push progress
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
-**Status**: ✅ CLOSED
+**Status**: 🔄 IN PROGRESS
 
 **Session Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
 
-**Closeout Commit**: Source changes pushed as `b728470`; this Memory Bank update follows
+**Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Diagnose and safely recover the existing non-empty mobile
-`typora-notes` repository whose `refs/heads/main` cannot be resolved; preserve
-the vault and `.git` state before any repair or checkout.
+**Next Session**: Continue official 1.41.9/mobile compatibility and real Obsidian acceptance after the source fixes are verified.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -28,6 +26,26 @@ source file was missing.
 - Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e active) | Planned: 3 (T34b, T34c, T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
 - Current Period: afternoon
+
+## Implementation Plan — 2026-09-03 18:26 IST
+
+1. Fix and test `.gitignore` enforcement across every staging path, using
+   official isomorphic-git 1.41.9 as the first dependency candidate.
+2. Add explicit first-load/loading states, comparison provenance, and push/
+   pull counts to the sidebar.
+3. Add tab-specific caches and precise mutation invalidation.
+4. Load persistent log history and make clear/export/retention consistent.
+5. Make memory sampling opt-in and lifecycle-safe.
+6. Replace clone-shaped push progress with an honest, timed, dismissible flow.
+
+## Implementation Result — 2026-09-03 18:45 IST
+
+- Official isomorphic-git 1.41.9 is pinned; the ignore regression is fixed at
+  the staging boundary and no fork was adopted.
+- All seven source-level fixes are implemented and verified by 57 Node tests,
+  production build, artifact identity, smoke checks, and diff validation.
+- Real Obsidian desktop/mobile and remote timing/freshness acceptance remain
+  open; keep those evidence layers separate from local verification.
 
 ## Task Registry
 - T1: Core Git Integration — ✅ COMPLETED

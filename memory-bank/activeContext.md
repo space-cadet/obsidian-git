@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 18:26:33 IST*
 
 ## Current Tasks
 
@@ -81,6 +81,25 @@
   status, individual staging, bulk staging, and automatic sync.
 - **Remaining**: Commit/push this continuation, then perform official 1.41.9
   compatibility testing and real mobile acceptance.
+
+### Current Implementation Session — 2026-09-03 18:26 IST
+- **Authorized scope**: Implement the seven confirmed sidebar, staging,
+  logging, metrics, and push-progress fixes recorded in T29/T35b/T36.
+- **First gate**: Test official isomorphic-git 1.41.9, centralize staging
+  classification, preserve tracked paths, reject ignored untracked paths, and
+  verify the index before claiming staging success.
+- **Shared follow-up**: Add a sidebar read model with loading/error states,
+  comparison provenance, tab caches, persistent log history, opt-in metrics,
+  and operation-specific push progress.
+- **Worktree safety**: Preserve the pre-existing user modification in `main.js`
+  and do not overwrite unrelated generated or local work.
+
+### Implementation Status — 2026-09-03 18:45 IST
+- Official isomorphic-git 1.41.9 is pinned and passed the tracked-ignore
+  reproduction plus all automated checks; no fork is currently required.
+- Source fixes for all seven reported behaviors are implemented locally.
+- Remaining acceptance is real Obsidian desktop/mobile behavior and remote
+  timing/freshness; automated tests do not close those device gates.
 
 ### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.
