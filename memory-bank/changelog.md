@@ -1,3 +1,13 @@
+## 2026-09-04 — T29a/T35b/T35f bulk action repaint
+
+- Fixed Stage all and Unstage all so they repaint Changes immediately after
+  their Git operation instead of starting a second full repository refresh.
+- Stage all moves only successful files; Unstage all now returns per-file
+  success/failure data so partial results remain accurate in the UI.
+- Added source-level regression coverage for the bulk completion path.
+- Verification passed: 72 Node tests, artifact identity, production build, 10
+  isomorphic-git checks, and `git diff --check`.
+
 ## 2026-09-04 — T29a/T35b/T35d/T35f/T37 sidebar follow-up
 
 - Removed the Log panel's newest-50 display cap so all bounded persistent and

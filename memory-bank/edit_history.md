@@ -1,11 +1,22 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 01:42:44 IST*
+*Last Updated: 2026-09-04 01:51:29 IST*
 
 ---
 
 ## 2026-09-04
+
+#### 01:51:29 IST - T29a/T35b/T35f: Fix bulk stage and unstage repaint
+- Modified `src/gitManager.ts` - Return per-file success and failure data from
+  `unstageAll()`.
+- Modified `src/views/GitSidebarView.ts` - Apply only successful bulk results
+  to the snapshot and repaint Changes without a second full refresh.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Added bulk
+  completion and partial-result assertions.
+- Regenerated `main.js` through the production build.
+- `CI=true pnpm test` passed: 72 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
 
 #### 01:42:44 IST - T29a/T35b/T35d/T35f/T37: Simplify post-stage repaint
 - Modified `src/views/GitSidebarView.ts` - Removed duplicate per-button busy

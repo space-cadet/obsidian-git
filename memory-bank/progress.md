@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 01:42:44 IST*
+*Last Updated: 2026-09-04 01:51:29 IST*
 
 ## 2026-09-04 Sidebar History, Staging, and Commit Controls
 
@@ -14,7 +14,9 @@
   owner, matching their role as persistent controls rather than headings.
 - Repainted the Changes view directly after a completed single-file mutation,
   avoiding a second repository-wide read before the UI reflects the result.
-- Verification passed: 71 Node tests, artifact identity, production build, 10
+- Applied the same direct repaint to Stage all and Unstage all, with per-file
+  result handling for partial bulk operations.
+- Verification passed: 72 Node tests, artifact identity, production build, 10
   isomorphic-git checks, and `git diff --check`. Real Obsidian runtime,
   cross-session persistence, and visual acceptance remain open.
 

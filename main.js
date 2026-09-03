@@ -23703,8 +23703,9 @@ Try again with a faster connection or smaller repository.`
         try {
           this.assertOperationActive();
           const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
-          let successCount = 0;
-          let failCount = 0;
+          const requested = [];
+          const unstaged = [];
+          const failed = [];
           for (const row of matrix) {
             this.assertOperationActive();
             const [filepath, head, workdir, stage] = row;
@@ -23712,19 +23713,22 @@ Try again with a faster connection or smaller repository.`
               continue;
             const hasStagedChanges = stage !== 1 && stage !== 0;
             if (hasStagedChanges) {
+              requested.push(filepath);
               try {
                 await this.unstageFile(filepath);
-                successCount++;
+                unstaged.push(filepath);
               } catch (err) {
-                failCount++;
+                const message = err instanceof Error ? err.message : String(err);
+                failed.push({ filepath, message });
                 log2.warn("GitManager", `Failed to unstage ${filepath}: ${err.message}`);
               }
             }
           }
-          log2.debug("GitManager", `Unstaged ${successCount} files, ${failCount} failed`);
-          if (failCount > 0 && successCount === 0) {
-            throw new Error(`Could not unstage ${failCount} file(s). resetIndex may not be available.`);
+          log2.debug("GitManager", `Unstaged ${unstaged.length} files, ${failed.length} failed`);
+          if (failed.length > 0 && unstaged.length === 0) {
+            throw new Error(`Could not unstage ${failed.length} file(s). resetIndex may not be available.`);
           }
+          return { requested: requested.length, unstaged, failed };
         } catch (error) {
           log2.error("GitManager", "Failed to unstage all files", error);
           throw error;
@@ -24662,6 +24666,15 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       unstaged
     };
   }
+  repaintStatusSnapshot() {
+    if (this.activeTab !== "status")
+      return;
+    this.contentContainer.empty();
+    this.renderStatusTab(this.sidebarSnapshot);
+    const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
+    if (footerEl)
+      this.renderFooter(footerEl);
+  }
   async refreshFromButton(button) {
     if (button.disabled)
       return;
@@ -25074,10 +25087,13 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           new import_obsidian5.Notice(`Unstaged ${fp}`);
         },
         async () => {
-          await this.plugin.runGitMutation("Unstage all files", async (manager) => {
-            await manager.unstageAll();
+          const result = await this.plugin.runGitMutation("Unstage all files", async (manager) => {
+            return manager.unstageAll();
           });
-          new import_obsidian5.Notice("All files unstaged");
+          for (const filepath of result.unstaged) {
+            this.applyFileMutationToSnapshot(filepath, "unstaged");
+          }
+          new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} files.` : "All files unstaged");
         }
       );
       this.renderCollapsibleSection(
@@ -25104,6 +25120,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             );
           } else {
             new import_obsidian5.Notice(`Staged ${result.staged.length} file${result.staged.length === 1 ? "" : "s"}.`);
+          }
+          for (const filepath of result.staged) {
+            this.applyFileMutationToSnapshot(filepath, "staged");
           }
         }
       );
@@ -25154,21 +25173,17 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       if (bulkBtn.disabled || this.mutationInFlight)
         return;
       this.setMutationBusy(true);
-      bulkBtn.disabled = true;
       bulkBtn.textContent = "Working\u2026";
-      bulkBtn.setAttr("aria-busy", "true");
       try {
         await onBulk();
-        await this.refresh();
+        this.repaintStatusSnapshot();
       } catch (err) {
         new import_obsidian5.Notice(`${bulkLabel} failed: ${err.message}`);
       } finally {
         this.setMutationBusy(false);
         if (bulkBtn.isConnected) {
-          bulkBtn.disabled = false;
           bulkBtn.empty();
           (0, import_obsidian5.setIcon)(bulkBtn, sectionClass === "staged" ? "minus" : "plus");
-          bulkBtn.removeAttribute("aria-busy");
         }
       }
     });
@@ -25256,13 +25271,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
               filepath,
               sectionClass === "staged" ? "unstaged" : "staged"
             );
-            if (this.activeTab === "status") {
-              this.contentContainer.empty();
-              this.renderStatusTab(this.sidebarSnapshot);
-              const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
-              if (footerEl)
-                this.renderFooter(footerEl);
-            }
+            this.repaintStatusSnapshot();
           } catch (err) {
             new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
           } finally {
@@ -26420,7 +26429,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "84da15fb914acc6a957195e961a29452ce317f70" : "unknown";
+var GIT_COMMIT_HASH = true ? "a13d4f0880013d3dcf20107840d5e3a945d57d2f" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

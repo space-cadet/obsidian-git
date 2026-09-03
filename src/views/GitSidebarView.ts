@@ -197,6 +197,14 @@ export class GitSidebarView extends ItemView {
         };
     }
 
+    private repaintStatusSnapshot(): void {
+        if (this.activeTab !== 'status') return;
+        this.contentContainer.empty();
+        this.renderStatusTab(this.sidebarSnapshot);
+        const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
+        if (footerEl) this.renderFooter(footerEl);
+    }
+
     private async refreshFromButton(button: HTMLButtonElement): Promise<void> {
         if (button.disabled) return;
         button.disabled = true;
@@ -728,10 +736,15 @@ export class GitSidebarView extends ItemView {
                     new Notice(`Unstaged ${fp}`);
                 },
                 async () => {
-                    await this.plugin.runGitMutation('Unstage all files', async (manager) => {
-                        await manager.unstageAll();
+                    const result = await this.plugin.runGitMutation('Unstage all files', async (manager) => {
+                        return manager.unstageAll();
                     });
-                    new Notice('All files unstaged');
+                    for (const filepath of result.unstaged) {
+                        this.applyFileMutationToSnapshot(filepath, 'unstaged');
+                    }
+                    new Notice(result.failed.length > 0
+                        ? `Unstaged ${result.unstaged.length} of ${result.requested} files.`
+                        : 'All files unstaged');
                 }
             );
 
@@ -755,6 +768,9 @@ export class GitSidebarView extends ItemView {
                         );
                     } else {
                         new Notice(`Staged ${result.staged.length} file${result.staged.length === 1 ? '' : 's'}.`);
+                    }
+                    for (const filepath of result.staged) {
+                        this.applyFileMutationToSnapshot(filepath, 'staged');
                     }
                 }
             );
@@ -830,21 +846,17 @@ export class GitSidebarView extends ItemView {
             e.stopPropagation();
             if (bulkBtn.disabled || this.mutationInFlight) return;
             this.setMutationBusy(true);
-            bulkBtn.disabled = true;
             bulkBtn.textContent = 'Working…';
-            bulkBtn.setAttr('aria-busy', 'true');
             try {
                 await onBulk();
-                await this.refresh();
+                this.repaintStatusSnapshot();
             } catch (err: any) {
                 new Notice(`${bulkLabel} failed: ${err.message}`);
             } finally {
                 this.setMutationBusy(false);
                 if (bulkBtn.isConnected) {
-                    bulkBtn.disabled = false;
                     bulkBtn.empty();
                     setIcon(bulkBtn, sectionClass === 'staged' ? 'minus' : 'plus');
-                    bulkBtn.removeAttribute('aria-busy');
                 }
             }
         });
@@ -961,12 +973,7 @@ export class GitSidebarView extends ItemView {
                         // The Git operation has completed. Repaint the current
                         // Changes view directly instead of starting a second
                         // repository-wide read just to reflect this result.
-                        if (this.activeTab === 'status') {
-                            this.contentContainer.empty();
-                            this.renderStatusTab(this.sidebarSnapshot);
-                            const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
-                            if (footerEl) this.renderFooter(footerEl);
-                        }
+                        this.repaintStatusSnapshot();
                     } catch (err: any) {
                         new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
                     } finally {

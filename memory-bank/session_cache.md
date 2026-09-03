@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 01:42:44 IST*
+*Last Updated: 2026-09-04 01:51:29 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -185,7 +185,9 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   scrolls.
 - Single-file stage/unstage completion now repaints the Changes view from the
   updated snapshot without a second full repository read.
-- Full package verification passes with 71 Node tests, artifact identity,
+- Bulk stage/unstage completion now uses the same direct repaint and preserves
+  per-file partial results.
+- Full package verification passes with 72 Node tests, artifact identity,
   production build, 10 isomorphic-git checks, and `git diff --check`.
 - Runtime Obsidian desktop/mobile evidence remains pending.
 

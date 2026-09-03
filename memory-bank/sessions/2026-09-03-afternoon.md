@@ -294,3 +294,12 @@ the incremental architecture plan
   whole-vault status scan before reflecting the result.
 - Full verification passed: 71 Node tests, artifact identity, production
   build, 10 isomorphic-git checks, and `git diff --check`.
+
+## Bulk Stage/Unstage Repaint — 2026-09-04 01:51:29 IST
+
+- Fixed Stage all and Unstage all to repaint Changes directly after completion,
+  removing their second full repository refresh.
+- Stage all applies only `result.staged`; Unstage all now returns successful
+  and failed paths, so partial operations remain accurate in the UI.
+- Full verification passed: 72 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.

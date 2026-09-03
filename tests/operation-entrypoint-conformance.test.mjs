@@ -137,7 +137,20 @@ test('single-file sidebar mutations repaint from the completed operation', () =>
 
   assert.ok(actionStart >= 0 && actionEnd > actionStart, 'single-file action handler not found');
   assert.match(actionSource, /this\.applyFileMutationToSnapshot\(/);
-  assert.match(actionSource, /this\.contentContainer\.empty\(\);[\s\S]*this\.renderStatusTab\(this\.sidebarSnapshot\);/);
+  assert.match(actionSource, /this\.repaintStatusSnapshot\(\);/);
   assert.doesNotMatch(actionSource, /await this\.refresh\(/);
   assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged'\)/);
+});
+
+test('bulk sidebar mutations repaint without a second repository read', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const bulkStart = sidebarSource.indexOf("bulkBtn.addEventListener('click'");
+  const bulkEnd = sidebarSource.indexOf('\n        });', bulkStart);
+  const bulkSource = sidebarSource.slice(bulkStart, bulkEnd);
+
+  assert.ok(bulkStart >= 0 && bulkEnd > bulkStart, 'bulk action handler not found');
+  assert.match(bulkSource, /await onBulk\(\);[\s\S]*this\.repaintStatusSnapshot\(\);/);
+  assert.doesNotMatch(bulkSource, /await this\.refresh\(/);
+  assert.match(sidebarSource, /for \(const filepath of result\.unstaged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'unstaged'\)/);
+  assert.match(sidebarSource, /for \(const filepath of result\.staged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'staged'\)/);
 });

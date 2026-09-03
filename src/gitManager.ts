@@ -427,6 +427,12 @@ export interface BulkStageResult {
     failed: Array<{ filepath: string; message: string }>;
 }
 
+export interface BulkUnstageResult {
+    requested: number;
+    unstaged: string[];
+    failed: Array<{ filepath: string; message: string }>;
+}
+
 type GitStatusMatrixRow = [string, number, number, number];
 
 // Keep bulk staging bounded for mobile vaults. isomorphic-git processes a
@@ -2595,12 +2601,13 @@ export class GitManager {
     /**
      * Unstage all staged files
      */
-    async unstageAll(): Promise<void> {
+    async unstageAll(): Promise<BulkUnstageResult> {
         try {
             this.assertOperationActive();
             const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
-            let successCount = 0;
-            let failCount = 0;
+            const requested: string[] = [];
+            const unstaged: string[] = [];
+            const failed: Array<{ filepath: string; message: string }> = [];
             
             for (const row of matrix) {
                 this.assertOperationActive();
@@ -2609,20 +2616,23 @@ export class GitManager {
                 
                 const hasStagedChanges = stage !== 1 && stage !== 0;
                 if (hasStagedChanges) {
+                    requested.push(filepath);
                     try {
                         await this.unstageFile(filepath);
-                        successCount++;
+                        unstaged.push(filepath);
                     } catch (err: any) {
-                        failCount++;
+                        const message = err instanceof Error ? err.message : String(err);
+                        failed.push({ filepath, message });
                         log.warn('GitManager', `Failed to unstage ${filepath}: ${err.message}`);
                     }
                 }
             }
             
-            log.debug('GitManager', `Unstaged ${successCount} files, ${failCount} failed`);
-            if (failCount > 0 && successCount === 0) {
-                throw new Error(`Could not unstage ${failCount} file(s). resetIndex may not be available.`);
+            log.debug('GitManager', `Unstaged ${unstaged.length} files, ${failed.length} failed`);
+            if (failed.length > 0 && unstaged.length === 0) {
+                throw new Error(`Could not unstage ${failed.length} file(s). resetIndex may not be available.`);
             }
+            return { requested: requested.length, unstaged, failed };
         } catch (error: any) {
             log.error('GitManager', 'Failed to unstage all files', error);
             throw error;

@@ -287,3 +287,8 @@ finishes, the known staged/unstaged arrays are updated, and the Changes DOM is
 repainted immediately. It does not trigger a second full status read merely to
 show a result Git has already returned. The next ordinary refresh remains the
 authoritative reconciliation path.
+
+Bulk staging follows the same completion rule. `addAll()` supplies the files
+that actually reached the index, and `unstageAll()` now supplies successful and
+failed paths. The view moves only successful paths before repainting, so a
+partial bulk operation stays visible and honest without a second full scan.

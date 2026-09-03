@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 01:42:44 IST*
+*Last Updated: 2026-09-04 01:51:29 IST*
 
 ## Current Tasks
 
@@ -343,7 +343,9 @@
 - After a single-file stage/unstage completes, the Changes view repaints from
   the updated snapshot directly instead of waiting for another repository
   status scan.
-- `CI=true pnpm test` passes with 71 Node tests, artifact identity,
+- Stage all and Unstage all now use the same direct repaint path and preserve
+  partial per-file results.
+- `CI=true pnpm test` passes with 72 Node tests, artifact identity,
   production build, 10 isomorphic-git checks, and `git diff --check`.
 - Real Obsidian cross-session log, staging timing, and visual acceptance are
   still pending; T35c repository replacement and mobile ref work remain open.
