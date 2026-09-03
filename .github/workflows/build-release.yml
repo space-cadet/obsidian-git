@@ -40,6 +40,9 @@ jobs:
       - name: Build plugin
         run: pnpm run build
 
+      - name: Verify artifact identity
+        run: pnpm run check:artifact
+
       - name: Build archive
         run: pnpm run archive
 
@@ -82,6 +85,9 @@ jobs:
       - name: Build plugin
         run: pnpm run build
 
+      - name: Verify artifact identity
+        run: pnpm run check:artifact
+
       - name: Build archive
         run: pnpm run archive
 
@@ -123,6 +129,9 @@ jobs:
 
       - name: Build plugin
         run: pnpm run build
+
+      - name: Verify artifact identity
+        run: pnpm run check:artifact
 
       - name: Build archive
         run: pnpm run archive

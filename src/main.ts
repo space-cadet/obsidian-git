@@ -21,6 +21,7 @@ import {
 	CredentialStore,
 	migrateLegacySecret,
 } from './credentialStore';
+import { OperationCoordinator } from './operationCoordinator';
 
 interface GitSyncSettings {
 	repoUrl: string;
@@ -68,6 +69,7 @@ export default class GitSyncPlugin extends Plugin {
 	private updater: PluginUpdater | null = null;
 	private credentialStore: CredentialStore | null = null;
 	private credentialStorageError: Error | null = null;
+	private readonly operationCoordinator = new OperationCoordinator();
 
 	async onload() {
 		await this.loadSettings();
@@ -159,13 +161,10 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Pull triggered from command palette');
 				try {
-					await this.ensureGitManager();
-						if (!this.gitManager) {
-							new Notice('No git repository found');
-							return;
-						}
+					await this.runGitMutation('Pull from remote', async (manager) => {
 						await this.refreshGitCredentials();
-						await this.gitManager.pull(this.settings.branchName);
+						await manager.pull(this.settings.branchName);
+					});
 					new Notice('Git pull completed successfully');
 				} catch (error: any) {
 					log.error('GitSyncPlugin', 'Pull failed', error);
@@ -180,13 +179,10 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Push triggered from command palette');
 				try {
-					await this.ensureGitManager();
-						if (!this.gitManager) {
-							new Notice('No git repository found');
-							return;
-						}
+					await this.runGitMutation('Push to remote', async (manager) => {
 						await this.refreshGitCredentials();
-						await this.gitManager.push(this.settings.branchName);
+						await manager.push(this.settings.branchName);
+					});
 					new Notice('Git push completed successfully');
 				} catch (error: any) {
 					log.error('GitSyncPlugin', 'Push failed', error);
@@ -201,16 +197,39 @@ export default class GitSyncPlugin extends Plugin {
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Status check triggered from command palette');
 				try {
-					await this.ensureGitManager();
-					if (!this.gitManager) {
+					const health = await this.checkRepositoryHealth();
+					if (health.state === 'missing') {
 						new Notice('No git repository found');
 						return;
 					}
+					if (health.state === 'damaged') {
+						new Notice('Git repository metadata is damaged. Use the rebuild comparison before repairing it.');
+						return;
+					}
+					if (!this.gitManager) return;
 					const status = await this.gitManager.getStatus();
 					new Notice(`Git status: ${status.branch} — ${status.ahead} ahead, ${status.behind} behind`);
 				} catch (error: any) {
 					log.error('GitSyncPlugin', 'Status check failed', error);
 					new Notice(`Git status failed: ${error.message}`);
+				}
+			}
+		});
+
+		this.addCommand({
+			id: 'git-sync-preview-repository-rebuild',
+			name: 'Preview repository rebuild',
+			callback: async () => {
+				try {
+					const preview = await this.previewRepositoryRebuild();
+					new Notice(
+						`Rebuild preview: ${preview.conflicts.length} conflicts, ` +
+						`${preview.remoteOnly.length} remote-only, ${preview.localOnly.length} local-only, ` +
+						`${preview.unchanged.length} unchanged.`,
+					);
+				} catch (error: any) {
+					log.error('GitSyncPlugin', 'Repository rebuild preview failed', error);
+					new Notice(`Rebuild preview failed: ${error.message}`);
 				}
 			}
 		});
@@ -257,6 +276,7 @@ export default class GitSyncPlugin extends Plugin {
 
 	onunload() {
 		this.clearAutoSync();
+		this.operationCoordinator.dispose();
 	}
 
 	async loadSettings() {
@@ -395,9 +415,9 @@ export default class GitSyncPlugin extends Plugin {
 				try {
 					if (!(await this.detectRealGitRepo())) return;
 					await this.syncVault();
-					console.log('Auto sync completed');
+					log.info('GitSyncPlugin', 'Auto sync completed');
 				} catch (error) {
-					console.error('Auto sync failed:', error);
+					log.error('GitSyncPlugin', 'Auto sync failed', error as Error);
 				}
 			}, intervalMs);
 		}
@@ -504,19 +524,66 @@ export default class GitSyncPlugin extends Plugin {
 		return this.gitManager;
 	}
 
+	/** Run one repository mutation through the shared lifecycle boundary. */
+	async runGitMutation<T>(
+		name: string,
+		operation: (manager: GitManager, signal: AbortSignal) => Promise<T>,
+	): Promise<T> {
+		return this.operationCoordinator.run(name, async ({ signal }) => {
+			const manager = await this.ensureGitManager();
+			if (!manager) throw new Error('No git repository found in vault');
+			if (signal.aborted) {
+				const error = new Error('Git operation cancelled');
+				error.name = 'AbortError';
+				throw error;
+			}
+			manager.setOperationSignal(signal);
+			try {
+				return await operation(manager, signal);
+			} finally {
+				if (this.gitManager === manager) manager.setOperationSignal(null);
+			}
+		});
+	}
+
+	async checkRepositoryHealth(): Promise<import('./gitManager').RepositoryHealth> {
+		const manager = await this.ensureGitManager();
+		if (!manager) {
+			return {
+				state: 'missing',
+				exists: false,
+				healthy: false,
+				branch: null,
+				hasCommits: false,
+				reason: 'missing .git directory',
+			};
+		}
+		return manager.checkRepositoryHealth();
+	}
+
+	async previewRepositoryRebuild(): Promise<import('./gitManager').RepositoryRebuildPreview> {
+		return this.runGitMutation('Preview repository rebuild', async (manager) => {
+			await this.refreshGitCredentials();
+			if (!this.settings.repoUrl) throw new Error('Set a remote repository URL before comparing a rebuild.');
+			return manager.previewRepositoryRebuild(this.settings.repoUrl, this.settings.branchName);
+		});
+	}
+
 	/**
 	 * Initialize a new git repository in the vault (git init)
 	 */
 	async initializeNewRepo(): Promise<void> {
-		try {
-			const git = await import('isomorphic-git');
-			await git.init({ fs: this.fs, dir: '.', defaultBranch: 'main' });
-			log.info('GitSyncPlugin', 'New git repository initialized in vault');
-			new Notice('New git repository initialized');
-		} catch (e: any) {
-			log.error('GitSyncPlugin', 'Failed to initialize repo', e);
-			throw new Error('Failed to initialize repo: ' + e.message);
-		}
+		await this.runGitMutation('Initialize repository', async (manager) => {
+			try {
+				const git = await import('isomorphic-git');
+				await git.init({ fs: this.fs, dir: '.', defaultBranch: this.settings.branchName || 'main' });
+				log.info('GitSyncPlugin', 'New git repository initialized in vault');
+				new Notice('New git repository initialized');
+			} catch (e: any) {
+				log.error('GitSyncPlugin', 'Failed to initialize repo', e);
+				throw new Error('Failed to initialize repo: ' + e.message);
+			}
+		});
 	}
 
 	/**
@@ -581,39 +648,24 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async syncVault(initializeRepository = false) {
-		// Format commit message with date
-		const commitMessage = this.settings.autoCommitMessage.replace(
-			'{{date}}', 
-			new Date().toLocaleString()
-		);
-	
-		// Initialize GitManager if not already done
-		await this.ensureGitManager();
-		if (!this.gitManager) {
-			throw new Error('No git repository found in vault');
-		}
-		
-		// Resolve the current secret immediately before initialization or sync.
-		await this.refreshGitCredentials();
-
-		if (initializeRepository) {
-			await this.gitManager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
-		} else if (!(await this.detectRealGitRepo())) {
-			throw new Error('No local git repository found. Use Clone Remote or Initialize New Repo first.');
-		}
-	
-		// Perform the sync operation
-		try {
-			await this.gitManager.sync(
-				this.settings.repoUrl,
-				this.settings.branchName,
-				commitMessage
+		return this.runGitMutation(initializeRepository ? 'Clone or initialize repository' : 'Sync vault', async (manager) => {
+			const commitMessage = this.settings.autoCommitMessage.replace(
+				'{{date}}',
+				new Date().toLocaleString(),
 			);
+
+			// Resolve the current secret immediately before initialization or sync.
+			await this.refreshGitCredentials();
+
+			if (initializeRepository) {
+				await manager.initializeRepo(this.settings.repoUrl, this.settings.branchName);
+			} else if (!(await this.checkRepositoryHealth()).healthy) {
+				throw new Error('Local git repository is missing or damaged. Use Clone Remote or repair it first.');
+			}
+
+			await manager.sync(this.settings.repoUrl, this.settings.branchName, commitMessage);
 			return true;
-		} catch (error) {
-			console.error('Sync failed:', error);
-			throw error;
-		}
+		});
 	}
 
 	/**

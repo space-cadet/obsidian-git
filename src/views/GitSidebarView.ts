@@ -276,8 +276,10 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
-                    await this.plugin.refreshGitCredentials();
-                    await this.plugin.gitManager.pull(this.plugin.settings.branchName);
+                    await this.plugin.runGitMutation('Pull from remote', async (manager) => {
+                        await this.plugin.refreshGitCredentials();
+                        await manager.pull(this.plugin.settings.branchName);
+                    });
                     new Notice('Pulled from remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
@@ -302,8 +304,10 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
-                    await this.plugin.refreshGitCredentials();
-                    await this.plugin.gitManager.push(this.plugin.settings.branchName);
+                    await this.plugin.runGitMutation('Push to remote', async (manager) => {
+                        await this.plugin.refreshGitCredentials();
+                        await manager.push(this.plugin.settings.branchName);
+                    });
                     new Notice('Pushed to remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
@@ -351,7 +355,9 @@ export class GitSidebarView extends ItemView {
             if (!this.plugin.gitManager) return;
             commitButton.setDisabled(true).setButtonText('Committing…');
             try {
-                await this.plugin.gitManager.commit(input.getValue().trim() || defaultMessage);
+                await this.plugin.runGitMutation('Commit changes', async (manager) => {
+                    await manager.commit(input.getValue().trim() || defaultMessage);
+                });
                 modal.close();
                 new Notice('Changes committed');
                 await this.refresh();
@@ -408,8 +414,10 @@ export class GitSidebarView extends ItemView {
         )) return;
 
         try {
-            await this.plugin.refreshGitCredentials();
-            await this.plugin.gitManager.push(this.plugin.settings.branchName, true);
+            await this.plugin.runGitMutation('Force push to remote', async (manager) => {
+                await this.plugin.refreshGitCredentials();
+                await manager.push(this.plugin.settings.branchName, true);
+            });
             new Notice('Force pushed to remote');
             this.invalidateRemoteCommitsCache();
             await this.refresh();
@@ -568,7 +576,7 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-primary')
             .onClick(async () => {
                 try {
-                    await this.plugin.ensureGitManager(false);
+                    await this.plugin.initializeNewRepo();
                     new Notice('Git storage initialized');
                     await this.refresh();
                 } catch (e: any) {
@@ -613,11 +621,15 @@ export class GitSidebarView extends ItemView {
             // ── Staged section ── (always show, default collapsed if empty)
             this.renderCollapsibleSection(container, 'Staged', staged, 'staged', 'Unstage all', statusByPath,
                 async (fp) => {
-                    await this.plugin.gitManager!.unstageFile(fp);
+                    await this.plugin.runGitMutation('Unstage file', async (manager) => {
+                        await manager.unstageFile(fp);
+                    });
                     new Notice(`Unstaged ${fp}`);
                 },
                 async () => {
-                    await this.plugin.gitManager!.unstageAll();
+                    await this.plugin.runGitMutation('Unstage all files', async (manager) => {
+                        await manager.unstageAll();
+                    });
                     new Notice('All files unstaged');
                 }
             );
@@ -625,11 +637,15 @@ export class GitSidebarView extends ItemView {
             // ── Uncommitted section ── (always show, default collapsed if empty)
             this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', 'Stage all', statusByPath,
                 async (fp) => {
-                    await this.plugin.gitManager!.stageFile(fp);
+                    await this.plugin.runGitMutation('Stage file', async (manager) => {
+                        await manager.stageFile(fp);
+                    });
                     new Notice(`Staged ${fp}`);
                 },
                 async () => {
-                    const result = await this.plugin.gitManager!.addAll(unstaged);
+                    const result = await this.plugin.runGitMutation('Stage all files', async (manager) => {
+                        return manager.addAll(unstaged);
+                    });
                     if (result.failed.length > 0) {
                         const firstFailure = result.failed[0];
                         new Notice(

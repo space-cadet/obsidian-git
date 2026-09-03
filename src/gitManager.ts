@@ -17,15 +17,18 @@ import {
  */
 class GitHttpClient {
   private credentials: GitCredentials;
-  private signal?: AbortSignal;
+  private signals: AbortSignal[];
   private onTransfer?: (event: TransferProgressEvent) => void;
 
     constructor(credentials: GitCredentials, options: {
       signal?: AbortSignal;
+      signals?: readonly (AbortSignal | undefined)[];
       onTransfer?: (event: TransferProgressEvent) => void;
     } = {}) {
         this.credentials = credentials;
-        this.signal = options.signal;
+        this.signals = [options.signal, ...(options.signals || [])].filter(
+          (signal): signal is AbortSignal => !!signal,
+        );
         this.onTransfer = options.onTransfer;
         log.setSensitiveValues([credentials.password]);
     }
@@ -48,7 +51,7 @@ class GitHttpClient {
     // Collect body if it's an async iterable (isomorphic-git sends Uint8Array chunks)
     let body: string | ArrayBuffer | undefined;
     if (config.body) {
-      body = await this.collectBody(config.body);
+      body = await this.collectBody(config.body, config.signal);
     }
 
     try {
@@ -108,7 +111,7 @@ class GitHttpClient {
       if (isRetryable && attempt < maxAttempts) {
         const delayMs = 1000 * attempt;
         log.warn('GitHttpClient', `Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
-        await new Promise(r => setTimeout(r, delayMs));
+        await this.waitBeforeRetry(delayMs, config.signal);
         return this.request(config, attempt + 1);
       }
 
@@ -118,7 +121,7 @@ class GitHttpClient {
   }
 
   private throwIfAborted(requestSignal?: AbortSignal): void {
-    if (this.signal?.aborted || requestSignal?.aborted) {
+    if (this.signals.some((signal) => signal.aborted) || requestSignal?.aborted) {
       const error = new Error('Git operation cancelled');
       error.name = 'AbortError';
       throw error;
@@ -128,9 +131,10 @@ class GitHttpClient {
   /**
    * Collect an async iterable of Uint8Arrays into a single ArrayBuffer
    */
-  private async collectBody(body: AsyncIterable<Uint8Array>): Promise<ArrayBuffer> {
+  private async collectBody(body: AsyncIterable<Uint8Array>, requestSignal?: AbortSignal): Promise<ArrayBuffer> {
     const chunks: Uint8Array[] = [];
     for await (const chunk of body) {
+      this.throwIfAborted(requestSignal);
       chunks.push(chunk);
     }
 
@@ -147,6 +151,36 @@ class GitHttpClient {
     }
 
     return result.buffer;
+  }
+
+  private async waitBeforeRetry(delayMs: number, requestSignal?: AbortSignal): Promise<void> {
+    this.throwIfAborted(requestSignal);
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const signals = [...this.signals, requestSignal].filter(
+        (value): value is AbortSignal => !!value,
+      );
+      const cleanup = () => signals.forEach((signal) => signal.removeEventListener('abort', onAbort));
+      const timer = setTimeout(() => {
+        settled = true;
+        cleanup();
+        resolve();
+      }, delayMs);
+      const onAbort = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        reject(Object.assign(new Error('Git operation cancelled'), { name: 'AbortError' }));
+      };
+      for (const signal of signals) {
+        if (signal.aborted) {
+          onAbort();
+          return;
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+    });
   }
 
   /**
@@ -418,6 +452,26 @@ function parseGitHubRepositoryUrl(repoUrl: string): { owner: string; repo: strin
     return null;
 }
 
+function bytesToExactFingerprint(value: Uint8Array | ArrayBuffer | string): string {
+    const bytes = typeof value === 'string'
+        ? new TextEncoder().encode(value)
+        : value instanceof Uint8Array
+            ? value
+            : new Uint8Array(value);
+    let result = '';
+    for (const byte of bytes) result += byte.toString(16).padStart(2, '0');
+    return result;
+}
+
+function isProtectedRepairPath(filepath: string): boolean {
+    const normalized = filepath.replace(/^\.\//, '').replace(/^\/+/, '');
+    return normalized === '.git'
+        || normalized.startsWith('.git/')
+        || normalized === '.git-sync-repair'
+        || normalized.startsWith('.git-sync-repair-')
+        || normalized.startsWith('.obsidian/plugins/obsidian-git-sync/');
+}
+
 export interface GitSidebarStatusSnapshot {
     branch: string;
     ahead: number;
@@ -450,6 +504,48 @@ export interface GitCredentials {
     };
 }
 
+export type RepositoryHealthState = 'missing' | 'healthy' | 'damaged';
+
+export interface RepositoryHealth {
+    state: RepositoryHealthState;
+    exists: boolean;
+    healthy: boolean;
+    branch: string | null;
+    hasCommits: boolean;
+    reason?: string;
+}
+
+export interface RepositoryRebuildPreview {
+    branch: string;
+    remoteOid: string | null;
+    localOnly: string[];
+    remoteOnly: string[];
+    conflicts: string[];
+    unchanged: string[];
+}
+
+export function compareRepositoryPaths(
+    localFiles: ReadonlyMap<string, string>,
+    remoteFiles: ReadonlyMap<string, string>,
+): Omit<RepositoryRebuildPreview, 'branch' | 'remoteOid'> {
+    const localOnly: string[] = [];
+    const remoteOnly: string[] = [];
+    const conflicts: string[] = [];
+    const unchanged: string[] = [];
+    const paths = new Set([...localFiles.keys(), ...remoteFiles.keys()]);
+
+    for (const filepath of [...paths].sort()) {
+        const local = localFiles.get(filepath);
+        const remote = remoteFiles.get(filepath);
+        if (local === undefined) remoteOnly.push(filepath);
+        else if (remote === undefined) localOnly.push(filepath);
+        else if (local === remote) unchanged.push(filepath);
+        else conflicts.push(filepath);
+    }
+
+    return { localOnly, remoteOnly, conflicts, unchanged };
+}
+
 interface PendingCheckoutState {
     version: 1;
     repoUrl: string;
@@ -464,6 +560,7 @@ export class GitManager {
     private credentials: GitCredentials;
     private statusBarItem: HTMLElement | null = null;
     private app: any;
+    private operationSignal: AbortSignal | null = null;
 
     constructor(fs: any, dir: string, credentials: GitCredentials, app?: any, statusBarItem?: HTMLElement) {
         this.fs = fs;
@@ -482,6 +579,18 @@ export class GitManager {
         log.debug('GitManager', 'Credentials updated');
     }
 
+    /** Attach the plugin-wide cancellation signal to the current mutation. */
+    setOperationSignal(signal: AbortSignal | null): void {
+        this.operationSignal = signal;
+    }
+
+    private assertOperationActive(): void {
+        if (!this.operationSignal?.aborted) return;
+        const error = new Error('Git operation cancelled');
+        error.name = 'AbortError';
+        throw error;
+    }
+
     private updateStatus(message: string) {
         if (this.statusBarItem) {
             this.statusBarItem.setText(`Git: ${message}`);
@@ -490,14 +599,21 @@ export class GitManager {
     }
 
     private createProgress(operationName: string): ProgressHandle {
-        return this.app
+        const progress = this.app
             ? createProgressModal(this.app, operationName)
             : createProgressNotice(operationName);
+        if (this.operationSignal) {
+            this.operationSignal.addEventListener('abort', () => {
+                progress.fail(new Error('Git operation cancelled'));
+            }, { once: true });
+        }
+        return progress;
     }
 
     private createHttpClient(progress?: ProgressHandle): GitHttpClient {
         return new GitHttpClient(this.credentials, {
             signal: progress?.signal,
+            signals: [this.operationSignal || undefined],
             onTransfer: progress?.onTransfer,
         });
     }
@@ -508,6 +624,7 @@ export class GitManager {
     }
 
     private assertProgressActive(progress: ProgressHandle): void {
+        this.assertOperationActive();
         if (progress.signal.aborted) {
             const error = new Error('Git operation cancelled');
             error.name = 'AbortError';
@@ -523,6 +640,7 @@ export class GitManager {
      */
     async ensureRemote(repoUrl: string): Promise<void> {
         try {
+            this.assertOperationActive();
             const remoteUrl = normalizeRemoteUrl(repoUrl);
             const remotes = await git.listRemotes({ fs: this.fs, dir: this.dir });
             const hasOrigin = remotes.some((r: any) => r.remote === 'origin');
@@ -536,7 +654,16 @@ export class GitManager {
                 if (origin && origin.url !== remoteUrl) {
                     log.info('GitManager', 'Updating remote origin');
                     await git.deleteRemote({ fs: this.fs, dir: this.dir, remote: 'origin' });
-                    await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: remoteUrl });
+                    try {
+                        await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: remoteUrl });
+                    } catch (error) {
+                        try {
+                            await git.addRemote({ fs: this.fs, dir: this.dir, remote: 'origin', url: origin.url });
+                        } catch (restoreError) {
+                            log.error('GitManager', 'Could not restore the previous origin URL', restoreError);
+                        }
+                        throw error;
+                    }
                 }
             }
         } catch (error) {
@@ -547,6 +674,7 @@ export class GitManager {
 
     async initializeRepo(repoUrl: string, branchName: string): Promise<boolean> {
         try {
+            this.assertOperationActive();
             const remoteUrl = repoUrl ? normalizeRemoteUrl(repoUrl) : '';
             log.debug('GitManager', `Initializing repository: ${remoteUrl || '(local only)'}, branch: ${branchName}`);
             // Check if .git directory exists
@@ -602,7 +730,7 @@ export class GitManager {
             log.debug('GitManager', 'Validating remote repository URL');
             
             await git.listServerRefs({
-                http: new GitHttpClient(this.credentials),
+                http: this.createHttpClient(),
                 url: remoteUrl,
                 prefix: `refs/heads/${branchName}`,
                 onAuth: () => ({
@@ -639,6 +767,141 @@ export class GitManager {
             log.debug('GitManager', `No local Git repository found`);
             return false;
         }
+    }
+
+    /**
+     * Distinguish a missing repository from a present but unreadable one.
+     * This check only reads metadata; it never repairs or replaces files.
+     */
+    async checkRepositoryHealth(): Promise<RepositoryHealth> {
+        const gitDir = this.dir === '.' ? '.git' : `${this.dir}/.git`;
+        try {
+            const stat = await this.fs.stat(gitDir);
+            if (!stat?.isDirectory?.()) {
+                return { state: 'missing', exists: false, healthy: false, branch: null, hasCommits: false, reason: 'missing .git directory' };
+            }
+        } catch {
+            return { state: 'missing', exists: false, healthy: false, branch: null, hasCommits: false, reason: 'missing .git directory' };
+        }
+
+        try {
+            const branch = await git.currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
+            if (!branch) {
+                return { state: 'damaged', exists: true, healthy: false, branch: null, hasCommits: false, reason: 'HEAD is not attached to a branch' };
+            }
+
+            let hasCommits = false;
+            try {
+                const oid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
+                await git.readCommit({ fs: this.fs, dir: this.dir, oid });
+                hasCommits = true;
+            } catch (error: any) {
+                const message = String(error?.message || error);
+                if (!/could not find|not found|unknown revision|does not exist|no such ref/i.test(message)) {
+                    return { state: 'damaged', exists: true, healthy: false, branch, hasCommits: false, reason: 'HEAD commit cannot be read' };
+                }
+            }
+
+            await git.listRemotes({ fs: this.fs, dir: this.dir });
+            return { state: 'healthy', exists: true, healthy: true, branch, hasCommits };
+        } catch (error) {
+            log.warn('GitManager', 'Repository health check failed', error);
+            return { state: 'damaged', exists: true, healthy: false, branch: null, hasCommits: false, reason: 'Git metadata cannot be read' };
+        }
+    }
+
+    /**
+     * Build a non-destructive comparison for repairing a repository. Remote
+     * objects are fetched into a temporary repository and removed afterwards;
+     * the current .git directory and vault files are never replaced here.
+     */
+    async previewRepositoryRebuild(repoUrl: string, branchName: string): Promise<RepositoryRebuildPreview> {
+        this.assertOperationActive();
+        const temporaryDir = `${this.dir === '.' ? '.' : this.dir}/.git-sync-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const fs = this.fs.promises || this.fs;
+
+        try {
+            await fs.mkdir(temporaryDir, { recursive: true });
+            await git.init({ fs: this.fs, dir: temporaryDir, defaultBranch: branchName });
+            await git.addRemote({
+                fs: this.fs,
+                dir: temporaryDir,
+                remote: 'origin',
+                url: normalizeRemoteUrl(repoUrl),
+            });
+
+            let remoteOid: string | null = null;
+            try {
+                await git.fetch({
+                    fs: this.fs,
+                    http: this.createHttpClient(),
+                    dir: temporaryDir,
+                    remote: 'origin',
+                    ref: branchName,
+                    depth: 1,
+                    singleBranch: true,
+                    onAuth: () => ({
+                        username: this.credentials.username,
+                        password: this.credentials.password,
+                    }),
+                });
+                remoteOid = await git.resolveRef({
+                    fs: this.fs,
+                    dir: temporaryDir,
+                    ref: `refs/remotes/origin/${branchName}`,
+                });
+            } catch (error) {
+                if (classifyRepositoryError(error) !== 'empty-remote') throw error;
+            }
+
+            const localFiles = await this.readLocalFileFingerprints(fs);
+            const remoteFiles = new Map<string, string>();
+            if (remoteOid) {
+                const commit = await git.readCommit({ fs: this.fs, dir: temporaryDir, oid: remoteOid });
+                const tree = await this.readTreeRecursiveAt(this.fs, temporaryDir, commit.commit.tree);
+                for (const [filepath, blobOid] of tree) {
+                    if (isProtectedRepairPath(filepath)) continue;
+                    const { blob } = await git.readBlob({ fs: this.fs, dir: temporaryDir, oid: blobOid });
+                    remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+                }
+            }
+
+            return {
+                branch: branchName,
+                remoteOid,
+                ...compareRepositoryPaths(localFiles, remoteFiles),
+            };
+        } finally {
+            try {
+                await fs.rmdir(temporaryDir, { recursive: true });
+            } catch (error) {
+                log.warn('GitManager', 'Could not remove temporary repository repair data', error);
+            }
+        }
+    }
+
+    private async readLocalFileFingerprints(fs: any): Promise<Map<string, string>> {
+        const result = new Map<string, string>();
+        const walk = async (relativeDir: string): Promise<void> => {
+            this.assertOperationActive();
+            const lookupPath = relativeDir || (this.dir === '.' ? '.' : this.dir);
+            const entries = await fs.readdir(lookupPath, { encoding: 'utf8' });
+            for (const entry of entries) {
+                const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
+                if (isProtectedRepairPath(filepath)) continue;
+                const fullPath = this.dir === '.' ? filepath : `${this.dir}/${filepath}`;
+                const stat = await fs.stat(fullPath);
+                if (stat.isDirectory()) {
+                    await walk(filepath);
+                } else if (stat.isFile()) {
+                    const value = await fs.readFile(fullPath);
+                    result.set(filepath, bytesToExactFingerprint(value));
+                }
+            }
+        };
+
+        await walk('');
+        return result;
     }
 
     /**
@@ -791,6 +1054,7 @@ export class GitManager {
      */
     async pull(branchName: string): Promise<void> {
         try {
+            this.assertOperationActive();
             this.updateStatus('Pulling changes...');
 
             // Ensure remote is configured before pulling
@@ -877,6 +1141,7 @@ export class GitManager {
      * state, allowing a later Clone Remote retry to reuse it.
      */
     private async shallowFetchAndCheckout(branchName: string): Promise<void> {
+        this.assertOperationActive();
         const progress = this.createProgress('Fetching remote files');
         const { onProgress, onMessage } = progress;
         let downloadTimer: number | null = null;
@@ -1031,9 +1296,12 @@ export class GitManager {
         progress: ProgressHandle,
         onMessage: (text: string) => void,
     ): Promise<void> {
+        this.assertOperationActive();
         const remoteRef = `refs/remotes/origin/${branchName}`;
         const oid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
         log.info('GitManager', `Fetched branch tip: ${oid.slice(0, 7)}`);
+
+        await this.assertCheckoutSafe(branchName, oid);
 
         await git.writeRef({
             fs: this.fs,
@@ -1073,6 +1341,49 @@ export class GitManager {
         log.info('GitManager', `Checked out ${branchName} at ${oid.slice(0, 7)}`);
     }
 
+    private async assertCheckoutSafe(branchName: string, remoteOid: string): Promise<void> {
+        const fs = this.fs.promises || this.fs;
+        const commit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: remoteOid });
+        const remoteTree = await this.readTreeRecursive(commit.commit.tree);
+        const remoteFiles = new Map<string, string>();
+        for (const [filepath, blobOid] of remoteTree) {
+            if (isProtectedRepairPath(filepath)) continue;
+            const { blob } = await git.readBlob({ fs: this.fs, dir: this.dir, oid: blobOid });
+            remoteFiles.set(filepath, bytesToExactFingerprint(blob));
+        }
+        const localFiles = await this.readLocalFileFingerprints(fs);
+        const comparison = compareRepositoryPaths(localFiles, remoteFiles);
+        const conflictingPrefixes = [...localFiles.keys()].filter((localPath) =>
+            [...remoteFiles.keys()].some((remotePath) =>
+                remotePath.startsWith(`${localPath}/`) && !localFiles.has(remotePath),
+            ),
+        );
+        const conflicts = [...new Set([...comparison.conflicts, ...conflictingPrefixes])].sort();
+        if (conflicts.length > 0) {
+            throw new Error(
+                `Clone stopped because existing vault files would be overwritten (${conflicts.slice(0, 3).join(', ')}${conflicts.length > 3 ? ', ...' : ''}). ` +
+                `Review the repository rebuild comparison before trying again.`,
+            );
+        }
+
+        // A directory at a remote file path is also a path conflict, even
+        // though directory entries are not included in the file comparison.
+        for (const filepath of remoteFiles.keys()) {
+            try {
+                const stat = await fs.stat(this.dir === '.' ? filepath : `${this.dir}/${filepath}`);
+                if (stat.isDirectory()) {
+                    throw new Error(
+                        `Clone stopped because the existing vault folder "${filepath}" would be replaced by a file. ` +
+                        `Review the repository rebuild comparison before trying again.`,
+                    );
+                }
+            } catch (error: any) {
+                if (error?.message?.startsWith('Clone stopped')) throw error;
+                if (!isTransientMissingPath(error)) throw error;
+            }
+        }
+    }
+
     /**
      * Clone a repository with resumable progress tracking and shallow depth.
      *
@@ -1080,6 +1391,7 @@ export class GitManager {
      * isomorphic-git deletes its partial git directory when clone throws.
      */
     async cloneRepository(repoUrl: string, branchName: string, depth: number = 1): Promise<void> {
+        this.assertOperationActive();
         const progress = this.createProgress(`Cloning ${branchName}`);
         const { onProgress, onMessage } = progress;
         const startTime = Date.now();
@@ -1131,6 +1443,9 @@ export class GitManager {
             }
 
             onMessage(resumeCheckout ? 'Resuming checkout...' : 'Fetch complete; checking out files...');
+            // Never overwrite pre-existing vault files during an explicit
+            // clone. isomorphic-git will stop on a path conflict and retain
+            // the fetched metadata for a later, user-approved repair.
             await this.checkoutFetchedBranch(branchName, progress, onMessage);
             await this.clearPendingCheckout();
             progress.complete();
@@ -1149,6 +1464,7 @@ export class GitManager {
      */
     async addAll(files?: readonly string[]): Promise<BulkStageResult> {
         try {
+            this.assertOperationActive();
             // When the sidebar supplies a list, use exactly what the user saw.
             // The sync path has no rendered list, so it discovers the files here.
             const filesToStage = files
@@ -1165,6 +1481,7 @@ export class GitManager {
             // not make the user lose the progress made on all the other files.
             for (const file of filesToStage) {
                 try {
+                    this.assertOperationActive();
                     await git.add({
                         fs: this.fs,
                         dir: this.dir,
@@ -1216,6 +1533,7 @@ export class GitManager {
      */
     async commit(message: string): Promise<string> {
         try {
+            this.assertOperationActive();
             this.updateStatus('Committing changes...');
             log.debug('GitManager', `Committing changes with message: ${message}`);
             
@@ -1245,6 +1563,7 @@ export class GitManager {
     async push(branchName: string, force: boolean = false): Promise<void> {
         let progress: ProgressHandle | null = null;
         try {
+            this.assertOperationActive();
             this.updateStatus('Pushing changes...');
             log.debug('GitManager', `Pushing changes to remote branch: ${branchName}`);
             
@@ -1460,6 +1779,7 @@ export class GitManager {
      */
     async stageFile(filepath: string): Promise<void> {
         try {
+            this.assertOperationActive();
             await git.add({ fs: this.fs, dir: this.dir, filepath });
             log.debug('GitManager', `Staged file: ${filepath}`);
         } catch (error) {
@@ -1473,6 +1793,7 @@ export class GitManager {
      */
     async unstageFile(filepath: string): Promise<void> {
         try {
+            this.assertOperationActive();
             // Try resetIndex if available (newer isomorphic-git versions)
             // IMPORTANT: do NOT pass ref: 'HEAD' explicitly — if HEAD doesn't exist
             // (fresh repo, no commits), isomorphic-git throws when ref is explicit,
@@ -1511,11 +1832,13 @@ export class GitManager {
      */
     async unstageAll(): Promise<void> {
         try {
+            this.assertOperationActive();
             const matrix = await git.statusMatrix({ fs: this.fs, dir: this.dir });
             let successCount = 0;
             let failCount = 0;
             
             for (const row of matrix) {
+                this.assertOperationActive();
                 const [filepath, head, workdir, stage] = row;
                 if (head === 1 && workdir === 1 && stage === 1) continue; // unchanged
                 
@@ -1658,13 +1981,22 @@ export class GitManager {
      * Recursively read a git tree and return a flat map of path -> oid
      */
     private async readTreeRecursive(treeOid: string, prefix: string = ''): Promise<Map<string, string>> {
+        return this.readTreeRecursiveAt(this.fs, this.dir, treeOid, prefix);
+    }
+
+    private async readTreeRecursiveAt(
+        fs: any,
+        dir: string,
+        treeOid: string,
+        prefix: string = '',
+    ): Promise<Map<string, string>> {
         const result = new Map<string, string>();
         try {
-            const tree = await git.readTree({ fs: this.fs, dir: this.dir, oid: treeOid });
+            const tree = await git.readTree({ fs, dir, oid: treeOid });
             for (const entry of tree.tree) {
                 const fullPath = prefix + entry.path;
                 if (entry.type === 'tree') {
-                    const subMap = await this.readTreeRecursive(entry.oid, fullPath + '/');
+                    const subMap = await this.readTreeRecursiveAt(fs, dir, entry.oid, fullPath + '/');
                     for (const [subPath, subOid] of subMap.entries()) {
                         result.set(subPath, subOid);
                     }
@@ -1734,6 +2066,7 @@ export class GitManager {
      */
     async initLocal(): Promise<void> {
         try {
+            this.assertOperationActive();
             // Check if .git exists in LightningFS
             const hasVirtualRepo = await GitManager.hasGitRepo(this.fs, this.dir);
             
@@ -1758,6 +2091,7 @@ export class GitManager {
      */
     async sync(repoUrl: string, branchName: string, commitMessage: string): Promise<void> {
         try {
+            this.assertOperationActive();
             log.info('GitManager', `Starting sync operation with repo: ${repoUrl || '(local only)'}, branch: ${branchName}`);
             
             if (!(await this.isRepository())) {

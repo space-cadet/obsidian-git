@@ -58,6 +58,7 @@ buildSync({
 
 const {
   GitManager,
+  compareRepositoryPaths,
   GitProgressEmitter,
   arrayBufferToAsyncIterable,
   createGitEmitter,
@@ -260,6 +261,77 @@ test('sync does not initialize or clone a missing local repository', async () =>
   );
   assert.equal(remoteCalls, 0);
   requestUrlImpl = async () => { throw new Error('not used in unit tests'); };
+});
+
+test('repository health distinguishes missing, empty, healthy, and damaged metadata', async () => {
+  const repositoryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-health-'));
+  try {
+    const manager = new GitManager(fsPromises, repositoryDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    assert.deepEqual(await manager.checkRepositoryHealth(), {
+      state: 'missing',
+      exists: false,
+      healthy: false,
+      branch: null,
+      hasCommits: false,
+      reason: 'missing .git directory',
+    });
+
+    await git.init({ fs: fsPromises, dir: repositoryDirectory, defaultBranch: 'main' });
+    const empty = await manager.checkRepositoryHealth();
+    assert.equal(empty.state, 'healthy');
+    assert.equal(empty.exists, true);
+    assert.equal(empty.hasCommits, false);
+    assert.equal(empty.branch, 'main');
+
+    await fsPromises.writeFile(join(repositoryDirectory, 'README.md'), 'healthy\n');
+    await git.add({ fs: fsPromises, dir: repositoryDirectory, filepath: 'README.md' });
+    await git.commit({
+      fs: fsPromises,
+      dir: repositoryDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    const healthy = await manager.checkRepositoryHealth();
+    assert.equal(healthy.state, 'healthy');
+    assert.equal(healthy.hasCommits, true);
+
+    await fsPromises.unlink(join(repositoryDirectory, '.git/HEAD'));
+    const damaged = await manager.checkRepositoryHealth();
+    assert.equal(damaged.state, 'damaged');
+    assert.equal(damaged.exists, true);
+    assert.equal(damaged.healthy, false);
+  } finally {
+    rmSync(repositoryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('repository rebuild comparison reports each path outcome deterministically', () => {
+  assert.deepEqual(
+    compareRepositoryPaths(
+      new Map([
+        ['conflict.md', 'local'],
+        ['local-only.md', 'local'],
+        ['same.md', 'same'],
+      ]),
+      new Map([
+        ['conflict.md', 'remote'],
+        ['remote-only.md', 'remote'],
+        ['same.md', 'same'],
+      ]),
+    ),
+    {
+      localOnly: ['local-only.md'],
+      remoteOnly: ['remote-only.md'],
+      conflicts: ['conflict.md'],
+      unchanged: ['same.md'],
+    },
+  );
 });
 
 test('addAll stages more than ten changed files', async () => {
