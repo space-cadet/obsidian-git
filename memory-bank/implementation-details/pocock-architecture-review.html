@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matt Pocock-style architecture review: obsidian-git</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+  </script>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+  <main class="max-w-6xl mx-auto px-6 py-12 space-y-10">
+    <header class="space-y-3">
+      <p class="text-xs uppercase tracking-wider text-emerald-700">Matt Pocock-style architecture survey</p>
+      <h1 class="text-4xl font-serif tracking-tight">Architecture review for obsidian-git</h1>
+      <p class="text-slate-600">2026-09-03 · main at 4f7d04b · existing T37 remains paused</p>
+      <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">This is an incremental-deepening report, not authorization for a rewrite, fork, or package replacement.</p>
+    </header>
+
+    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+      <h2 class="text-2xl font-serif">Top recommendation: deepen operation ownership</h2>
+      <p>The coordinator already serializes some calls, but main.ts still wires credential refresh, logging, progress finalization, manager cleanup, and repository outcomes around individual operations.</p>
+      <pre class="mermaid">flowchart LR
+        C[commands] --> O[operation module]
+        S[sidebar] --> O
+        A[auto-sync] --> O
+        O --> G[Git work]
+        O --> R[observable outcome]</pre>
+      <p class="text-sm">Concentrate admission, cancellation, completion, and repository-state outcomes at one seam while callers express intent. This has the highest leverage across commands, sidebar actions, auto-sync, progress, and unload behavior.</p>
+      <p class="font-mono text-sm text-slate-600">src/main.ts · src/operationCoordinator.ts · src/gitManager.ts</p>
+    </section>
+
+    <section class="grid md:grid-cols-2 gap-6">
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+        <h2 class="text-xl font-serif">2. Deepen the repository operation module</h2>
+        <p class="text-sm">GitManager is a 2,883-line module spanning transport, progress, initialization, repair, history, status, staging, commit, push, and sync.</p>
+        <p class="text-sm">Use the deletion test before extracting code. Keep Git rules together where that preserves depth; separate only a coherent cluster whose complexity disappears behind a smaller caller seam.</p>
+        <p class="font-mono text-xs text-slate-600">src/gitManager.ts · tests/git-manager.test.mjs</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+        <h2 class="text-xl font-serif">3. Deepen the sidebar read module</h2>
+        <p class="text-sm">GitSidebarView owns rendering, cache invalidation, remote fallback, generation guards, log loading, and mutation callbacks.</p>
+        <p class="text-sm">Keep rendering in the view and concentrate status, history, log data, freshness, and invalidation in a testable read module. T29a remains visual-only; T35b owns behavior.</p>
+        <p class="font-mono text-xs text-slate-600">src/views/GitSidebarView.ts · T29a · T35b</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+        <h2 class="text-xl font-serif">4. Deepen the update transaction</h2>
+        <p class="text-sm">PluginUpdater combines release selection, HTTP, ZIP parsing, vault writes, backup, rollback, and modal presentation.</p>
+        <p class="text-sm">Put release identity and install/rollback invariants behind one transaction seam, while keeping result presentation outside it. T35e owns the integrity evidence.</p>
+        <p class="font-mono text-xs text-slate-600">src/updater/PluginUpdater.ts · T35e</p>
+      </article>
+      <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-3">
+        <h2 class="text-xl font-serif">5. Make the filesystem seam explicit</h2>
+        <p class="text-sm">The adapter combines native desktop reads, Obsidian fallback, path normalization, stale-entry filtering, and write behavior.</p>
+        <p class="text-sm">First measure whether platform-specific rules can be concentrated without adding pass-through modules. T35d and T36 retain ownership of transport and dependency acceptance.</p>
+        <p class="font-mono text-xs text-slate-600">src/adapters/ObsidianFsAdapter.ts · T35d · T36</p>
+      </article>
+    </section>
+
+    <section class="rounded-2xl bg-slate-900 text-white p-6 space-y-3">
+      <h2 class="text-2xl font-serif">Recommended order</h2>
+      <ol class="list-decimal ml-5 space-y-1 text-slate-200">
+        <li>Complete operation coordination and explicit repository-state outcomes.</li>
+        <li>Freeze behavior with conformance and lifecycle tests.</li>
+        <li>Extract read models and stores with declared lifetimes.</li>
+        <li>Reassess the GitManager, updater, adapter, and transport seams.</li>
+        <li>Decide on rewrite versus continuation only after desktop and Android evidence.</li>
+      </ol>
+      <p class="text-sm text-slate-300">A big-bang rewrite is not advised now. Existing behavior, settings, commands, mobile constraints, and release evidence remain the rollback baseline.</p>
+    </section>
+  </main>
+</body>
+</html>

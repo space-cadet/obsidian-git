@@ -1,12 +1,12 @@
 ---
 source_branch: main
-source_commit: e2cb6ad55885227f464b606d614b50f2f2d75f72
+source_commit: 4f7d04b1a2d5870cb32ddabd13e4ae822256eb3f
 ---
 
 # Plugin Rewrite Feasibility and Architecture Assessment
 
 *Created: 2026-09-03 19:58:37 IST*
-*Last Updated: 2026-09-03 19:58:37 IST*
+*Last Updated: 2026-09-04 00:05:23 IST*
 *Task: T37*
 
 ## Purpose
@@ -147,3 +147,22 @@ signals to improve boundaries and tests, not standalone rewrite criteria.
 
 T37 is tentative and paused. No rewrite, fork, package replacement, or public
 release-track change is authorized by this document.
+
+## Matt Pocock-Style Deepening Review — 2026-09-04
+
+The saved report
+[`pocock-architecture-review.html`](pocock-architecture-review.html) applies
+module depth, locality, leverage, seam, and deletion-test reasoning to the
+current checkout. It identifies five candidates:
+
+1. Deepen operation ownership first.
+2. Deepen the repository operation module before splitting GitManager.
+3. Move sidebar data freshness and invalidation into a read module.
+4. Concentrate updater identity, installation, and rollback in one transaction.
+5. Make the filesystem adapter seam explicit only after measuring platform
+   differences.
+
+The first candidate has the highest leverage because it covers commands,
+sidebar actions, auto-sync, progress, cancellation, and unload behavior. T35b
+owns the implementation; T35f owns the conformance evidence. The report does
+not propose new interfaces or authorize a rewrite.

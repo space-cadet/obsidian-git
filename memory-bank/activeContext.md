@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-03 20:07:23 IST*
+*Last Updated: 2026-09-04 00:05:23 IST*
 
 ## Current Tasks
 
@@ -52,8 +52,9 @@
 - **Scope**: Decide whether the recurring lifecycle, repository, adapter,
   transport, and UI problems warrant incremental extraction or a parallel
   clean rewrite.
-- **Status**: Assessment document created; no rewrite, fork, or replacement is
-  authorized. The current plugin remains the rollback baseline.
+- **Status**: Assessment document and saved Matt Pocock-style report are
+  recorded; no rewrite, fork, or replacement is authorized. The current plugin
+  remains the rollback baseline.
 - **Next**: Build the conformance, desktop, Android, and release evidence
   needed for a final go/no-go decision.
 
@@ -82,8 +83,8 @@
   `refs/heads/main` cannot be resolved, starting with read-only adapter/ref
   inspection and preserving all existing vault and `.git` data.
 
-### Current Session Continuation — 2026-09-03
-- **Title**: T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
+### Current Session Continuation — 2026-09-04
+- **Title**: T35b, T35f, T37: Apply Pocock's modularity review and align the incremental architecture plan
 - **Completed**: Recorded the mobile-copy Git repair, deletion-aware staging,
   bounded batch/concurrent reads, official isomorphic-git inspection, and T36
   architecture plan.

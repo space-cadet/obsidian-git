@@ -1,7 +1,7 @@
 # Session 2026-09-03 - Afternoon
 
 *Created: 2026-09-03 13:11:02 IST*
-*Last Updated: 2026-09-03 20:07:23 IST*
+*Last Updated: 2026-09-04 00:05:23 IST*
 
 ## Focus Task
 
@@ -146,3 +146,27 @@ and assess a plugin rewrite
   evidence is available.
 - Memory Bank changes are ready for commit and push; no production source code
   was changed in this documentation-only continuation.
+
+## Pocock Modularity Review and Memory Update — 2026-09-04 00:05 IST
+
+**Session Title**: T35b, T35f, T37: Apply Pocock's modularity review and align
+the incremental architecture plan
+
+### Work Completed
+
+- Ran the deep Memory Bank scan across the task registry, related tasks,
+  implementation details, session records, active context, and session cache.
+- Confirmed that T35b owns operation coordination, T35f owns conformance
+  evidence, and T37 owns the incremental-extraction versus rewrite assessment.
+- Saved the self-contained Matt Pocock-style report at
+  `memory-bank/implementation-details/pocock-architecture-review.html`.
+- Updated T35b, T35f, T37, the rewrite assessment, active context, and session
+  cache with the recommended implementation order and evidence requirements.
+
+### Decision and Handoff
+
+- Deepen operation ownership first, then add conformance coverage before
+  extracting the sidebar, updater, adapter, or transport seams.
+- No rewrite, fork, package replacement, or production source change was
+  authorized or made.
+- The pre-existing `main.js` modification remains untouched.
