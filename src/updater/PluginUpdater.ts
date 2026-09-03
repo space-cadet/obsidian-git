@@ -56,6 +56,12 @@ const RELEASE_FILES = ['main.js', 'manifest.json', 'styles.css'];
 const BACKUP_STATE_FILE = 'state.json';
 const UPDATE_REQUEST_TIMEOUT_MS = 30_000;
 
+type UpdateLog = (level: string, ...args: any[]) => void;
+
+function elapsedMs(startedAt: number): number {
+	return Math.round(performance.now() - startedAt);
+}
+
 /**
  * Compare the numeric portions of two plugin versions. Rolling development
  * tags such as `dev` are considered newer than a stable numeric version.
@@ -94,20 +100,39 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, m
 	}
 }
 
-async function requestUpdate(url: string, label: string): Promise<any> {
-	return withTimeout(
-		requestUrl({
+async function requestUpdate(url: string, label: string, logger?: UpdateLog): Promise<any> {
+	const startedAt = performance.now();
+	logger?.('debug', 'request started', { label, url });
+	try {
+		const response = await withTimeout(
+			requestUrl({
+				url,
+				method: 'GET',
+				headers: { 'User-Agent': 'obsidian-git-sync-updater' },
+			}),
+			UPDATE_REQUEST_TIMEOUT_MS,
+			`Timed out downloading ${label}. Check your network connection and try again.`,
+		);
+		logger?.('info', 'request completed', {
+			label,
+			status: response.status,
+			elapsedMs: elapsedMs(startedAt),
+			bytes: response.arrayBuffer?.byteLength ?? response.text?.length ?? 0,
+		});
+		return response;
+	} catch (error) {
+		logger?.('error', 'request failed', {
+			label,
 			url,
-			method: 'GET',
-			headers: { 'User-Agent': 'obsidian-git-sync-updater' },
-		}),
-		UPDATE_REQUEST_TIMEOUT_MS,
-		`Timed out downloading ${label}. Check your network connection and try again.`,
-	);
+			elapsedMs: elapsedMs(startedAt),
+			error,
+		});
+		throw error;
+	}
 }
 
-async function fetchJson(url: string): Promise<any> {
-	const response = await requestUpdate(url, 'the update information');
+async function fetchJson(url: string, logger?: UpdateLog): Promise<any> {
+	const response = await requestUpdate(url, 'the update information', logger);
 	if (response.status < 200 || response.status >= 300) {
 		let message = `HTTP ${response.status}`;
 		try {
@@ -122,10 +147,11 @@ async function fetchJson(url: string): Promise<any> {
 	return JSON.parse(response.text);
 }
 
-async function fetchLatestCommit(branch = 'main'): Promise<CommitInfo | null> {
+async function fetchLatestCommit(branch = 'main', logger?: UpdateLog): Promise<CommitInfo | null> {
 	try {
 		const data = await fetchJson(
 			`https://api.github.com/repos/${GITHUB_REPO}/commits/${encodeURIComponent(branch)}?_cb=${Date.now()}`,
+			logger,
 		);
 		if (!data?.sha) return null;
 		return {
@@ -139,20 +165,29 @@ async function fetchLatestCommit(branch = 'main'): Promise<CommitInfo | null> {
 	}
 }
 
-async function downloadFile(app: App, url: string, destination: string, label: string): Promise<void> {
-	const response = await requestUpdate(url, label);
+async function downloadFile(app: App, url: string, destination: string, label: string, logger?: UpdateLog): Promise<void> {
+	const startedAt = performance.now();
+	const response = await requestUpdate(url, label, logger);
 	if (response.status < 200 || response.status >= 300) {
 		throw new Error(`Download failed: HTTP ${response.status}`);
 	}
+	const content = response.text;
+	const writeStartedAt = performance.now();
 	await withTimeout(
-		app.vault.adapter.write(destination, response.text),
+		app.vault.adapter.write(destination, content),
 		UPDATE_REQUEST_TIMEOUT_MS,
 		`Timed out writing ${label}. Check that the vault storage is available and try again.`,
 	);
+	logger?.('info', 'asset download and stage completed', {
+		label,
+		bytes: typeof content === 'string' ? content.length : 0,
+		writeMs: elapsedMs(writeStartedAt),
+		totalMs: elapsedMs(startedAt),
+	});
 }
 
-async function downloadBinary(url: string, label: string): Promise<Uint8Array> {
-	const response = await requestUpdate(url, label);
+async function downloadBinary(url: string, label: string, logger?: UpdateLog): Promise<Uint8Array> {
+	const response = await requestUpdate(url, label, logger);
 	if (response.status < 200 || response.status >= 300) {
 		throw new Error(`Download failed: HTTP ${response.status}`);
 	}
@@ -269,6 +304,7 @@ export class PluginUpdater {
 	private readonly app: App;
 	private readonly pluginDir: string;
 	private readonly logger: UpdaterLogger | null;
+	private operationSequence = 0;
 
 	constructor(app: App, pluginId: string, logger?: UpdaterLogger) {
 		this.app = app;
@@ -364,12 +400,12 @@ export class PluginUpdater {
 		}
 	}
 
-	private async selectRelease(includePrerelease: boolean, currentBranch?: string): Promise<ReleaseInfo | null> {
+	private async selectRelease(includePrerelease: boolean, currentBranch?: string, logger?: UpdateLog): Promise<ReleaseInfo | null> {
 		if (!includePrerelease) {
-			return await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_cb=${Date.now()}`);
+			return await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest?_cb=${Date.now()}`, logger);
 		}
 
-		const releases = await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=30&_cb=${Date.now()}`) as ReleaseInfo[];
+		const releases = await fetchJson(`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=30&_cb=${Date.now()}`, logger) as ReleaseInfo[];
 		if (!Array.isArray(releases) || releases.length === 0) return null;
 		const branchRelease = currentBranch && currentBranch !== 'main'
 			? releases.find((release) => release.tag_name === `latest-dev-${currentBranch}`)
@@ -390,6 +426,7 @@ export class PluginUpdater {
 		currentCommitHash?: string,
 		currentBranch?: string,
 	): Promise<UpdateCheckResult> {
+		const logger: UpdateLog = (level, ...args) => this.log(level, ...args);
 		this.log('info', 'checkForUpdate:', {
 			currentVersion,
 			includePrerelease,
@@ -397,15 +434,15 @@ export class PluginUpdater {
 			currentBranch,
 		});
 		try {
-			const release = await this.selectRelease(includePrerelease, currentBranch);
+			const release = await this.selectRelease(includePrerelease, currentBranch, logger);
 			if (!release) {
 				return { hasUpdate: false, currentVersion, latestVersion: currentVersion, release: null, isPrerelease: false };
 			}
 
 			const latestVersion = release.tag_name.replace(/^v/, '');
 			const latestCommit = includePrerelease
-				? commitInfoFromRelease(release) ?? await fetchLatestCommit(branchFromRelease(release))
-				: await fetchLatestCommit('main');
+				? commitInfoFromRelease(release) ?? await fetchLatestCommit(branchFromRelease(release), logger)
+				: await fetchLatestCommit('main', logger);
 			this.log('info', 'latestCommit:', latestCommit?.sha?.slice(0, 7));
 			let commitMatch = false;
 			if (includePrerelease && currentCommitHash && latestCommit) {
@@ -458,11 +495,13 @@ export class PluginUpdater {
 
 	/** Return every published stable and development build. */
 	async listAvailableBuilds(): Promise<AvailableBuild[]> {
+		const logger: UpdateLog = (level, ...args) => this.log(level, ...args);
 		const releases: ReleaseInfo[] = [];
 		let page = 1;
 		while (true) {
 			const pageReleases = await fetchJson(
 				`https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=100&page=${page}&_cb=${Date.now()}`,
+				logger,
 			) as ReleaseInfo[];
 			if (!Array.isArray(pageReleases) || pageReleases.length === 0) break;
 			releases.push(...pageReleases);
@@ -485,6 +524,14 @@ export class PluginUpdater {
 	/** Download required release assets using Obsidian's native HTTP and vault APIs. */
 	async downloadUpdate(release: ReleaseInfo): Promise<string> {
 		const tempDir = `${this.pluginDir}/.update-tmp-${Date.now()}`;
+		const operationId = `download-${Date.now()}-${++this.operationSequence}`;
+		const startedAt = performance.now();
+		const logger: UpdateLog = (level, ...args) => this.log(level, ...args);
+		this.log('info', 'update download started', {
+			operationId,
+			tag: release.tag_name,
+			assetCount: release.assets?.length ?? 0,
+		});
 		try {
 			await this.cleanupStaleUpdateDirectories();
 			await this.ensureDir(tempDir);
@@ -495,32 +542,45 @@ export class PluginUpdater {
 				for (let index = 0; index < RELEASE_FILES.length; index += 1) {
 					const filename = RELEASE_FILES[index];
 					this.log('info', 'Downloading update asset:', filename);
-					await downloadFile(this.app, directAssets[index].browser_download_url, `${tempDir}/${filename}`, filename);
+					await downloadFile(this.app, directAssets[index].browser_download_url, `${tempDir}/${filename}`, filename, logger);
 				}
 			} else {
 				const archive = assets.find((asset) => /\.zip$/i.test(asset.name));
-				if (!archive) {
-					const missing = RELEASE_FILES.filter((_, index) => !directAssets[index]).join(', ');
-					throw new Error(`Release has no installable plugin assets (missing ${missing}). Publish direct plugin assets or a ZIP archive.`);
+					if (!archive) {
+						const missing = RELEASE_FILES.filter((_, index) => !directAssets[index]).join(', ');
+						throw new Error(`Release has no installable plugin assets (missing ${missing}). Publish direct plugin assets or a ZIP archive.`);
+					}
+					this.log('info', 'Downloading update archive:', archive.name);
+					const archiveBytes = await downloadBinary(archive.browser_download_url, archive.name, logger);
+					this.log('info', 'update archive received', { operationId, bytes: archiveBytes.byteLength });
+					for (const filename of RELEASE_FILES) {
+						const contents = await readZipEntry(archiveBytes, filename);
+						if (!contents) throw new Error(`Release archive is missing ${filename}.`);
+						await this.writeFile(`${tempDir}/${filename}`, new TextDecoder().decode(contents));
+						this.log('info', 'update archive entry staged', { operationId, filename, bytes: contents.byteLength });
+					}
 				}
-				this.log('info', 'Downloading update archive:', archive.name);
-				const archiveBytes = await downloadBinary(archive.browser_download_url, archive.name);
-				for (const filename of RELEASE_FILES) {
-					const contents = await readZipEntry(archiveBytes, filename);
-					if (!contents) throw new Error(`Release archive is missing ${filename}.`);
-					await this.writeFile(`${tempDir}/${filename}`, new TextDecoder().decode(contents));
-				}
-			}
 
-			const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
-			if (manifest.id !== this.pluginDir.split('/').pop()) {
-				throw new Error('Downloaded update belongs to a different plugin.');
+				const manifest = JSON.parse(await this.readFile(`${tempDir}/manifest.json`));
+				if (manifest.id !== this.pluginDir.split('/').pop()) {
+					throw new Error('Downloaded update belongs to a different plugin.');
+				}
+				this.log('info', 'update download completed', {
+					operationId,
+					tag: release.tag_name,
+					version: manifest.version,
+					elapsedMs: elapsedMs(startedAt),
+				});
+				return tempDir;
+			} catch (error) {
+				this.log('error', 'update download failed', {
+					operationId,
+					elapsedMs: elapsedMs(startedAt),
+					error,
+				});
+				await this.removeDirectory(tempDir);
+				throw error;
 			}
-			return tempDir;
-		} catch (error) {
-			await this.removeDirectory(tempDir);
-			throw error;
-		}
 	}
 
 	private async readBackupState(backupDir: string): Promise<string[]> {
@@ -552,34 +612,75 @@ export class PluginUpdater {
 	 */
 	async installUpdate(tempDir: string): Promise<void> {
 		const backupDir = `${this.pluginDir}/.backup`;
+		const operationId = `install-${Date.now()}-${++this.operationSequence}`;
+		const startedAt = performance.now();
+		this.log('info', 'update installation started', { operationId, tempDir });
 		await this.ensureDir(backupDir);
 
 		const existingFiles: string[] = [];
-		for (const filename of RELEASE_FILES) {
-			const currentPath = `${this.pluginDir}/${filename}`;
-			const backupPath = `${backupDir}/${filename}`;
-			if (await this.fileExists(currentPath)) {
-				existingFiles.push(filename);
-				await this.writeFile(backupPath, await this.readFile(currentPath));
-			} else {
-				await this.removeFile(backupPath);
+		try {
+			for (const filename of RELEASE_FILES) {
+				const fileStartedAt = performance.now();
+				const currentPath = `${this.pluginDir}/${filename}`;
+				const backupPath = `${backupDir}/${filename}`;
+				if (await this.fileExists(currentPath)) {
+					existingFiles.push(filename);
+					const readStartedAt = performance.now();
+					const content = await this.readFile(currentPath);
+					const readMs = elapsedMs(readStartedAt);
+					const writeStartedAt = performance.now();
+					await this.writeFile(backupPath, content);
+					this.log('info', 'update backup file completed', {
+						operationId,
+						filename,
+						bytes: content.length,
+						readMs,
+						writeMs: elapsedMs(writeStartedAt),
+						totalMs: elapsedMs(fileStartedAt),
+					});
+				} else {
+					await this.removeFile(backupPath);
+					this.log('info', 'update backup file absent', { operationId, filename, totalMs: elapsedMs(fileStartedAt) });
+				}
 			}
+			await this.writeFile(`${backupDir}/${BACKUP_STATE_FILE}`, JSON.stringify({ existingFiles }));
+		} catch (error) {
+			this.log('error', 'update backup failed', { operationId, elapsedMs: elapsedMs(startedAt), error });
+			throw error;
 		}
-		await this.writeFile(`${backupDir}/${BACKUP_STATE_FILE}`, JSON.stringify({ existingFiles }));
 
 		try {
 			for (const filename of RELEASE_FILES) {
+				const fileStartedAt = performance.now();
 				const source = `${tempDir}/${filename}`;
 				if (!(await this.fileExists(source))) throw new Error(`Downloaded update is missing ${filename}.`);
-				await this.writeFile(`${this.pluginDir}/${filename}`, await this.readFile(source));
+				const readStartedAt = performance.now();
+				const content = await this.readFile(source);
+				const readMs = elapsedMs(readStartedAt);
+				const writeStartedAt = performance.now();
+				await this.writeFile(`${this.pluginDir}/${filename}`, content);
+				this.log('info', 'update install file completed', {
+					operationId,
+					filename,
+					bytes: content.length,
+					readMs,
+					writeMs: elapsedMs(writeStartedAt),
+					totalMs: elapsedMs(fileStartedAt),
+				});
 			}
 			await this.removeDirectory(tempDir);
+			this.log('info', 'update installation completed', { operationId, elapsedMs: elapsedMs(startedAt) });
 		} catch (error: any) {
 			try {
 				await this.restoreFiles(backupDir, existingFiles);
 			} catch (rollbackError) {
-				console.error('[PluginUpdater] Automatic rollback failed:', rollbackError);
+				this.log('error', 'Automatic rollback failed', { operationId, error: rollbackError });
 			}
+			this.log('error', 'update installation failed and was rolled back', {
+				operationId,
+				elapsedMs: elapsedMs(startedAt),
+				error,
+			});
 			throw new Error(`Update installation failed and was rolled back: ${error?.message || String(error)}`);
 		} finally {
 			await this.removeDirectory(tempDir);

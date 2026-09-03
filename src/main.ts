@@ -12,6 +12,7 @@ import {
 import { ObsidianFsAdapter } from './adapters/ObsidianFsAdapter';
 import { GitManager, GitCredentials } from './gitManager';
 import { log, LogLevel } from './logger';
+import { FileLogger } from './fileLogger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
 import { GIT_BRANCH, GIT_COMMIT_HASH } from './buildInfo';
@@ -67,11 +68,16 @@ export default class GitSyncPlugin extends Plugin {
 	statusBarItem: HTMLElement | null = null;
 	isDesktop: boolean = false;
 	private updater: PluginUpdater | null = null;
+	private fileLogger: FileLogger | null = null;
 	private credentialStore: CredentialStore | null = null;
 	private credentialStorageError: Error | null = null;
 	private readonly operationCoordinator = new OperationCoordinator();
 
 	async onload() {
+		// Start persistent diagnostics before settings, updater, or remote work so
+		// startup failures and update timing are available from debug.log.
+		this.fileLogger = new FileLogger(this.app, this.manifest.id);
+		await this.fileLogger.init();
 		await this.loadSettings();
 		if (this.credentialStorageError) {
 			new Notice(this.credentialStorageError.message);
@@ -271,12 +277,23 @@ export default class GitSyncPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'git-sync-clear-debug-log',
+			name: 'Clear debug log file',
+			callback: async () => {
+				await this.fileLogger?.clear();
+				new Notice('Debug log cleared.');
+			},
+		});
+
 		this.setupAutoSync();
 	}
 
 	onunload() {
 		this.clearAutoSync();
 		this.operationCoordinator.dispose();
+		this.fileLogger?.stop();
+		this.fileLogger = null;
 	}
 
 	async loadSettings() {
@@ -324,7 +341,7 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async getGitCredentials(resolveSecret = true): Promise<GitCredentials> {
-		return {
+		const credentials = {
 			username: this.settings.username,
 			password: resolveSecret ? await this.resolveGitPassword() : '',
 			repoUrl: this.settings.repoUrl,
@@ -333,6 +350,9 @@ export default class GitSyncPlugin extends Plugin {
 				email: this.settings.author.email || 'user@example.com',
 			},
 		};
+		log.setSensitiveValues([credentials.password]);
+		this.fileLogger?.setSensitiveValues([credentials.password]);
+		return credentials;
 	}
 
 	async refreshGitCredentials(): Promise<void> {
@@ -346,6 +366,12 @@ export default class GitSyncPlugin extends Plugin {
 
 	async checkForUpdates(manual: boolean): Promise<void> {
 		if (!this.updater) return;
+		const startedAt = performance.now();
+		log.info('Updater', 'Update check started', {
+			manual,
+			channel: this.settings.updateChannel,
+			currentVersion: this.manifest.version,
+		});
 
 		try {
 			const result = await this.updater.checkForUpdate(
@@ -356,6 +382,12 @@ export default class GitSyncPlugin extends Plugin {
 			);
 			this.settings.lastUpdateCheck = Date.now();
 			await this.saveSettings();
+			log.info('Updater', 'Update check completed', {
+				manual,
+				hasUpdate: result.hasUpdate,
+				latestVersion: result.latestVersion,
+				elapsedMs: Math.round(performance.now() - startedAt),
+			});
 
 			if (result.error) {
 				if (manual) {
@@ -385,6 +417,7 @@ export default class GitSyncPlugin extends Plugin {
 			});
 			modal.open();
 		} catch (error: any) {
+			log.error('Updater', 'Update check failed', error);
 			log.error('GitSyncPlugin', 'Update check failed', error);
 			if (manual) {
 				new Notice(`❌ Update check failed: ${error?.message || String(error)}`);
