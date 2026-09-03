@@ -311,6 +311,89 @@ test('repository health distinguishes missing, empty, healthy, and damaged metad
   }
 });
 
+test('repository health detects an empty index and repair rebuilds it without changing vault files', async () => {
+  const repositoryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-index-repair-'));
+  try {
+    await git.init({ fs: fsPromises, dir: repositoryDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(repositoryDirectory, 'tracked.md'), 'original\n');
+    await fsPromises.writeFile(join(repositoryDirectory, 'deleted.md'), 'to be deleted\n');
+    await git.add({ fs: fsPromises, dir: repositoryDirectory, filepath: 'tracked.md' });
+    await git.add({ fs: fsPromises, dir: repositoryDirectory, filepath: 'deleted.md' });
+    await git.commit({
+      fs: fsPromises,
+      dir: repositoryDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    await fsPromises.writeFile(join(repositoryDirectory, 'tracked.md'), 'modified\n');
+    await fsPromises.unlink(join(repositoryDirectory, 'deleted.md'));
+    await fsPromises.writeFile(join(repositoryDirectory, 'untracked.md'), 'new\n');
+    await fsPromises.writeFile(join(repositoryDirectory, '.git/index'), new Uint8Array());
+
+    const manager = new GitManager(fsPromises, repositoryDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+
+    const damaged = await manager.checkRepositoryHealth();
+    assert.equal(damaged.state, 'damaged');
+    assert.equal(damaged.reason, 'Git index is empty (.git/index)');
+
+    const result = await manager.rebuildIndexFromHead();
+    assert.equal(result.trackedFiles, 2);
+    assert.equal(result.worktreeFiles, 2);
+    assert.equal(result.stagedStateRecovered, false);
+    assert.ok(result.backupPath);
+    assert.equal((await fsPromises.stat(result.backupPath)).size, 0);
+    assert.equal(await fsPromises.readFile(join(repositoryDirectory, 'tracked.md'), 'utf8'), 'modified\n');
+    await assert.rejects(fsPromises.stat(join(repositoryDirectory, 'deleted.md')), /ENOENT/);
+    assert.equal(await fsPromises.readFile(join(repositoryDirectory, 'untracked.md'), 'utf8'), 'new\n');
+
+    const matrix = await git.statusMatrix({ fs: fsPromises, dir: repositoryDirectory });
+    const rows = new Map(matrix.map((row) => [row[0], row]));
+    assert.deepEqual(rows.get('tracked.md'), ['tracked.md', 1, 2, 1]);
+    assert.deepEqual(rows.get('deleted.md'), ['deleted.md', 1, 0, 1]);
+    assert.deepEqual(rows.get('untracked.md'), ['untracked.md', 0, 2, 0]);
+    assert.equal((await manager.checkRepositoryHealth()).state, 'healthy');
+  } finally {
+    rmSync(repositoryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('repository index repair can restore the latest valid backup', async () => {
+  const repositoryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-index-restore-'));
+  try {
+    await git.init({ fs: fsPromises, dir: repositoryDirectory, defaultBranch: 'main' });
+    await fsPromises.writeFile(join(repositoryDirectory, 'README.md'), 'healthy\n');
+    await git.add({ fs: fsPromises, dir: repositoryDirectory, filepath: 'README.md' });
+    await git.commit({
+      fs: fsPromises,
+      dir: repositoryDirectory,
+      message: 'initial',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    const validIndex = await fsPromises.readFile(join(repositoryDirectory, '.git/index'));
+    await fsPromises.writeFile(join(repositoryDirectory, '.git/index'), new Uint8Array());
+
+    const manager = new GitManager(fsPromises, repositoryDirectory, {
+      repoUrl: '',
+      username: '',
+      password: '',
+      author: { name: 'Test User', email: 'test@example.test' },
+    });
+    // A real repair backup is non-empty; write the valid index into the
+    // backup slot to exercise the restore path independently.
+    await fsPromises.writeFile(join(repositoryDirectory, '.git/index.obsidian-git-backup-123'), validIndex);
+    assert.equal(await manager.restoreLatestIndexBackup(), 'index.obsidian-git-backup-123');
+    assert.equal((await manager.checkRepositoryIndex()).state, 'healthy');
+  } finally {
+    rmSync(repositoryDirectory, { recursive: true, force: true });
+  }
+});
+
 test('repository rebuild comparison reports each path outcome deterministically', () => {
   assert.deepEqual(
     compareRepositoryPaths(

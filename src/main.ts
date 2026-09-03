@@ -218,7 +218,10 @@ export default class GitSyncPlugin extends Plugin {
 						return;
 					}
 					if (health.state === 'damaged') {
-						new Notice('Git repository metadata is damaged. Use the rebuild comparison before repairing it.');
+						new Notice(
+							`Git repository metadata is damaged${health.reason ? `: ${health.reason}` : ''}. ` +
+							`Use "Repair Git index from HEAD" to preserve vault files and rebuild the index.`,
+						);
 						return;
 					}
 					if (!this.gitManager) return;
@@ -247,6 +250,44 @@ export default class GitSyncPlugin extends Plugin {
 					new Notice(`Rebuild preview failed: ${error.message}`);
 				}
 			}
+		});
+
+		this.addCommand({
+			id: 'git-sync-rebuild-index',
+			name: 'Repair Git index from HEAD',
+			callback: async () => {
+				if (!window.confirm(
+					'Rebuild the Git index from HEAD? Vault files will be preserved, but staged changes from the damaged index cannot be recovered.',
+				)) return;
+				try {
+					const result = await this.rebuildRepositoryIndex();
+					const backup = result.backupPath ? ` Backup: ${result.backupPath}` : '';
+					new Notice(
+						`Git index repaired. ${result.trackedFiles} tracked files restored; ` +
+						`${result.worktreeFiles} vault files preserved.${backup}`,
+					);
+				} catch (error: any) {
+					log.error('GitSyncPlugin', 'Git index repair failed', error);
+					new Notice(`Git index repair failed: ${error.message}`);
+				}
+			},
+		});
+
+		this.addCommand({
+			id: 'git-sync-restore-index-backup',
+			name: 'Restore latest Git index backup',
+			callback: async () => {
+				if (!window.confirm(
+					'Restore the latest Git index repair backup? The current index will be saved first.',
+				)) return;
+				try {
+					const backup = await this.restoreLatestRepositoryIndexBackup();
+					new Notice(`Git index restored from ${backup}`);
+				} catch (error: any) {
+					log.error('GitSyncPlugin', 'Git index backup restore failed', error);
+					new Notice(`Git index restore failed: ${error.message}`);
+				}
+			},
 		});
 
 		this.addCommand({
@@ -637,6 +678,14 @@ export default class GitSyncPlugin extends Plugin {
 			if (!this.settings.repoUrl) throw new Error('Set a remote repository URL before comparing a rebuild.');
 			return manager.previewRepositoryRebuild(this.settings.repoUrl, this.settings.branchName);
 		});
+	}
+
+	async rebuildRepositoryIndex(): Promise<import('./gitManager').RepositoryIndexRepairResult> {
+		return this.runGitMutation('Repair Git index', async (manager) => manager.rebuildIndexFromHead());
+	}
+
+	async restoreLatestRepositoryIndexBackup(): Promise<string> {
+		return this.runGitMutation('Restore Git index backup', async (manager) => manager.restoreLatestIndexBackup());
 	}
 
 	/**

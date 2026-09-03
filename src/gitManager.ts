@@ -515,6 +515,22 @@ export interface RepositoryHealth {
     reason?: string;
 }
 
+export type RepositoryIndexState = 'missing' | 'healthy' | 'empty' | 'invalid';
+
+export interface RepositoryIndexHealth {
+    state: RepositoryIndexState;
+    exists: boolean;
+    size: number | null;
+    reason?: string;
+}
+
+export interface RepositoryIndexRepairResult {
+    backupPath: string | null;
+    trackedFiles: number;
+    worktreeFiles: number;
+    stagedStateRecovered: false;
+}
+
 export interface RepositoryRebuildPreview {
     branch: string;
     remoteOid: string | null;
@@ -803,10 +819,221 @@ export class GitManager {
             }
 
             await git.listRemotes({ fs: this.fs, dir: this.dir });
+            const indexHealth = await this.checkRepositoryIndex();
+            if (indexHealth.state === 'empty' || indexHealth.state === 'invalid') {
+                return {
+                    state: 'damaged',
+                    exists: true,
+                    healthy: false,
+                    branch,
+                    hasCommits,
+                    reason: indexHealth.reason || 'Git index cannot be read',
+                };
+            }
             return { state: 'healthy', exists: true, healthy: true, branch, hasCommits };
         } catch (error) {
             log.warn('GitManager', 'Repository health check failed', error);
             return { state: 'damaged', exists: true, healthy: false, branch: null, hasCommits: false, reason: 'Git metadata cannot be read' };
+        }
+    }
+
+    /**
+     * Inspect the index without scanning the vault worktree. A missing index
+     * is valid for a newly-created repository; an existing empty or malformed
+     * index is repairable metadata damage.
+     */
+    async checkRepositoryIndex(): Promise<RepositoryIndexHealth> {
+        const fs = this.fs.promises || this.fs;
+        const indexPath = this.repositoryGitPath('index');
+        let stat: any;
+        try {
+            stat = await fs.stat(indexPath);
+        } catch (error) {
+            if (isTransientMissingPath(error)) {
+                return { state: 'missing', exists: false, size: null };
+            }
+            throw error;
+        }
+
+        const size = Number.isFinite(stat?.size) ? stat.size : null;
+        if (size === 0) {
+            return {
+                state: 'empty',
+                exists: true,
+                size,
+                reason: 'Git index is empty (.git/index)',
+            };
+        }
+
+        try {
+            // listFiles parses the complete index and verifies its checksum,
+            // without hashing or reading every file in the worktree.
+            await git.listFiles({ fs: this.fs, dir: this.dir });
+            return { state: 'healthy', exists: true, size };
+        } catch (error: any) {
+            log.warn('GitManager', 'Git index validation failed', error);
+            return {
+                state: 'invalid',
+                exists: true,
+                size,
+                reason: error?.message || 'Git index is malformed',
+            };
+        }
+    }
+
+    private repositoryGitPath(filepath: string): string {
+        return this.dir === '.' ? `.git/${filepath}` : `${this.dir}/.git/${filepath}`;
+    }
+
+    private async indexExists(fs: any): Promise<boolean> {
+        try {
+            await fs.stat(this.repositoryGitPath('index'));
+            return true;
+        } catch (error) {
+            if (isTransientMissingPath(error)) return false;
+            throw error;
+        }
+    }
+
+    private async backupIndex(fs: any, prefix: string): Promise<string | null> {
+        if (!(await this.indexExists(fs))) return null;
+        const indexPath = this.repositoryGitPath('index');
+        const backupPath = this.repositoryGitPath(`${prefix}-${Date.now()}`);
+        const value = await fs.readFile(indexPath);
+        await fs.writeFile(backupPath, value);
+        log.info('GitManager', `Backed up Git index to ${backupPath}`);
+        return backupPath;
+    }
+
+    private async removeIndexIfPresent(fs: any): Promise<void> {
+        try {
+            if (await this.indexExists(fs)) await fs.unlink(this.repositoryGitPath('index'));
+        } catch (error) {
+            if (!isTransientMissingPath(error)) throw error;
+        }
+    }
+
+    /**
+     * Rebuild the Git index from HEAD while leaving all vault files in place.
+     *
+     * The damaged index is backed up first. Current worktree files are added
+     * temporarily so isomorphic-git can create a valid index, then every HEAD
+     * path is reset to HEAD and temporary entries for new files are removed.
+     * This preserves modified, deleted, and untracked files, but staged state
+     * from the damaged index cannot be recovered.
+     */
+    async rebuildIndexFromHead(): Promise<RepositoryIndexRepairResult> {
+        this.assertOperationActive();
+        const fs = this.fs.promises || this.fs;
+        const indexPath = this.repositoryGitPath('index');
+        const lockPath = this.repositoryGitPath('index.lock');
+        const health = await this.checkRepositoryIndex();
+        if (health.state === 'healthy') {
+            throw new Error('The Git index is already healthy; no repair is needed.');
+        }
+
+        try {
+            await fs.stat(lockPath);
+            throw new Error('Git index.lock exists. Another Git operation may be running; try again after it finishes.');
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('Another Git operation')) throw error;
+            if (!isTransientMissingPath(error)) throw error;
+        }
+
+        const headOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: 'HEAD' });
+        const headCommit = await git.readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
+        const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, '', true);
+        const worktreeFiles = await this.readLocalFileFingerprints(fs);
+        let backupPath: string | null = null;
+        let originalIndex: Uint8Array | null = null;
+
+        try {
+            if (await this.indexExists(fs)) {
+                const value = await fs.readFile(indexPath);
+                originalIndex = value instanceof Uint8Array ? value : new Uint8Array(value);
+                backupPath = await this.backupIndex(fs, 'index.obsidian-git-backup');
+            }
+
+            // isomorphic-git treats a missing index as an empty staging area,
+            // whereas it deliberately rejects a zero-byte index.
+            await this.removeIndexIfPresent(fs);
+
+            for (const filepath of worktreeFiles.keys()) {
+                this.assertOperationActive();
+                await git.add({ fs: this.fs, dir: this.dir, filepath });
+            }
+
+            for (const filepath of headFiles.keys()) {
+                this.assertOperationActive();
+                await git.resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: 'HEAD' });
+            }
+
+            for (const filepath of worktreeFiles.keys()) {
+                if (headFiles.has(filepath)) continue;
+                this.assertOperationActive();
+                await git.resetIndex({ fs: this.fs, dir: this.dir, filepath });
+            }
+
+            await git.listFiles({ fs: this.fs, dir: this.dir });
+            await git.statusMatrix({ fs: this.fs, dir: this.dir });
+            log.info('GitManager', `Rebuilt Git index from HEAD (${headFiles.size} tracked files, ${worktreeFiles.size} worktree files)`);
+            return {
+                backupPath,
+                trackedFiles: headFiles.size,
+                worktreeFiles: worktreeFiles.size,
+                stagedStateRecovered: false,
+            };
+        } catch (error) {
+            // Do not leave a partially rebuilt index behind if a repair fails.
+            await this.removeIndexIfPresent(fs);
+            if (originalIndex !== null) {
+                await fs.writeFile(indexPath, originalIndex);
+            }
+            log.error('GitManager', 'Git index rebuild failed; original index restored', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Restore the newest non-empty index backup created by a repair.
+     * The current index is backed up first so this action remains reversible.
+     */
+    async restoreLatestIndexBackup(): Promise<string> {
+        this.assertOperationActive();
+        const fs = this.fs.promises || this.fs;
+        const gitDir = this.dir === '.' ? '.git' : `${this.dir}/.git`;
+        const entries = await fs.readdir(gitDir, { encoding: 'utf8' });
+        const backups = entries
+            .filter((entry: string) => /^index\.obsidian-git-backup-\d+$/.test(entry))
+            .sort()
+            .reverse();
+        if (backups.length === 0) throw new Error('No Git index repair backup was found.');
+
+        const backupPath = `${gitDir}/${backups[0]}`;
+        const backup = await fs.readFile(backupPath);
+        const bytes = backup instanceof Uint8Array ? backup : new Uint8Array(backup);
+        if (bytes.byteLength === 0) {
+            throw new Error(`The newest Git index backup is empty: ${backups[0]}`);
+        }
+
+        let currentIndex: Uint8Array | null = null;
+        if (await this.indexExists(fs)) {
+            const current = await fs.readFile(this.repositoryGitPath('index'));
+            currentIndex = current instanceof Uint8Array ? current : new Uint8Array(current);
+            await fs.writeFile(this.repositoryGitPath(`index.obsidian-git-pre-restore-${Date.now()}`), currentIndex);
+        }
+
+        try {
+            await fs.writeFile(this.repositoryGitPath('index'), bytes);
+            await git.listFiles({ fs: this.fs, dir: this.dir });
+            log.info('GitManager', `Restored Git index backup ${backups[0]}`);
+            return backups[0];
+        } catch (error) {
+            await this.removeIndexIfPresent(fs);
+            if (currentIndex !== null) {
+                await fs.writeFile(this.repositoryGitPath('index'), currentIndex);
+            }
+            throw error;
         }
     }
 
@@ -1989,6 +2216,7 @@ export class GitManager {
         dir: string,
         treeOid: string,
         prefix: string = '',
+        strict: boolean = false,
     ): Promise<Map<string, string>> {
         const result = new Map<string, string>();
         try {
@@ -1996,7 +2224,7 @@ export class GitManager {
             for (const entry of tree.tree) {
                 const fullPath = prefix + entry.path;
                 if (entry.type === 'tree') {
-                    const subMap = await this.readTreeRecursiveAt(fs, dir, entry.oid, fullPath + '/');
+                    const subMap = await this.readTreeRecursiveAt(fs, dir, entry.oid, fullPath + '/', strict);
                     for (const [subPath, subOid] of subMap.entries()) {
                         result.set(subPath, subOid);
                     }
@@ -2006,6 +2234,7 @@ export class GitManager {
             }
         } catch (e) {
             log.warn('GitManager', `Failed to read tree ${treeOid.slice(0, 7)}`, e);
+            if (strict) throw e;
         }
         return result;
     }
