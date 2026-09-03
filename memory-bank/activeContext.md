@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-03 18:26:33 IST*
+*Last Updated: 2026-09-03 20:07:23 IST*
 
 ## Current Tasks
 
@@ -48,16 +48,26 @@
   coordination, then perform mobile acceptance of clone, updater, progress,
   and repository-ref recovery behavior.
 
+### T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️
+- **Scope**: Decide whether the recurring lifecycle, repository, adapter,
+  transport, and UI problems warrant incremental extraction or a parallel
+  clean rewrite.
+- **Status**: Assessment document created; no rewrite, fork, or replacement is
+  authorized. The current plugin remains the rollback baseline.
+- **Next**: Build the conformance, desktop, Android, and release evidence
+  needed for a final go/no-go decision.
+
 ### T36: Fork and Maintain isomorphic-git — 🔄 Independent architecture task
 - **Scope**: Evaluate official isomorphic-git 1.41.9, then fork, publish, and
   maintain only the smallest required changes for bulk Git mutations and
   Obsidian/mobile compatibility.
 - **Status**: The upstream repository is cloned at
   `/Users/deepak/code/isomorphic-git` at tag `v1.41.9`; no fork has been
-  adopted. The current plugin still resolves 1.29.0 from its lockfile.
-- **Boundary**: T36 is a separate top-level task, not a T35 child. It must not
-  be used to defer the urgent `.gitignore` enforcement regression or the mobile
-  `refs/heads/main` diagnosis.
+  adopted. The plugin now pins official 1.41.9 in source and lockfile; older
+  1.29.0 references are historical baseline notes.
+- **Boundary**: T36 is a separate top-level task, not a T35 child. Its source
+  ignore regression is fixed; it must not be used to defer the mobile
+  `refs/heads/main` diagnosis or broader adapter acceptance.
 - **Next**: Test official 1.41.9 in a controlled branch before deciding whether
   a published fork is necessary.
 
@@ -73,7 +83,7 @@
   inspection and preserving all existing vault and `.git` data.
 
 ### Current Session Continuation — 2026-09-03
-- **Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
+- **Title**: T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
 - **Completed**: Recorded the mobile-copy Git repair, deletion-aware staging,
   bounded batch/concurrent reads, official isomorphic-git inspection, and T36
   architecture plan.
@@ -100,6 +110,15 @@
 - Source fixes for all seven reported behaviors are implemented locally.
 - Remaining acceptance is real Obsidian desktop/mobile behavior and remote
   timing/freshness; automated tests do not close those device gates.
+
+### Memory Bank Follow-up — 2026-09-03 19:58 IST
+- Updated the reliability, sidebar, mobile, dependency, progress, and release
+  records with the follow-up commit `e2cb6ad` and its exact verification.
+- Corrected the current isomorphic-git dependency record to official 1.41.9;
+  historical 1.29.0 references remain labeled as baseline evidence.
+- Created tentative T37 and `implementation-details/plugin-rewrite-assessment.md`
+  to assess incremental extraction versus a clean rewrite. No rewrite is
+  approved; the current plugin remains the rollback baseline.
 
 ### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.
@@ -267,7 +286,7 @@
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
 - **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d/T35e active,
   T35f planned,
-  T1-T6/T30/T32/T33 completed; mb-core protocols, templates, and missing
+  T1-T6/T30/T32/T33 completed; T37 tentative/paused; mb-core protocols, templates, and missing
   support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)
 

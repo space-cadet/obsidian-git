@@ -1,7 +1,7 @@
 # isomorphic-git Fork and Maintenance
 
 *Created: 2026-09-03 16:39:34 IST*
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 19:58:37 IST*
 *Task: T36*
 
 ## Purpose
@@ -35,8 +35,9 @@ Git APIs or changes that cannot be contributed upstream in the required time.
 - The plugin has a custom `ObsidianFsAdapter`, mobile Buffer handling, native
   `requestUrl` transport, and bundled `main.js`; all must be tested after an
   upgrade or fork adoption.
-- The current plugin dependency declaration is `^1.21.0`, but the lockfile
-  resolves `1.29.0`. No deliberate 1.29 compatibility pin was found.
+- The current plugin pins official isomorphic-git `1.41.9` in source and
+  lockfile. The former `1.29.0` resolution is retained only as historical
+  compatibility evidence.
 
 ## Proposed Distribution
 

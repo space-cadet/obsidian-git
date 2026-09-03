@@ -1,3 +1,14 @@
+## 2026-09-03 — T29/T35b/T35d/T36/T37 Memory Bank reconciliation
+
+- Recorded the `e2cb6ad` reliability follow-up, including refresh invalidation,
+  delete-aware refresh, cache lifetime, staging busy-state protection, live
+  logs, frozen progress timers, and the already-current pull fast path.
+- Corrected the current isomorphic-git record to official 1.41.9 and preserved
+  1.29.0 only as historical pre-upgrade evidence.
+- Added tentative T37 and a design document assessing incremental extraction
+  versus a clean plugin rewrite. The current recommendation is incremental
+  extraction with the existing plugin retained as the rollback baseline.
+
 ## 2026-09-02 — T29/T35 updater repair and sidebar follow-up audit
 
 - Repaired rolling development-build detection in `910c5f5` by aligning the

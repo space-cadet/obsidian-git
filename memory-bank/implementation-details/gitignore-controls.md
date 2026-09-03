@@ -71,10 +71,10 @@ large change set.
 
 ## Confirmed Source Diagnosis and Implementation Order — 2026-09-03
 
-- The installed lockfile version is isomorphic-git 1.29.0. Its `add()` path
-  checks `isIgnored()` without checking index membership first, so a tracked
-  file that later matches `.gitignore` is silently skipped. This is contrary
-  to normal Git behavior.
+- The former lockfile version was isomorphic-git 1.29.0. Its `add()` path
+  checked `isIgnored()` without checking index membership first, so a tracked
+  file that later matched `.gitignore` could be silently skipped. The current
+  plugin pins official 1.41.9; this remains historical diagnosis.
 - `GitManager.addAll()` filters only plugin-owned paths, trusts caller-supplied
   paths, and marks each batch member staged after `git.add()` returns. A
   skipped ignored path can therefore be reported as staged even when the index

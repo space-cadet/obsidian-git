@@ -1,7 +1,7 @@
 # Session 2026-09-03 - Afternoon
 
 *Created: 2026-09-03 13:11:02 IST*
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 20:07:23 IST*
 
 ## Focus Task
 
@@ -119,3 +119,30 @@ reported as staged after a no-op add.
   10 isomorphic-git smoke checks, and `git diff --check`.
 - Remaining evidence is real Obsidian desktop/mobile acceptance, including
   remote-state freshness, push duration display, and Android rendering.
+
+## Memory Bank and Rewrite Assessment Closeout — 2026-09-03 19:58 IST
+
+**Session Title**: T29, T35b, T35d, T36, T37: Reconcile reliability records
+and assess a plugin rewrite
+
+### Work Completed
+
+- Reconciled the existing reliability, sidebar, mobile, dependency, progress,
+  and release records with the follow-up source commit `e2cb6ad`.
+- Corrected the current isomorphic-git record to official 1.41.9 and labeled
+  1.29.0 references as historical baseline evidence.
+- Created tentative T37 and
+  `memory-bank/implementation-details/plugin-rewrite-assessment.md`.
+- Recorded the architectural pattern shared by the reported failures and the
+  feasibility, risks, go/no-go criteria, and recommendation for incremental
+  extraction versus a clean rewrite.
+
+### Decision and Handoff
+
+- A big-bang rewrite is not advised or authorized now. The existing plugin is
+  the rollback baseline while explicit operation, repository-state, read-model,
+  cache, progress, log, policy, adapter, and transport boundaries are tested.
+- T37 remains tentative/paused until conformance, desktop, Android, and release
+  evidence is available.
+- Memory Bank changes are ready for commit and push; no production source code
+  was changed in this documentation-only continuation.

@@ -1,6 +1,18 @@
 # Project Progress
 
-*Last Updated: 2026-09-03 16:39:34 IST*
+*Last Updated: 2026-09-03 19:58:37 IST*
+
+## 2026-09-03 Reliability Documentation and Rewrite Assessment
+
+- Reconciled T29, T29a, T35b, T35d, and T36 with the follow-up source commit
+  `e2cb6ad` and its 57-test/build/artifact/smoke/diff verification.
+- Corrected the current dependency record to official isomorphic-git 1.41.9;
+  earlier 1.29.0 references are now treated as historical baseline notes.
+- Created tentative T37 and the plugin rewrite assessment document. The
+  recommendation is incremental extraction behind explicit repository,
+  operation, read-model, cache, progress, log, and policy boundaries; a
+  big-bang rewrite is not advised before mobile and conformance evidence.
+- No source rewrite, dependency fork, or release-track change was authorized.
 
 ## 2026-09-03 Session Closeout
 

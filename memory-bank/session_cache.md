@@ -1,15 +1,15 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-03 18:26:33 IST*
+*Last Updated: 2026-09-03 20:07:23 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
-**Focus Task**: T29, T35b, T35d, T36 sidebar reliability, ignore enforcement, persistent logs, metrics, and push progress
+**Focus Task**: T29, T35b, T35d, T36, T37 reliability closeout and plugin rewrite assessment
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
-**Status**: 🔄 IN PROGRESS
+**Status**: ✅ CLOSED
 
-**Session Title**: T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
+**Session Title**: T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
@@ -23,7 +23,7 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e active) | Planned: 3 (T34b, T34c, T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e active) | Planned: 4 (T34b, T34c, T35f, T37) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
 - Current Period: afternoon
 
@@ -72,6 +72,7 @@ source file was missing.
 - T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (timeouts and stale-folder cleanup shipped; runtime acceptance remains)
 - T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
 - T36: Fork and Maintain isomorphic-git — 🔄 IN PROGRESS (official 1.41.9 evaluated; fork decision open)
+- T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️ PLANNED (assessment only; no rewrite authorized)
 
 ## Active Tasks
 ### T29: obsidian-git Plugin
@@ -111,6 +112,24 @@ replaces the presentation as one coordinated pass.
 3. ✅ Implement mockup-matching sidebar presentation at source level
 4. ⬜ Verify real Obsidian desktop/mobile visual acceptance
 
+### T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment
+**Status:** ⏸️ **PLANNED**
+**Priority:** MEDIUM
+**Started:** 2026-09-03
+**Last Active:** 2026-09-03 19:58:37 IST
+**Dependencies:** T35, T35b, T35c, T35d, T35f, T36
+
+#### Context
+The recurring sidebar, staging, repository, transport, progress, logging, and
+mobile issues expose missing architectural boundaries. T37 assesses
+incremental extraction versus a parallel clean rewrite without authorizing a
+replacement.
+
+#### Implementation Progress
+1. ✅ Recorded the cross-cutting failure pattern and current source evidence
+2. ✅ Compared rewrite feasibility, risks, and advisability
+3. 🔄 Await desktop/mobile conformance evidence before a final decision
+
 ### T34: Remote Authentication for Obsidian Git
 **Status:** 🔄 **Priority:** HIGH
 **Started:** 2026-08-10 **Last:** 2026-08-10
@@ -138,9 +157,8 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   bounded staging batches and concurrent reads are now recorded locally.
 - The current plugin worktree contains the performance changes and the saved
   maintenance mockup; they are included in this closeout commit.
-- The plugin still has an urgent unresolved `.gitignore` enforcement issue;
-  reproduce it before the next implementation session and test all staging
-  entry points.
+- The `.gitignore` enforcement regression is fixed in source; next acceptance
+  should cover mobile, nested/negated rules, and every staging entry point.
 - The mobile-copy repository is `/Users/deepak/Downloads/typora-notes`; the
   official working repository is `/Volumes/Data/owncloud/Notes/typora-notes`.
 - T36 is an independent top-level task for the isomorphic-git 1.41.9 upgrade
@@ -149,7 +167,7 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   investigation and must not be inferred from desktop or automated tests.
 
 ## Session History (Recent)
-1. `sessions/2026-09-03-afternoon.md` — T29, T35b, T35c, T35d, T35f, T36: Repair mobile repository, optimize Git operations, record gitignore regression, and define isomorphic-git fork plan
+1. `sessions/2026-09-03-afternoon.md` — T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
 2. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
 3. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
 4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
