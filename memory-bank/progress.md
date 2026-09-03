@@ -1,6 +1,6 @@
 # Project Progress
 
-*Last Updated: 2026-09-03 02:37:37 IST*
+*Last Updated: 2026-09-03 13:11:02 IST*
 
 ## 2026-09-03 Session Closeout
 
@@ -13,9 +13,23 @@
   comparison metadata is unavailable.
 - Verification passed: production build, 43 Node tests, 10 isomorphic-git
   checks, and `git diff --check`.
-- Remaining: measured Android keyboard fix, repository health/repair preview,
-  protected `.git` replacement, updater install acceptance, and full mutation
-  coordination.
+- Remaining: measured Android keyboard fix, protected remote `.git`
+  replacement, updater install acceptance, full mutation coordination, and
+  mobile existing-repository ref recovery.
+
+## 2026-09-03 Maintenance, Diagnostics, and Mobile Recovery
+
+- Added Settings Maintenance and Diagnostics panels for repository health,
+  local index repair, backup/restore, remote comparison, metrics, and logs.
+- Added persistent plugin-scoped logging and lifecycle records for maintenance
+  actions; result text is selectable in the Settings panel.
+- Optimized local index repair and verified the desktop path without claiming
+  that it replaces a damaged repository.
+- Recorded the unresolved mobile failure for the existing non-empty
+  `typora-notes` repository: `refs/heads/main` cannot be resolved during dry
+  run and requires read-only ref/adapter diagnosis next session.
+- Verification recorded: 51 Node tests, 10 isomorphic-git checks, production
+  build, artifact checks, and `git diff --check`.
 
 ## 2026-09-02 Updater, Sidebar, and Repository-Recovery Follow-up
 

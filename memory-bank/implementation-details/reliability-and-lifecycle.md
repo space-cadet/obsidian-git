@@ -187,4 +187,16 @@ mutations.
 
 The session did not implement repository replacement. Health checks, protected
 backups, temporary reconstruction, conflict comparison, explicit confirmation,
-and rollback remain required before a repair action is exposed.
+and rollback remain required before a repository-replacement action is exposed.
+
+## Maintenance Action and Ref-Recovery Status — 2026-09-03
+
+The Maintenance settings now expose local index repair and related backup and
+comparison previews. Maintenance operations log their lifecycle and return
+selectable result text, but this does not change the repository-replacement
+boundary above.
+
+On mobile, the existing non-empty `typora-notes` repository fails before the
+index scan when `refs/heads/main` cannot be resolved. The next recovery step is
+read-only inspection of `HEAD`, local refs, remote-tracking refs, and adapter
+visibility before any replacement or checkout is attempted.

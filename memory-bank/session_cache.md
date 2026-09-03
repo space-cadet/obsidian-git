@@ -1,21 +1,21 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-03 02:37:37 IST*
+*Last Updated: 2026-09-03 13:11:02 IST*
 
 ## Current Session
-**Started**: 2026-09-02 14:11:31 IST
-**Focus Task**: T29, T29a, T30, T35b, T35c, T35e updater/sidebar follow-ups
-**Session File**: `memory-bank/sessions/2026-09-02-afternoon.md`
+**Started**: 2026-09-03 13:11:02 IST
+**Focus Task**: T29, T35, T35b, T35c, T35d, T35e, T35f maintenance and diagnostics closeout
+**Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
 **Status**: ✅ CLOSED
 
-**Session Title**: T29, T29a, T30, T35b, T35c, T35e, T35f: Sidebar, gitignore, updater, status, and repository-recovery work
+**Session Title**: T29, T35, T35b, T35c, T35d, T35e, T35f: Add Git maintenance repair, diagnostics, and document updater/mobile recovery
 
-**Closeout Commit**: Source changes pushed as `d38e28e`; this Memory Bank update follows
+**Closeout Commit**: Source changes pushed as `b728470`; this Memory Bank update follows
 
-**Next Session**: Reproduce and fix the unresolved Android keyboard overlap,
-then implement repository health/repair preview and complete real Obsidian
-sidebar and updater acceptance.
+**Next Session**: Diagnose and safely recover the existing non-empty mobile
+`typora-notes` repository whose `refs/heads/main` cannot be resolved; preserve
+the vault and `.git` state before any repair or checkout.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -26,7 +26,7 @@ source file was missing.
 
 ## Overview
 - Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e active) | Planned: 3 (T34b, T34c, T35f) | Completed: 2 tracked milestones (T29 progress, T33 complete)
-- Last Session: 2026-09-02 afternoon (sidebar redesign, updater repair, and follow-up audit)
+- Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
 - Current Period: afternoon
 
 ## Task Registry
@@ -115,19 +115,20 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 
 ## Latest Session Handoff — 2026-09-03
 
-- The source implementation is pushed at `d38e28e` and the worktree was clean
+- The source implementation is pushed at `b728470` and the worktree is clean
   before this documentation update.
 - The `.gitignore` editor viewport fix was not accepted on Android; keyboard
   overlap remains the first fresh-session investigation.
 - Local status now derives from one matrix and survives branch-comparison
   failure when the working-tree scan succeeds.
-- The next repository step is read-only health detection followed by a
-  protected remote reconstruction/compare/confirm/rollback workflow.
+- The next repository step is read-only inspection of mobile `HEAD` and local
+  and remote-tracking refs for the existing non-empty `typora-notes` vault.
+- Do not claim the missing-ref issue is resolved from desktop or test evidence.
 
 ## Session History (Recent)
-1. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
-2. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
-3. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
-4. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
-5. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
-6. `sessions/2026-08-11-early-morning.md` — Architecture review recording and T35 hardening decomposition
+1. `sessions/2026-09-03-afternoon.md` — T29, T35, T35b, T35c, T35d, T35e, T35f: Add Git maintenance repair, diagnostics, and document updater/mobile recovery
+2. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
+3. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
+5. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+6. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation

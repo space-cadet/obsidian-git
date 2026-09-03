@@ -74,3 +74,12 @@
 - Reduced shallow-history warning noise and retained remote commit fallback.
 - Added a viewport-aware `.gitignore` editor attempt; Android keyboard overlap
   remains an unresolved acceptance issue.
+## 2026-09-03 — T29/T35 maintenance diagnostics and mobile-ref follow-up
+
+- Recorded the shipped Maintenance and Diagnostics settings, local index
+  repair, backup/restore previews, faster repair scans, scoped file logging,
+  metrics, lifecycle messages, and selectable result text.
+- Recorded the boundary that local index repair does not replace a damaged
+  repository or rebuild an existing non-empty vault from the remote.
+- Recorded the unresolved mobile `typora-notes` failure where
+  `refs/heads/main` cannot be resolved during the repair dry run.

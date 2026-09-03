@@ -133,3 +133,15 @@ T35d owns the follow-up. T29 mobile release acceptance must record actual
 Android/iOS results for clone, pull, push, progress, remote history, commit
 expansion, large responses, and pack-index behavior before the stable release
 gate closes.
+
+## Existing Repository Ref-Resolution Failure — 2026-09-03
+
+Real mobile testing of the existing non-empty `typora-notes` repository reports
+`Could not find refs/heads/main` during the index-repair dry run, while the
+health panel reports `main` with no commits. This is unresolved and must not be
+classified as a fixed mobile issue from desktop or automated tests.
+
+The next investigation must compare the mobile adapter's reads of `.git/HEAD`,
+`refs/heads/main`, and `refs/remotes/origin/main` with the configured branch and
+remote state. A recovery action must protect the existing vault and `.git`
+state before writing refs or checking out files.

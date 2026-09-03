@@ -23472,7 +23472,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "0069622e9e6c6f215d485cbc6eb44c1be063e58f" : "unknown";
+var GIT_COMMIT_HASH = true ? "b7284707587237181b5fa856a177ed323f1f515b" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

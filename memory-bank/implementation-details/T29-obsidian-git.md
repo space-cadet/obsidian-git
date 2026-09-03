@@ -350,3 +350,20 @@ T29 remains the release-package and acceptance owner; T34 remains the
 authentication owner. The new `security-and-secrets.md` and
 `reliability-and-lifecycle.md` documents hold the durable design boundaries
 that should guide implementation.
+
+## Maintenance and Diagnostics Settings — 2026-09-03
+
+The Settings panel now includes a Maintenance section with repository health,
+HEAD-based local index repair, repair backup/restore, and remote comparison
+preview actions. Dry-run output is retained in the panel and can be selected
+and copied as text.
+
+Diagnostics include persisted plugin-scoped file logging, memory/DOM metrics,
+updater adapter tracing, and lifecycle records for maintenance actions. The
+file logger owns its sink instead of globally intercepting console output, so
+messages from Dataview, ObsidianAI, and other plugins are excluded.
+
+Index repair is an index-only operation. Protected remote reconstruction,
+replacement, and rollback for an existing damaged repository remain separate
+T35c work. Mobile testing still has an unresolved existing-repository ref
+failure for `refs/heads/main`.

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-03 02:37:37 IST*
+*Last Updated: 2026-09-03 13:11:02 IST*
 
 ## Current Tasks
 
@@ -44,9 +44,20 @@
   SecretStorage is implemented; T35c replacement backups and T35b lifecycle
   coordination remain open. T35 is separate from T29 release ownership and
   T34 authentication ownership.
-- **Next**: Add protected replacement backups, repository-health diagnostics,
-  and shared operation coordination, then perform mobile acceptance of clone,
-  updater, and progress behavior.
+- **Next**: Add protected replacement backups and shared operation
+  coordination, then perform mobile acceptance of clone, updater, progress,
+  and repository-ref recovery behavior.
+
+### T29/T35 Maintenance and Diagnostics — 🔄 Desktop complete, mobile recovery open
+- **Delivered**: Settings Maintenance and Diagnostics panels, health and local
+  index repair actions, backup/restore and remote comparison previews, faster
+  repair scans, persistent plugin-scoped logging, metrics, and selectable
+  maintenance results.
+- **Current boundary**: Local index repair does not replace a damaged
+  repository or rebuild a non-empty vault from the remote.
+- **Next**: Diagnose the existing mobile `typora-notes` failure where
+  `refs/heads/main` cannot be resolved, starting with read-only adapter/ref
+  inspection and preserving all existing vault and `.git` data.
 
 ### T35e Updater and Release Artifact Consistency — 🔄 implementation partial
 - Ported the proven `obsidian-ai` updater pattern into `obsidian-git`: logger-backed diagnostics, cache-busted/status-aware GitHub requests, release-embedded commit identity, branch-aware dev selection, all published builds, and direct-asset validation.
@@ -125,15 +136,26 @@
 
 ### 2026-09-03 Session Closeout
 
-- Source commits `1389297`, `6aa7550`, `ec8927b`, `68632dd`, `25be638`,
-  `fa2156c`, and `d38e28e` were pushed to `origin/main`.
+- Source commits through `d38e28e` plus maintenance commits `986b695`,
+  `22fb14e`, `840649e`, `c215f29`, `d6670c8`, `ee9edf8`, `29085ed`,
+  `0069622`, and `b728470` were pushed to `origin/main`.
 - The session covered sidebar redesign and compact-only density, remote commit
   browsing, `.gitignore` controls and UTF-8 parsing, updater timeouts/cleanup,
   shared status reads, and stale-history/status resilience.
 - Android testing still reports keyboard overlap in the `.gitignore` dialog;
   this remains an unaccepted T29a issue despite the viewport-aware attempt.
-- Current source and remote are synchronized at `d38e28e`; worktree was clean
+- Current source and remote are synchronized at `b728470`; worktree was clean
   before this Memory Bank update.
+
+### 2026-09-03 Maintenance and Diagnostics Closeout
+
+- Maintenance and diagnostic source commits through `b728470` are pushed and
+  the checkout is clean and aligned with `origin/main`.
+- Recorded verification is 51 Node tests, 10 isomorphic-git checks, production
+  build, artifact checks, and `git diff --check`.
+- The next session must resolve the mobile missing-`refs/heads/main` problem
+  for the existing non-empty `typora-notes` repository; desktop success does
+  not close this device-acceptance issue.
 
 ### T33: Git Progress Modal + UI Fixes — ✅ COMPLETED
 - **Scope**: Dark-themed progress modal, mobile crash fix via chunked ArrayBuffer, desktop UI parity with mobile, commit file GitHub API fallback
