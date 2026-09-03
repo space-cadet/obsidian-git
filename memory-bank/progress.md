@@ -1,6 +1,18 @@
 # Project Progress
 
-*Last Updated: 2026-09-03 19:58:37 IST*
+*Last Updated: 2026-09-04 00:45:38 IST*
+
+## 2026-09-04 Operation Ownership Checkpoint
+
+- Deepened `OperationCoordinator` with lifecycle events, cancellation-safe
+  finalization, late-result rejection, and observer isolation.
+- Centralized plugin-owned operation lifecycle logging and routed local
+  repository initialization through the cancellable GitManager path.
+- Regenerated the production `main.js` bundle with source commit `b179d02f`.
+- Verification passed: `CI=true pnpm test`, 59 Node tests, artifact checks,
+  10 isomorphic-git checks, and `git diff --check`.
+- Remaining: full operation-entry-point conformance, protected replacement,
+  and real desktop/mobile acceptance.
 
 ## 2026-09-03 Reliability Documentation and Rewrite Assessment
 

@@ -170,3 +170,25 @@ the incremental architecture plan
 - No rewrite, fork, package replacement, or production source change was
   authorized or made.
 - The pre-existing `main.js` modification remains untouched.
+
+## Operation Ownership Implementation — 2026-09-04 00:45:38 IST
+
+### Work Completed
+
+- Implemented coordinator lifecycle events for admitted Git mutations,
+  including explicit cancellation and idle cleanup outcomes.
+- Rejected late operation results after cancellation or plugin unload and
+  isolated lifecycle observer failures from operation results.
+- Moved operation lifecycle logging to the plugin's coordinator subscription.
+- Routed local repository initialization through GitManager so it cannot bypass
+  the shared operation signal.
+- Regenerated `main.js` and verified that it embeds source commit
+  `b179d02f27df13116bae3357b7001d0fa77ea57a`.
+
+### Verification and Handoff
+
+- `CI=true pnpm test` passed: 59 Node tests, production build, artifact checks,
+  and 10 isomorphic-git checks.
+- T35b/T35f source-level progress is recorded; protected repository
+  replacement, full entry-point conformance, and real Obsidian desktop/mobile
+  acceptance remain open.

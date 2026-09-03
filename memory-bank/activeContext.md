@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 00:05:23 IST*
+*Last Updated: 2026-09-04 00:45:38 IST*
 
 ## Current Tasks
 
@@ -37,13 +37,14 @@
 - **Scope**: Cross-cutting credential safety, operation coordination,
   repository initialization safety, mobile transport, updater integrity, and
   test/CI/documentation alignment.
-- **Children**: T35a-T35e are active; T35f remains planned.
+- **Children**: T35a-T35f are active.
 - **Status**: The first KIRSS implementation slice adds logger redaction,
   protected automatic staging, URL normalization, repository-error
   classification, and safe repository initialization boundaries. T35a
-  SecretStorage is implemented; T35c replacement backups and T35b lifecycle
-  coordination remain open. T35 is separate from T29 release ownership and
-  T34 authentication ownership.
+  SecretStorage is implemented; T35b now has a source-level operation
+  lifecycle checkpoint, while T35c replacement backups and full conformance
+  remain open. T35 is separate from T29 release ownership and T34
+  authentication ownership.
 - **Next**: Add protected replacement backups and shared operation
   coordination, then perform mobile acceptance of clone, updater, progress,
   and repository-ref recovery behavior.
@@ -84,14 +85,22 @@
   inspection and preserving all existing vault and `.git` data.
 
 ### Current Session Continuation — 2026-09-04
-- **Title**: T35b, T35f, T37: Apply Pocock's modularity review and align the incremental architecture plan
-- **Completed**: Recorded the mobile-copy Git repair, deletion-aware staging,
-  bounded batch/concurrent reads, official isomorphic-git inspection, and T36
-  architecture plan.
-- **Urgent next session**: Reproduce and fix `.gitignore` enforcement across
-  status, individual staging, bulk staging, and automatic sync.
-- **Remaining**: Commit/push this continuation, then perform official 1.41.9
-  compatibility testing and real mobile acceptance.
+- **Title**: T35b, T35f, T37: Implement operation ownership and publish the verified bundle
+- **Completed**: Implemented coordinator lifecycle events, cancellation-safe
+  finalization, centralized operation logging, cancellable local init, and
+  focused lifecycle coverage.
+- **Verification**: Production build and `CI=true pnpm test` pass with 59 Node
+  tests, artifact checks, 10 isomorphic-git checks, and diff validation.
+- **Remaining**: Commit/push this continuation, then complete entry-point
+  conformance, protected replacement safety, and real desktop/mobile acceptance.
+
+### Operation Ownership Checkpoint — 2026-09-04
+- `OperationCoordinator` now admits one mutation at a time and emits explicit
+  started, completed, failed, cancelled, and idle events.
+- A callback that returns after cancellation or plugin unload cannot produce a
+  success result; lifecycle observers cannot change operation outcomes.
+- `GitSyncPlugin` owns the coordinator subscription and operation log records;
+  local initialization now uses the same cancellable GitManager path.
 
 ### Current Implementation Session — 2026-09-03 18:26 IST
 - **Authorized scope**: Implement the seven confirmed sidebar, staging,
@@ -286,7 +295,7 @@
 - **Updater**: `PluginUpdater` uses `requestUrl` plus the vault adapter; the latest repaired generated build is embedded as commit `3f269e4` in source commit `910c5f5`
 - **Dev release**: https://github.com/space-cadet/obsidian-git/releases/tag/dev
 - **Memory Bank**: T29/T34/T35 active, T34a/T35a/T35b/T35c/T35d/T35e active,
-  T35f planned,
+  T35f in progress,
   T1-T6/T30/T32/T33 completed; T37 tentative/paused; mb-core protocols, templates, and missing
   support files initialized without overwriting existing project records
 - **Branch**: `main` (isomorphic-git + ObsidianFsAdapter)

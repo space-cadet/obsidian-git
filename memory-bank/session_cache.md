@@ -1,19 +1,19 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 00:05:23 IST*
+*Last Updated: 2026-09-04 00:45:38 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
-**Focus Task**: T35b, T35f, T37 Pocock modularity review and incremental architecture plan
+**Focus Task**: T35b, T35f, T37 operation ownership and verified bundle
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
-**Status**: ✅ CLOSED
+**Status**: 🔄 IN PROGRESS
 
-**Session Title**: T35b, T35f, T37: Apply Pocock's modularity review and align the incremental architecture plan
+**Session Title**: T35b, T35f, T37: Implement operation ownership and publish the verified bundle
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Continue official 1.41.9/mobile compatibility and real Obsidian acceptance after the source fixes are verified.
+**Next Session**: Complete operation entry-point conformance, protected replacement safety, and real Obsidian acceptance.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -23,7 +23,7 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e active) | Planned: 4 (T34b, T34c, T35f, T37) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f active) | Planned: 2 (T34b, T34c) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
 - Current Period: afternoon
 
@@ -70,7 +70,7 @@ source file was missing.
 - T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (health checks and protected rebuild open)
 - T35d: Mobile and Remote Transport Reliability — 🔄 IN PROGRESS (separate progress telemetry and modal stats implemented)
 - T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (timeouts and stale-folder cleanup shipped; runtime acceptance remains)
-- T35f: Test, CI, and Documentation Alignment — ⏸️ PLANNED
+- T35f: Test, CI, and Documentation Alignment — 🔄 IN PROGRESS
 - T36: Fork and Maintain isomorphic-git — 🔄 IN PROGRESS (official 1.41.9 evaluated; fork decision open)
 - T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️ PLANNED (assessment only; no rewrite authorized)
 
@@ -174,3 +174,13 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
 5. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
 6. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+
+## Current Implementation Checkpoint — 2026-09-04
+
+- Production bundle regenerated from source commit `b179d02f27df13116bae3357b7001d0fa77ea57a`.
+- The coordinator now owns operation lifecycle outcomes and plugin-scoped
+  lifecycle logging; local repository initialization uses the same signal.
+- `CI=true pnpm test` passed: 59 Node tests, artifact checks, production
+  build, and 10 isomorphic-git checks.
+- T35b and T35f remain in progress. Protected replacement, full conformance,
+  and real desktop/mobile acceptance remain open.

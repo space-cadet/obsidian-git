@@ -1,3 +1,13 @@
+## 2026-09-04 — T35b/T35f operation ownership checkpoint
+
+- Added explicit operation lifecycle events and cancellation finalization.
+- Prevented late mutation results from being reported as successful after
+  cancellation or plugin unload.
+- Centralized operation lifecycle logging and routed local initialization
+  through the GitManager cancellation boundary.
+- Regenerated and verified the production bundle; 59 Node tests and 10
+  isomorphic-git checks pass.
+
 ## 2026-09-03 — T29/T35b/T35d/T36/T37 Memory Bank reconciliation
 
 - Recorded the `e2cb6ad` reliability follow-up, including refresh invalidation,

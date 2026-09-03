@@ -227,3 +227,21 @@ Bulk staging now reduces index-write overhead through bounded batches, but the
 broader mutation coordinator and bulk unstage/reset/remove contract remain
 open. Ignore-rule enforcement must be applied consistently before any automatic
 or caller-supplied staging operation.
+
+## Operation Ownership Checkpoint — 2026-09-04
+
+`OperationCoordinator` now owns admission, cancellation, terminal outcome, and
+idle cleanup for admitted Git mutations. It emits one lifecycle sequence per
+operation, rejects a result that arrives after cancellation or unload, and
+isolates lifecycle observers from the operation result.
+
+`GitSyncPlugin` subscribes to that lifecycle for plugin-scoped operation logs.
+The existing `runGitMutation()` path remains the shared manager/signal adapter
+used by commands, sidebar actions, settings maintenance, manual sync, and
+auto-sync. Local repository initialization now goes through `GitManager`, so
+it cannot bypass the operation signal.
+
+Focused lifecycle tests cover overlap rejection, cancellation, disposal,
+late-success rejection, terminal cleanup, and observer failures. This is a
+source-level checkpoint, not proof of real Obsidian desktop/mobile behavior;
+protected repository replacement and full device conformance remain open.

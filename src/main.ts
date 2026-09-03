@@ -22,7 +22,7 @@ import {
 	CredentialStore,
 	migrateLegacySecret,
 } from './credentialStore';
-import { OperationCoordinator } from './operationCoordinator';
+import { OperationCancelledError, OperationCoordinator } from './operationCoordinator';
 import { DiagnosticLogLevel, renderDiagnosticsSection } from './settings-sections/diagnostics';
 import { renderMaintenanceSection } from './settings-sections/maintenance';
 
@@ -82,6 +82,7 @@ export default class GitSyncPlugin extends Plugin {
 	private credentialStore: CredentialStore | null = null;
 	private credentialStorageError: Error | null = null;
 	private readonly operationCoordinator = new OperationCoordinator();
+	private operationLifecycleUnsubscribe: (() => void) | null = null;
 
 	async onload() {
 		// Start persistent diagnostics before settings, updater, or remote work so
@@ -89,6 +90,34 @@ export default class GitSyncPlugin extends Plugin {
 		this.fileLogger = new FileLogger(this.app, this.manifest.id);
 		await this.fileLogger.init();
 		log.setFileLogSink((level, ...args) => this.fileLogger?.log(level, ...args));
+		this.operationLifecycleUnsubscribe = this.operationCoordinator.subscribe((event) => {
+			const details = {
+				operation: event.name,
+				operationId: event.id,
+				...(event.elapsedMs === undefined ? {} : { elapsedMs: event.elapsedMs }),
+			};
+			switch (event.lifecycle) {
+				case 'started':
+					log.info('GitOperation', 'Operation started', details);
+					break;
+				case 'completed':
+					log.info('GitOperation', 'Operation completed', details);
+					break;
+				case 'cancelled':
+					log.warn('GitOperation', 'Operation cancelled', {
+						...details,
+						reason: event.error instanceof Error ? event.error.message : String(event.error || 'cancelled'),
+					});
+					break;
+				case 'failed':
+					log.error(
+						'GitOperation',
+						`Operation failed: ${event.name} after ${event.elapsedMs || 0}ms`,
+						event.error instanceof Error ? event.error : new Error(String(event.error)),
+					);
+					break;
+			}
+		});
 		await this.loadSettings();
 		this.setDiagnosticLogLevel(this.settings.debugLogLevel);
 		this.setDiagnosticLogMaxSize(this.settings.debugLogMaxSizeMB);
@@ -347,6 +376,8 @@ export default class GitSyncPlugin extends Plugin {
 	onunload() {
 		this.clearAutoSync();
 		this.operationCoordinator.dispose();
+		this.operationLifecycleUnsubscribe?.();
+		this.operationLifecycleUnsubscribe = null;
 		log.setFileLogSink(null);
 		this.fileLogger?.stop();
 		this.fileLogger = null;
@@ -660,38 +691,19 @@ export default class GitSyncPlugin extends Plugin {
 		name: string,
 		operation: (manager: GitManager, signal: AbortSignal) => Promise<T>,
 	): Promise<T> {
-		const startedAt = Date.now();
-		log.info('Maintenance', 'Action started', { action: name });
-		try {
-			const result = await this.operationCoordinator.run(name, async ({ signal }) => {
-				const manager = await this.ensureGitManager();
-				if (!manager) throw new Error('No git repository found in vault');
-				if (signal.aborted) {
-					const error = new Error('Git operation cancelled');
-					error.name = 'AbortError';
-					throw error;
-				}
-				manager.setOperationSignal(signal);
-				try {
-					return await operation(manager, signal);
-				} finally {
-					if (this.gitManager === manager) manager.setOperationSignal(null);
-				}
-			});
-			log.info('Maintenance', 'Action completed', {
-				action: name,
-				elapsedMs: Date.now() - startedAt,
-			});
-			return result;
-		} catch (error: any) {
-			const details = { action: name, elapsedMs: Date.now() - startedAt };
-			if (error?.name === 'AbortError') {
-				log.warn('Maintenance', 'Action cancelled', { ...details, reason: error?.message });
-			} else {
-				log.error('Maintenance', `Action failed: ${name} after ${details.elapsedMs}ms`, error instanceof Error ? error : new Error(String(error)));
+		return this.operationCoordinator.run(name, async ({ signal }) => {
+			const manager = await this.ensureGitManager();
+			if (!manager) throw new Error('No git repository found in vault');
+			if (signal.aborted) {
+				throw new OperationCancelledError();
 			}
-			throw error;
-		}
+			manager.setOperationSignal(signal);
+			try {
+				return await operation(manager, signal);
+			} finally {
+				if (this.gitManager === manager) manager.setOperationSignal(null);
+			}
+		});
 	}
 
 	async checkRepositoryHealth(): Promise<import('./gitManager').RepositoryHealth> {
@@ -750,12 +762,14 @@ export default class GitSyncPlugin extends Plugin {
 	async initializeNewRepo(): Promise<void> {
 		await this.runGitMutation('Initialize repository', async (manager) => {
 			try {
-				const git = await import('isomorphic-git');
-				await git.init({ fs: this.fs, dir: '.', defaultBranch: this.settings.branchName || 'main' });
+				// Keep initialization inside GitManager so it receives the same
+				// operation signal as clone, pull, push, and sync.
+				await manager.initializeRepo('', this.settings.branchName || 'main');
 				log.info('GitSyncPlugin', 'New git repository initialized in vault');
 				new Notice('New git repository initialized');
 			} catch (e: any) {
 				log.error('GitSyncPlugin', 'Failed to initialize repo', e);
+				if (e?.name === 'AbortError') throw e;
 				throw new Error('Failed to initialize repo: ' + e.message);
 			}
 		});

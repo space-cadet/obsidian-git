@@ -26307,7 +26307,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "bb4e4260e445fc65379b11b74c4dbfd534914d6d" : "unknown";
+var GIT_COMMIT_HASH = true ? "b179d02f27df13116bae3357b7001d0fa77ea57a" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -26363,6 +26363,15 @@ function credentialStoreFromApp(app, secretId) {
 }
 
 // src/operationCoordinator.ts
+var OperationCancelledError = class extends Error {
+  constructor(message = "Git operation cancelled") {
+    super(message);
+    this.name = "AbortError";
+  }
+};
+function isAbortError(error) {
+  return Boolean(error && typeof error === "object" && error.name === "AbortError");
+}
 var OperationInProgressError = class extends Error {
   constructor(operationName) {
     super(`Git operation already in progress: ${operationName}`);
@@ -26375,11 +26384,19 @@ var OperationCoordinator = class {
     this.nextId = 1;
     this.active = null;
     this.disposed = false;
+    this.listeners = /* @__PURE__ */ new Set();
   }
   get activeOperation() {
     if (!this.active)
       return null;
     return { id: this.active.id, name: this.active.name };
+  }
+  get isDisposed() {
+    return this.disposed;
+  }
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
   async run(name, operation) {
     var _a;
@@ -26388,13 +26405,44 @@ var OperationCoordinator = class {
     if (this.active)
       throw new OperationInProgressError(this.active.name);
     const controller = new AbortController();
-    const active = { id: this.nextId++, name, controller };
+    const active = { id: this.nextId++, name, controller, startedAt: Date.now() };
     this.active = active;
+    this.emit({ lifecycle: "started", id: active.id, name, startedAt: active.startedAt });
     try {
-      return await operation({ id: active.id, name, signal: controller.signal });
+      const result = await operation({ id: active.id, name, signal: controller.signal });
+      if (controller.signal.aborted)
+        throw new OperationCancelledError();
+      this.emit({
+        lifecycle: "completed",
+        id: active.id,
+        name,
+        startedAt: active.startedAt,
+        elapsedMs: Date.now() - active.startedAt
+      });
+      return result;
+    } catch (error) {
+      const cancelled = controller.signal.aborted || isAbortError(error);
+      const finalError = cancelled && !(error instanceof OperationCancelledError) ? new OperationCancelledError() : error;
+      this.emit({
+        lifecycle: cancelled ? "cancelled" : "failed",
+        id: active.id,
+        name,
+        startedAt: active.startedAt,
+        elapsedMs: Date.now() - active.startedAt,
+        error: finalError
+      });
+      throw finalError;
     } finally {
-      if (((_a = this.active) == null ? void 0 : _a.id) === active.id)
+      if (((_a = this.active) == null ? void 0 : _a.id) === active.id) {
         this.active = null;
+        this.emit({
+          lifecycle: "idle",
+          id: active.id,
+          name,
+          startedAt: active.startedAt,
+          elapsedMs: Date.now() - active.startedAt
+        });
+      }
     }
   }
   cancelActive() {
@@ -26405,6 +26453,14 @@ var OperationCoordinator = class {
   dispose() {
     this.disposed = true;
     this.cancelActive();
+  }
+  emit(event) {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch (e) {
+      }
+    }
   }
 };
 
@@ -26736,6 +26792,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.credentialStore = null;
     this.credentialStorageError = null;
     this.operationCoordinator = new OperationCoordinator();
+    this.operationLifecycleUnsubscribe = null;
   }
   async onload() {
     var _a;
@@ -26744,6 +26801,34 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     log2.setFileLogSink((level, ...args) => {
       var _a2;
       return (_a2 = this.fileLogger) == null ? void 0 : _a2.log(level, ...args);
+    });
+    this.operationLifecycleUnsubscribe = this.operationCoordinator.subscribe((event) => {
+      const details = {
+        operation: event.name,
+        operationId: event.id,
+        ...event.elapsedMs === void 0 ? {} : { elapsedMs: event.elapsedMs }
+      };
+      switch (event.lifecycle) {
+        case "started":
+          log2.info("GitOperation", "Operation started", details);
+          break;
+        case "completed":
+          log2.info("GitOperation", "Operation completed", details);
+          break;
+        case "cancelled":
+          log2.warn("GitOperation", "Operation cancelled", {
+            ...details,
+            reason: event.error instanceof Error ? event.error.message : String(event.error || "cancelled")
+          });
+          break;
+        case "failed":
+          log2.error(
+            "GitOperation",
+            `Operation failed: ${event.name} after ${event.elapsedMs || 0}ms`,
+            event.error instanceof Error ? event.error : new Error(String(event.error))
+          );
+          break;
+      }
     });
     await this.loadSettings();
     this.setDiagnosticLogLevel(this.settings.debugLogLevel);
@@ -26963,11 +27048,13 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.setupAutoSync();
   }
   onunload() {
-    var _a;
+    var _a, _b;
     this.clearAutoSync();
     this.operationCoordinator.dispose();
+    (_a = this.operationLifecycleUnsubscribe) == null ? void 0 : _a.call(this);
+    this.operationLifecycleUnsubscribe = null;
     log2.setFileLogSink(null);
-    (_a = this.fileLogger) == null ? void 0 : _a.stop();
+    (_b = this.fileLogger) == null ? void 0 : _b.stop();
     this.fileLogger = null;
   }
   async loadSettings() {
@@ -27234,40 +27321,21 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   }
   /** Run one repository mutation through the shared lifecycle boundary. */
   async runGitMutation(name, operation) {
-    const startedAt = Date.now();
-    log2.info("Maintenance", "Action started", { action: name });
-    try {
-      const result = await this.operationCoordinator.run(name, async ({ signal }) => {
-        const manager = await this.ensureGitManager();
-        if (!manager)
-          throw new Error("No git repository found in vault");
-        if (signal.aborted) {
-          const error = new Error("Git operation cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-        manager.setOperationSignal(signal);
-        try {
-          return await operation(manager, signal);
-        } finally {
-          if (this.gitManager === manager)
-            manager.setOperationSignal(null);
-        }
-      });
-      log2.info("Maintenance", "Action completed", {
-        action: name,
-        elapsedMs: Date.now() - startedAt
-      });
-      return result;
-    } catch (error) {
-      const details = { action: name, elapsedMs: Date.now() - startedAt };
-      if ((error == null ? void 0 : error.name) === "AbortError") {
-        log2.warn("Maintenance", "Action cancelled", { ...details, reason: error == null ? void 0 : error.message });
-      } else {
-        log2.error("Maintenance", `Action failed: ${name} after ${details.elapsedMs}ms`, error instanceof Error ? error : new Error(String(error)));
+    return this.operationCoordinator.run(name, async ({ signal }) => {
+      const manager = await this.ensureGitManager();
+      if (!manager)
+        throw new Error("No git repository found in vault");
+      if (signal.aborted) {
+        throw new OperationCancelledError();
       }
-      throw error;
-    }
+      manager.setOperationSignal(signal);
+      try {
+        return await operation(manager, signal);
+      } finally {
+        if (this.gitManager === manager)
+          manager.setOperationSignal(null);
+      }
+    });
   }
   async checkRepositoryHealth() {
     const startedAt = Date.now();
@@ -27318,12 +27386,13 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   async initializeNewRepo() {
     await this.runGitMutation("Initialize repository", async (manager) => {
       try {
-        const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
-        await git.init({ fs: this.fs, dir: ".", defaultBranch: this.settings.branchName || "main" });
+        await manager.initializeRepo("", this.settings.branchName || "main");
         log2.info("GitSyncPlugin", "New git repository initialized in vault");
         new import_obsidian9.Notice("New git repository initialized");
       } catch (e) {
         log2.error("GitSyncPlugin", "Failed to initialize repo", e);
+        if ((e == null ? void 0 : e.name) === "AbortError")
+          throw e;
         throw new Error("Failed to initialize repo: " + e.message);
       }
     });
