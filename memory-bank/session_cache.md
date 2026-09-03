@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 00:53:16 IST*
+*Last Updated: 2026-09-04 01:01:19 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -194,3 +194,14 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   operation-signal cleanup.
 - Remaining: stale-view and repository-state cases, protected replacement,
   and real Obsidian desktop/mobile/release acceptance.
+
+## Current UI and Log Regression Checkpoint — 2026-09-04
+
+- Removed spinner behavior from staging checkboxes entirely; mutation controls
+  are disabled without rotating any checkbox.
+- Normalized persisted structured log data and deduplicated live/file copies
+  with small timestamp drift.
+- Successful pushes now force-update the existing local remote-tracking ref,
+  avoiding the reported post-push `AlreadyExistsError` warning.
+- Full package verification passes with 65 Node tests and 10 isomorphic-git
+  checks. Real Obsidian visual acceptance remains open.

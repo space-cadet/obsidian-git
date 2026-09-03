@@ -1791,12 +1791,12 @@
     color: var(--text-muted);
 }
 
-.git-file-stage-busy svg,
 .git-header-refreshing svg {
     animation: git-sync-spin 0.9s linear infinite;
 }
 
 .git-file-stage-busy,
+.git-operation-busy,
 .git-header-refreshing {
     opacity: 0.65;
     cursor: progress;

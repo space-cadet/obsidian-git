@@ -76,3 +76,23 @@ test('plugin lifecycle owns coordinator disposal and signal cleanup', () => {
   assert.match(mainSource, /manager\.setOperationSignal\(signal\)/);
   assert.match(mainSource, /manager\.setOperationSignal\(null\)/);
 });
+
+test('only the pressed staging control can receive the busy spinner', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
+
+  assert.match(sidebarSource, /stageBtn\.addClass\('git-file-stage-busy'\)/);
+  assert.match(sidebarSource, /control\.addClass\('git-operation-busy'\)/);
+  assert.doesNotMatch(sidebarSource, /if \(busy\) control\.addClass\('git-file-stage-busy'\)/);
+  assert.match(styles, /\.git-header-refreshing svg[\s\S]*animation: git-sync-spin/);
+  assert.doesNotMatch(styles, /\.git-file-stage-busy svg/);
+  assert.doesNotMatch(styles, /\.git-operation-busy svg[\s\S]*animation: git-sync-spin/);
+});
+
+test('successful pushes force-update the existing local tracking ref', () => {
+  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
+  assert.match(
+    gitManagerSource,
+    /ref: `refs\/remotes\/origin\/\$\{branchName\}`,[\s\S]*value: localOid,[\s\S]*force: true,/,
+  );
+});

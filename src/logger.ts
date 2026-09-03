@@ -53,8 +53,25 @@ export class Logger {
    */
   public getEntries(): LogEntry[] {
     const merged = new Map<string, LogEntry>();
+    const persisted = this.persistedEntries;
     for (const entry of [...this.persistedEntries, ...this.entries]) {
-      merged.set(`${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`, entry);
+      const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
+      if (merged.has(exactKey)) continue;
+
+      // FileLogger timestamps an entry when its sink receives it, which can be
+      // a few milliseconds after the in-memory entry is created. Treat that
+      // small timestamp drift as the same event when the structured payload
+      // also matches; otherwise one operation appears twice in the Log tab.
+      const isLiveEntry = !persisted.includes(entry);
+      if (isLiveEntry && persisted.some((persistedEntry) =>
+        persistedEntry.level === entry.level
+        && persistedEntry.namespace === entry.namespace
+        && persistedEntry.message === entry.message
+        && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250
+        && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
+      )) continue;
+
+      merged.set(exactKey, entry);
     }
     return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
   }

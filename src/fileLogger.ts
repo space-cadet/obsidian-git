@@ -83,16 +83,32 @@ export class FileLogger {
 				if (!Number.isFinite(timestamp)) continue;
 				const body = match[3];
 				const namespaceMatch = body.match(/^\[Git Sync\]\[([^\]]+)\]\s*(.*)$/);
+				const rawMessage = (namespaceMatch?.[2] || body).trim();
+				const parsed = this.parseMessageAndData(rawMessage);
 				entries.push({
 					timestamp,
 					level: match[2].toLowerCase(),
 					namespace: namespaceMatch?.[1] || 'FileLogger',
-					message: namespaceMatch?.[2] || body,
+					message: parsed.message,
+					...(parsed.data === undefined ? {} : { data: parsed.data }),
 				});
 			}
 			return entries.slice(-Math.max(1, limit));
 		} catch {
 			return [];
+		}
+	}
+
+	private parseMessageAndData(value: string): { message: string; data?: unknown } {
+		const separator = value.search(/\s(?=[\[{])/);
+		if (separator === -1) return { message: value };
+
+		const message = value.slice(0, separator).trimEnd();
+		const serializedData = value.slice(separator).trim();
+		try {
+			return { message, data: JSON.parse(serializedData) };
+		} catch {
+			return { message: value };
 		}
 	}
 

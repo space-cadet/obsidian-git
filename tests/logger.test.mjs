@@ -75,3 +75,25 @@ test('logger sends only explicit plugin entries to the persistent sink', () => {
   assert.match(entries[0].args[0], /^\[Git Sync\]\[GitManager\]/);
   assert.doesNotMatch(entries[0].args[0], /Dataview|ObsidianAI/);
 });
+
+test('logger merges the live and persisted copy of one event once', () => {
+  log.clear();
+  log.setLogLevel(LogLevel.INFO);
+  const originalNow = Date.now;
+  const timestamp = 1725400479000;
+  Date.now = () => timestamp;
+  try {
+    log.mergePersistedEntries([{
+      timestamp: timestamp - 50,
+      level: 'info',
+      namespace: 'GitOperation',
+      message: 'Operation started',
+      data: { operation: 'Stage all files', operationId: 1 },
+    }]);
+    log.info('GitOperation', 'Operation started', { operation: 'Stage all files', operationId: 1 });
+    assert.equal(log.getEntries().length, 1);
+  } finally {
+    Date.now = originalNow;
+    log.clear();
+  }
+});

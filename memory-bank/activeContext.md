@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 00:53:16 IST*
+*Last Updated: 2026-09-04 01:01:19 IST*
 
 ## Current Tasks
 
@@ -107,6 +107,16 @@
   plugin and sidebar use `runGitMutation`.
 - The same focused test checks coordinator disposal and GitManager signal
   cleanup. Runtime Obsidian and mobile acceptance remain separate.
+
+### UI and Log Regression Fixes — 2026-09-04
+- Changes-view busy state now disables all staging controls without rotating
+  any checkbox; no staging checkbox uses a spinner animation.
+- Successful pushes now force-update an existing local remote-tracking ref, so
+  an `AlreadyExistsError` cannot be reported after the remote push succeeds.
+- Persisted log data is normalized before merging, and small live/file
+  timestamp drift no longer creates duplicate Log-tab events.
+- Focused and full automated verification passes. Real Obsidian visual and
+  mobile acceptance remains open.
 
 ### Current Implementation Session — 2026-09-03 18:26 IST
 - **Authorized scope**: Implement the seven confirmed sidebar, staging,

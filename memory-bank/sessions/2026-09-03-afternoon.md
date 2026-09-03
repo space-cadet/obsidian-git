@@ -208,3 +208,23 @@ the incremental architecture plan
 - The focused conformance test passes with two tests and no failures.
 - The next planned evidence is stale-view and repository-state coverage,
   followed by protected replacement and real Obsidian desktop/mobile tests.
+
+## UI and Push/Log Regression Fixes — 2026-09-04 01:03:01 IST
+
+### Work Completed
+
+- Removed the staging-checkbox spinner animation entirely. Mutation busy state
+  now disables the staging controls without rotating any checkbox.
+- Made the post-push local remote-tracking ref update use `force: true`, which
+  makes an existing `refs/remotes/origin/<branch>` ref update idempotent.
+- Normalized structured payloads while reading persisted debug lines and
+  deduplicated live and persisted copies with small timestamp drift.
+- Added focused regression coverage for checkbox styling, push ref handling,
+  persisted payload parsing, and live/file log merging.
+
+### Verification and Handoff
+
+- `CI=true pnpm test` passed: 65 Node tests, artifact identity, production
+  build, 10 isomorphic-git checks, and `git diff --check`.
+- Real Obsidian desktop/mobile visual acceptance and remote push execution
+  remain separate runtime evidence layers.

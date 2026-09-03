@@ -1,9 +1,37 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 00:53:16 IST*
+*Last Updated: 2026-09-04 01:03:01 IST*
 
 ---
+
+## 2026-09-04
+
+#### 01:03:01 IST - T29a/T35d/T35f: Fix checkbox animation and push/log regressions
+- Modified `src/views/GitSidebarView.ts` - Applied a non-animated generic busy
+  class to sibling controls.
+- Modified `styles.css` - Removed spinner animation from staging checkboxes.
+- Modified `src/gitManager.ts` - Made successful-push tracking-ref updates
+  overwrite-safe.
+- Modified `src/fileLogger.ts` - Restored structured payloads from persisted
+  diagnostic lines.
+- Modified `src/logger.ts` - Deduplicated matching live and persisted events
+  despite small timestamp drift.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Added checkbox
+  and push metadata regression assertions.
+- Modified `tests/logger.test.mjs` - Added live/persisted deduplication coverage.
+- Created `tests/file-logger.test.mjs` - Added persisted payload parsing coverage.
+- Modified `memory-bank/tasks/T29a.md` - Recorded the no-spinner UI fix.
+- Modified `memory-bank/tasks/T35d.md` - Recorded the log deduplication fix.
+- Modified `memory-bank/tasks/T35f.md` - Recorded tests and 65-test verification.
+- Modified `memory-bank/activeContext.md` - Recorded the UI and push fixes.
+- Modified `memory-bank/session_cache.md` - Recorded the current checkpoint.
+- Modified `memory-bank/sessions/2026-09-03-afternoon.md` - Appended the fix
+  and runtime evidence boundary.
+- Modified `memory-bank/progress.md` - Recorded the regression fixes and checks.
+- Modified `memory-bank/changelog.md` - Recorded the user-reported regressions.
+- Created `memory-bank/edits/2026-09-04/010301-T29a-push-log-regressions.md`
+  - Recorded the edit chunk and verification boundary.
 
 ## 2026-09-04
 

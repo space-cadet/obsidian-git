@@ -1,3 +1,14 @@
+## 2026-09-04 — T29a/T35d/T35f UI and log regression fixes
+
+- Fixed the Changes view so a single staging action cannot animate every
+  checkbox.
+- Removed checkbox spinner animation entirely; staging controls now only use
+  disabled-state feedback during a mutation.
+- Fixed duplicate Log-tab entries caused by merging live entries with their
+  persisted file copies.
+- Made successful-push tracking-ref updates overwrite-safe.
+- Added focused regression coverage for both reported behaviors.
+
 ## 2026-09-04 — T35b/T35f operation-entry-point conformance
 
 - Added AST-backed source checks that keep all main-plugin and sidebar Git

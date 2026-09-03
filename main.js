@@ -20914,8 +20914,17 @@ var init_logger = __esm({
        */
       getEntries() {
         const merged = /* @__PURE__ */ new Map();
+        const persisted = this.persistedEntries;
         for (const entry of [...this.persistedEntries, ...this.entries]) {
-          merged.set(`${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`, entry);
+          const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
+          if (merged.has(exactKey))
+            continue;
+          const isLiveEntry = !persisted.includes(entry);
+          if (isLiveEntry && persisted.some(
+            (persistedEntry) => persistedEntry.level === entry.level && persistedEntry.namespace === entry.namespace && persistedEntry.message === entry.message && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250 && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
+          ))
+            continue;
+          merged.set(exactKey, entry);
         }
         return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
       }
@@ -23383,7 +23392,13 @@ Try again with a faster connection or smaller repository.`
           onMessage("Confirming branch...");
           try {
             const localOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` });
-            await writeRef({ fs: this.fs, dir: this.dir, ref: `refs/remotes/origin/${branchName}`, value: localOid });
+            await writeRef({
+              fs: this.fs,
+              dir: this.dir,
+              ref: `refs/remotes/origin/${branchName}`,
+              value: localOid,
+              force: true
+            });
           } catch (error) {
             log2.warn("GitManager", "Push succeeded but tracking metadata could not be updated", error);
           }
@@ -24245,16 +24260,31 @@ var _FileLogger = class _FileLogger {
           continue;
         const body = match[3];
         const namespaceMatch = body.match(/^\[Git Sync\]\[([^\]]+)\]\s*(.*)$/);
+        const rawMessage = ((namespaceMatch == null ? void 0 : namespaceMatch[2]) || body).trim();
+        const parsed = this.parseMessageAndData(rawMessage);
         entries.push({
           timestamp,
           level: match[2].toLowerCase(),
           namespace: (namespaceMatch == null ? void 0 : namespaceMatch[1]) || "FileLogger",
-          message: (namespaceMatch == null ? void 0 : namespaceMatch[2]) || body
+          message: parsed.message,
+          ...parsed.data === void 0 ? {} : { data: parsed.data }
         });
       }
       return entries.slice(-Math.max(1, limit));
     } catch (e) {
       return [];
+    }
+  }
+  parseMessageAndData(value) {
+    const separator = value.search(/\s(?=[\[{])/);
+    if (separator === -1)
+      return { message: value };
+    const message = value.slice(0, separator).trimEnd();
+    const serializedData = value.slice(separator).trim();
+    try {
+      return { message, data: JSON.parse(serializedData) };
+    } catch (e) {
+      return { message: value };
     }
   }
   setSensitiveValues(values) {
@@ -25172,9 +25202,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       control.disabled = busy;
       control.setAttr("aria-busy", String(busy));
       if (busy)
-        control.addClass("git-file-stage-busy");
+        control.addClass("git-operation-busy");
       else
-        control.removeClass("git-file-stage-busy");
+        control.removeClass("git-operation-busy");
     });
   }
   openIgnorePatternModal() {
@@ -26307,7 +26337,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "2b7c2593e20c7d8f3ec2c9f07a60e31a6ac0bf10" : "unknown";
+var GIT_COMMIT_HASH = true ? "249ba50e1585df19439e42793d24022840899eed" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts

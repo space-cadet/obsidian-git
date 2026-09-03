@@ -977,8 +977,8 @@ export class GitSidebarView extends ItemView {
         controls.forEach((control) => {
             control.disabled = busy;
             control.setAttr('aria-busy', String(busy));
-            if (busy) control.addClass('git-file-stage-busy');
-            else control.removeClass('git-file-stage-busy');
+            if (busy) control.addClass('git-operation-busy');
+            else control.removeClass('git-operation-busy');
         });
     }
 

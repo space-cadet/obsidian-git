@@ -2223,7 +2223,13 @@ export class GitManager {
             // the next sidebar refresh does not report a stale ahead count.
             try {
                 const localOid = await git.resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` });
-                await git.writeRef({ fs: this.fs, dir: this.dir, ref: `refs/remotes/origin/${branchName}`, value: localOid });
+                await git.writeRef({
+                    fs: this.fs,
+                    dir: this.dir,
+                    ref: `refs/remotes/origin/${branchName}`,
+                    value: localOid,
+                    force: true,
+                });
             } catch (error) {
                 log.warn('GitManager', 'Push succeeded but tracking metadata could not be updated', error as Error);
             }

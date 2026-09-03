@@ -1,6 +1,16 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 00:53:16 IST*
+*Last Updated: 2026-09-04 01:01:19 IST*
+
+## 2026-09-04 UI and Log Regression Fixes
+
+- Removed spinner behavior from staging checkboxes while preserving
+  disabled-state feedback for the other controls.
+- Reconstructed structured data from persisted log lines and deduplicated
+  matching live/file events with small timestamp drift.
+- Made successful push metadata updates overwrite the existing tracking ref.
+- Verification passed: 65 Node tests, artifact identity, production build,
+  10 isomorphic-git checks, and `git diff --check`.
 
 ## 2026-09-04 Operation Entry-Point Conformance
 
