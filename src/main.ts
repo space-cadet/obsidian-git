@@ -413,7 +413,12 @@ export default class GitSyncPlugin extends Plugin {
 				GIT_BRANCH,
 			);
 			this.settings.lastUpdateCheck = Date.now();
+			const saveStartedAt = performance.now();
+			log.debug('Updater', 'Saving update-check timestamp');
 			await this.saveSettings();
+			log.info('Updater', 'Update-check timestamp saved', {
+				elapsedMs: Math.round(performance.now() - saveStartedAt),
+			});
 			log.info('Updater', 'Update check completed', {
 				manual,
 				hasUpdate: result.hasUpdate,

@@ -173,11 +173,27 @@ async function downloadFile(app: App, url: string, destination: string, label: s
 	}
 	const content = response.text;
 	const writeStartedAt = performance.now();
-	await withTimeout(
-		app.vault.adapter.write(destination, content),
-		UPDATE_REQUEST_TIMEOUT_MS,
-		`Timed out writing ${label}. Check that the vault storage is available and try again.`,
-	);
+	logger?.('debug', 'adapter.write started', { path: destination, bytes: content.length });
+	try {
+		await withTimeout(
+			app.vault.adapter.write(destination, content),
+			UPDATE_REQUEST_TIMEOUT_MS,
+			`Timed out writing ${label}. Check that the vault storage is available and try again.`,
+		);
+		logger?.('debug', 'adapter.write completed', {
+			path: destination,
+			bytes: content.length,
+			elapsedMs: elapsedMs(writeStartedAt),
+		});
+	} catch (error) {
+		logger?.('error', 'adapter.write failed', {
+			path: destination,
+			bytes: content.length,
+			elapsedMs: elapsedMs(writeStartedAt),
+			error,
+		});
+		throw error;
+	}
 	logger?.('info', 'asset download and stage completed', {
 		label,
 		bytes: typeof content === 'string' ? content.length : 0,
@@ -333,48 +349,96 @@ export class PluginUpdater {
 	}
 
 	private async ensureDir(path: string): Promise<void> {
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.mkdir started', { path });
 		try {
 			await this.app.vault.adapter.mkdir(path);
-		} catch {
+			this.log('debug', 'adapter.mkdir completed', { path, elapsedMs: elapsedMs(startedAt) });
+		} catch (error) {
 			// The directory may already exist.
+			this.log('debug', 'adapter.mkdir ignored', { path, elapsedMs: elapsedMs(startedAt), reason: 'directory may already exist', error });
 		}
 	}
 
 	private async fileExists(path: string): Promise<boolean> {
-		return this.app.vault.adapter.exists(path);
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.exists started', { path });
+		try {
+			const exists = await this.app.vault.adapter.exists(path);
+			this.log('debug', 'adapter.exists completed', { path, exists, elapsedMs: elapsedMs(startedAt) });
+			return exists;
+		} catch (error) {
+			this.log('error', 'adapter.exists failed', { path, elapsedMs: elapsedMs(startedAt), error });
+			throw error;
+		}
 	}
 
 	private async readFile(path: string): Promise<string> {
-		return withTimeout(
-			this.app.vault.adapter.read(path),
-			UPDATE_REQUEST_TIMEOUT_MS,
-			`Timed out reading ${path}. Check that the vault storage is available and try again.`,
-		);
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.read started', { path });
+		try {
+			const content = await withTimeout(
+				this.app.vault.adapter.read(path),
+				UPDATE_REQUEST_TIMEOUT_MS,
+				`Timed out reading ${path}. Check that the vault storage is available and try again.`,
+			);
+			this.log('debug', 'adapter.read completed', { path, bytes: content.length, elapsedMs: elapsedMs(startedAt) });
+			return content;
+		} catch (error) {
+			this.log('error', 'adapter.read failed', { path, elapsedMs: elapsedMs(startedAt), error });
+			throw error;
+		}
 	}
 
 	private async writeFile(path: string, data: string): Promise<void> {
-		await withTimeout(
-			this.app.vault.adapter.write(path, data),
-			UPDATE_REQUEST_TIMEOUT_MS,
-			`Timed out writing ${path}. Check that the vault storage is available and try again.`,
-		);
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.write started', { path, bytes: data.length });
+		try {
+			await withTimeout(
+				this.app.vault.adapter.write(path, data),
+				UPDATE_REQUEST_TIMEOUT_MS,
+				`Timed out writing ${path}. Check that the vault storage is available and try again.`,
+			);
+			this.log('debug', 'adapter.write completed', { path, bytes: data.length, elapsedMs: elapsedMs(startedAt) });
+		} catch (error) {
+			this.log('error', 'adapter.write failed', { path, bytes: data.length, elapsedMs: elapsedMs(startedAt), error });
+			throw error;
+		}
 	}
 
 	private async removeFile(path: string): Promise<void> {
 		const adapter = this.app.vault.adapter as any;
-		if (typeof adapter.remove === 'function' && await this.fileExists(path)) {
-			await adapter.remove(path);
+		if (typeof adapter.remove !== 'function') {
+			this.log('debug', 'adapter.remove skipped', { path, reason: 'unsupported' });
+			return;
+		}
+		if (await this.fileExists(path)) {
+			const startedAt = performance.now();
+			this.log('debug', 'adapter.remove started', { path });
+			try {
+				await adapter.remove(path);
+				this.log('debug', 'adapter.remove completed', { path, elapsedMs: elapsedMs(startedAt) });
+			} catch (error) {
+				this.log('error', 'adapter.remove failed', { path, elapsedMs: elapsedMs(startedAt), error });
+				throw error;
+			}
 		}
 	}
 
 	private async removeDirectory(path: string): Promise<void> {
 		const adapter = this.app.vault.adapter as any;
-		if (typeof adapter.rmdir === 'function') {
-			try {
-				await adapter.rmdir(path, true);
-			} catch {
-				// Temporary update files are best-effort cleanup only.
-			}
+		if (typeof adapter.rmdir !== 'function') {
+			this.log('debug', 'adapter.rmdir skipped', { path, reason: 'unsupported' });
+			return;
+		}
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.rmdir started', { path });
+		try {
+			await adapter.rmdir(path, true);
+			this.log('debug', 'adapter.rmdir completed', { path, elapsedMs: elapsedMs(startedAt) });
+		} catch (error) {
+			// Temporary update files are best-effort cleanup only.
+			this.log('debug', 'adapter.rmdir ignored', { path, elapsedMs: elapsedMs(startedAt), error });
 		}
 	}
 
@@ -383,8 +447,16 @@ export class PluginUpdater {
 		const adapter = this.app.vault.adapter as any;
 		if (typeof adapter.list !== 'function') return;
 
+		const startedAt = performance.now();
+		this.log('debug', 'adapter.list started', { path: this.pluginDir });
 		try {
 			const listed = await adapter.list(this.pluginDir);
+			this.log('debug', 'adapter.list completed', {
+				path: this.pluginDir,
+				fileCount: listed?.files?.length ?? 0,
+				folderCount: listed?.folders?.length ?? 0,
+				elapsedMs: elapsedMs(startedAt),
+			});
 			const prefix = `${this.pluginDir}/`;
 			for (const folder of listed?.folders ?? []) {
 				const normalized = String(folder).replace(/\\/g, '/');
@@ -396,7 +468,11 @@ export class PluginUpdater {
 			}
 		} catch (error) {
 			// Cleanup should never prevent a new update from being attempted.
-			this.log('debug', 'Could not inspect stale updater folders:', error);
+			this.log('debug', 'adapter.list failed while inspecting stale updater folders', {
+				path: this.pluginDir,
+				elapsedMs: elapsedMs(startedAt),
+				error,
+			});
 		}
 	}
 

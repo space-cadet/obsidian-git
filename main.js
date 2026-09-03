@@ -22461,11 +22461,27 @@ async function downloadFile(app, url, destination, label, logger) {
   }
   const content = response.text;
   const writeStartedAt = performance.now();
-  await withTimeout(
-    app.vault.adapter.write(destination, content),
-    UPDATE_REQUEST_TIMEOUT_MS,
-    `Timed out writing ${label}. Check that the vault storage is available and try again.`
-  );
+  logger == null ? void 0 : logger("debug", "adapter.write started", { path: destination, bytes: content.length });
+  try {
+    await withTimeout(
+      app.vault.adapter.write(destination, content),
+      UPDATE_REQUEST_TIMEOUT_MS,
+      `Timed out writing ${label}. Check that the vault storage is available and try again.`
+    );
+    logger == null ? void 0 : logger("debug", "adapter.write completed", {
+      path: destination,
+      bytes: content.length,
+      elapsedMs: elapsedMs(writeStartedAt)
+    });
+  } catch (error) {
+    logger == null ? void 0 : logger("error", "adapter.write failed", {
+      path: destination,
+      bytes: content.length,
+      elapsedMs: elapsedMs(writeStartedAt),
+      error
+    });
+    throw error;
+  }
   logger == null ? void 0 : logger("info", "asset download and stage completed", {
     label,
     bytes: typeof content === "string" ? content.length : 0,
@@ -22604,53 +22620,109 @@ var PluginUpdater = class {
     fn("[PluginUpdater]", ...args);
   }
   async ensureDir(path) {
+    const startedAt = performance.now();
+    this.log("debug", "adapter.mkdir started", { path });
     try {
       await this.app.vault.adapter.mkdir(path);
-    } catch (e) {
+      this.log("debug", "adapter.mkdir completed", { path, elapsedMs: elapsedMs(startedAt) });
+    } catch (error) {
+      this.log("debug", "adapter.mkdir ignored", { path, elapsedMs: elapsedMs(startedAt), reason: "directory may already exist", error });
     }
   }
   async fileExists(path) {
-    return this.app.vault.adapter.exists(path);
+    const startedAt = performance.now();
+    this.log("debug", "adapter.exists started", { path });
+    try {
+      const exists = await this.app.vault.adapter.exists(path);
+      this.log("debug", "adapter.exists completed", { path, exists, elapsedMs: elapsedMs(startedAt) });
+      return exists;
+    } catch (error) {
+      this.log("error", "adapter.exists failed", { path, elapsedMs: elapsedMs(startedAt), error });
+      throw error;
+    }
   }
   async readFile(path) {
-    return withTimeout(
-      this.app.vault.adapter.read(path),
-      UPDATE_REQUEST_TIMEOUT_MS,
-      `Timed out reading ${path}. Check that the vault storage is available and try again.`
-    );
+    const startedAt = performance.now();
+    this.log("debug", "adapter.read started", { path });
+    try {
+      const content = await withTimeout(
+        this.app.vault.adapter.read(path),
+        UPDATE_REQUEST_TIMEOUT_MS,
+        `Timed out reading ${path}. Check that the vault storage is available and try again.`
+      );
+      this.log("debug", "adapter.read completed", { path, bytes: content.length, elapsedMs: elapsedMs(startedAt) });
+      return content;
+    } catch (error) {
+      this.log("error", "adapter.read failed", { path, elapsedMs: elapsedMs(startedAt), error });
+      throw error;
+    }
   }
   async writeFile(path, data) {
-    await withTimeout(
-      this.app.vault.adapter.write(path, data),
-      UPDATE_REQUEST_TIMEOUT_MS,
-      `Timed out writing ${path}. Check that the vault storage is available and try again.`
-    );
+    const startedAt = performance.now();
+    this.log("debug", "adapter.write started", { path, bytes: data.length });
+    try {
+      await withTimeout(
+        this.app.vault.adapter.write(path, data),
+        UPDATE_REQUEST_TIMEOUT_MS,
+        `Timed out writing ${path}. Check that the vault storage is available and try again.`
+      );
+      this.log("debug", "adapter.write completed", { path, bytes: data.length, elapsedMs: elapsedMs(startedAt) });
+    } catch (error) {
+      this.log("error", "adapter.write failed", { path, bytes: data.length, elapsedMs: elapsedMs(startedAt), error });
+      throw error;
+    }
   }
   async removeFile(path) {
     const adapter = this.app.vault.adapter;
-    if (typeof adapter.remove === "function" && await this.fileExists(path)) {
-      await adapter.remove(path);
+    if (typeof adapter.remove !== "function") {
+      this.log("debug", "adapter.remove skipped", { path, reason: "unsupported" });
+      return;
+    }
+    if (await this.fileExists(path)) {
+      const startedAt = performance.now();
+      this.log("debug", "adapter.remove started", { path });
+      try {
+        await adapter.remove(path);
+        this.log("debug", "adapter.remove completed", { path, elapsedMs: elapsedMs(startedAt) });
+      } catch (error) {
+        this.log("error", "adapter.remove failed", { path, elapsedMs: elapsedMs(startedAt), error });
+        throw error;
+      }
     }
   }
   async removeDirectory(path) {
     const adapter = this.app.vault.adapter;
-    if (typeof adapter.rmdir === "function") {
-      try {
-        await adapter.rmdir(path, true);
-      } catch (e) {
-      }
+    if (typeof adapter.rmdir !== "function") {
+      this.log("debug", "adapter.rmdir skipped", { path, reason: "unsupported" });
+      return;
+    }
+    const startedAt = performance.now();
+    this.log("debug", "adapter.rmdir started", { path });
+    try {
+      await adapter.rmdir(path, true);
+      this.log("debug", "adapter.rmdir completed", { path, elapsedMs: elapsedMs(startedAt) });
+    } catch (error) {
+      this.log("debug", "adapter.rmdir ignored", { path, elapsedMs: elapsedMs(startedAt), error });
     }
   }
   /** Remove temporary directories left by an interrupted earlier update. */
   async cleanupStaleUpdateDirectories() {
-    var _a;
+    var _a, _b, _c, _d, _e;
     const adapter = this.app.vault.adapter;
     if (typeof adapter.list !== "function")
       return;
+    const startedAt = performance.now();
+    this.log("debug", "adapter.list started", { path: this.pluginDir });
     try {
       const listed = await adapter.list(this.pluginDir);
+      this.log("debug", "adapter.list completed", {
+        path: this.pluginDir,
+        fileCount: (_b = (_a = listed == null ? void 0 : listed.files) == null ? void 0 : _a.length) != null ? _b : 0,
+        folderCount: (_d = (_c = listed == null ? void 0 : listed.folders) == null ? void 0 : _c.length) != null ? _d : 0,
+        elapsedMs: elapsedMs(startedAt)
+      });
       const prefix = `${this.pluginDir}/`;
-      for (const folder of (_a = listed == null ? void 0 : listed.folders) != null ? _a : []) {
+      for (const folder of (_e = listed == null ? void 0 : listed.folders) != null ? _e : []) {
         const normalized = String(folder).replace(/\\/g, "/");
         const name = normalized.startsWith(prefix) ? normalized.slice(prefix.length) : normalized;
         if (/^\.update-tmp-\d+$/.test(name)) {
@@ -22659,7 +22731,11 @@ var PluginUpdater = class {
         }
       }
     } catch (error) {
-      this.log("debug", "Could not inspect stale updater folders:", error);
+      this.log("debug", "adapter.list failed while inspecting stale updater folders", {
+        path: this.pluginDir,
+        elapsedMs: elapsedMs(startedAt),
+        error
+      });
     }
   }
   async selectRelease(includePrerelease, currentBranch2, logger) {
@@ -23036,7 +23112,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "22fb14e21f30628142a40151242afa33c44a6765" : "unknown";
+var GIT_COMMIT_HASH = true ? "840649e2b43024a9a48f9ca55edbff804cc1c7ed" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -23619,7 +23695,12 @@ var GitSyncPlugin = class extends import_obsidian8.Plugin {
         GIT_BRANCH
       );
       this.settings.lastUpdateCheck = Date.now();
+      const saveStartedAt = performance.now();
+      log2.debug("Updater", "Saving update-check timestamp");
       await this.saveSettings();
+      log2.info("Updater", "Update-check timestamp saved", {
+        elapsedMs: Math.round(performance.now() - saveStartedAt)
+      });
       log2.info("Updater", "Update check completed", {
         manual,
         hasUpdate: result.hasUpdate,
