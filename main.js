@@ -23472,7 +23472,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "29085edfc8decca766a1b2e5f4f620b03eec5ad3" : "unknown";
+var GIT_COMMIT_HASH = true ? "0069622e9e6c6f215d485cbc6eb44c1be063e58f" : "unknown";
 var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
@@ -24390,28 +24390,47 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   }
   /** Run one repository mutation through the shared lifecycle boundary. */
   async runGitMutation(name, operation) {
-    return this.operationCoordinator.run(name, async ({ signal }) => {
-      const manager = await this.ensureGitManager();
-      if (!manager)
-        throw new Error("No git repository found in vault");
-      if (signal.aborted) {
-        const error = new Error("Git operation cancelled");
-        error.name = "AbortError";
-        throw error;
+    const startedAt = Date.now();
+    log2.info("Maintenance", "Action started", { action: name });
+    try {
+      const result = await this.operationCoordinator.run(name, async ({ signal }) => {
+        const manager = await this.ensureGitManager();
+        if (!manager)
+          throw new Error("No git repository found in vault");
+        if (signal.aborted) {
+          const error = new Error("Git operation cancelled");
+          error.name = "AbortError";
+          throw error;
+        }
+        manager.setOperationSignal(signal);
+        try {
+          return await operation(manager, signal);
+        } finally {
+          if (this.gitManager === manager)
+            manager.setOperationSignal(null);
+        }
+      });
+      log2.info("Maintenance", "Action completed", {
+        action: name,
+        elapsedMs: Date.now() - startedAt
+      });
+      return result;
+    } catch (error) {
+      const details = { action: name, elapsedMs: Date.now() - startedAt };
+      if ((error == null ? void 0 : error.name) === "AbortError") {
+        log2.warn("Maintenance", "Action cancelled", { ...details, reason: error == null ? void 0 : error.message });
+      } else {
+        log2.error("Maintenance", `Action failed: ${name} after ${details.elapsedMs}ms`, error instanceof Error ? error : new Error(String(error)));
       }
-      manager.setOperationSignal(signal);
-      try {
-        return await operation(manager, signal);
-      } finally {
-        if (this.gitManager === manager)
-          manager.setOperationSignal(null);
-      }
-    });
+      throw error;
+    }
   }
   async checkRepositoryHealth() {
-    const manager = await this.ensureGitManager();
-    if (!manager) {
-      return {
+    const startedAt = Date.now();
+    log2.info("Maintenance", "Repository health check started");
+    try {
+      const manager = await this.ensureGitManager();
+      const health = manager ? await manager.checkRepositoryHealth() : {
         state: "missing",
         exists: false,
         healthy: false,
@@ -24419,8 +24438,15 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         hasCommits: false,
         reason: "missing .git directory"
       };
+      log2.info("Maintenance", "Repository health check completed", {
+        ...health,
+        elapsedMs: Date.now() - startedAt
+      });
+      return health;
+    } catch (error) {
+      log2.error("Maintenance", `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
-    return manager.checkRepositoryHealth();
   }
   async previewRepositoryRebuild() {
     return this.runGitMutation("Preview repository rebuild", async (manager) => {

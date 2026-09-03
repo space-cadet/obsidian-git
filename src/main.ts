@@ -652,36 +652,64 @@ export default class GitSyncPlugin extends Plugin {
 		name: string,
 		operation: (manager: GitManager, signal: AbortSignal) => Promise<T>,
 	): Promise<T> {
-		return this.operationCoordinator.run(name, async ({ signal }) => {
-			const manager = await this.ensureGitManager();
-			if (!manager) throw new Error('No git repository found in vault');
-			if (signal.aborted) {
-				const error = new Error('Git operation cancelled');
-				error.name = 'AbortError';
-				throw error;
+		const startedAt = Date.now();
+		log.info('Maintenance', 'Action started', { action: name });
+		try {
+			const result = await this.operationCoordinator.run(name, async ({ signal }) => {
+				const manager = await this.ensureGitManager();
+				if (!manager) throw new Error('No git repository found in vault');
+				if (signal.aborted) {
+					const error = new Error('Git operation cancelled');
+					error.name = 'AbortError';
+					throw error;
+				}
+				manager.setOperationSignal(signal);
+				try {
+					return await operation(manager, signal);
+				} finally {
+					if (this.gitManager === manager) manager.setOperationSignal(null);
+				}
+			});
+			log.info('Maintenance', 'Action completed', {
+				action: name,
+				elapsedMs: Date.now() - startedAt,
+			});
+			return result;
+		} catch (error: any) {
+			const details = { action: name, elapsedMs: Date.now() - startedAt };
+			if (error?.name === 'AbortError') {
+				log.warn('Maintenance', 'Action cancelled', { ...details, reason: error?.message });
+			} else {
+				log.error('Maintenance', `Action failed: ${name} after ${details.elapsedMs}ms`, error instanceof Error ? error : new Error(String(error)));
 			}
-			manager.setOperationSignal(signal);
-			try {
-				return await operation(manager, signal);
-			} finally {
-				if (this.gitManager === manager) manager.setOperationSignal(null);
-			}
-		});
+			throw error;
+		}
 	}
 
 	async checkRepositoryHealth(): Promise<import('./gitManager').RepositoryHealth> {
-		const manager = await this.ensureGitManager();
-		if (!manager) {
-			return {
-				state: 'missing',
-				exists: false,
-				healthy: false,
-				branch: null,
-				hasCommits: false,
-				reason: 'missing .git directory',
-			};
+		const startedAt = Date.now();
+		log.info('Maintenance', 'Repository health check started');
+		try {
+			const manager = await this.ensureGitManager();
+			const health = manager
+				? await manager.checkRepositoryHealth()
+				: {
+					state: 'missing' as const,
+					exists: false,
+					healthy: false,
+					branch: null,
+					hasCommits: false,
+					reason: 'missing .git directory',
+				};
+			log.info('Maintenance', 'Repository health check completed', {
+				...health,
+				elapsedMs: Date.now() - startedAt,
+			});
+			return health;
+		} catch (error: any) {
+			log.error('Maintenance', `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
+			throw error;
 		}
-		return manager.checkRepositoryHealth();
 	}
 
 	async previewRepositoryRebuild(): Promise<import('./gitManager').RepositoryRebuildPreview> {

@@ -127,12 +127,18 @@
     color: var(--text-normal);
     font-family: var(--font-monospace);
     font-size: var(--font-ui-small);
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
 }
 
 .git-maintenance-result-safe {
     margin-top: 4px;
     color: var(--text-success);
     font-size: var(--font-ui-small);
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
 }
 
 @media (max-width: 620px) {
