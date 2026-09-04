@@ -21922,7 +21922,7 @@ var GitBackend = class {
         const worktree = worktreeState !== stageState;
         if (!staged && !worktree)
           continue;
-        const change = worktreeState === 0 && headState !== 0 ? "deleted" : headState === 0 ? "untracked" : staged && !worktree ? "staged" : worktreeState === 2 ? "modified" : "conflict";
+        const change = worktreeState === 0 && headState !== 0 ? "deleted" : headState === 0 && staged ? "added" : headState === 0 ? "untracked" : staged && !worktree ? "staged" : worktreeState === 2 ? "modified" : "conflict";
         files.push({ path, change, staged, worktree });
       }
       (_a = this.ports.diagnostics) == null ? void 0 : _a.info("Working-tree status matrix read", {
@@ -25823,7 +25823,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "4376c4c5ac1ccd8165e5a2531fc7cddee4ebc156" : "unknown";
+var GIT_COMMIT_HASH = true ? "b26f2fbe555e0c6bc812039882e8336fe3e56540" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

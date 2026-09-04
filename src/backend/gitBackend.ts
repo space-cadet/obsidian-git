@@ -423,7 +423,9 @@ export class GitBackend {
         if (!staged && !worktree) continue;
         const change = worktreeState === 0 && headState !== 0
           ? 'deleted'
-          : headState === 0
+          : headState === 0 && staged
+            ? 'added'
+            : headState === 0
             ? 'untracked'
             : staged && !worktree
               ? 'staged'

@@ -85,6 +85,7 @@ test('single-file stage performs the Git mutation without a preceding status sca
   assert.equal(transport.requests.length, 0);
   const status = await backend.status();
   assert.deepEqual(status.staged, ['note.md']);
+  assert.equal(status.files[0].change, 'added');
 
   rmSync(directory, { recursive: true, force: true });
 });
