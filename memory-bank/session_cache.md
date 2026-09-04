@@ -1,15 +1,26 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 02:19:21 IST*
+*Last Updated: 2026-09-04 11:36:55 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
-**Focus Task**: T35b, T35d, T35f, T37 sidebar reliability and verified bundle
+**Focus Task**: T38 current product specification and rewrite PRD foundation
 **Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
 **Status**: 🔄 IN PROGRESS
 
-**Session Title**: T29a, T35b, T35d, T35f, T37: Harden sidebar lifecycle, logging, staging, and modularity boundaries
+**Documentation Continuation**: Created the canonical implementation-agnostic
+`memory-bank/product-spec.md` and the first `memory-bank/product-prd.md` draft,
+both linked from `productContext.md`. They record current features, UI,
+Settings, platform behaviour, actual edge cases, evidence status, rewrite
+requirements, KISS constraints, and the UI-preserving mechanics replacement.
+They intentionally exclude current internal ownership and call structure.
+
+**Next Session Origin**: Create the rewrite task as the new origin task after
+reviewing this product specification. Do not use T37's architecture-assessment
+structure as the product or rewrite specification.
+
+**Session Title**: T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
@@ -23,7 +34,7 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 3 parents (T29, T34, T35; T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f active) | Planned: 2 (T34b, T34c) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Active: 5 parents (T29, T34, T35, T36, T38; T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f active) | Planned: 2 (T34b, T34c) | Completed: 2 tracked milestones (T29 progress, T33 complete)
 - Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
 - Current Period: afternoon
 
@@ -73,6 +84,7 @@ source file was missing.
 - T35f: Test, CI, and Documentation Alignment — 🔄 IN PROGRESS
 - T36: Fork and Maintain isomorphic-git — 🔄 IN PROGRESS (official 1.41.9 evaluated; fork decision open)
 - T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️ PLANNED (assessment only; no rewrite authorized)
+- T38: Current Product Specification and Rewrite PRD Foundation — 🔄 IN PROGRESS (UI-preserving mechanics rewrite PRD draft open for review)
 
 ## Active Tasks
 ### T29: obsidian-git Plugin
@@ -130,6 +142,23 @@ replacement.
 2. ✅ Compared rewrite feasibility, risks, and advisability
 3. ✅ Saved the Matt Pocock-style architecture report and mapped it to T35b/T35f
 4. 🔄 Await desktop/mobile conformance evidence before a final decision
+
+### T38: Current Product Specification and Rewrite PRD Foundation
+**Status:** 🔄 **Priority:** HIGH
+**Started:** 2026-09-04 **Last Active:** 2026-09-04 11:36:55 IST
+**Dependencies:** T29, T29a, T34, T35, T36
+
+#### Context
+The current product and first rewrite PRD are documented independently of the
+current code structure. The agreed rewrite direction retains the Settings
+panel, sidebar, visual design, dialogs, and proven updater behaviour while
+replacing Git/repository mechanics and their result-to-UI path.
+
+#### Implementation Progress
+1. ✅ Created the canonical current product specification
+2. ✅ Created the first rewrite PRD draft
+3. ✅ Added the UI-preserving mechanics rewrite decision and updater carry-forward
+4. 🔄 Await user review and next-session creation of the rewrite origin task
 
 ### T34: Remote Authentication for Obsidian Git
 **Status:** 🔄 **Priority:** HIGH

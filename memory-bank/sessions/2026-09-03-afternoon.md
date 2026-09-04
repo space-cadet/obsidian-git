@@ -1,7 +1,7 @@
 # Session 2026-09-03 - Afternoon
 
 *Created: 2026-09-03 13:11:02 IST*
-*Last Updated: 2026-09-04 00:05:23 IST*
+*Last Updated: 2026-09-04 11:36:55 IST*
 
 ## Focus Task
 
@@ -314,3 +314,59 @@ the incremental architecture plan
   passing.
 - Many UI issues remain unresolved. T29a remains in progress, and real
   Obsidian desktop/mobile visual and timing acceptance is still pending.
+
+## Product Specification Continuation — 2026-09-04 11:05:03 IST
+
+### Work Completed
+
+- Inspected the Memory Bank structure and confirmed that it had no canonical
+  product specification; `productContext.md` was empty and the existing
+  implementation notes were technical.
+- Created `memory-bank/product-spec.md` as the single current product
+  contract, covering entry points, commands, sidebar, dialogs, Settings,
+  Git/repository behaviour, platform behaviour, diagnostics, updater, and
+  evidenced edge cases.
+- Updated `memory-bank/productContext.md` to provide the short product summary
+  and link to the canonical specification.
+- Created T38 to track specification review and the later PRD foundation.
+
+### Scope Decision
+
+- The product specification records user-visible outcomes and evidence only.
+- It does not document current ownership paths, call chains, module boundaries,
+  or architectural debt.
+- The next session will create the rewrite task as the new origin task after
+  the product specification has been reviewed.
+
+### Verification and Handoff
+
+- Current checkout remains clean and aligned with `origin/main` at
+  `8dac512ee44e2109d9cc88d4a5c8b37f723af37d` before this documentation work.
+- No source code or UI was changed.
+- T38 remains active pending user review and PRD derivation.
+
+## Rewrite PRD Draft — 2026-09-04 11:05:03 IST
+
+### Work Completed
+
+- Created `memory-bank/product-prd.md` from the reviewed product-specification
+  structure.
+- Defined product goals, non-goals, user journeys, UI preservation, Settings,
+  functional requirements, platform requirements, actual edge-case acceptance,
+  evidence layers, and KISS constraints for the fresh implementation.
+- Recorded that the rewrite task and branch will be created in the next
+  session as the new origin task, without making it a child of T37.
+
+### Handoff
+
+- The PRD is a first draft and remains open for user review.
+- No rewrite branch, rewrite task, or source implementation was created.
+
+## Final Session Title
+
+**T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a
+UI-preserving mechanics rewrite**
+
+This title covers the sidebar and lifecycle work, mobile and evidence
+boundaries, rewrite assessment, current product specification, and UI-
+preserving mechanics PRD completed across the session.

@@ -1,6 +1,34 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 02:19:21 IST*
+*Last Updated: 2026-09-04 11:36:55 IST*
+
+## 2026-09-04 Current Product Specification
+
+- Created the implementation-agnostic `memory-bank/product-spec.md` as the
+  single current product contract for the later rewrite PRD.
+- Documented current entry points, UI structure, Settings, Git/repository
+  behaviour, platform behaviour, diagnostics, updater, and evidenced edge
+  cases.
+- Recorded that the next session will create the rewrite task as the new
+  origin task; no rewrite or source change was made.
+
+## 2026-09-04 Rewrite PRD Draft
+
+- Derived `memory-bank/product-prd.md` from the current product specification.
+- Defined UI preservation, product and platform requirements, actual edge-case
+  acceptance, evidence layers, and KISS constraints for the new implementation.
+- Review remains open; the rewrite task and branch are deferred to the next
+  session as the new origin task.
+
+## 2026-09-04 UI-Preserving Mechanics Rewrite Decision
+
+- Updated the product specification and PRD to make clear that the existing
+  Settings panel, sidebar layout, styles, dialogs, and updater experience are
+  retained where they already satisfy the product contract.
+- Defined the rewrite scope as replacement of Git/repository mechanics and the
+  result-to-UI path behind a small product-facing interface.
+- Added the proven `obsidian-ai`-derived updater behaviours to the rewrite
+  requirements without prescribing its source structure.
 
 ## 2026-09-04 Sidebar History, Staging, and Commit Controls
 

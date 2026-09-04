@@ -1,8 +1,19 @@
 # Active Context
 
-*Last Updated: 2026-09-04 02:19:21 IST*
+*Last Updated: 2026-09-04 11:36:55 IST*
 
 ## Current Tasks
+
+### T38: Current Product Specification and Rewrite PRD Foundation — 🔄
+- **Scope**: Record the current product's user-visible features, UI, Settings,
+  platform behaviour, and evidenced edge cases in one canonical specification.
+- **Status**: `memory-bank/product-spec.md` and the first
+  `memory-bank/product-prd.md` draft are created and linked from
+  `productContext.md`. Both are product-facing and implementation-agnostic.
+  The PRD now explicitly defines a UI-preserving mechanics replacement and
+  carries forward the proven `obsidian-ai`-derived updater behaviours.
+- **Next**: Review the specification and PRD. The next session will create the
+  rewrite task as the new origin task.
 
 ### T29: obsidian-git Plugin — 🔄 sidebar and updater implementation pending runtime acceptance
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git
@@ -85,7 +96,7 @@
   inspection and preserving all existing vault and `.git` data.
 
 ### Current Session Continuation — 2026-09-04
-- **Title**: T35b, T35f, T37: Implement operation ownership and publish the verified bundle
+- **Title**: T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite
 - **Completed**: Implemented coordinator lifecycle events, cancellation-safe
   finalization, centralized operation logging, cancellable local init, and
   focused lifecycle coverage.
@@ -352,11 +363,14 @@
 
 ## Session Closeout — 2026-09-04
 
-- Session title: `T29a, T35b, T35d, T35f, T37: Harden sidebar lifecycle, logging, staging, and modularity boundaries`.
+- Session title: `T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite`.
 - The session delivered targeted lifecycle, Log, staging, bulk-action, and
   commit-control fixes, with generated-bundle and automated-test evidence.
 - Many UI issues still remain. Keep T29a in progress and do not claim broad
   desktop/mobile visual acceptance.
+- Added the current product specification and first rewrite PRD draft under
+  T38. The agreed direction retains the existing UI and replaces the Git/
+  repository mechanics and result-to-UI path.
 
 ## Decisions Made
 

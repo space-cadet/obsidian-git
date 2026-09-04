@@ -189,3 +189,30 @@
   history, opt-in memory metrics, and honest timed push progress.
 - Automated verification passed; real Obsidian desktop/mobile acceptance is
   still open.
+## 2026-09-04 — T38 current product specification
+
+- Added the implementation-agnostic current product specification covering
+  the complete visible product, Settings panel, platform behaviour, and
+  evidenced edge cases.
+- Added a product-context index and T38 tracking record.
+- Recorded the next-session handoff: create the rewrite task as the new origin
+  task after product-specification review.
+- No source code, UI layout, or implementation behaviour was changed.
+
+## 2026-09-04 — T38 rewrite PRD draft
+
+- Derived the first rewrite PRD from the current product specification.
+- Recorded UI preservation, functional and platform requirements, actual
+  edge-case acceptance, evidence layers, and KISS constraints.
+- Deferred creation of the rewrite task and branch to the next session as the
+  new origin task.
+- No source code or UI layout was changed.
+
+## 2026-09-04 — T38 UI-preserving mechanics rewrite
+
+- Clarified the PRD so the existing Settings panel, sidebar layout, styles,
+  dialogs, and updater presentation remain the baseline.
+- Defined the rewrite as replacement of Git/repository mechanics and the
+  result-to-UI path behind a small product-facing interface.
+- Added the proven `obsidian-ai`-derived updater behaviour and safety rules to
+  the rewrite requirements without copying its source structure.
