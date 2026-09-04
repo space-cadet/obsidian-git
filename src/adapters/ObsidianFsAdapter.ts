@@ -35,7 +35,7 @@ export class ObsidianFsAdapter {
     readdir = this.readdirImpl.bind(this);
     unlink = this.unlinkImpl.bind(this);
     stat = this.statImpl.bind(this);
-    lstat = this.statImpl.bind(this);
+    lstat = this.lstatImpl.bind(this);
     readlink = this.readlinkImpl.bind(this);
     symlink = this.symlinkImpl.bind(this);
 
@@ -49,7 +49,7 @@ export class ObsidianFsAdapter {
             readdir: this.readdirImpl.bind(this),
             unlink: this.unlinkImpl.bind(this),
             stat: this.statImpl.bind(this),
-            lstat: this.statImpl.bind(this), // Obsidian doesn't expose symlinks; treat as stat
+            lstat: this.lstatImpl.bind(this),
             readlink: this.readlinkImpl.bind(this),
             symlink: this.symlinkImpl.bind(this),
             setWriteProgress: this.setWriteProgress.bind(this),
@@ -301,6 +301,40 @@ export class ObsidianFsAdapter {
             throw err;
         }
 
+        return this.toNodeStat(stat);
+    }
+
+    /**
+     * Keep lstat distinct from stat on desktop. A regular stat follows a
+     * symlink and therefore throws for a broken link. Git's worktree walker
+     * deliberately uses lstat so it can identify the link without following
+     * it (and subsequently apply ignore rules normally).
+     */
+    private async lstatImpl(filepath: string): Promise<any> {
+        const path = this.resolve(filepath);
+
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                return await nodeFile.fs.promises.lstat(nodeFile.fullPath);
+            } catch {
+                // Mobile and virtual vault adapters do not expose symlink
+                // metadata, so retain the existing DataAdapter fallback.
+            }
+        }
+
+        const validated = this.validatedStats.get(path);
+        if (validated) {
+            this.validatedStats.delete(path);
+            return this.toNodeStat(validated);
+        }
+
+        const stat: Stat | null = await this.adapter.stat(path);
+        if (!stat) {
+            const err: any = new Error(`ENOENT: no such file or directory, lstat '${path}'`);
+            err.code = 'ENOENT';
+            throw err;
+        }
         return this.toNodeStat(stat);
     }
 

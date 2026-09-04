@@ -20825,7 +20825,7 @@ var ObsidianFsAdapter = class {
     this.readdir = this.readdirImpl.bind(this);
     this.unlink = this.unlinkImpl.bind(this);
     this.stat = this.statImpl.bind(this);
-    this.lstat = this.statImpl.bind(this);
+    this.lstat = this.lstatImpl.bind(this);
     this.readlink = this.readlinkImpl.bind(this);
     this.symlink = this.symlinkImpl.bind(this);
     this.adapter = adapter;
@@ -20845,8 +20845,7 @@ var ObsidianFsAdapter = class {
       readdir: this.readdirImpl.bind(this),
       unlink: this.unlinkImpl.bind(this),
       stat: this.statImpl.bind(this),
-      lstat: this.statImpl.bind(this),
-      // Obsidian doesn't expose symlinks; treat as stat
+      lstat: this.lstatImpl.bind(this),
       readlink: this.readlinkImpl.bind(this),
       symlink: this.symlinkImpl.bind(this),
       setWriteProgress: this.setWriteProgress.bind(this)
@@ -21051,6 +21050,34 @@ var ObsidianFsAdapter = class {
     const stat = await this.adapter.stat(path);
     if (!stat) {
       const err = new Error(`ENOENT: no such file or directory, stat '${path}'`);
+      err.code = "ENOENT";
+      throw err;
+    }
+    return this.toNodeStat(stat);
+  }
+  /**
+   * Keep lstat distinct from stat on desktop. A regular stat follows a
+   * symlink and therefore throws for a broken link. Git's worktree walker
+   * deliberately uses lstat so it can identify the link without following
+   * it (and subsequently apply ignore rules normally).
+   */
+  async lstatImpl(filepath) {
+    const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        return await nodeFile.fs.promises.lstat(nodeFile.fullPath);
+      } catch (e) {
+      }
+    }
+    const validated = this.validatedStats.get(path);
+    if (validated) {
+      this.validatedStats.delete(path);
+      return this.toNodeStat(validated);
+    }
+    const stat = await this.adapter.stat(path);
+    if (!stat) {
+      const err = new Error(`ENOENT: no such file or directory, lstat '${path}'`);
       err.code = "ENOENT";
       throw err;
     }
@@ -25750,7 +25777,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "3271658b89abd4619f40de29ddca59ec5e2e07e9" : "unknown";
+var GIT_COMMIT_HASH = true ? "7c98622347250cfd58b3c9eefa15b4f704ef6c15" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
