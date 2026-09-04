@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
 
 ## Current Session
 **Started**: 2026-09-03 18:26:33 IST
@@ -16,15 +16,18 @@ Settings, platform behaviour, actual edge cases, evidence status, rewrite
 requirements, KISS constraints, and the UI-preserving mechanics replacement.
 They intentionally exclude current internal ownership and call structure.
 
-**Next Session Origin**: Create the rewrite task as the new origin task after
-reviewing this product specification. Do not use T37's architecture-assessment
-structure as the product or rewrite specification.
+**Next Session Origin**: Revise and review the rewrite PRD using KISS. Create
+the rewrite task as the new origin task only after the product requirements
+are approved. Do not use T37's module-extraction suggestions as the rewrite
+specification.
 
-**Session Title**: T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite
+**Session Title**: T29a, T35b, T35d, T35f, T37, T38: Review sidebar behavior and simplify the rewrite plan
 
 **Prior Closeout**: Source changes through `b728470` were pushed before this implementation continuation
 
-**Next Session**: Continue the remaining UI fixes, then complete repository-state coverage, protected replacement safety, and real Obsidian acceptance.
+**Next Session**: Review the revised PRD, then test the specific remaining
+repository, mobile, updater, and UI workflows before deciding whether a
+replacement is justified.
 
 **Memory Bank Bootstrap**: mb-core selectively initialized the missing
 protocol, template, and support-file layer with existing files skipped. The
@@ -75,15 +78,15 @@ source file was missing.
 - T34a: PAT Validation and Repository-Access Diagnostics — 🔄 IN PROGRESS
 - T34b: GitHub Device-Flow Authentication — ⏸️ PLANNED
 - T34c: Android/Desktop Authentication Acceptance Tests — ⏸️ PLANNED
-- T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 IN PROGRESS
+- T35: Plugin Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up — 🔄 IN PROGRESS
 - T35a: Credential Safety and Git Staging Boundaries — 🔄 IN PROGRESS (read-only audit complete)
-- T35b: Operation Coordination and Lifecycle Safety — 🔄 IN PROGRESS (shared status snapshot and stale-render protection implemented; mutation coordinator open)
+- T35b: Git Mutation Concurrency and Cancellation — 🔄 IN PROGRESS (current wrapper and cancellation code exist; focused behavior acceptance remains)
 - T35c: Repository Initialization and Destructive-Operation Safety — 🔄 IN PROGRESS (health checks and protected rebuild open)
 - T35d: Mobile and Remote Transport Reliability — 🔄 IN PROGRESS (separate progress telemetry and modal stats implemented)
 - T35e: Updater Integrity and Release Artifact Consistency — 🔄 IN PROGRESS (timeouts and stale-folder cleanup shipped; runtime acceptance remains)
 - T35f: Test, CI, and Documentation Alignment — 🔄 IN PROGRESS
 - T36: Fork and Maintain isomorphic-git — 🔄 IN PROGRESS (official 1.41.9 evaluated; fork decision open)
-- T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️ PLANNED (assessment only; no rewrite authorized)
+- T37: Tentative Plugin Rewrite Feasibility and User-Workflow Assessment — ⏸️ PLANNED (assessment only; no rewrite authorized)
 - T38: Current Product Specification and Rewrite PRD Foundation — 🔄 IN PROGRESS (UI-preserving mechanics rewrite PRD draft open for review)
 
 ## Active Tasks
@@ -124,7 +127,7 @@ replaces the presentation as one coordinated pass.
 3. ✅ Implement mockup-matching sidebar presentation at source level
 4. ⬜ Verify real Obsidian desktop/mobile visual acceptance
 
-### T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment
+### T37: Tentative Plugin Rewrite Feasibility and User-Workflow Assessment
 **Status:** ⏸️ **PLANNED**
 **Priority:** MEDIUM
 **Started:** 2026-09-03
@@ -133,15 +136,14 @@ replaces the presentation as one coordinated pass.
 
 #### Context
 The recurring sidebar, staging, repository, transport, progress, logging, and
-mobile issues expose missing architectural boundaries. T37 assesses
-incremental extraction versus a parallel clean rewrite without authorizing a
-replacement.
+mobile issues are recorded as user-workflow and acceptance questions. T37
+assesses whether a replacement is justified without authorizing one.
 
 #### Implementation Progress
 1. ✅ Recorded the cross-cutting failure pattern and current source evidence
 2. ✅ Compared rewrite feasibility, risks, and advisability
-3. ✅ Saved the Matt Pocock-style architecture report and mapped it to T35b/T35f
-4. 🔄 Await desktop/mobile conformance evidence before a final decision
+3. ✅ Saved the architecture review as historical context
+4. 🔄 Await actual desktop/mobile/live-remote workflow evidence before a final decision
 
 ### T38: Current Product Specification and Rewrite PRD Foundation
 **Status:** 🔄 **Priority:** HIGH
@@ -169,17 +171,18 @@ rejected with HTTP 401 by account, repository, and Git smart-HTTP endpoints.
 **Next:** Implement T34a diagnostics. The exposed token must not be reused or
 recorded.
 
-### T35: Plugin Reliability, Security, and Architecture Hardening
+### T35: Plugin Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up
 **Status:** 🔄 **Priority:** HIGH
 **Started:** 2026-08-11 **Last:** 2026-08-11
-**Context**: The first KIRSS implementation slice covers logger redaction,
+**Context**: The first credential-safety implementation covers logger redaction,
 protected automatic staging, URL normalization, repository error
 classification, and secure credential storage. The T35c startup fix now keeps
 manager creation, sidebar refresh, normal sync, and auto-sync non-mutating on a
 fresh vault; explicit Clone Remote remains the only initialization path.
-**Next:** Implement protected replacement backups, T35b operation
-  coordination, and the recorded remote-read/rebuild follow-ups, then complete
-  mobile acceptance while preserving T29 and T34 ownership boundaries.
+**Next:** Complete only the protected replacement, remote-read, rebuild, or
+  operation-cancellation work required by a demonstrated user workflow, then
+  complete mobile acceptance while preserving T29 and T34 ownership
+  boundaries.
 
 ## Latest Session Handoff — 2026-09-03
 
@@ -222,30 +225,27 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 
 ## Session Closeout Note — 2026-09-04 02:19:21 IST
 
-- Many UI issues remain unresolved; this is a targeted hardening checkpoint,
-  not a broad UI acceptance closeout.
+- Many UI issues remain unresolved; this is a targeted implementation
+  checkpoint, not a broad UI acceptance closeout.
 - Preserve the distinction between automated source/build evidence and real
   Obsidian desktop/mobile visual and timing evidence.
 
 ## Current Implementation Checkpoint — 2026-09-04
 
 - Production bundle regenerated from source commit `b179d02f27df13116bae3357b7001d0fa77ea57a`.
-- The coordinator now owns operation lifecycle outcomes and plugin-scoped
-  lifecycle logging; local repository initialization uses the same signal.
+- The current source admits one mutation at a time and passes cancellation to
+  GitManager; its operation-event logging is an implementation detail.
 - `CI=true pnpm test` passed: 59 Node tests, artifact checks, production
   build, and 10 isomorphic-git checks.
-- T35b and T35f remain in progress. Protected replacement, full conformance,
-  and real desktop/mobile acceptance remain open.
+- T35b and T35f remain in progress for focused behavior tests and acceptance.
+  Protected replacement and real desktop/mobile acceptance remain open.
 
-## Current Conformance Checkpoint — 2026-09-04
+## Current Source-Test Checkpoint — 2026-09-04
 
-- Added `tests/operation-entrypoint-conformance.test.mjs` with AST-backed
-  checks for all repository mutation entry points in the main plugin and
-  sidebar.
-- The focused test passes for wrapper ownership, coordinator disposal, and
-  operation-signal cleanup.
-- Remaining: stale-view and repository-state cases, protected replacement,
-  and real Obsidian desktop/mobile/release acceptance.
+- `tests/operation-entrypoint-conformance.test.mjs` checks the current source
+  wrapper arrangement and cleanup. It is not a rewrite requirement.
+- Remaining: focused user-workflow tests, protected replacement, and real
+  Obsidian desktop/mobile/release acceptance.
 
 ## Current UI and Log Regression Checkpoint — 2026-09-04
 
@@ -258,14 +258,13 @@ fresh vault; explicit Clone Remote remains the only initialization path.
 - Full package verification passes with 65 Node tests and 10 isomorphic-git
   checks. Real Obsidian visual acceptance remains open.
 
-## Current Read-Model Checkpoint — 2026-09-04
+## Current Sidebar Cache Checkpoint — 2026-09-04
 
-- Added and integrated `SidebarReadModel` for plugin-lifetime history,
-  commit-detail, and activity-log cache ownership.
-- Added model tests for repository/branch keying and invalidation; the view
-  still owns rendering and operation callbacks.
-- Full package verification passes with 67 Node tests, artifact identity,
-  production build, and 10 isomorphic-git checks.
+- The current source contains `SidebarReadModel` for history, commit-detail,
+  and activity-log caching. It is optional implementation history; a fresh
+  implementation may keep this state with the sidebar.
+- The current model tests pass as part of the package verification, but this
+  does not establish that a dedicated cache is needed.
 
 ## Current Stale-Read Checkpoint — 2026-09-04
 

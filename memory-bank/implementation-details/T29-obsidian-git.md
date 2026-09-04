@@ -337,7 +337,7 @@ mobile release checks are complete.
 ## Architecture Review Follow-up (2026-08-11)
 
 The original architecture remains the historical description of the current
-implementation. Cross-cutting hardening is now tracked separately under T35:
+implementation. Cross-cutting follow-up work is now tracked separately under T35:
 
 - T35a: credential safety and Git staging boundaries
 - T35b: operation coordination and lifecycle safety

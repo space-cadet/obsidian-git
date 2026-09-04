@@ -141,5 +141,5 @@ complete; visible vault files are only written during checkout.
 - T35c: `.git` replacement, backup, destructive cleanup, and vault-file safety.
 - T35d: native transport capabilities, byte telemetry, object progress, and
   mobile evidence.
-- T29: release acceptance and public-release gate after the hardening evidence
+- T29: release acceptance and public-release gate after the relevant follow-up evidence
   is complete.

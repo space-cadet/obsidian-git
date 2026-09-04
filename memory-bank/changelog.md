@@ -1,3 +1,15 @@
+## 2026-09-04 — T38 KISS rewrite-plan revision
+
+- Revised the live product and rewrite records around KISS: “Keep It Simple,
+  Stupid.”
+- Made demonstrated user behaviour the requirement and treated coordinators,
+  caches, read models, event systems, and source-structure tests as optional
+  implementation choices.
+- Replaced the active rewrite next steps with real Obsidian/device workflow
+  checks, specific fixes for observed failures, focused tests, and PRD approval
+  before any rewrite task or branch is created.
+- Preserved dated session records as historical records.
+
 ## 2026-09-04 — T29a/T35b/T35f bulk action repaint
 
 - Fixed Stage all and Unstage all so they repaint Changes immediately after

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
 
 ## Current Tasks
 
@@ -27,7 +27,7 @@
   mockup-led design across Changes, Commits, and Log.
 - **Status**: Mockup-matching source-level presentation pass is implemented and
   verified by build/tests. Preserve existing Git actions, T33 completion, T34
-  authentication ownership, and T35 hardening ownership.
+  authentication ownership, and T35 follow-up ownership.
 - **Next**: Investigate the failed Android keyboard acceptance using measured
   WebView viewport/modal bounds; compact-only layout and shared status reads are
   implemented, but real Obsidian visual acceptance remains open.
@@ -44,31 +44,29 @@
   v1.0.0 tag until authentication validation and remaining mobile acceptance
   are complete.
 
-### T35: Plugin Reliability, Security, and Architecture Hardening — 🔄 Implementation active
-- **Scope**: Cross-cutting credential safety, operation coordination,
-  repository initialization safety, mobile transport, updater integrity, and
-  test/CI/documentation alignment.
+### T35: Plugin Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up — 🔄 Implementation active
+- **Scope**: Concrete credential, repository, mobile transport, updater,
+  testing, and documentation problems with recorded user impact.
 - **Children**: T35a-T35f are active.
-- **Status**: The first KIRSS implementation slice adds logger redaction,
+- **Status**: The first credential-safety implementation adds logger redaction,
   protected automatic staging, URL normalization, repository-error
   classification, and safe repository initialization boundaries. T35a
   SecretStorage is implemented; T35b now has a source-level operation
-  lifecycle checkpoint, while T35c replacement backups and full conformance
-  remain open. T35 is separate from T29 release ownership and T34
+  lifecycle checkpoint, while T35c replacement backups and specific behaviour
+  checks remain open. T35 is separate from T29 release ownership and T34
   authentication ownership.
-- **Next**: Add protected replacement backups and shared operation
-  coordination, then perform mobile acceptance of clone, updater, progress,
-  and repository-ref recovery behavior.
+- **Next**: Complete only the repository-safety and mobile acceptance work that
+  is required by a demonstrated workflow. Do not add a general operation or
+  cache architecture as a planning target.
 
-### T37: Tentative Plugin Rewrite Feasibility and Architecture Assessment — ⏸️
-- **Scope**: Decide whether the recurring lifecycle, repository, adapter,
-  transport, and UI problems warrant incremental extraction or a parallel
-  clean rewrite.
+### T37: Tentative Plugin Rewrite Feasibility and User-Workflow Assessment — ⏸️
+- **Scope**: Decide whether demonstrated user workflows justify replacing the
+  current Git mechanics.
 - **Status**: Assessment document and saved Matt Pocock-style report are
   recorded; no rewrite, fork, or replacement is authorized. The current plugin
   remains the rollback baseline.
-- **Next**: Build the conformance, desktop, Android, and release evidence
-  needed for a final go/no-go decision.
+- **Next**: Run the actual affected workflows on desktop, Android, and against
+  a live remote; record what works, fails, or has not been tested.
 
 ### T36: Fork and Maintain isomorphic-git — 🔄 Independent architecture task
 - **Scope**: Evaluate official isomorphic-git 1.41.9, then fork, publish, and
@@ -96,28 +94,26 @@
   inspection and preserving all existing vault and `.git` data.
 
 ### Current Session Continuation — 2026-09-04
-- **Title**: T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite
-- **Completed**: Implemented coordinator lifecycle events, cancellation-safe
-  finalization, centralized operation logging, cancellable local init, and
-  focused lifecycle coverage.
+- **Title**: T29a, T35b, T35d, T35f, T37, T38: Review sidebar behavior and simplify the rewrite plan
+- **Completed**: Added current-source operation cancellation and cleanup,
+  sidebar cache code, stale-result checks, and focused tests. These are
+  implementation history, not requirements for a fresh implementation.
 - **Verification**: Production build and `CI=true pnpm test` pass with 59 Node
   tests, artifact checks, 10 isomorphic-git checks, and diff validation.
-- **Remaining**: Complete stale-view and repository-state coverage, protected
-  replacement safety, and real desktop/mobile acceptance.
+- **Remaining**: Test the specific stale-view, repository-state, replacement,
+  and desktop/mobile workflows that users actually encounter.
 
-### Operation Ownership Checkpoint — 2026-09-04
-- `OperationCoordinator` now admits one mutation at a time and emits explicit
-  started, completed, failed, cancelled, and idle events.
-- A callback that returns after cancellation or plugin unload cannot produce a
-  success result; lifecycle observers cannot change operation outcomes.
-- `GitSyncPlugin` owns the coordinator subscription and operation log records;
-  local initialization now uses the same cancellable GitManager path.
+### Existing Operation Implementation — 2026-09-04
+- The current source admits one mutation at a time, passes cancellation into
+  GitManager, and rejects a late result after cancellation or unload.
+- The current source also emits operation events and records them in the log.
+  Neither the event system nor its class structure is a rewrite requirement.
 
-### Operation Entry-Point Conformance — 2026-09-04
-- A TypeScript-AST-backed test now checks that repository mutations in the main
-  plugin and sidebar use `runGitMutation`.
-- The same focused test checks coordinator disposal and GitManager signal
-  cleanup. Runtime Obsidian and mobile acceptance remain separate.
+### Existing Source Test — 2026-09-04
+- A TypeScript-AST-backed test checks the current wrapper arrangement, and a
+  focused test checks disposal and signal cleanup. These are source tests, not
+  rewrite requirements. Runtime Obsidian and mobile acceptance remain
+  separate.
 
 ### UI and Log Regression Fixes — 2026-09-04
 - Changes-view busy state now disables all staging controls without rotating
@@ -129,13 +125,12 @@
 - Focused and full automated verification passes. Real Obsidian visual and
   mobile acceptance remains open.
 
-### Sidebar Read-Model Extraction — 2026-09-04
-- `SidebarReadModel` now owns plugin-lifetime history, commit-detail, and log
-  cache data with explicit repository/branch keys and invalidation.
-- `GitSidebarView` retains rendering, tab interaction, mutation callbacks, and
-  stale-render guards. The model is independently unit tested.
-- This is the first read-boundary extraction; further module work remains
-  subject to conformance and real desktop/mobile evidence.
+### Existing Sidebar Cache — 2026-09-04
+- The current source contains a cache for history, commit details, and log
+  entries, with explicit invalidation and unit tests.
+- It is optional implementation history. A fresh implementation should keep
+  this state with the sidebar unless real use or profiling proves the cache is
+  necessary.
 
 ### Stale-Read Guard — 2026-09-04
 - Log loading and commit-detail responses now verify the current render
@@ -150,9 +145,10 @@
 - **First gate**: Test official isomorphic-git 1.41.9, centralize staging
   classification, preserve tracked paths, reject ignored untracked paths, and
   verify the index before claiming staging success.
-- **Shared follow-up**: Add a sidebar read model with loading/error states,
-  comparison provenance, tab caches, persistent log history, opt-in metrics,
-  and operation-specific push progress.
+- **Earlier follow-up record**: The previous session proposed a sidebar read
+  model with loading/error states, tab caches, persistent log history, opt-in
+  metrics, and operation-specific push progress. Only the user-visible parts
+  that solve a demonstrated problem remain relevant.
 - **Worktree safety**: Preserve the pre-existing user modification in `main.js`
   and do not overwrite unrelated generated or local work.
 
@@ -225,8 +221,8 @@
   transport iterator, fetch callbacks, and checkout callbacks.
 - `requestUrl` still buffers full responses, so byte metrics are
   response-consumption telemetry rather than live wire transfer telemetry.
-- Protected replacement backups, shared operation coordination, and Android/
-  desktop real-device acceptance remain open.
+- Protected replacement backups, preventing conflicting actions where needed,
+  and Android/desktop real-device acceptance remain open.
 
 ### T29/T35b `.gitignore` Controls, Bulk Staging, and Sidebar UX — 2026-08-18
 
@@ -324,10 +320,10 @@
 2. **T34b decision** — Decide whether to implement GitHub device-flow sign-in.
 3. **T34c + T29: Test the current dev release on Android/iOS** — Verify a
    valid remote credential, clone/pull/push, progress, and commit expansion.
-4. **T35** — Address the recorded reliability, security, lifecycle, transport,
-   updater, and CI risks.
+4. **T35** — Complete only the concrete repository, transport, updater, or
+   test work required by an observed user workflow.
 5. **Create tagged v1.0.0 release** only after mobile acceptance, applicable
-   T35 hardening, and explicit authorization.
+   T35 follow-up work, and explicit authorization.
 
 ## System Status
 
@@ -363,7 +359,7 @@
 
 ## Session Closeout — 2026-09-04
 
-- Session title: `T29a, T35b, T35d, T35f, T37, T38: Harden sidebar behavior and define a UI-preserving mechanics rewrite`.
+- Session title: `T29a, T35b, T35d, T35f, T37, T38: Review sidebar behavior and simplify the rewrite plan`.
 - The session delivered targeted lifecycle, Log, staging, bulk-action, and
   commit-control fixes, with generated-bundle and automated-test evidence.
 - Many UI issues still remain. Keep T29a in progress and do not claim broad
@@ -407,8 +403,8 @@
 - **Test runner**: Node built-in test runner, with a bundled source test and Obsidian host stub ✅
 - **Updater identity**: Rolling dev release checks compare embedded local commit hash with GitHub `main` HEAD ✅
 - **Archive output**: `pnpm run archive` creates the ZIP and copies plugin files directly into `dist/` ✅
-- **Hardening task boundary**: T35 owns cross-cutting reliability/security
-  implementation; T29 owns release packaging/acceptance and T34 owns remote
+- **Task ownership**: T35 owns its concrete reliability and security
+  follow-up; T29 owns release packaging/acceptance and T34 owns remote
   authentication ✅
 
 ## Decisions Pending
@@ -421,10 +417,12 @@
 - **Mobile acceptance**: Need real-device validation of the current dev release
 - **Credential storage**: T35a must choose and document the secure-storage
   boundary and automatic staging exclusions.
-- **Operation coordination**: T35b must define the single-operation and
-  cancellation contract.
-- **Repository state machine**: T35c must define safe clone, empty-remote,
-  local-only, and replacement behavior.
+- **Competing operations**: T35b must define what the user sees if two
+  conflicting actions are requested, only if the current workflow requires a
+  change.
+- **Repository behaviour**: T35c must define safe clone, empty-remote,
+  local-only, and replacement behaviour only where those workflows are
+  required and observed.
 
 ## Next Steps
 

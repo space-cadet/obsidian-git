@@ -1,9 +1,20 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
 
 ---
+
+#### 20:18:35 IST - T38: Revise rewrite plan using KISS
+- Updated the current product and rewrite planning records so KISS means
+  “Keep It Simple, Stupid.”
+- Kept only demonstrated user behaviour as the rewrite requirement; named
+  coordinators, caches, read models, event systems, and source-structure tests
+  are implementation choices, not required design elements.
+- Replaced the active next steps with real Obsidian/device workflow checks,
+  specific fixes for observed failures, focused tests, and PRD approval before
+  any rewrite task or branch is created.
+- Created `memory-bank/edits/2026-09-04/201835-T38-kiss-plan-revision.md`.
 
 #### 11:36:55 IST - T29a/T35b/T35d/T35f/T37/T38: Define UI-preserving mechanics rewrite
 - Updated `memory-bank/product-spec.md` - Recorded the UI baseline and proven updater behaviours to carry forward.

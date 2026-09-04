@@ -11,7 +11,7 @@ password cannot be committed to the vault remote or exposed through logs.
 
 ## Current Risk
 
-The first hardening slice now stores only a per-vault secret ID in ordinary
+The first credential-safety change now stores only a per-vault secret ID in ordinary
 plugin settings and excludes plugin-owned paths from automatic staging. The
 actual credential is resolved through Obsidian `SecretStorage` immediately
 before remote operations. Logger-managed output has a central redaction
@@ -154,5 +154,5 @@ credential freshness remain open.
 ## Related Tasks
 
 - T34/T34a: Remote authentication and safe diagnostics
-- T35: Plugin Reliability, Security, and Architecture Hardening
+- T35: Plugin Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up
 - T35f: Test, CI, and Documentation Alignment
