@@ -414,7 +414,10 @@ export class GitBackend {
     try {
       const matrix = await git.statusMatrix({ fs: this.ports.fs, dir: this.dir }) as MatrixRow[];
       files = [];
+      const matrixStates: Record<string, number> = {};
       for (const [path, headState, worktreeState, stageState] of matrix) {
+        const state = `${headState}/${worktreeState}/${stageState}`;
+        matrixStates[state] = (matrixStates[state] || 0) + 1;
         const staged = stageState !== headState;
         const worktree = worktreeState !== stageState;
         if (!staged && !worktree) continue;
@@ -429,7 +432,20 @@ export class GitBackend {
                 : 'conflict';
         files.push({ path, change, staged, worktree });
       }
+      this.ports.diagnostics?.info('Working-tree status matrix read', {
+        branch,
+        matrixEntries: matrix.length,
+        changedFiles: files.length,
+        stagedFiles: files.filter((file) => file.staged).length,
+        worktreeFiles: files.filter((file) => file.worktree).length,
+        untrackedFiles: files.filter((file) => file.change === 'untracked').length,
+        matrixStates,
+      });
     } catch (error) {
+      this.ports.diagnostics?.error(
+        'Working-tree status matrix failed',
+        error instanceof Error ? error : new Error(errorMessage(error)),
+      );
       return this.emptyStatus('damaged', errorMessage(error), branch, head);
     }
 

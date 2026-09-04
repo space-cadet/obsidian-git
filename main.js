@@ -9005,7 +9005,7 @@ __export(isomorphic_git_exports, {
   listRemotes: () => listRemotes,
   listServerRefs: () => listServerRefs,
   listTags: () => listTags,
-  log: () => log,
+  log: () => log2,
   merge: () => merge,
   packObjects: () => packObjects,
   pull: () => pull,
@@ -14914,7 +14914,7 @@ async function getChanges({ fs, cache, gitdir, commit: commit2, shallow }) {
     }
   });
 }
-async function log({
+async function log2({
   fs,
   dir,
   gitdir = join(dir, ".git"),
@@ -16958,7 +16958,7 @@ async function writeTree({ fs, dir, gitdir = join(dir, ".git"), tree }) {
     throw err;
   }
 }
-var import_sha1, import_async_lock, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, InvalidRefNameError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyCommitError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, EMPTY_TREE_OID, bad, worthWalking, LINEBREAKS, _TreeMap, abbreviateRx, CREDENTIALS, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, scpLike, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
+var import_sha1, import_async_lock, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, InvalidRefNameError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath2, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyCommitError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, EMPTY_TREE_OID, bad, worthWalking, LINEBREAKS, _TreeMap, abbreviateRx, CREDENTIALS, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, scpLike, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
 var init_isomorphic_git = __esm({
   "node_modules/.pnpm/isomorphic-git@1.41.9/node_modules/isomorphic-git/index.js"() {
     import_sha1 = __toESM(require_sha1(), 1);
@@ -17751,7 +17751,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
     getPath = (section, subsection, name) => {
       return [lower(section), subsection, lower(name)].filter((a) => a != null).join(".");
     };
-    normalizePath = (path) => {
+    normalizePath2 = (path) => {
       const pathSegments = path.split(".");
       const section = pathSegments.shift();
       const name = pathSegments.pop();
@@ -17799,7 +17799,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
         return new _GitConfig(text);
       }
       async get(path, getall = false) {
-        const normalizedPath = normalizePath(path).path;
+        const normalizedPath = normalizePath2(path).path;
         const allValues = this.parsedConfig.filter((config) => config.path === normalizedPath).map(({ section, name, value }) => {
           const fn = schema[section] && schema[section][name];
           return fn ? fn(value) : value;
@@ -17828,7 +17828,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
           path: normalizedPath,
           sectionPath,
           isSection
-        } = normalizePath(path);
+        } = normalizePath2(path);
         const configIndex = findLastIndex(
           this.parsedConfig,
           (config) => config.path === normalizedPath
@@ -20767,7 +20767,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       listRemotes,
       listServerRefs,
       listTags,
-      log,
+      log: log2,
       merge,
       packObjects,
       pull,
@@ -21110,7 +21110,311 @@ var ObsidianFsAdapter = class {
 };
 
 // src/backend/obsidianAdapter.ts
+var import_obsidian2 = require("obsidian");
+
+// src/logger.ts
 var import_obsidian = require("obsidian");
+
+// src/security.ts
+var REDACTED = "[REDACTED]";
+var SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+  "authorization",
+  "password",
+  "passwd",
+  "pat",
+  "secret",
+  "token",
+  "credential",
+  "credentials",
+  "cookie",
+  "set-cookie"
+]);
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function redactSensitiveText(value, secrets = []) {
+  let result = String(value);
+  for (const secret of secrets) {
+    if (secret && secret.length >= 3) {
+      result = result.replace(new RegExp(escapeRegExp(secret), "g"), REDACTED);
+    }
+  }
+  result = result.replace(/(https?:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}@`);
+  result = result.replace(/(authorization\s*[:=]\s*)(?:basic|bearer)\s+[^\s,;]+/gi, `$1${REDACTED}`);
+  result = result.replace(/\bBasic\s+[A-Za-z0-9+/=]+/g, `Basic ${REDACTED}`);
+  result = result.replace(/\b(?:ghp|github_pat|glpat)-[A-Za-z0-9_-]+/g, REDACTED);
+  return result;
+}
+function redactSensitiveData(value, secrets = []) {
+  if (value === null || value === void 0)
+    return value;
+  if (typeof value === "string")
+    return redactSensitiveText(value, secrets);
+  if (typeof value !== "object")
+    return value;
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: redactSensitiveText(value.message, secrets),
+      stack: value.stack ? redactSensitiveText(value.stack, secrets) : void 0
+    };
+  }
+  if (Array.isArray(value))
+    return value.map((item) => redactSensitiveData(item, secrets));
+  const output = {};
+  for (const [key, item] of Object.entries(value)) {
+    output[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactSensitiveData(item, secrets);
+  }
+  return output;
+}
+
+// src/logger.ts
+var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
+  LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
+  LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
+  LogLevel2[LogLevel2["WARN"] = 2] = "WARN";
+  LogLevel2[LogLevel2["ERROR"] = 3] = "ERROR";
+  return LogLevel2;
+})(LogLevel || {});
+var Logger = class _Logger {
+  constructor() {
+    this.logLevel = 1 /* INFO */;
+    this.showNotices = true;
+    this.entries = [];
+    this.persistedEntries = [];
+    this.maxEntries = 500;
+    this.sensitiveValues = [];
+    this.recentNoticeTimes = /* @__PURE__ */ new Map();
+    this.noticeCooldownMs = 5 * 60 * 1e3;
+    this.fileLogSink = null;
+    this.listeners = /* @__PURE__ */ new Set();
+  }
+  /**
+   * Get the singleton instance of the logger
+   */
+  static getInstance() {
+    if (!_Logger.instance) {
+      _Logger.instance = new _Logger();
+    }
+    return _Logger.instance;
+  }
+  /**
+   * Get recent log entries for display
+   */
+  getEntries() {
+    const merged = /* @__PURE__ */ new Map();
+    const persisted = this.persistedEntries;
+    for (const entry of [...this.persistedEntries, ...this.entries]) {
+      const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
+      if (merged.has(exactKey))
+        continue;
+      const isLiveEntry = !persisted.includes(entry);
+      if (isLiveEntry && persisted.some(
+        (persistedEntry) => persistedEntry.level === entry.level && persistedEntry.namespace === entry.namespace && persistedEntry.message === entry.message && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250 && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
+      ))
+        continue;
+      merged.set(exactKey, entry);
+    }
+    return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
+  }
+  mergePersistedEntries(entries) {
+    this.persistedEntries = [...entries].slice(-this.maxEntries);
+  }
+  /** Subscribe to new entries so long-lived views can update without polling. */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  /** Clear the in-memory activity log shown in the sidebar. */
+  clear() {
+    this.entries = [];
+    this.persistedEntries = [];
+  }
+  /**
+   * Export logs to a markdown file in the vault
+   */
+  async exportToFile(vault, filename) {
+    var _a;
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
+    const normalizedPath = (0, import_obsidian.normalizePath)(path);
+    const folder = normalizedPath.split("/").slice(0, -1).join("/");
+    if (folder) {
+      try {
+        await vault.adapter.mkdir(folder);
+      } catch (e) {
+        if (!((_a = e.message) == null ? void 0 : _a.includes("already exists"))) {
+          throw e;
+        }
+      }
+    }
+    const lines = [
+      "# Obsidian Git Sync \u2014 Debug Log",
+      "",
+      `**Generated:** ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
+      `**Entries:** ${this.getEntries().length}`,
+      `**Log Level:** ${LogLevel[this.logLevel]}`,
+      "",
+      "---",
+      ""
+    ];
+    for (const entry of this.getEntries()) {
+      const time = new Date(entry.timestamp).toLocaleTimeString();
+      const emoji = entry.level === "error" ? "\u{1F534}" : entry.level === "warn" ? "\u26A0\uFE0F" : entry.level === "debug" ? "\u{1F50D}" : "\u2139\uFE0F";
+      lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} \u2014 ${time}`);
+      lines.push("");
+      lines.push(entry.message);
+      if (entry.data) {
+        lines.push("");
+        lines.push("```json");
+        try {
+          lines.push(JSON.stringify(entry.data, null, 2).slice(0, 2e3));
+        } catch (e) {
+          lines.push(String(entry.data).slice(0, 2e3));
+        }
+        lines.push("```");
+      }
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    }
+    const content = lines.join("\n");
+    await vault.adapter.write(path, content);
+    return path;
+  }
+  /**
+   * Set the maximum number of entries to keep in memory
+   */
+  setMaxEntries(max) {
+    this.maxEntries = max;
+  }
+  /**
+   * Set the minimum log level to display
+   */
+  setLogLevel(level) {
+    this.logLevel = level;
+  }
+  /**
+   * Set whether to show notices for warnings and errors
+   */
+  setShowNotices(show) {
+    this.showNotices = show;
+  }
+  /** Show a background warning/error once per message during the cooldown. */
+  showNotice(level, message) {
+    const key = `${level}:${message}`;
+    const now = Date.now();
+    const previous = this.recentNoticeTimes.get(key);
+    if (previous !== void 0 && now - previous < this.noticeCooldownMs)
+      return;
+    this.recentNoticeTimes.set(key, now);
+    if (this.recentNoticeTimes.size > 100) {
+      for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
+        if (now - timestamp >= this.noticeCooldownMs)
+          this.recentNoticeTimes.delete(noticeKey);
+      }
+    }
+    new import_obsidian.Notice(`[${level}] ${message}`);
+  }
+  setSensitiveValues(values) {
+    this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
+  }
+  /** Attach the plugin-owned persistent log sink without touching global console state. */
+  setFileLogSink(sink) {
+    this.fileLogSink = sink;
+  }
+  /**
+   * Log a debug message
+   */
+  debug(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("debug", context, safeMessage, safeData);
+    if (this.logLevel <= 0 /* DEBUG */) {
+      console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+    }
+  }
+  /**
+   * Log an info message
+   */
+  info(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("info", context, safeMessage, safeData);
+    if (this.logLevel <= 1 /* INFO */) {
+      console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+    }
+  }
+  /**
+   * Log a warning message
+   */
+  warn(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("warn", context, safeMessage, safeData);
+    if (this.logLevel <= 2 /* WARN */) {
+      console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+      if (this.showNotices) {
+        this.showNotice("Warning", safeMessage);
+      }
+    }
+  }
+  /**
+   * Log an error message
+   */
+  error(context, message, error) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeError = redactSensitiveData(error, this.sensitiveValues);
+    const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : "";
+    this.pushEntry("error", context, safeMessage, safeError || errorText);
+    if (this.logLevel <= 3 /* ERROR */) {
+      console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || "");
+      if (error && typeof safeError === "object" && safeError && "stack" in safeError) {
+        console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
+      }
+      if (this.showNotices) {
+        this.showNotice("Error", `${safeMessage}${errorText ? `: ${errorText}` : ""}`);
+      }
+    }
+  }
+  pushEntry(level, namespace, message, data) {
+    var _a, _b;
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.entries.push({
+      timestamp: Date.now(),
+      level,
+      namespace,
+      message: safeMessage,
+      data: safeData
+    });
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries);
+    }
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (e) {
+      }
+    }
+    const levelRank = {
+      debug: 0 /* DEBUG */,
+      info: 1 /* INFO */,
+      warn: 2 /* WARN */,
+      error: 3 /* ERROR */,
+      fatal: 3 /* ERROR */
+    };
+    if (((_a = levelRank[level]) != null ? _a : 1 /* INFO */) >= this.logLevel) {
+      (_b = this.fileLogSink) == null ? void 0 : _b.call(
+        this,
+        level,
+        `[Git Sync][${namespace}] ${safeMessage}`,
+        safeData || ""
+      );
+    }
+  }
+};
+var log = Logger.getInstance();
 
 // src/backend/gitBackend.ts
 init_isomorphic_git();
@@ -21583,6 +21887,7 @@ var GitBackend = class {
    * first useful file state does not wait for history traversal or network IO.
    */
   async status(options = {}) {
+    var _a, _b;
     if (!await this.hasRepository())
       return this.emptyStatus("missing");
     let branch2 = null;
@@ -21604,7 +21909,10 @@ var GitBackend = class {
     try {
       const matrix = await statusMatrix({ fs: this.ports.fs, dir: this.dir });
       files = [];
+      const matrixStates = {};
       for (const [path, headState, worktreeState, stageState] of matrix) {
+        const state = `${headState}/${worktreeState}/${stageState}`;
+        matrixStates[state] = (matrixStates[state] || 0) + 1;
         const staged = stageState !== headState;
         const worktree = worktreeState !== stageState;
         if (!staged && !worktree)
@@ -21612,7 +21920,20 @@ var GitBackend = class {
         const change = worktreeState === 0 && headState !== 0 ? "deleted" : headState === 0 ? "untracked" : staged && !worktree ? "staged" : worktreeState === 2 ? "modified" : "conflict";
         files.push({ path, change, staged, worktree });
       }
+      (_a = this.ports.diagnostics) == null ? void 0 : _a.info("Working-tree status matrix read", {
+        branch: branch2,
+        matrixEntries: matrix.length,
+        changedFiles: files.length,
+        stagedFiles: files.filter((file) => file.staged).length,
+        worktreeFiles: files.filter((file) => file.worktree).length,
+        untrackedFiles: files.filter((file) => file.change === "untracked").length,
+        matrixStates
+      });
     } catch (error) {
+      (_b = this.ports.diagnostics) == null ? void 0 : _b.error(
+        "Working-tree status matrix failed",
+        error instanceof Error ? error : new Error(errorMessage(error))
+      );
       return this.emptyStatus("damaged", errorMessage(error), branch2, head);
     }
     const result = {
@@ -21860,7 +22181,7 @@ var GitBackend = class {
   async history(limit = 25) {
     let commits;
     try {
-      commits = await log({ fs: this.ports.fs, dir: this.dir, ref: "HEAD", depth: limit });
+      commits = await log2({ fs: this.ports.fs, dir: this.dir, ref: "HEAD", depth: limit });
     } catch (error) {
       if (isMissing(error))
         return [];
@@ -21890,7 +22211,7 @@ var GitBackend = class {
   async remoteHistory(branch2 = this.config.branch, limit = 25) {
     let commits;
     try {
-      commits = await log({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${branch2}`, depth: limit });
+      commits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${branch2}`, depth: limit });
     } catch (error) {
       if (isMissing(error))
         return [];
@@ -22083,8 +22404,8 @@ var GitBackend = class {
       return { ...status2, comparison: "unavailable", comparisonError: "No local remote-tracking ref" };
     if (remote === status2.head)
       return { ...status2, comparison: "up-to-date" };
-    const localCommits = await log({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${status2.branch}` });
-    const remoteCommits = await log({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${status2.branch}` });
+    const localCommits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${status2.branch}` });
+    const remoteCommits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${status2.branch}` });
     const localOids = new Set(localCommits.map((entry) => entry.oid));
     const remoteOids = new Set(remoteCommits.map((entry) => entry.oid));
     const ahead = localCommits.filter((entry) => !remoteOids.has(entry.oid)).length;
@@ -22371,7 +22692,7 @@ var ObsidianGitBackend = class {
     this.transport = {
       async request(request) {
         const body = request.body instanceof Uint8Array ? request.body.buffer.slice(request.body.byteOffset, request.body.byteOffset + request.body.byteLength) : request.body;
-        const response = await (0, import_obsidian.requestUrl)({
+        const response = await (0, import_obsidian2.requestUrl)({
           url: request.url,
           method: request.method || "GET",
           headers: request.headers,
@@ -22390,7 +22711,11 @@ var ObsidianGitBackend = class {
     this.backend = new GitBackend({
       fs,
       transport: this.transport,
-      credentials: this.credentials
+      credentials: this.credentials,
+      diagnostics: {
+        info: (message, data) => log.info("GitStatus", message, data),
+        error: (message, error) => log.error("GitStatus", message, error)
+      }
     }, dir, this.config);
   }
   updateCredentials(credentials) {
@@ -22455,6 +22780,17 @@ var ObsidianGitBackend = class {
     const status2 = await this.backend.status();
     const staged = status2.staged;
     const unstaged = status2.files.filter((file) => file.worktree && !file.staged).map((file) => file.path);
+    log.info("GitStatus", "Sidebar status snapshot built", {
+      repositoryState: status2.state,
+      branch: status2.branch || this.config.branch,
+      statusFiles: status2.files.length,
+      detailedFiles: status2.files.length,
+      stagedFiles: staged.length,
+      unstagedFiles: unstaged.length,
+      untrackedFiles: status2.files.filter((file) => file.change === "untracked").length,
+      comparison: status2.comparison,
+      ...status2.comparisonError ? { comparisonError: status2.comparisonError } : {}
+    });
     return {
       branch: status2.branch || this.config.branch,
       ahead: status2.ahead,
@@ -22572,310 +22908,6 @@ var ObsidianGitBackend = class {
     return this.transport;
   }
 };
-
-// src/logger.ts
-var import_obsidian2 = require("obsidian");
-
-// src/security.ts
-var REDACTED = "[REDACTED]";
-var SENSITIVE_KEYS = /* @__PURE__ */ new Set([
-  "authorization",
-  "password",
-  "passwd",
-  "pat",
-  "secret",
-  "token",
-  "credential",
-  "credentials",
-  "cookie",
-  "set-cookie"
-]);
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function redactSensitiveText(value, secrets = []) {
-  let result = String(value);
-  for (const secret of secrets) {
-    if (secret && secret.length >= 3) {
-      result = result.replace(new RegExp(escapeRegExp(secret), "g"), REDACTED);
-    }
-  }
-  result = result.replace(/(https?:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}@`);
-  result = result.replace(/(authorization\s*[:=]\s*)(?:basic|bearer)\s+[^\s,;]+/gi, `$1${REDACTED}`);
-  result = result.replace(/\bBasic\s+[A-Za-z0-9+/=]+/g, `Basic ${REDACTED}`);
-  result = result.replace(/\b(?:ghp|github_pat|glpat)-[A-Za-z0-9_-]+/g, REDACTED);
-  return result;
-}
-function redactSensitiveData(value, secrets = []) {
-  if (value === null || value === void 0)
-    return value;
-  if (typeof value === "string")
-    return redactSensitiveText(value, secrets);
-  if (typeof value !== "object")
-    return value;
-  if (value instanceof Error) {
-    return {
-      name: value.name,
-      message: redactSensitiveText(value.message, secrets),
-      stack: value.stack ? redactSensitiveText(value.stack, secrets) : void 0
-    };
-  }
-  if (Array.isArray(value))
-    return value.map((item) => redactSensitiveData(item, secrets));
-  const output = {};
-  for (const [key, item] of Object.entries(value)) {
-    output[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactSensitiveData(item, secrets);
-  }
-  return output;
-}
-
-// src/logger.ts
-var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
-  LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
-  LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
-  LogLevel2[LogLevel2["WARN"] = 2] = "WARN";
-  LogLevel2[LogLevel2["ERROR"] = 3] = "ERROR";
-  return LogLevel2;
-})(LogLevel || {});
-var Logger = class _Logger {
-  constructor() {
-    this.logLevel = 1 /* INFO */;
-    this.showNotices = true;
-    this.entries = [];
-    this.persistedEntries = [];
-    this.maxEntries = 500;
-    this.sensitiveValues = [];
-    this.recentNoticeTimes = /* @__PURE__ */ new Map();
-    this.noticeCooldownMs = 5 * 60 * 1e3;
-    this.fileLogSink = null;
-    this.listeners = /* @__PURE__ */ new Set();
-  }
-  /**
-   * Get the singleton instance of the logger
-   */
-  static getInstance() {
-    if (!_Logger.instance) {
-      _Logger.instance = new _Logger();
-    }
-    return _Logger.instance;
-  }
-  /**
-   * Get recent log entries for display
-   */
-  getEntries() {
-    const merged = /* @__PURE__ */ new Map();
-    const persisted = this.persistedEntries;
-    for (const entry of [...this.persistedEntries, ...this.entries]) {
-      const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
-      if (merged.has(exactKey))
-        continue;
-      const isLiveEntry = !persisted.includes(entry);
-      if (isLiveEntry && persisted.some(
-        (persistedEntry) => persistedEntry.level === entry.level && persistedEntry.namespace === entry.namespace && persistedEntry.message === entry.message && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250 && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
-      ))
-        continue;
-      merged.set(exactKey, entry);
-    }
-    return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
-  }
-  mergePersistedEntries(entries) {
-    this.persistedEntries = [...entries].slice(-this.maxEntries);
-  }
-  /** Subscribe to new entries so long-lived views can update without polling. */
-  subscribe(listener) {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-  /** Clear the in-memory activity log shown in the sidebar. */
-  clear() {
-    this.entries = [];
-    this.persistedEntries = [];
-  }
-  /**
-   * Export logs to a markdown file in the vault
-   */
-  async exportToFile(vault, filename) {
-    var _a;
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-    const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
-    const normalizedPath = (0, import_obsidian2.normalizePath)(path);
-    const folder = normalizedPath.split("/").slice(0, -1).join("/");
-    if (folder) {
-      try {
-        await vault.adapter.mkdir(folder);
-      } catch (e) {
-        if (!((_a = e.message) == null ? void 0 : _a.includes("already exists"))) {
-          throw e;
-        }
-      }
-    }
-    const lines = [
-      "# Obsidian Git Sync \u2014 Debug Log",
-      "",
-      `**Generated:** ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
-      `**Entries:** ${this.getEntries().length}`,
-      `**Log Level:** ${LogLevel[this.logLevel]}`,
-      "",
-      "---",
-      ""
-    ];
-    for (const entry of this.getEntries()) {
-      const time = new Date(entry.timestamp).toLocaleTimeString();
-      const emoji = entry.level === "error" ? "\u{1F534}" : entry.level === "warn" ? "\u26A0\uFE0F" : entry.level === "debug" ? "\u{1F50D}" : "\u2139\uFE0F";
-      lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} \u2014 ${time}`);
-      lines.push("");
-      lines.push(entry.message);
-      if (entry.data) {
-        lines.push("");
-        lines.push("```json");
-        try {
-          lines.push(JSON.stringify(entry.data, null, 2).slice(0, 2e3));
-        } catch (e) {
-          lines.push(String(entry.data).slice(0, 2e3));
-        }
-        lines.push("```");
-      }
-      lines.push("");
-      lines.push("---");
-      lines.push("");
-    }
-    const content = lines.join("\n");
-    await vault.adapter.write(path, content);
-    return path;
-  }
-  /**
-   * Set the maximum number of entries to keep in memory
-   */
-  setMaxEntries(max) {
-    this.maxEntries = max;
-  }
-  /**
-   * Set the minimum log level to display
-   */
-  setLogLevel(level) {
-    this.logLevel = level;
-  }
-  /**
-   * Set whether to show notices for warnings and errors
-   */
-  setShowNotices(show) {
-    this.showNotices = show;
-  }
-  /** Show a background warning/error once per message during the cooldown. */
-  showNotice(level, message) {
-    const key = `${level}:${message}`;
-    const now = Date.now();
-    const previous = this.recentNoticeTimes.get(key);
-    if (previous !== void 0 && now - previous < this.noticeCooldownMs)
-      return;
-    this.recentNoticeTimes.set(key, now);
-    if (this.recentNoticeTimes.size > 100) {
-      for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
-        if (now - timestamp >= this.noticeCooldownMs)
-          this.recentNoticeTimes.delete(noticeKey);
-      }
-    }
-    new import_obsidian2.Notice(`[${level}] ${message}`);
-  }
-  setSensitiveValues(values) {
-    this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
-  }
-  /** Attach the plugin-owned persistent log sink without touching global console state. */
-  setFileLogSink(sink) {
-    this.fileLogSink = sink;
-  }
-  /**
-   * Log a debug message
-   */
-  debug(context, message, data) {
-    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-    const safeData = redactSensitiveData(data, this.sensitiveValues);
-    this.pushEntry("debug", context, safeMessage, safeData);
-    if (this.logLevel <= 0 /* DEBUG */) {
-      console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-    }
-  }
-  /**
-   * Log an info message
-   */
-  info(context, message, data) {
-    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-    const safeData = redactSensitiveData(data, this.sensitiveValues);
-    this.pushEntry("info", context, safeMessage, safeData);
-    if (this.logLevel <= 1 /* INFO */) {
-      console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-    }
-  }
-  /**
-   * Log a warning message
-   */
-  warn(context, message, data) {
-    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-    const safeData = redactSensitiveData(data, this.sensitiveValues);
-    this.pushEntry("warn", context, safeMessage, safeData);
-    if (this.logLevel <= 2 /* WARN */) {
-      console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-      if (this.showNotices) {
-        this.showNotice("Warning", safeMessage);
-      }
-    }
-  }
-  /**
-   * Log an error message
-   */
-  error(context, message, error) {
-    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-    const safeError = redactSensitiveData(error, this.sensitiveValues);
-    const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : "";
-    this.pushEntry("error", context, safeMessage, safeError || errorText);
-    if (this.logLevel <= 3 /* ERROR */) {
-      console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || "");
-      if (error && typeof safeError === "object" && safeError && "stack" in safeError) {
-        console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
-      }
-      if (this.showNotices) {
-        this.showNotice("Error", `${safeMessage}${errorText ? `: ${errorText}` : ""}`);
-      }
-    }
-  }
-  pushEntry(level, namespace, message, data) {
-    var _a, _b;
-    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-    const safeData = redactSensitiveData(data, this.sensitiveValues);
-    this.entries.push({
-      timestamp: Date.now(),
-      level,
-      namespace,
-      message: safeMessage,
-      data: safeData
-    });
-    if (this.entries.length > this.maxEntries) {
-      this.entries = this.entries.slice(-this.maxEntries);
-    }
-    for (const listener of this.listeners) {
-      try {
-        listener();
-      } catch (e) {
-      }
-    }
-    const levelRank = {
-      debug: 0 /* DEBUG */,
-      info: 1 /* INFO */,
-      warn: 2 /* WARN */,
-      error: 3 /* ERROR */,
-      fatal: 3 /* ERROR */
-    };
-    if (((_a = levelRank[level]) != null ? _a : 1 /* INFO */) >= this.logLevel) {
-      (_b = this.fileLogSink) == null ? void 0 : _b.call(
-        this,
-        level,
-        `[Git Sync][${namespace}] ${safeMessage}`,
-        safeData || ""
-      );
-    }
-  }
-};
-var log2 = Logger.getInstance();
 
 // src/fileLogger.ts
 var import_obsidian3 = require("obsidian");
@@ -23683,7 +23715,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("tabindex", "0");
     this.contentContainer.setAttr("aria-label", "Git Sync content");
     this.renderLoadingState();
-    this.logUnsubscribe = log2.subscribe(() => {
+    this.logUnsubscribe = log.subscribe(() => {
       this.readModel.invalidateLogs();
       if (this.activeTab !== "log" || this.logRenderScheduled)
         return;
@@ -23692,7 +23724,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         this.logRenderScheduled = false;
         if (this.activeTab === "log" && this.containerEl.isConnected) {
           void this.refresh({ readRepository: false }).catch((error) => {
-            log2.debug("GitSidebar", "Log refresh failed", error);
+            log.debug("GitSidebar", "Log refresh failed", error);
           });
         }
       }, 0);
@@ -23700,7 +23732,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const refreshAfterVaultChange = () => {
       if (this.containerEl.isConnected) {
         void this.refresh({ force: true }).catch((error) => {
-          log2.debug("GitSidebar", "Vault-change refresh failed", error);
+          log.debug("GitSidebar", "Vault-change refresh failed", error);
         });
       }
     };
@@ -23711,7 +23743,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     void this.refresh().catch((error) => {
-      log2.warn("GitSidebar", "Initial sidebar refresh failed", error);
+      log.warn("GitSidebar", "Initial sidebar refresh failed", error);
     });
     this.startAutoRefresh();
     this.startRemoteFetchSchedule();
@@ -23732,7 +23764,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.refreshInterval = window.setInterval(() => {
         if (this.containerEl.isShown() && !this.repositoryReadInFlight) {
           void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
-            log2.debug("GitSidebar", "Automatic sidebar refresh failed", error);
+            log.debug("GitSidebar", "Automatic sidebar refresh failed", error);
           });
         }
       }, ms);
@@ -23757,7 +23789,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           return;
         this.invalidateRemoteCommitsCache();
         void this.refresh({ readRepository: false, force: true }).catch((error) => {
-          log2.debug("GitSidebar", "Scheduled remote commit fetch failed", error);
+          log.debug("GitSidebar", "Scheduled remote commit fetch failed", error);
         });
       }, ms);
     }
@@ -23880,7 +23912,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         this.activeTab = tab.id;
         this.renderTabs();
         void this.refresh({ readRepository: false }).catch((error) => {
-          log2.debug("GitSidebar", "Tab refresh failed", error);
+          log.debug("GitSidebar", "Tab refresh failed", error);
         });
       });
     }
@@ -24159,7 +24191,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       hasReal = await manager.hasRepository();
       this.repositoryStateKnown = true;
     } catch (error) {
-      log2.warn("GitSidebar", "repository check failed", error);
+      log.warn("GitSidebar", "repository check failed", error);
       return;
     }
     this.hasRealRepo = hasReal;
@@ -24178,8 +24210,17 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.readModel.setStatusSnapshot(snapshot);
       if (changed)
         this.statusRevision += 1;
+      log.info("GitStatus", "Sidebar status snapshot applied", {
+        activeTab: this.activeTab,
+        changed,
+        repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+        detailedFiles: snapshot.detailedStatus.length,
+        stagedFiles: snapshot.staged.length,
+        unstagedFiles: snapshot.unstaged.length,
+        untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === "untracked").length
+      });
     } catch (error) {
-      log2.warn("GitSidebar", "Failed to read repository snapshot", error);
+      log.warn("GitSidebar", "Failed to read repository snapshot", error);
     }
   }
   async renderCurrentState(generation, readRepository) {
@@ -24294,7 +24335,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         this.sidebarSnapshot.comparison
       );
     } catch (error) {
-      log2.debug("GitSidebar", "Remote comparison unavailable after local refresh", error);
+      log.debug("GitSidebar", "Remote comparison unavailable after local refresh", error);
     }
   }
   async renderUninitializedContent(hasReal, target = this.contentContainer) {
@@ -24429,7 +24470,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         }
       );
     } catch (e) {
-      log2.warn("GitSidebar", "Failed to get file status", e);
+      log.warn("GitSidebar", "Failed to get file status", e);
       container.empty();
       if (e.isPackIndexError || ((_a = e.message) == null ? void 0 : _a.includes("Pack index"))) {
         const errContainer = container.createDiv("git-uninit-container");
@@ -24657,7 +24698,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.commitsViewMode = "local";
       this.invalidateTab("commits");
       void this.refresh({ readRepository: false }).catch((error) => {
-        log2.debug("GitSidebar", "Local commit view refresh failed", error);
+        log.debug("GitSidebar", "Local commit view refresh failed", error);
       });
     });
     const remoteBtn = toggleBar.createEl("button", {
@@ -24669,7 +24710,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.commitsViewMode = "remote";
       this.invalidateTab("commits");
       void this.refresh({ readRepository: false }).catch((error) => {
-        log2.debug("GitSidebar", "Remote commit view refresh failed", error);
+        log.debug("GitSidebar", "Remote commit view refresh failed", error);
       });
     });
     const loading = this.commitsViewMode === "remote" ? listContainer.createEl("p", { text: "Loading remote commits\u2026", cls: "git-empty-state" }) : null;
@@ -24700,28 +24741,28 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         } else {
           const isGitHub = parseGitHubRepositoryUrl(remoteUrl) !== null;
           if (!this.plugin.gitManager) {
-            log2.error(
+            log.error(
               "GitSidebar",
               `Remote commit fetch skipped (source=${isGitHub ? "github-api" : "local-remote-ref"}, branch=${branch2}): Git backend unavailable`,
               new Error("Git backend unavailable")
             );
           } else {
             await this.plugin.refreshGitCredentials();
-            log2.info("GitSidebar", "Fetching remote commit history", {
+            log.info("GitSidebar", "Fetching remote commit history", {
               branch: branch2,
               source: isGitHub ? "github-api" : "local-remote-ref"
             });
             commits = await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch2, 25);
-            log2.info("GitSidebar", "Remote commit history fetched", {
+            log.info("GitSidebar", "Remote commit history fetched", {
               branch: branch2,
               source: isGitHub ? "github-api" : "local-remote-ref",
               count: commits.length
             });
             if (commits.length === 0 && !isGitHub) {
-              log2.warn("GitSidebar", "Remote API returned no commits; using local remote-tracking ref", { branch: branch2 });
+              log.warn("GitSidebar", "Remote API returned no commits; using local remote-tracking ref", { branch: branch2 });
               commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
             } else if (commits.length === 0) {
-              log2.warn("GitSidebar", "GitHub returned no remote commits", { branch: branch2 });
+              log.warn("GitSidebar", "GitHub returned no remote commits", { branch: branch2 });
             }
           }
         }
@@ -24798,7 +24839,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     } catch (e) {
       loading == null ? void 0 : loading.remove();
       const error = e instanceof Error ? e : new Error(String(e));
-      log2.error(
+      log.error(
         "GitSidebar",
         `Failed to get commit log (mode=${this.commitsViewMode}, branch=${this.plugin.settings.branchName || "main"})`,
         error
@@ -24837,7 +24878,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         try {
           files = await this.plugin.gitManager.getCommitFiles(oid);
         } catch (error) {
-          log2.debug("GitSidebar", "Local commit details unavailable; trying remote fallback", error);
+          log.debug("GitSidebar", "Local commit details unavailable; trying remote fallback", error);
         }
       }
       if (files.length === 0 && this.commitsViewMode === "remote" && this.plugin.settings.repoUrl) {
@@ -24889,15 +24930,15 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const listContainer = target.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
-    const currentLogEntries = log2.getEntries();
+    const currentLogEntries = log.getEntries();
     const cachedEntries = this.readModel.getLogEntries();
     const cacheStale = cachedEntries && currentLogEntries.length !== cachedEntries.length;
     if (!cachedEntries || cacheStale) {
       const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
       if (!this.isCurrentRender(generation))
         return;
-      log2.mergePersistedEntries(persisted);
-      this.readModel.setLogEntries(log2.getEntries());
+      log.mergePersistedEntries(persisted);
+      this.readModel.setLogEntries(log.getEntries());
     }
     const entries = this.readModel.getLogEntries() || [];
     if (entries.length === 0) {
@@ -24933,10 +24974,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       try {
         if (!this.readModel.getLogEntries()) {
           const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
-          log2.mergePersistedEntries(persisted);
-          this.readModel.setLogEntries(log2.getEntries());
+          log.mergePersistedEntries(persisted);
+          this.readModel.setLogEntries(log.getEntries());
         }
-        const path = await log2.exportToFile(this.app.vault);
+        const path = await log.exportToFile(this.app.vault);
         new import_obsidian5.Notice(`Log exported to ${path}`);
       } catch (e) {
         new import_obsidian5.Notice("Could not export log: " + e.message);
@@ -24945,7 +24986,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(async () => {
       var _a;
       try {
-        log2.clear();
+        log.clear();
         await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
         this.readModel.setLogEntries([]);
         new import_obsidian5.Notice("Activity log cleared");
@@ -24960,8 +25001,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       try {
         if (!this.readModel.getLogEntries()) {
           const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
-          log2.mergePersistedEntries(persisted);
-          this.readModel.setLogEntries(log2.getEntries());
+          log.mergePersistedEntries(persisted);
+          this.readModel.setLogEntries(log.getEntries());
         }
         const entries = [...this.readModel.getLogEntries() || []].reverse();
         const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
@@ -25777,7 +25818,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "7c98622347250cfd58b3c9eefa15b4f704ef6c15" : "unknown";
+var GIT_COMMIT_HASH = true ? "9a663e112fac01d47ea11d45cfa81830672edf66" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
@@ -26272,7 +26313,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     var _a;
     this.fileLogger = new FileLogger(this.app, this.manifest.id);
     await this.fileLogger.init();
-    log2.setFileLogSink((level, ...args) => {
+    log.setFileLogSink((level, ...args) => {
       var _a2;
       return (_a2 = this.fileLogger) == null ? void 0 : _a2.log(level, ...args);
     });
@@ -26284,19 +26325,19 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       };
       switch (event.lifecycle) {
         case "started":
-          log2.info("GitOperation", "Operation started", details);
+          log.info("GitOperation", "Operation started", details);
           break;
         case "completed":
-          log2.info("GitOperation", "Operation completed", details);
+          log.info("GitOperation", "Operation completed", details);
           break;
         case "cancelled":
-          log2.warn("GitOperation", "Operation cancelled", {
+          log.warn("GitOperation", "Operation cancelled", {
             ...details,
             reason: event.error instanceof Error ? event.error.message : String(event.error || "cancelled")
           });
           break;
         case "failed":
-          log2.error(
+          log.error(
             "GitOperation",
             `Operation failed: ${event.name} after ${event.elapsedMs || 0}ms`,
             event.error instanceof Error ? event.error : new Error(String(event.error))
@@ -26312,22 +26353,22 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       new import_obsidian9.Notice(this.credentialStorageError.message);
     }
     this.isDesktop = typeof window !== "undefined" && !!window.require && !!window.process;
-    log2.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
+    log.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
     if (!this.isDesktop && typeof Buffer === "undefined") {
       const { Buffer: Buffer2 } = await Promise.resolve().then(() => __toESM(require_buffer()));
       window.Buffer = Buffer2;
-      log2.info("GitSyncPlugin", "Buffer polyfill loaded for mobile");
+      log.info("GitSyncPlugin", "Buffer polyfill loaded for mobile");
     }
-    log2.info("GitSyncPlugin", "Initializing Git Sync plugin");
+    log.info("GitSyncPlugin", "Initializing Git Sync plugin");
     this.fs = new ObsidianFsAdapter(this.app.vault.adapter, ".").promises;
-    log2.debug("GitSyncPlugin", "File system adapter initialized");
+    log.debug("GitSyncPlugin", "File system adapter initialized");
     const ribbonIconEl = this.addRibbonIcon("refresh-cw", "Git Sync", async () => {
-      log2.info("GitSyncPlugin", "Manual sync triggered from ribbon");
+      log.info("GitSyncPlugin", "Manual sync triggered from ribbon");
       try {
         await this.syncVault();
         new import_obsidian9.Notice("Git sync completed successfully");
       } catch (error) {
-        log2.error("GitSyncPlugin", "Manual sync failed", error);
+        log.error("GitSyncPlugin", "Manual sync failed", error);
         new import_obsidian9.Notice(`Git sync failed: ${error.message}`);
       }
     });
@@ -26338,7 +26379,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.statusBarItem = this.addStatusBarItem();
     this.statusBarItem.setText("Git: Ready");
     this.addSettingTab(new GitSyncSettingTab(this.app, this));
-    this.updater = new PluginUpdater(this.app, this.manifest.id, log2);
+    this.updater = new PluginUpdater(this.app, this.manifest.id, log);
     this.addCommand({
       id: "git-sync-check-for-updates",
       name: "Check for plugin updates",
@@ -26354,12 +26395,12 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-now",
       name: "Sync now",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Manual sync triggered from command palette");
+        log.info("GitSyncPlugin", "Manual sync triggered from command palette");
         try {
           await this.syncVault();
           new import_obsidian9.Notice("Git sync completed successfully");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Manual sync failed", error);
+          log.error("GitSyncPlugin", "Manual sync failed", error);
           new import_obsidian9.Notice(`Git sync failed: ${error.message}`);
         }
       }
@@ -26368,7 +26409,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-pull",
       name: "Pull from remote",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Pull triggered from command palette");
+        log.info("GitSyncPlugin", "Pull triggered from command palette");
         const progress = createProgressModal(this.app, "Pulling from remote");
         try {
           await this.runGitMutation("Pull from remote", async (manager) => {
@@ -26384,7 +26425,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           new import_obsidian9.Notice("Git pull completed successfully");
         } catch (error) {
           progress.fail(error);
-          log2.error("GitSyncPlugin", "Pull failed", error);
+          log.error("GitSyncPlugin", "Pull failed", error);
           new import_obsidian9.Notice(`Git pull failed: ${error.message}`);
         }
       }
@@ -26393,7 +26434,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-push",
       name: "Push to remote",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Push triggered from command palette");
+        log.info("GitSyncPlugin", "Push triggered from command palette");
         const progress = createProgressModal(this.app, "Pushing to remote");
         try {
           await this.runGitMutation("Push to remote", async (manager) => {
@@ -26409,7 +26450,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           new import_obsidian9.Notice("Git push completed successfully");
         } catch (error) {
           progress.fail(error);
-          log2.error("GitSyncPlugin", "Push failed", error);
+          log.error("GitSyncPlugin", "Push failed", error);
           new import_obsidian9.Notice(`Git push failed: ${error.message}`);
         }
       }
@@ -26418,7 +26459,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-status",
       name: "Show repository status",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Status check triggered from command palette");
+        log.info("GitSyncPlugin", "Status check triggered from command palette");
         try {
           const health = await this.checkRepositoryHealth();
           if (health.state === "missing") {
@@ -26436,7 +26477,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           const status2 = await this.gitManager.getStatus();
           new import_obsidian9.Notice(`Git status: ${status2.branch} \u2014 ${status2.ahead} ahead, ${status2.behind} behind`);
         } catch (error) {
-          log2.error("GitSyncPlugin", "Status check failed", error);
+          log.error("GitSyncPlugin", "Status check failed", error);
           new import_obsidian9.Notice(`Git status failed: ${error.message}`);
         }
       }
@@ -26451,7 +26492,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
             `Rebuild preview: ${preview.conflicts.length} conflicts, ${preview.remoteOnly.length} remote-only, ${preview.localOnly.length} local-only, ${preview.unchanged.length} unchanged.`
           );
         } catch (error) {
-          log2.error("GitSyncPlugin", "Repository rebuild preview failed", error);
+          log.error("GitSyncPlugin", "Repository rebuild preview failed", error);
           new import_obsidian9.Notice(`Rebuild preview failed: ${error.message}`);
         }
       }
@@ -26471,7 +26512,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
             `Git index repaired. ${result.trackedFiles} tracked files restored; ${result.worktreeFiles} vault files preserved.${backup}`
           );
         } catch (error) {
-          log2.error("GitSyncPlugin", "Git index repair failed", error);
+          log.error("GitSyncPlugin", "Git index repair failed", error);
           new import_obsidian9.Notice(`Git index repair failed: ${error.message}`);
         }
       }
@@ -26488,7 +26529,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           const backup = await this.restoreLatestRepositoryIndexBackup();
           new import_obsidian9.Notice(`Git index restored from ${backup}`);
         } catch (error) {
-          log2.error("GitSyncPlugin", "Git index backup restore failed", error);
+          log.error("GitSyncPlugin", "Git index backup restore failed", error);
           new import_obsidian9.Notice(`Git index restore failed: ${error.message}`);
         }
       }
@@ -26519,7 +26560,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       name: "Export debug logs",
       callback: async () => {
         try {
-          const path = await log2.exportToFile(this.app.vault);
+          const path = await log.exportToFile(this.app.vault);
           new import_obsidian9.Notice(`Debug log exported to ${path}`);
         } catch (error) {
           new import_obsidian9.Notice(`Export failed: ${error.message}`);
@@ -26543,7 +26584,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.operationCoordinator.dispose();
     (_a = this.operationLifecycleUnsubscribe) == null ? void 0 : _a.call(this);
     this.operationLifecycleUnsubscribe = null;
-    log2.setFileLogSink(null);
+    log.setFileLogSink(null);
     (_b = this.fileLogger) == null ? void 0 : _b.stop();
     this.fileLogger = null;
   }
@@ -26577,11 +26618,11 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       if (await migrateLegacySecret(this.credentialStore, legacyPassword, async () => {
         await this.saveData(this.settings);
       })) {
-        log2.info("GitSyncPlugin", "Migrated the legacy Git credential to secure storage");
+        log.info("GitSyncPlugin", "Migrated the legacy Git credential to secure storage");
       }
     } catch (error) {
       this.credentialStorageError = error instanceof Error ? error : new Error(String(error));
-      log2.warn("GitSyncPlugin", "Secure credential storage is unavailable; remote operations are disabled");
+      log.warn("GitSyncPlugin", "Secure credential storage is unavailable; remote operations are disabled");
     }
   }
   async saveSettings() {
@@ -26599,7 +26640,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       info: 1 /* INFO */,
       debug: 0 /* DEBUG */
     };
-    log2.setLogLevel(levels[level]);
+    log.setLogLevel(levels[level]);
     (_a = this.fileLogger) == null ? void 0 : _a.setMemorySamplingEnabled(level === "debug");
   }
   setDiagnosticLogMaxSize(maxSizeMB) {
@@ -26635,7 +26676,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         email: this.settings.author.email || "user@example.com"
       }
     };
-    log2.setSensitiveValues([credentials.password]);
+    log.setSensitiveValues([credentials.password]);
     (_a = this.fileLogger) == null ? void 0 : _a.setSensitiveValues([credentials.password]);
     return credentials;
   }
@@ -26679,7 +26720,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     if (!this.updater)
       return;
     const startedAt = performance.now();
-    log2.info("Updater", "Update check started", {
+    log.info("Updater", "Update check started", {
       manual,
       channel: this.settings.updateChannel,
       currentVersion: this.manifest.version
@@ -26693,12 +26734,12 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       );
       this.settings.lastUpdateCheck = Date.now();
       const saveStartedAt = performance.now();
-      log2.debug("Updater", "Saving update-check timestamp");
+      log.debug("Updater", "Saving update-check timestamp");
       await this.saveSettings();
-      log2.info("Updater", "Update-check timestamp saved", {
+      log.info("Updater", "Update-check timestamp saved", {
         elapsedMs: Math.round(performance.now() - saveStartedAt)
       });
-      log2.info("Updater", "Update check completed", {
+      log.info("Updater", "Update check completed", {
         manual,
         hasUpdate: result.hasUpdate,
         latestVersion: result.latestVersion,
@@ -26729,8 +26770,8 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       });
       modal.open();
     } catch (error) {
-      log2.error("Updater", "Update check failed", error);
-      log2.error("GitSyncPlugin", "Update check failed", error);
+      log.error("Updater", "Update check failed", error);
+      log.error("GitSyncPlugin", "Update check failed", error);
       if (manual) {
         new import_obsidian9.Notice(`\u274C Update check failed: ${(error == null ? void 0 : error.message) || String(error)}`);
       }
@@ -26757,9 +26798,9 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           if (!await this.detectRealGitRepo())
             return;
           await this.syncVault();
-          log2.info("GitSyncPlugin", "Auto sync completed");
+          log.info("GitSyncPlugin", "Auto sync completed");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Auto sync failed", error);
+          log.error("GitSyncPlugin", "Auto sync failed", error);
         }
       }, intervalMs);
     }
@@ -26822,7 +26863,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.gitManagerPromise = (async () => {
       const vaultPath = ".";
       if (!this.settings.repoUrl && requireRemote) {
-        log2.warn("GitSyncPlugin", "No remote URL configured");
+        log.warn("GitSyncPlugin", "No remote URL configured");
         return null;
       }
       const credentials = await this.getGitCredentials(false);
@@ -26855,7 +26896,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   }
   async checkRepositoryHealth() {
     const startedAt = Date.now();
-    log2.info("Maintenance", "Repository health check started");
+    log.info("Maintenance", "Repository health check started");
     try {
       const manager = await this.ensureGitManager();
       const health = manager ? await manager.checkRepositoryHealth() : {
@@ -26866,13 +26907,13 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         hasCommits: false,
         reason: "missing .git directory"
       };
-      log2.info("Maintenance", "Repository health check completed", {
+      log.info("Maintenance", "Repository health check completed", {
         ...health,
         elapsedMs: Date.now() - startedAt
       });
       return health;
     } catch (error) {
-      log2.error("Maintenance", `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
+      log.error("Maintenance", `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -26903,10 +26944,10 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     await this.runGitMutation("Initialize repository", async (manager) => {
       try {
         await manager.initializeRepo("", this.settings.branchName || "main");
-        log2.info("GitSyncPlugin", "New git repository initialized in vault");
+        log.info("GitSyncPlugin", "New git repository initialized in vault");
         new import_obsidian9.Notice("New git repository initialized");
       } catch (e) {
-        log2.error("GitSyncPlugin", "Failed to initialize repo", e);
+        log.error("GitSyncPlugin", "Failed to initialize repo", e);
         if ((e == null ? void 0 : e.name) === "AbortError")
           throw e;
         throw new Error("Failed to initialize repo: " + e.message);
@@ -26930,23 +26971,23 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         if (basePath) {
           const gitPath = nodePath.join(basePath, ".git");
           await nodeFs.promises.access(gitPath);
-          log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs found .git");
+          log.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs found .git");
           return true;
         }
       } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs failed, trying adapter");
+        log.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs failed, trying adapter");
       }
     }
     try {
       await adapter.read(".git/HEAD");
-      log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.read .git/HEAD succeeded");
+      log.debug("GitSyncPlugin", "detectRealGitRepo: adapter.read .git/HEAD succeeded");
       return true;
     } catch (e) {
     }
     try {
       const stat = await adapter.stat(".git");
       if (stat && stat.type === "folder") {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.stat .git succeeded");
+        log.debug("GitSyncPlugin", "detectRealGitRepo: adapter.stat .git succeeded");
         return true;
       }
     } catch (e) {
@@ -26955,11 +26996,11 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
       const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
       if (root !== void 0) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
+        log.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
         return true;
       }
     } catch (e) {
-      log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed");
+      log.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed");
     }
     return false;
   }
@@ -27053,7 +27094,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       results.push(`Git init test: FAIL \u2014 ${e.message}`);
     }
     const message = results.join("\n");
-    log2.info("GitSyncPlugin", "Diagnostics:\n" + message);
+    log.info("GitSyncPlugin", "Diagnostics:\n" + message);
     const modal = new import_obsidian9.Modal(this.app);
     modal.titleEl.setText("Git Sync Diagnostics");
     modal.contentEl.createEl("pre", { text: message, cls: "git-diagnostics" });
@@ -27246,7 +27287,7 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
           await this.plugin.setGitCredential(value);
           new import_obsidian9.Notice(value ? "Credential stored securely" : "Stored credential cleared");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Failed to store Git credential", error);
+          log.error("GitSyncPlugin", "Failed to store Git credential", error);
           new import_obsidian9.Notice((error == null ? void 0 : error.message) || "Secure credential storage is unavailable");
         }
       });
@@ -27360,7 +27401,7 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
     const diagnostics = this.createSettingsSection(containerEl, sections[4]);
     new import_obsidian9.Setting(diagnostics).setName("Export Debug Logs").setDesc("Export captured debug logs to a markdown file in your vault").addButton((button) => button.setButtonText("Export Logs").onClick(async () => {
       try {
-        const path = await log2.exportToFile(this.app.vault);
+        const path = await log.exportToFile(this.app.vault);
         new import_obsidian9.Notice(`Debug log exported to ${path}`);
       } catch (error) {
         new import_obsidian9.Notice(`Export failed: ${error.message}`);

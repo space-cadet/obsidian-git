@@ -726,6 +726,15 @@ export class GitSidebarView extends ItemView {
             this.sidebarSnapshot = snapshot;
             this.readModel.setStatusSnapshot(snapshot);
             if (changed) this.statusRevision += 1;
+            log.info('GitStatus', 'Sidebar status snapshot applied', {
+                activeTab: this.activeTab,
+                changed,
+                repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+                detailedFiles: snapshot.detailedStatus.length,
+                stagedFiles: snapshot.staged.length,
+                unstagedFiles: snapshot.unstaged.length,
+                untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === 'untracked').length,
+            });
         } catch (error) {
             log.warn('GitSidebar', 'Failed to read repository snapshot', error);
         }

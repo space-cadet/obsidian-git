@@ -1,5 +1,6 @@
 import { DataAdapter, requestUrl } from 'obsidian';
 import { ObsidianFsAdapter } from '../adapters/ObsidianFsAdapter';
+import { log } from '../logger';
 import { GitBackend } from './gitBackend';
 import { GitHubApi } from './githubApi';
 import { GitHubDeviceAuth, GitHubAuthSession, StaticCredentialProvider } from './githubAuth';
@@ -119,6 +120,10 @@ export class ObsidianGitBackend {
       fs,
       transport: this.transport,
       credentials: this.credentials,
+      diagnostics: {
+        info: (message, data) => log.info('GitStatus', message, data),
+        error: (message, error) => log.error('GitStatus', message, error),
+      },
     }, dir, this.config);
   }
 
@@ -194,6 +199,17 @@ export class ObsidianGitBackend {
     const status = await this.backend.status();
     const staged = status.staged;
     const unstaged = status.files.filter((file) => file.worktree && !file.staged).map((file) => file.path);
+    log.info('GitStatus', 'Sidebar status snapshot built', {
+      repositoryState: status.state,
+      branch: status.branch || this.config.branch,
+      statusFiles: status.files.length,
+      detailedFiles: status.files.length,
+      stagedFiles: staged.length,
+      unstagedFiles: unstaged.length,
+      untrackedFiles: status.files.filter((file) => file.change === 'untracked').length,
+      comparison: status.comparison,
+      ...(status.comparisonError ? { comparisonError: status.comparisonError } : {}),
+    });
     return {
       branch: status.branch || this.config.branch,
       ahead: status.ahead,

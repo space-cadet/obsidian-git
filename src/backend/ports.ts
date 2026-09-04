@@ -6,8 +6,15 @@ import { CredentialProvider, HttpTransport } from './types';
  */
 export type GitFileSystem = any;
 
+/** Optional host-owned diagnostics. The portable backend never imports UI logging. */
+export interface GitBackendDiagnostics {
+  info(message: string, data?: unknown): void;
+  error(message: string, error: Error): void;
+}
+
 export interface GitBackendPorts {
   fs: GitFileSystem;
   transport: HttpTransport;
   credentials?: CredentialProvider;
+  diagnostics?: GitBackendDiagnostics;
 }
