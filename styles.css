@@ -1221,7 +1221,7 @@
 
 .git-header-status {
     min-height: 20px;
-    margin: 2px 44px 0 20px;
+    margin: 0 0 0 14px;
     font-size: var(--font-ui-small);
     line-height: 1.4;
 }

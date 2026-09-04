@@ -41,6 +41,7 @@ interface GitSyncSettings {
 	autoSyncInterval: number; // in minutes, 0 means disabled
 	autoCommitMessage: string;
 	refreshInterval: number; // in seconds, 0 means disabled
+	remoteFetchInterval: number; // in minutes, 0 means disabled
 	checkForUpdates: boolean;
 	updateChannel: 'stable' | 'dev';
 	lastUpdateCheck: number;
@@ -65,6 +66,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	autoSyncInterval: 0,
 	autoCommitMessage: 'Vault backup: {{date}}',
 	refreshInterval: 60, // default 60 seconds
+	remoteFetchInterval: 0,
 	checkForUpdates: true,
 	updateChannel: 'stable',
 	lastUpdateCheck: 0,
@@ -1305,6 +1307,25 @@ class GitSyncSettingTab extends PluginSettingTab {
 					}
 				}));
 		new Setting(sync)
+			.setName('Remote Commit Fetch Interval')
+			.setDesc('How often to fetch remote commit history while the Remote commits view is open (in minutes, 0 to disable)')
+			.addText(text => text
+				.setPlaceholder('0')
+				.setValue(String(this.plugin.settings.remoteFetchInterval))
+				.onChange(async (value) => {
+					const numValue = Number(value);
+					if (!isNaN(numValue) && numValue >= 0) {
+						this.plugin.settings.remoteFetchInterval = numValue;
+						await this.plugin.saveSettings();
+						const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+						for (const leaf of leaves) {
+							if (leaf.view instanceof GitSidebarView) {
+								(leaf.view as GitSidebarView).updateRemoteFetchInterval(numValue);
+							}
+						}
+					}
+				}));
+		new Setting(sync)
 			.setName('Test Connection')
 			.setDesc('Checks the remote URL and credentials without cloning, initializing, or changing this vault.')
 			.addButton(button => button
@@ -1327,20 +1348,6 @@ class GitSyncSettingTab extends PluginSettingTab {
 						button.setButtonText('Test');
 					}
 				}));
-		new Setting(sync)
-			.setName('Manual Sync')
-			.setDesc('Manually sync your vault with the Git repository')
-			.addButton(button => button
-				.setButtonText('Sync Now')
-				.onClick(async () => {
-					try {
-						await this.plugin.syncVault();
-						new Notice('Git sync completed successfully');
-					} catch (error: any) {
-						new Notice(`Git sync failed: ${error?.message || String(error)}`);
-					}
-				}));
-
 		const updates = this.createSettingsSection(containerEl, sections[3]);
 		let updateVersionLabel: () => void = () => undefined;
 		new Setting(updates)

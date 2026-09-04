@@ -23129,6 +23129,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.refreshInterval = null;
+    this.remoteFetchInterval = null;
     this.stagedCount = 0;
     this.activeTab = "status";
     this.commitsViewMode = "local";
@@ -23225,10 +23226,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       log2.warn("GitSidebar", "Initial sidebar refresh failed", error);
     });
     this.startAutoRefresh();
+    this.startRemoteFetchSchedule();
   }
   async onClose() {
     var _a;
     this.stopAutoRefresh();
+    this.stopRemoteFetchSchedule();
     (_a = this.logUnsubscribe) == null ? void 0 : _a.call(this);
     this.logUnsubscribe = null;
     this.renderGeneration += 1;
@@ -23256,6 +23259,30 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   updateRefreshInterval(seconds) {
     this.plugin.settings.refreshInterval = seconds;
     this.startAutoRefresh();
+  }
+  startRemoteFetchSchedule() {
+    this.stopRemoteFetchSchedule();
+    const ms = this.plugin.settings.remoteFetchInterval * 60 * 1e3;
+    if (ms > 0) {
+      this.remoteFetchInterval = window.setInterval(() => {
+        if (!this.containerEl.isShown() || !this.hasRemote || this.activeTab !== "commits" || this.commitsViewMode !== "remote")
+          return;
+        this.invalidateRemoteCommitsCache();
+        void this.refresh({ readRepository: false, force: true }).catch((error) => {
+          log2.debug("GitSidebar", "Scheduled remote commit fetch failed", error);
+        });
+      }, ms);
+    }
+  }
+  stopRemoteFetchSchedule() {
+    if (this.remoteFetchInterval !== null) {
+      window.clearInterval(this.remoteFetchInterval);
+      this.remoteFetchInterval = null;
+    }
+  }
+  updateRemoteFetchInterval(minutes) {
+    this.plugin.settings.remoteFetchInterval = minutes;
+    this.startRemoteFetchSchedule();
   }
   invalidateRemoteCommitsCache() {
     this.readModel.invalidateHistory();
@@ -23341,7 +23368,6 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     (0, import_obsidian4.setIcon)(icon, "git-branch");
     row.createSpan({ text: "Loading repository\u2026", cls: "git-branch-name git-branch-uninit" });
     this.contentContainer.empty();
-    this.contentContainer.createEl("p", { text: "Loading Git status\u2026", cls: "git-empty-state" });
   }
   // ─── Tabs ───
   renderTabs() {
@@ -23404,7 +23430,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         await this.refreshFromButton(headerAction);
       });
     }
-    const statusRow = this.headerContainer.createDiv("git-header-status");
+    const statusRow = branchRow.createDiv("git-header-status");
     const statusIcon = statusRow.createSpan({ cls: "git-header-status-icon", attr: { "aria-hidden": "true" } });
     if (!initialized) {
       (0, import_obsidian4.setIcon)(statusIcon, "circle-alert");
@@ -23578,6 +23604,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   async refresh(options = {}) {
     const generation = ++this.renderGeneration;
     const readRepository = options.readRepository !== false;
+    if (options.force && this.activeTab === "commits" && this.commitsViewMode === "remote") {
+      this.invalidateRemoteCommitsCache();
+    }
     if (readRepository) {
       await this.renderCurrentState(generation, false);
       await this.refreshRepositoryStatus(options.skipIfRepositoryReadInFlight === true);
@@ -25215,7 +25244,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "0648ff1783002759720fe7ee540e1b520e188df6" : "unknown";
+var GIT_COMMIT_HASH = true ? "056df8ba703a7b45a7a5505dea20499d0cf9c230" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
@@ -25681,6 +25710,7 @@ var DEFAULT_SETTINGS = {
   autoCommitMessage: "Vault backup: {{date}}",
   refreshInterval: 60,
   // default 60 seconds
+  remoteFetchInterval: 0,
   checkForUpdates: true,
   updateChannel: "stable",
   lastUpdateCheck: 0,
@@ -26708,6 +26738,19 @@ var GitSyncSettingTab = class extends import_obsidian8.PluginSettingTab {
         }
       }
     }));
+    new import_obsidian8.Setting(sync).setName("Remote Commit Fetch Interval").setDesc("How often to fetch remote commit history while the Remote commits view is open (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.remoteFetchInterval)).onChange(async (value) => {
+      const numValue = Number(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        this.plugin.settings.remoteFetchInterval = numValue;
+        await this.plugin.saveSettings();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+        for (const leaf of leaves) {
+          if (leaf.view instanceof GitSidebarView) {
+            leaf.view.updateRemoteFetchInterval(numValue);
+          }
+        }
+      }
+    }));
     new import_obsidian8.Setting(sync).setName("Test Connection").setDesc("Checks the remote URL and credentials without cloning, initializing, or changing this vault.").addButton((button) => button.setButtonText("Test").onClick(async () => {
       button.setDisabled(true);
       button.setButtonText("Testing\u2026");
@@ -26724,14 +26767,6 @@ var GitSyncSettingTab = class extends import_obsidian8.PluginSettingTab {
       } finally {
         button.setDisabled(false);
         button.setButtonText("Test");
-      }
-    }));
-    new import_obsidian8.Setting(sync).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
-      try {
-        await this.plugin.syncVault();
-        new import_obsidian8.Notice("Git sync completed successfully");
-      } catch (error) {
-        new import_obsidian8.Notice(`Git sync failed: ${(error == null ? void 0 : error.message) || String(error)}`);
       }
     }));
     const updates = this.createSettingsSection(containerEl, sections[3]);

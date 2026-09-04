@@ -28,6 +28,7 @@ export class GitSidebarView extends ItemView {
     private headerContainer: HTMLElement;
     private tabsContainer: HTMLElement;
     private refreshInterval: number | null = null;
+    private remoteFetchInterval: number | null = null;
     private stagedCount: number = 0;
     private activeTab: SidebarTab = 'status';
     private commitsViewMode: 'local' | 'remote' = 'local';
@@ -159,10 +160,12 @@ export class GitSidebarView extends ItemView {
         // Auto-refresh with configured interval. The refresh path is
         // single-flight, so a slow mobile read cannot spawn another scan.
         this.startAutoRefresh();
+        this.startRemoteFetchSchedule();
     }
 
     async onClose(): Promise<void> {
         this.stopAutoRefresh();
+        this.stopRemoteFetchSchedule();
         this.logUnsubscribe?.();
         this.logUnsubscribe = null;
         // Invalidate any in-flight repository/history read before Obsidian
@@ -196,6 +199,33 @@ export class GitSidebarView extends ItemView {
     updateRefreshInterval(seconds: number): void {
         this.plugin.settings.refreshInterval = seconds;
         this.startAutoRefresh();
+    }
+
+    private startRemoteFetchSchedule(): void {
+        this.stopRemoteFetchSchedule();
+        const ms = this.plugin.settings.remoteFetchInterval * 60 * 1000;
+        if (ms > 0) {
+            this.remoteFetchInterval = window.setInterval(() => {
+                if (!this.containerEl.isShown() || !this.hasRemote
+                    || this.activeTab !== 'commits' || this.commitsViewMode !== 'remote') return;
+                this.invalidateRemoteCommitsCache();
+                void this.refresh({ readRepository: false, force: true }).catch((error) => {
+                    log.debug('GitSidebar', 'Scheduled remote commit fetch failed', error);
+                });
+            }, ms);
+        }
+    }
+
+    private stopRemoteFetchSchedule(): void {
+        if (this.remoteFetchInterval !== null) {
+            window.clearInterval(this.remoteFetchInterval);
+            this.remoteFetchInterval = null;
+        }
+    }
+
+    updateRemoteFetchInterval(minutes: number): void {
+        this.plugin.settings.remoteFetchInterval = minutes;
+        this.startRemoteFetchSchedule();
     }
 
     private invalidateRemoteCommitsCache(): void {
@@ -284,7 +314,6 @@ export class GitSidebarView extends ItemView {
         setIcon(icon, 'git-branch');
         row.createSpan({ text: 'Loading repository…', cls: 'git-branch-name git-branch-uninit' });
         this.contentContainer.empty();
-        this.contentContainer.createEl('p', { text: 'Loading Git status…', cls: 'git-empty-state' });
     }
 
     // ─── Tabs ───
@@ -364,7 +393,7 @@ export class GitSidebarView extends ItemView {
             });
         }
 
-        const statusRow = this.headerContainer.createDiv('git-header-status');
+        const statusRow = branchRow.createDiv('git-header-status');
         const statusIcon = statusRow.createSpan({ cls: 'git-header-status-icon', attr: { 'aria-hidden': 'true' } });
         if (!initialized) {
             setIcon(statusIcon, 'circle-alert');
@@ -595,6 +624,10 @@ export class GitSidebarView extends ItemView {
     async refresh(options: { readRepository?: boolean; force?: boolean; skipIfRepositoryReadInFlight?: boolean } = {}): Promise<void> {
         const generation = ++this.renderGeneration;
         const readRepository = options.readRepository !== false;
+
+        if (options.force && this.activeTab === 'commits' && this.commitsViewMode === 'remote') {
+            this.invalidateRemoteCommitsCache();
+        }
 
         if (readRepository) {
             // Paint the cached state before awaiting the adapter. On the first
