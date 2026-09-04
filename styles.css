@@ -506,6 +506,9 @@
 .git-status-section-header {
     display: flex;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
     gap: 10px;
     padding: 10px 14px;
     background: var(--background-secondary-alt);
@@ -1312,6 +1315,7 @@
     gap: 10px;
     padding: 10px 16px;
     background: var(--background-primary);
+    box-shadow: 0 1px 0 var(--git-sidebar-divider);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     letter-spacing: 0.05em;

@@ -149,6 +149,19 @@ test('uncommitted changes offer status filters and file-list sorting', () => {
   assert.match(sidebarSource, /return manager\.addAll\(visibleUnstaged\)/);
 });
 
+test('Changes section headers stay visible while the sidebar content scrolls', () => {
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
+
+  const headerStyles = styles.slice(
+    styles.indexOf('.git-status-section-header {'),
+    styles.indexOf('\n}', styles.indexOf('.git-status-section-header {')) + 2,
+  );
+  assert.match(headerStyles, /position:\s*sticky/);
+  assert.match(headerStyles, /top:\s*0/);
+  assert.match(headerStyles, /z-index:\s*5/);
+  assert.match(styles, /\.git-sidebar-content\s*\{[\s\S]*overflow-y:\s*auto/);
+});
+
 test('sidebar keeps retained activity history and commit source controls visible', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
