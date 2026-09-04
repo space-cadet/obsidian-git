@@ -22798,6 +22798,7 @@ var _FileLogger = class _FileLogger {
     this.stopped = false;
     this.bytesWrittenSinceCheck = 0;
     this.sensitiveValues = [];
+    this.lastMemorySnapshot = null;
     this.app = app;
     this.pluginDir = `${app.vault.configDir}/plugins/${pluginId}`;
     this.logPath = `${this.pluginDir}/debug.log`;
@@ -22832,8 +22833,11 @@ var _FileLogger = class _FileLogger {
       window.clearInterval(this.memoryTimer);
       this.memoryTimer = null;
     }
-    if (!enabled || this.stopped || !this.initialized)
+    if (!enabled || this.stopped || !this.initialized) {
+      this.lastMemorySnapshot = null;
       return;
+    }
+    this.lastMemorySnapshot = null;
     this.logMemorySnapshot();
     this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 6e4);
   }
@@ -22932,14 +22936,16 @@ var _FileLogger = class _FileLogger {
   logMemorySnapshot() {
     const mem = performance.memory;
     const domNodes = typeof document === "undefined" ? 0 : document.getElementsByTagName("*").length;
+    let message;
     if (mem) {
-      this.log(
-        "metric",
-        `Memory \u2014 used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`
-      );
+      message = `Memory \u2014 used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`;
     } else {
-      this.log("metric", `Memory \u2014 N/A, DOM nodes: ${domNodes}`);
+      message = `Memory \u2014 N/A, DOM nodes: ${domNodes}`;
     }
+    if (message === this.lastMemorySnapshot)
+      return;
+    this.lastMemorySnapshot = message;
+    this.log("metric", message);
   }
   formatLine(level, ...args) {
     const message = args.map((value) => {
@@ -25015,7 +25021,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "bdbe4b195fa83e0adc7d4661f26cdd51c6f5e112" : "unknown";
+var GIT_COMMIT_HASH = true ? "823c2e0a642cc27d778e415a50317a1543564315" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

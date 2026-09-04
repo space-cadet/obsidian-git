@@ -58,3 +58,37 @@ test('readEntries restores structured data so live and persisted logs deduplicat
     },
   ]);
 });
+
+test('unchanged memory snapshots are not persisted repeatedly', () => {
+  const previousWindow = globalThis.window;
+  const previousDocument = globalThis.document;
+  const previousPerformance = globalThis.performance;
+  let scheduled = 0;
+  globalThis.window = {
+    setTimeout() { scheduled += 1; return scheduled; },
+    clearTimeout() {},
+  };
+  globalThis.document = {
+    getElementsByTagName() { return { length: 2984 }; },
+  };
+  globalThis.performance = {
+    memory: {
+      usedJSHeapSize: 110.6 * 1024 * 1024,
+      totalJSHeapSize: 117.3 * 1024 * 1024,
+      jsHeapSizeLimit: 2994.5 * 1024 * 1024,
+    },
+  };
+
+  try {
+    const logger = new FileLogger({ vault: { configDir: '.obsidian', adapter: {} } }, 'obsidian-git-sync');
+    logger.logMemorySnapshot();
+    logger.logMemorySnapshot();
+
+    assert.equal(logger.buffer.length, 1);
+    assert.equal(scheduled, 1);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.document = previousDocument;
+    globalThis.performance = previousPerformance;
+  }
+});
