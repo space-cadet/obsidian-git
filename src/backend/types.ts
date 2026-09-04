@@ -26,6 +26,12 @@ export interface FileStatus {
   worktree: boolean;
 }
 
+export interface FileReview {
+  path: string;
+  head: string | null;
+  worktree: string | null;
+}
+
 export type RepositoryState = 'missing' | 'empty' | 'healthy' | 'damaged';
 
 export type RemoteComparison = 'up-to-date' | 'ahead' | 'behind' | 'diverged' | 'local-only' | 'unavailable';

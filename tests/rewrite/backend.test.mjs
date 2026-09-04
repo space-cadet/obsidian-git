@@ -109,6 +109,26 @@ test('single-file stage does not enumerate the repository worktree', async () =>
   rmSync(directory, { recursive: true, force: true });
 });
 
+test('discard restores a tracked file and review reads HEAD beside the worktree', async () => {
+  const { directory, backend } = await makeBackend();
+  await backend.initialize();
+  await fsPromises.writeFile(join(directory, 'note.md'), 'committed\n');
+  await backend.stage('note.md');
+  await backend.commit('initial note');
+  await fsPromises.writeFile(join(directory, 'note.md'), 'working copy\n');
+
+  assert.deepEqual(await backend.review('note.md'), {
+    path: 'note.md',
+    head: 'committed\n',
+    worktree: 'working copy\n',
+  });
+  await backend.discard('note.md');
+  assert.equal(await fsPromises.readFile(join(directory, 'note.md'), 'utf8'), 'committed\n');
+  await assert.rejects(backend.discard('not-tracked.md'), /Cannot restore untracked/);
+
+  rmSync(directory, { recursive: true, force: true });
+});
+
 test('single-file stage rejects ignored untracked files but permits tracked files after ignore changes', async () => {
   const { directory, backend } = await makeBackend();
   await backend.initialize();

@@ -43,6 +43,7 @@ interface GitSyncSettings {
 	autoCommitMessage: string;
 	refreshInterval: number; // in seconds, 0 means disabled
 	remoteFetchInterval: number; // in minutes, 0 means disabled
+	reviewActionsEnabled: boolean;
 	checkForUpdates: boolean;
 	updateChannel: 'stable' | 'dev';
 	lastUpdateCheck: number;
@@ -68,6 +69,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	autoCommitMessage: 'Vault backup: {{date}}',
 	refreshInterval: 60, // default 60 seconds
 	remoteFetchInterval: 0,
+	reviewActionsEnabled: true,
 	checkForUpdates: true,
 	updateChannel: 'stable',
 	lastUpdateCheck: 0,
@@ -1322,6 +1324,15 @@ class GitSyncSettingTab extends PluginSettingTab {
 							}
 						}
 					}
+				}));
+		new Setting(sync)
+			.setName('Show change review actions')
+			.setDesc('Show the read-only “Review changes” action for files in Uncommitted Changes.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.reviewActionsEnabled)
+				.onChange(async (value) => {
+					this.plugin.settings.reviewActionsEnabled = value;
+					await this.plugin.saveSettings();
 				}));
 		new Setting(sync)
 			.setName('Remote Commit Fetch Interval')

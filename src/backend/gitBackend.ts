@@ -15,6 +15,7 @@ import {
   RepositoryHealth,
   StageResult,
   FileStatus,
+  FileReview,
   RepositoryIndexHealth,
   RepositoryIndexRepairResult,
   RepositoryIndexRepairPreview,
@@ -604,6 +605,38 @@ export class GitBackend {
     return { requested, succeeded, failed };
   }
 
+  /** Restore one tracked worktree path to its committed HEAD version. */
+  async discard(path: string): Promise<void> {
+    this.assertPath(path);
+    const tracked = new Set(await git.listFiles({ fs: this.ports.fs, dir: this.dir }));
+    if (!tracked.has(path)) throw new Error(`Cannot restore untracked file "${path}" from HEAD`);
+    await git.checkout({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ref: 'HEAD',
+      filepaths: [path],
+      force: true,
+      noUpdateHead: true,
+    });
+  }
+
+  /** Read the current and committed text for a read-only review UI. */
+  async review(path: string): Promise<FileReview> {
+    this.assertPath(path);
+    let head: string | null = null;
+    try {
+      const oid = await git.resolveRef({ fs: this.ports.fs, dir: this.dir, ref: 'HEAD' });
+      const result: any = await git.readBlob({ fs: this.ports.fs, dir: this.dir, oid, filepath: path });
+      head = this.reviewText(result.blob);
+    } catch (error) {
+      if (!isMissing(error)) throw error;
+    }
+    let worktree: string | null = null;
+    try { worktree = this.reviewText(await this.fileSystem.readFile(this.repositoryPath(path))); }
+    catch (error) { if (!isMissingPath(error)) throw error; }
+    return { path, head, worktree };
+  }
+
   async commit(message: string): Promise<CommitResult> {
     const trimmed = message.trim();
     if (!trimmed) throw new Error('A commit message is required');
@@ -956,5 +989,12 @@ export class GitBackend {
 
   private assertPath(path: string): void {
     if (!path || path.startsWith('/') || path.split('/').includes('..')) throw new Error(`Invalid repository path: ${path}`);
+  }
+
+  private reviewText(value: Uint8Array | ArrayBuffer | string): string {
+    const bytes = asBytes(value);
+    if (bytes.byteLength > 512 * 1024) return `[File is ${bytes.byteLength.toLocaleString()} bytes; review is limited to the first 512 KiB.]\n${new TextDecoder().decode(bytes.slice(0, 512 * 1024))}`;
+    if (bytes.includes(0)) return `[Binary file: ${bytes.byteLength.toLocaleString()} bytes]`;
+    return new TextDecoder().decode(bytes);
   }
 }

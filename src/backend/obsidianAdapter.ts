@@ -4,7 +4,7 @@ import { log } from '../logger';
 import { GitBackend } from './gitBackend';
 import { GitHubApi } from './githubApi';
 import { GitHubDeviceAuth, GitHubAuthSession, StaticCredentialProvider } from './githubAuth';
-import { GitCredential, GitBackendConfig, RepositoryStatus } from './types';
+import { GitCredential, GitBackendConfig, RepositoryStatus, FileReview } from './types';
 
 export interface ObsidianGitCredentials {
   username: string;
@@ -255,6 +255,9 @@ export class ObsidianGitBackend {
     const result = await this.backend.unstageAll(status.staged);
     return { requested: result.requested.length, unstaged: result.succeeded, failed: result.failed.map((failure) => ({ filepath: failure.path, message: failure.message })) };
   }
+
+  discardFile(path: string): Promise<void> { return this.backend.discard(path); }
+  reviewFile(path: string): Promise<FileReview> { return this.backend.review(path); }
 
   async commit(message: string): Promise<string> {
     return (await this.backend.commit(message)).oid;

@@ -182,7 +182,7 @@ test('single-file sidebar mutations repaint from the completed operation', () =>
   assert.match(actionSource, /this\.applyFileMutationToSnapshot\(/);
   assert.match(actionSource, /this\.repaintStatusSnapshot\(\);/);
   assert.doesNotMatch(actionSource, /await this\.refresh\(/);
-  assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged'\)/);
+  assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged' \| 'removed'\)/);
 });
 
 test('bulk sidebar mutations repaint without a second repository read', () => {

@@ -284,13 +284,13 @@ export class GitSidebarView extends ItemView {
      * reconcile against Git, but the completed user action must not wait for a
      * second whole-vault status scan before becoming visible.
      */
-    private applyFileMutationToSnapshot(filepath: string, destination: 'staged' | 'unstaged'): void {
+    private applyFileMutationToSnapshot(filepath: string, destination: 'staged' | 'unstaged' | 'removed'): void {
         if (!this.sidebarSnapshot) return;
 
         const staged = this.sidebarSnapshot.staged.filter((path) => path !== filepath);
         const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
         if (destination === 'staged') staged.push(filepath);
-        else unstaged.push(filepath);
+        else if (destination === 'unstaged') unstaged.push(filepath);
 
         this.sidebarSnapshot = {
             ...this.sidebarSnapshot,
@@ -1338,6 +1338,20 @@ export class GitSidebarView extends ItemView {
                                 new Notice('Could not open .gitignore: ' + err.message);
                             }
                         }));
+                    if (sectionClass === 'unstaged' && this.plugin.settings.reviewActionsEnabled) {
+                        menu.addItem((item) => item
+                            .setTitle('Review changes')
+                            .setIcon('columns-2')
+                            .onClick(() => this.openReviewModal(filepath)));
+                    }
+                    if (sectionClass === 'unstaged') {
+                        menu.addSeparator();
+                        menu.addItem((item) => item
+                            .setTitle(status === 'untracked' ? 'Discard untracked file…' : 'Discard changes…')
+                            .setIcon('undo-2')
+                            .setWarning(true)
+                            .onClick(() => this.confirmDiscard(filepath, status || 'modified')));
+                    }
                     menu.showAtMouseEvent(e);
                 });
 
@@ -1376,6 +1390,60 @@ export class GitSidebarView extends ItemView {
             if (busy) control.addClass('git-operation-busy');
             else control.removeClass('git-operation-busy');
         });
+    }
+
+    private confirmDiscard(filepath: string, status: GitFileStatus['status']): void {
+        const untracked = status === 'untracked';
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(untracked ? 'Discard untracked file?' : 'Discard changes?');
+        modal.contentEl.createEl('p', {
+            text: untracked
+                ? `“${filepath}” is not in Git. It will be moved to Obsidian’s trash.`
+                : `Restore “${filepath}” to its committed HEAD version. Its current changes will be lost.`,
+        });
+        const actions = modal.contentEl.createDiv('git-confirm-actions');
+        new ButtonComponent(actions).setButtonText('Cancel').onClick(() => modal.close());
+        new ButtonComponent(actions).setButtonText(untracked ? 'Move to trash' : 'Discard changes').setWarning().onClick(async () => {
+            try {
+                if (untracked) {
+                    const file = this.app.vault.getAbstractFileByPath(filepath);
+                    if (!file) throw new Error('File no longer exists in the vault');
+                    await this.app.vault.trash(file, false);
+                } else {
+                    await this.plugin.runGitMutation('Discard file changes', async (manager) => manager.discardFile(filepath));
+                }
+                this.applyFileMutationToSnapshot(filepath, 'removed');
+                this.repaintStatusSnapshot();
+                new Notice(untracked ? `Moved ${filepath} to trash` : `Restored ${filepath} from HEAD`);
+                modal.close();
+            } catch (error: any) {
+                new Notice(`Discard failed: ${error?.message || String(error)}`);
+            }
+        });
+        modal.open();
+    }
+
+    private async openReviewModal(filepath: string): Promise<void> {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(`Review changes: ${filepath}`);
+        modal.contentEl.createEl('p', { text: 'Read-only comparison of the committed HEAD version and the current vault file.', cls: 'git-review-description' });
+        const panes = modal.contentEl.createDiv('git-review-panes');
+        const headPane = panes.createDiv('git-review-pane');
+        const worktreePane = panes.createDiv('git-review-pane');
+        headPane.createEl('h4', { text: 'HEAD' });
+        worktreePane.createEl('h4', { text: 'Working copy' });
+        const headContent = headPane.createEl('pre', { text: 'Loading…', cls: 'git-review-content' });
+        const worktreeContent = worktreePane.createEl('pre', { text: 'Loading…', cls: 'git-review-content' });
+        modal.open();
+        try {
+            const review = await this.plugin.gitManager?.reviewFile(filepath);
+            if (!review) throw new Error('Git backend unavailable');
+            headContent.setText(review.head ?? '(Not tracked in HEAD)');
+            worktreeContent.setText(review.worktree ?? '(Deleted from working copy)');
+        } catch (error: any) {
+            headContent.setText(`Could not load review: ${error?.message || String(error)}`);
+            worktreeContent.setText('');
+        }
     }
 
     private openIgnorePatternModal(): void {

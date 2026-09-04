@@ -22085,6 +22085,42 @@ var GitBackend = class {
     }
     return { requested, succeeded, failed };
   }
+  /** Restore one tracked worktree path to its committed HEAD version. */
+  async discard(path) {
+    this.assertPath(path);
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
+    if (!tracked.has(path))
+      throw new Error(`Cannot restore untracked file "${path}" from HEAD`);
+    await checkout({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ref: "HEAD",
+      filepaths: [path],
+      force: true,
+      noUpdateHead: true
+    });
+  }
+  /** Read the current and committed text for a read-only review UI. */
+  async review(path) {
+    this.assertPath(path);
+    let head = null;
+    try {
+      const oid = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+      const result = await readBlob({ fs: this.ports.fs, dir: this.dir, oid, filepath: path });
+      head = this.reviewText(result.blob);
+    } catch (error) {
+      if (!isMissing(error))
+        throw error;
+    }
+    let worktree = null;
+    try {
+      worktree = this.reviewText(await this.fileSystem.readFile(this.repositoryPath(path)));
+    } catch (error) {
+      if (!isMissingPath(error))
+        throw error;
+    }
+    return { path, head, worktree };
+  }
   async commit(message) {
     const trimmed = message.trim();
     if (!trimmed)
@@ -22466,6 +22502,15 @@ var GitBackend = class {
     if (!path || path.startsWith("/") || path.split("/").includes(".."))
       throw new Error(`Invalid repository path: ${path}`);
   }
+  reviewText(value) {
+    const bytes = asBytes(value);
+    if (bytes.byteLength > 512 * 1024)
+      return `[File is ${bytes.byteLength.toLocaleString()} bytes; review is limited to the first 512 KiB.]
+${new TextDecoder().decode(bytes.slice(0, 512 * 1024))}`;
+    if (bytes.includes(0))
+      return `[Binary file: ${bytes.byteLength.toLocaleString()} bytes]`;
+    return new TextDecoder().decode(bytes);
+  }
 };
 
 // src/backend/githubApi.ts
@@ -22833,6 +22878,12 @@ var ObsidianGitBackend = class {
     const status2 = await this.backend.status();
     const result = await this.backend.unstageAll(status2.staged);
     return { requested: result.requested.length, unstaged: result.succeeded, failed: result.failed.map((failure) => ({ filepath: failure.path, message: failure.message })) };
+  }
+  discardFile(path) {
+    return this.backend.discard(path);
+  }
+  reviewFile(path) {
+    return this.backend.review(path);
   }
   async commit(message) {
     return (await this.backend.commit(message)).oid;
@@ -23860,7 +23911,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
     if (destination === "staged")
       staged.push(filepath);
-    else
+    else if (destination === "unstaged")
       unstaged.push(filepath);
     this.sidebarSnapshot = {
       ...this.sidebarSnapshot,
@@ -24706,6 +24757,13 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
               new import_obsidian5.Notice("Could not open .gitignore: " + err.message);
             }
           }));
+          if (sectionClass === "unstaged" && this.plugin.settings.reviewActionsEnabled) {
+            menu.addItem((item) => item.setTitle("Review changes").setIcon("columns-2").onClick(() => this.openReviewModal(filepath)));
+          }
+          if (sectionClass === "unstaged") {
+            menu.addSeparator();
+            menu.addItem((item) => item.setTitle(status2 === "untracked" ? "Discard untracked file\u2026" : "Discard changes\u2026").setIcon("undo-2").setWarning(true).onClick(() => this.confirmDiscard(filepath, status2 || "modified")));
+          }
           menu.showAtMouseEvent(e);
         });
         stageBtn.addEventListener("click", async (e) => {
@@ -24743,6 +24801,59 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       else
         control.removeClass("git-operation-busy");
     });
+  }
+  confirmDiscard(filepath, status2) {
+    const untracked = status2 === "untracked";
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText(untracked ? "Discard untracked file?" : "Discard changes?");
+    modal.contentEl.createEl("p", {
+      text: untracked ? `\u201C${filepath}\u201D is not in Git. It will be moved to Obsidian\u2019s trash.` : `Restore \u201C${filepath}\u201D to its committed HEAD version. Its current changes will be lost.`
+    });
+    const actions = modal.contentEl.createDiv("git-confirm-actions");
+    new import_obsidian5.ButtonComponent(actions).setButtonText("Cancel").onClick(() => modal.close());
+    new import_obsidian5.ButtonComponent(actions).setButtonText(untracked ? "Move to trash" : "Discard changes").setWarning().onClick(async () => {
+      try {
+        if (untracked) {
+          const file = this.app.vault.getAbstractFileByPath(filepath);
+          if (!file)
+            throw new Error("File no longer exists in the vault");
+          await this.app.vault.trash(file, false);
+        } else {
+          await this.plugin.runGitMutation("Discard file changes", async (manager) => manager.discardFile(filepath));
+        }
+        this.applyFileMutationToSnapshot(filepath, "removed");
+        this.repaintStatusSnapshot();
+        new import_obsidian5.Notice(untracked ? `Moved ${filepath} to trash` : `Restored ${filepath} from HEAD`);
+        modal.close();
+      } catch (error) {
+        new import_obsidian5.Notice(`Discard failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+      }
+    });
+    modal.open();
+  }
+  async openReviewModal(filepath) {
+    var _a, _b, _c;
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText(`Review changes: ${filepath}`);
+    modal.contentEl.createEl("p", { text: "Read-only comparison of the committed HEAD version and the current vault file.", cls: "git-review-description" });
+    const panes = modal.contentEl.createDiv("git-review-panes");
+    const headPane = panes.createDiv("git-review-pane");
+    const worktreePane = panes.createDiv("git-review-pane");
+    headPane.createEl("h4", { text: "HEAD" });
+    worktreePane.createEl("h4", { text: "Working copy" });
+    const headContent = headPane.createEl("pre", { text: "Loading\u2026", cls: "git-review-content" });
+    const worktreeContent = worktreePane.createEl("pre", { text: "Loading\u2026", cls: "git-review-content" });
+    modal.open();
+    try {
+      const review = await ((_a = this.plugin.gitManager) == null ? void 0 : _a.reviewFile(filepath));
+      if (!review)
+        throw new Error("Git backend unavailable");
+      headContent.setText((_b = review.head) != null ? _b : "(Not tracked in HEAD)");
+      worktreeContent.setText((_c = review.worktree) != null ? _c : "(Deleted from working copy)");
+    } catch (error) {
+      headContent.setText(`Could not load review: ${(error == null ? void 0 : error.message) || String(error)}`);
+      worktreeContent.setText("");
+    }
   }
   openIgnorePatternModal() {
     const modal = new import_obsidian5.Modal(this.app);
@@ -25923,7 +26034,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "a3acacb7afaaf6d0f5746900e3546c8981e625fa" : "unknown";
+var GIT_COMMIT_HASH = true ? "1573f1e9f038b7cf87bd1a9b2a383c9fb55698bb" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
@@ -26390,6 +26501,7 @@ var DEFAULT_SETTINGS = {
   refreshInterval: 60,
   // default 60 seconds
   remoteFetchInterval: 0,
+  reviewActionsEnabled: true,
   checkForUpdates: true,
   updateChannel: "stable",
   lastUpdateCheck: 0,
@@ -27432,6 +27544,10 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
           }
         }
       }
+    }));
+    new import_obsidian9.Setting(sync).setName("Show change review actions").setDesc("Show the read-only \u201CReview changes\u201D action for files in Uncommitted Changes.").addToggle((toggle) => toggle.setValue(this.plugin.settings.reviewActionsEnabled).onChange(async (value) => {
+      this.plugin.settings.reviewActionsEnabled = value;
+      await this.plugin.saveSettings();
     }));
     new import_obsidian9.Setting(sync).setName("Remote Commit Fetch Interval").setDesc("How often to fetch remote commit history while the Remote commits view is open (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.remoteFetchInterval)).onChange(async (value) => {
       const numValue = Number(value);

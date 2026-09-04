@@ -1150,6 +1150,57 @@
     outline-offset: -2px;
 }
 
+.git-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.git-review-description {
+    color: var(--text-muted);
+    margin: 0 0 12px;
+}
+
+.git-review-panes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: min(760px, 80vw);
+}
+
+.git-review-pane {
+    min-width: 0;
+}
+
+.git-review-pane h4 {
+    margin: 0 0 6px;
+    color: var(--text-muted);
+}
+
+.git-review-content {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: min(58vh, 620px);
+    overflow: auto;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary-alt);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 620px) {
+    .git-review-panes {
+        grid-template-columns: 1fr;
+        min-width: 0;
+    }
+}
+
 .git-tab-active {
     color: var(--text-accent) !important;
     border-bottom-color: var(--interactive-accent);
