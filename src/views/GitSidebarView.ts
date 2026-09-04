@@ -9,6 +9,22 @@ import { createProgressModal } from '../ui/GitProgressModal';
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
 type SidebarTab = 'status' | 'commits' | 'log';
+type ChangeFilterStatus = Extract<GitFileStatus['status'], 'untracked' | 'added' | 'modified' | 'deleted'>;
+type UncommittedSort = 'path-asc' | 'path-desc' | 'status' | 'folder';
+
+const changeFilterStatuses: Array<{ status: ChangeFilterStatus; marker: string; label: string }> = [
+    { status: 'untracked', marker: '?', label: 'Untracked' },
+    { status: 'added', marker: 'A', label: 'Added' },
+    { status: 'modified', marker: 'M', label: 'Modified' },
+    { status: 'deleted', marker: 'D', label: 'Deleted' },
+];
+
+const uncommittedSortOptions: Array<{ value: UncommittedSort; label: string }> = [
+    { value: 'path-asc', label: 'Path (A–Z)' },
+    { value: 'path-desc', label: 'Path (Z–A)' },
+    { value: 'status', label: 'Status, then path' },
+    { value: 'folder', label: 'Folder, then name' },
+];
 
 // Keep immutable history data for the lifetime of the plugin, not only for
 // the lifetime of one ItemView instance. Obsidian can recreate a sidebar view
@@ -52,6 +68,8 @@ export class GitSidebarView extends ItemView {
     private renderedStatusRevision = -1;
     private renderedHeaderKey: string | null = null;
     private renderedFooterKey: string | null = null;
+    private readonly uncommittedFilters = new Set<ChangeFilterStatus>(changeFilterStatuses.map(({ status }) => status));
+    private uncommittedSort: UncommittedSort = 'path-asc';
     private commitInFlight = false;
     private ignorePatternInFlight = false;
 
@@ -1007,7 +1025,9 @@ export class GitSidebarView extends ItemView {
             );
 
             // ── Uncommitted section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', 'Stage all', statusByPath,
+            const visibleUnstaged = this.filteredAndSortedUnstagedFiles(unstaged, statusByPath);
+            const bulkLabel = visibleUnstaged.length === unstaged.length ? 'Stage all' : 'Stage visible';
+            this.renderCollapsibleSection(container, 'Uncommitted Changes', visibleUnstaged, 'unstaged', bulkLabel, statusByPath,
                 async (fp) => {
                     await this.plugin.runGitMutation('Stage file', async (manager) => {
                         await manager.stageFile(fp);
@@ -1016,7 +1036,7 @@ export class GitSidebarView extends ItemView {
                 },
                 async () => {
                     const result = await this.plugin.runGitMutation('Stage all files', async (manager) => {
-                        return manager.addAll(unstaged);
+                        return manager.addAll(visibleUnstaged);
                     });
                     if (result.failed.length > 0) {
                         const firstFailure = result.failed[0];
@@ -1031,7 +1051,7 @@ export class GitSidebarView extends ItemView {
                         this.applyFileMutationToSnapshot(filepath, 'staged');
                     }
                 }
-            );
+            , { totalFiles: unstaged.length, showChangeControls: true });
 
         } catch (e: any) {
             log.warn('GitSidebar', 'Failed to get file status', e);
@@ -1060,6 +1080,44 @@ export class GitSidebarView extends ItemView {
         }
     }
 
+    private filteredAndSortedUnstagedFiles(
+        files: readonly string[],
+        statusByPath: ReadonlyMap<string, GitFileStatus['status']>,
+    ): string[] {
+        const statusFor = (path: string): ChangeFilterStatus => {
+            const status = statusByPath.get(path);
+            return status === 'untracked' || status === 'added' || status === 'deleted'
+                ? status
+                : 'modified';
+        };
+        const splitPath = (path: string): [string, string] => {
+            const slash = path.lastIndexOf('/');
+            return slash === -1 ? ['', path] : [path.slice(0, slash), path.slice(slash + 1)];
+        };
+        const statusOrder: Record<ChangeFilterStatus, number> = {
+            untracked: 0,
+            added: 1,
+            modified: 2,
+            deleted: 3,
+        };
+
+        return files
+            .filter((path) => this.uncommittedFilters.has(statusFor(path)))
+            .sort((left, right) => {
+                if (this.uncommittedSort === 'path-desc') return right.localeCompare(left);
+                if (this.uncommittedSort === 'status') {
+                    const difference = statusOrder[statusFor(left)] - statusOrder[statusFor(right)];
+                    return difference || left.localeCompare(right);
+                }
+                if (this.uncommittedSort === 'folder') {
+                    const [leftFolder, leftName] = splitPath(left);
+                    const [rightFolder, rightName] = splitPath(right);
+                    return leftFolder.localeCompare(rightFolder) || leftName.localeCompare(rightName);
+                }
+                return left.localeCompare(right);
+            });
+    }
+
     private renderCollapsibleSection(
         container: HTMLElement,
         title: string,
@@ -1068,8 +1126,10 @@ export class GitSidebarView extends ItemView {
         bulkLabel: string,
         statusByPath: Map<string, GitFileStatus['status']>,
         onAction: (filepath: string) => Promise<void>,
-        onBulk: () => Promise<void>
+        onBulk: () => Promise<void>,
+        options: { totalFiles?: number; showChangeControls?: boolean } = {},
     ): void {
+        const totalFiles = options.totalFiles ?? files.length;
         const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
         
         // Default: expanded if files exist, collapsed if empty
@@ -1090,9 +1150,67 @@ export class GitSidebarView extends ItemView {
         
         // File count badge
         const countBadge = header.createSpan({ 
-            text: String(files.length), 
+            text: files.length === totalFiles ? String(totalFiles) : `${files.length}/${totalFiles}`,
             cls: 'git-status-section-count' 
         });
+
+        const headerControls: HTMLButtonElement[] = [];
+        if (options.showChangeControls) {
+            const filterBtn = header.createEl('button', {
+                cls: 'git-status-section-control',
+                attr: { type: 'button', 'aria-label': 'Filter uncommitted changes' },
+            }) as HTMLButtonElement;
+            setIcon(filterBtn, 'filter');
+            filterBtn.setAttr('title', `Filter statuses (${this.uncommittedFilters.size} of ${changeFilterStatuses.length} shown)`);
+            filterBtn.classList.toggle('is-active', this.uncommittedFilters.size !== changeFilterStatuses.length);
+            filterBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const menu = new Menu();
+                menu.addItem((item) => item
+                    .setTitle('All status types')
+                    .setChecked(this.uncommittedFilters.size === changeFilterStatuses.length)
+                    .onClick(() => {
+                        this.uncommittedFilters.clear();
+                        for (const { status } of changeFilterStatuses) this.uncommittedFilters.add(status);
+                        this.repaintStatusSnapshot();
+                    }));
+                menu.addSeparator();
+                for (const { status, marker, label } of changeFilterStatuses) {
+                    menu.addItem((item) => item
+                        .setTitle(`${marker} ${label}`)
+                        .setChecked(this.uncommittedFilters.has(status))
+                        .onClick(() => {
+                            if (this.uncommittedFilters.has(status)) this.uncommittedFilters.delete(status);
+                            else this.uncommittedFilters.add(status);
+                            this.repaintStatusSnapshot();
+                        }));
+                }
+                menu.showAtMouseEvent(event);
+            });
+            headerControls.push(filterBtn);
+
+            const sortBtn = header.createEl('button', {
+                cls: 'git-status-section-control',
+                attr: { type: 'button', 'aria-label': 'Sort uncommitted changes' },
+            }) as HTMLButtonElement;
+            setIcon(sortBtn, 'arrow-down-up');
+            sortBtn.setAttr('title', `Sort: ${uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)?.label}`);
+            sortBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const menu = new Menu();
+                for (const option of uncommittedSortOptions) {
+                    menu.addItem((item) => item
+                        .setTitle(option.label)
+                        .setChecked(option.value === this.uncommittedSort)
+                        .onClick(() => {
+                            this.uncommittedSort = option.value;
+                            this.repaintStatusSnapshot();
+                        }));
+                }
+                menu.showAtMouseEvent(event);
+            });
+            headerControls.push(sortBtn);
+        }
         
         // Bulk action button (always visible)
         const bulkBtn = header.createEl('button', { cls: 'git-status-section-action' }) as HTMLButtonElement;
@@ -1100,6 +1218,7 @@ export class GitSidebarView extends ItemView {
         bulkBtn.disabled = files.length === 0;
         bulkBtn.setAttr('title', bulkLabel);
         bulkBtn.setAttr('aria-label', bulkLabel);
+        headerControls.push(bulkBtn);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (bulkBtn.disabled || this.mutationInFlight) return;
@@ -1121,7 +1240,7 @@ export class GitSidebarView extends ItemView {
 
         // Toggle fold/unfold on header click (but not on bulk button)
         header.addEventListener('click', (e) => {
-            if (e.target === bulkBtn || bulkBtn.contains(e.target as Node)) return;
+            if (headerControls.some((control) => e.target === control || control.contains(e.target as Node))) return;
             const currentlyCollapsed = section.getAttr('data-collapsed') === 'true';
             section.setAttr('data-collapsed', String(!currentlyCollapsed));
             toggle.setText(!currentlyCollapsed ? '▸' : '▾');
@@ -1133,7 +1252,7 @@ export class GitSidebarView extends ItemView {
         if (files.length === 0) {
             const emptyMsg = sectionClass === 'staged' 
                 ? 'No staged files' 
-                : 'No uncommitted changes';
+                : totalFiles > 0 ? 'No files match the selected filters' : 'No uncommitted changes';
             list.createEl('p', { text: emptyMsg, cls: 'git-empty-state' });
         } else {
             for (const filepath of files) {

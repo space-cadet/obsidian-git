@@ -135,6 +135,20 @@ test('sidebar distinguishes untracked files from staged additions', () => {
   assert.match(sidebarSource, /status === 'untracked'\s*\? 'git-status-untracked'/);
 });
 
+test('uncommitted changes offer status filters and file-list sorting', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /marker: '\?', label: 'Untracked'/);
+  assert.match(sidebarSource, /marker: 'A', label: 'Added'/);
+  assert.match(sidebarSource, /marker: 'M', label: 'Modified'/);
+  assert.match(sidebarSource, /marker: 'D', label: 'Deleted'/);
+  assert.match(sidebarSource, /label: 'Path \(A–Z\)'/);
+  assert.match(sidebarSource, /label: 'Path \(Z–A\)'/);
+  assert.match(sidebarSource, /label: 'Status, then path'/);
+  assert.match(sidebarSource, /label: 'Folder, then name'/);
+  assert.match(sidebarSource, /return manager\.addAll\(visibleUnstaged\)/);
+});
+
 test('sidebar keeps retained activity history and commit source controls visible', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');

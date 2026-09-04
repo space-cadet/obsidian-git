@@ -23637,6 +23637,18 @@ function createProgressModal(app, operationName) {
 
 // src/views/GitSidebarView.ts
 var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
+var changeFilterStatuses = [
+  { status: "untracked", marker: "?", label: "Untracked" },
+  { status: "added", marker: "A", label: "Added" },
+  { status: "modified", marker: "M", label: "Modified" },
+  { status: "deleted", marker: "D", label: "Deleted" }
+];
+var uncommittedSortOptions = [
+  { value: "path-asc", label: "Path (A\u2013Z)" },
+  { value: "path-desc", label: "Path (Z\u2013A)" },
+  { value: "status", label: "Status, then path" },
+  { value: "folder", label: "Folder, then name" }
+];
 var sidebarReadModels = /* @__PURE__ */ new WeakMap();
 function getSidebarReadModel(plugin) {
   let model = sidebarReadModels.get(plugin);
@@ -23671,6 +23683,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.renderedStatusRevision = -1;
     this.renderedHeaderKey = null;
     this.renderedFooterKey = null;
+    this.uncommittedFilters = new Set(changeFilterStatuses.map(({ status: status2 }) => status2));
+    this.uncommittedSort = "path-asc";
     this.commitInFlight = false;
     this.ignorePatternInFlight = false;
     this.plugin = plugin;
@@ -24444,12 +24458,14 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} files.` : "All files unstaged");
         }
       );
+      const visibleUnstaged = this.filteredAndSortedUnstagedFiles(unstaged, statusByPath);
+      const bulkLabel = visibleUnstaged.length === unstaged.length ? "Stage all" : "Stage visible";
       this.renderCollapsibleSection(
         container,
         "Uncommitted Changes",
-        unstaged,
+        visibleUnstaged,
         "unstaged",
-        "Stage all",
+        bulkLabel,
         statusByPath,
         async (fp) => {
           await this.plugin.runGitMutation("Stage file", async (manager) => {
@@ -24459,7 +24475,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         },
         async () => {
           const result = await this.plugin.runGitMutation("Stage all files", async (manager) => {
-            return manager.addAll(unstaged);
+            return manager.addAll(visibleUnstaged);
           });
           if (result.failed.length > 0) {
             const firstFailure = result.failed[0];
@@ -24472,7 +24488,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           for (const filepath of result.staged) {
             this.applyFileMutationToSnapshot(filepath, "staged");
           }
-        }
+        },
+        { totalFiles: unstaged.length, showChangeControls: true }
       );
     } catch (e) {
       log.warn("GitSidebar", "Failed to get file status", e);
@@ -24495,7 +24512,39 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     }
   }
-  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk) {
+  filteredAndSortedUnstagedFiles(files, statusByPath) {
+    const statusFor = (path) => {
+      const status2 = statusByPath.get(path);
+      return status2 === "untracked" || status2 === "added" || status2 === "deleted" ? status2 : "modified";
+    };
+    const splitPath = (path) => {
+      const slash = path.lastIndexOf("/");
+      return slash === -1 ? ["", path] : [path.slice(0, slash), path.slice(slash + 1)];
+    };
+    const statusOrder = {
+      untracked: 0,
+      added: 1,
+      modified: 2,
+      deleted: 3
+    };
+    return files.filter((path) => this.uncommittedFilters.has(statusFor(path))).sort((left, right) => {
+      if (this.uncommittedSort === "path-desc")
+        return right.localeCompare(left);
+      if (this.uncommittedSort === "status") {
+        const difference = statusOrder[statusFor(left)] - statusOrder[statusFor(right)];
+        return difference || left.localeCompare(right);
+      }
+      if (this.uncommittedSort === "folder") {
+        const [leftFolder, leftName] = splitPath(left);
+        const [rightFolder, rightName] = splitPath(right);
+        return leftFolder.localeCompare(rightFolder) || leftName.localeCompare(rightName);
+      }
+      return left.localeCompare(right);
+    });
+  }
+  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk, options = {}) {
+    var _a, _b;
+    const totalFiles = (_a = options.totalFiles) != null ? _a : files.length;
     const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
     const isCollapsed = files.length === 0;
     section.setAttr("data-collapsed", String(isCollapsed));
@@ -24508,14 +24557,65 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     toggle.setAttr("aria-expanded", String(!isCollapsed));
     header.createSpan({ text: title, cls: "git-status-section-label" });
     const countBadge = header.createSpan({
-      text: String(files.length),
+      text: files.length === totalFiles ? String(totalFiles) : `${files.length}/${totalFiles}`,
       cls: "git-status-section-count"
     });
+    const headerControls = [];
+    if (options.showChangeControls) {
+      const filterBtn = header.createEl("button", {
+        cls: "git-status-section-control",
+        attr: { type: "button", "aria-label": "Filter uncommitted changes" }
+      });
+      (0, import_obsidian5.setIcon)(filterBtn, "filter");
+      filterBtn.setAttr("title", `Filter statuses (${this.uncommittedFilters.size} of ${changeFilterStatuses.length} shown)`);
+      filterBtn.classList.toggle("is-active", this.uncommittedFilters.size !== changeFilterStatuses.length);
+      filterBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = new import_obsidian5.Menu();
+        menu.addItem((item) => item.setTitle("All status types").setChecked(this.uncommittedFilters.size === changeFilterStatuses.length).onClick(() => {
+          this.uncommittedFilters.clear();
+          for (const { status: status2 } of changeFilterStatuses)
+            this.uncommittedFilters.add(status2);
+          this.repaintStatusSnapshot();
+        }));
+        menu.addSeparator();
+        for (const { status: status2, marker, label } of changeFilterStatuses) {
+          menu.addItem((item) => item.setTitle(`${marker} ${label}`).setChecked(this.uncommittedFilters.has(status2)).onClick(() => {
+            if (this.uncommittedFilters.has(status2))
+              this.uncommittedFilters.delete(status2);
+            else
+              this.uncommittedFilters.add(status2);
+            this.repaintStatusSnapshot();
+          }));
+        }
+        menu.showAtMouseEvent(event);
+      });
+      headerControls.push(filterBtn);
+      const sortBtn = header.createEl("button", {
+        cls: "git-status-section-control",
+        attr: { type: "button", "aria-label": "Sort uncommitted changes" }
+      });
+      (0, import_obsidian5.setIcon)(sortBtn, "arrow-down-up");
+      sortBtn.setAttr("title", `Sort: ${(_b = uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)) == null ? void 0 : _b.label}`);
+      sortBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = new import_obsidian5.Menu();
+        for (const option of uncommittedSortOptions) {
+          menu.addItem((item) => item.setTitle(option.label).setChecked(option.value === this.uncommittedSort).onClick(() => {
+            this.uncommittedSort = option.value;
+            this.repaintStatusSnapshot();
+          }));
+        }
+        menu.showAtMouseEvent(event);
+      });
+      headerControls.push(sortBtn);
+    }
     const bulkBtn = header.createEl("button", { cls: "git-status-section-action" });
     (0, import_obsidian5.setIcon)(bulkBtn, sectionClass === "staged" ? "minus" : "plus");
     bulkBtn.disabled = files.length === 0;
     bulkBtn.setAttr("title", bulkLabel);
     bulkBtn.setAttr("aria-label", bulkLabel);
+    headerControls.push(bulkBtn);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (bulkBtn.disabled || this.mutationInFlight)
@@ -24536,7 +24636,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     });
     header.addEventListener("click", (e) => {
-      if (e.target === bulkBtn || bulkBtn.contains(e.target))
+      if (headerControls.some((control) => e.target === control || control.contains(e.target)))
         return;
       const currentlyCollapsed = section.getAttr("data-collapsed") === "true";
       section.setAttr("data-collapsed", String(!currentlyCollapsed));
@@ -24545,7 +24645,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     });
     const list = section.createDiv("git-status-section-list");
     if (files.length === 0) {
-      const emptyMsg = sectionClass === "staged" ? "No staged files" : "No uncommitted changes";
+      const emptyMsg = sectionClass === "staged" ? "No staged files" : totalFiles > 0 ? "No files match the selected filters" : "No uncommitted changes";
       list.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
     } else {
       for (const filepath of files) {
@@ -24576,7 +24676,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           const menu = new import_obsidian5.Menu();
           if (filepath !== ".gitignore") {
             menu.addItem((item) => item.setTitle("Ignore this file").setIcon("file-minus").onClick(async () => {
-              var _a;
+              var _a2;
               try {
                 const pattern = `/${filepath.replace(/^\/+/, "")}`;
                 const currentStatus = statusByPath.get(filepath);
@@ -24589,7 +24689,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
                     `Added ${pattern} to .gitignore. ${filepath} remains in Changes because it is tracked or staged.`
                   );
                 } else {
-                  const stillListed = (_a = this.sidebarSnapshot) == null ? void 0 : _a.detailedStatus.some(
+                  const stillListed = (_a2 = this.sidebarSnapshot) == null ? void 0 : _a2.detailedStatus.some(
                     (file) => file.filepath === filepath
                   );
                   new import_obsidian5.Notice(stillListed ? `Added ${pattern} to .gitignore, but ${filepath} is still listed after refresh.` : `Ignored ${filepath}; removed from local changes.`);
@@ -25823,7 +25923,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "b26f2fbe555e0c6bc812039882e8336fe3e56540" : "unknown";
+var GIT_COMMIT_HASH = true ? "a3acacb7afaaf6d0f5746900e3546c8981e625fa" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
