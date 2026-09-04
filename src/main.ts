@@ -10,7 +10,8 @@ import {
 	TextAreaComponent,
 } from 'obsidian';
 import { ObsidianFsAdapter } from './adapters/ObsidianFsAdapter';
-import { GitManager, GitCredentials } from './gitManager';
+import { ObsidianGitBackend, ObsidianGitCredentials as GitCredentials, RepositoryHealthSummary } from './backend/obsidianAdapter';
+import { RepositoryIndexRepairPreview, RepositoryIndexBackupPreview, RepositoryIndexRepairResult, RepositoryRebuildPreview } from './backend/types';
 import { log, LogLevel } from './logger';
 import { FileLogger } from './fileLogger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
@@ -31,6 +32,8 @@ interface GitSyncSettings {
 	branchName: string;
 	username: string;
 	passwordSecretId: string;
+	authMethod: 'pat' | 'github';
+	githubClientId: string;
 	author: {
 		name: string;
 		email: string;
@@ -53,6 +56,8 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	branchName: 'main',
 	username: '',
 	passwordSecretId: '',
+	authMethod: 'pat',
+	githubClientId: '',
 	author: {
 		name: '',
 		email: ''
@@ -74,7 +79,7 @@ export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings;
 	fs: any;
 	intervalId: number | null = null;
-	gitManager: GitManager | null = null;
+	gitManager: ObsidianGitBackend | null = null;
 	statusBarItem: HTMLElement | null = null;
 	isDesktop: boolean = false;
 	private updater: PluginUpdater | null = null;
@@ -400,6 +405,9 @@ export default class GitSyncPlugin extends Plugin {
 		if (!this.settings.settingsSectionStates || typeof this.settings.settingsSectionStates !== 'object') {
 			this.settings.settingsSectionStates = {};
 		}
+		if (this.settings.authMethod !== 'pat' && this.settings.authMethod !== 'github') {
+			this.settings.authMethod = 'pat';
+		}
 		// The sidebar has one compact layout. Migrate settings written by the
 		// short-lived comfortable/compact toggle so old data cannot restore the
 		// oversized header.
@@ -465,10 +473,12 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async getGitCredentials(resolveSecret = true): Promise<GitCredentials> {
+		const usingGitHub = this.settings.authMethod === 'github';
 		const credentials = {
-			username: this.settings.username,
+			username: usingGitHub ? 'x-access-token' : this.settings.username,
 			password: resolveSecret ? await this.resolveGitPassword() : '',
 			repoUrl: this.settings.repoUrl,
+			source: usingGitHub ? 'github' as const : (resolveSecret && this.settings.passwordSecretId ? 'pat' as const : 'none' as const),
 			author: {
 				name: this.settings.author.name || 'Obsidian Git User',
 				email: this.settings.author.email || 'user@example.com',
@@ -480,12 +490,40 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async refreshGitCredentials(): Promise<void> {
-		if (this.gitManager) this.gitManager.updateCredentials(await this.getGitCredentials());
+		if (this.gitManager) {
+			this.gitManager.updateCredentials(await this.getGitCredentials());
+			this.gitManager.configure({ branch: this.settings.branchName });
+		}
+	}
+
+	async testRemoteConnection(): Promise<void> {
+		if (!this.settings.repoUrl) throw new Error('Please enter a repository URL first');
+		const manager = await this.ensureGitManager(true);
+		if (!manager) throw new Error('No Git backend is available');
+		await this.refreshGitCredentials();
+		await manager.testRemote();
 	}
 
 	async setGitCredential(value: string): Promise<void> {
 		this.requireCredentialStore().set(value);
+		this.settings.authMethod = 'pat';
 		await this.saveSettings();
+	}
+
+	async authenticateWithGitHub(): Promise<void> {
+		if (!this.settings.githubClientId.trim()) {
+			throw new Error('Set a GitHub OAuth client ID before signing in with GitHub.');
+		}
+		const manager = await this.ensureGitManager();
+		if (!manager) throw new Error('Unable to prepare the Git backend.');
+		const session = await manager.authenticateWithGitHub(this.settings.githubClientId, (code) => {
+			window.open(code.verificationUri, '_blank');
+			new Notice(`GitHub sign-in: enter ${code.userCode} at ${code.verificationUri}`, 15000);
+		});
+		this.requireCredentialStore().set(session.credential.password);
+		this.settings.authMethod = 'github';
+		await this.saveSettings();
+		await this.refreshGitCredentials();
 	}
 
 	async checkForUpdates(manual: boolean): Promise<void> {
@@ -623,7 +661,9 @@ export default class GitSyncPlugin extends Plugin {
 		// opening that indexed TFile is unreliable on mobile. Open the modal
 		// immediately while the provider-backed read happens in the editor.
 		new GitIgnoreEditorModal(this.app, () => this.readGitIgnore(), async (updatedContent) => {
-			await this.app.vault.adapter.write('.gitignore', updatedContent);
+			const manager = await this.ensureGitManager();
+			if (!manager) throw new Error('Unable to prepare the Git backend');
+			await manager.writeGitignore(updatedContent);
 			new Notice('Saved .gitignore');
 		}).open();
 	}
@@ -633,55 +673,30 @@ export default class GitSyncPlugin extends Plugin {
 	 * hidden .gitignore file manually.
 	 */
 	async addGitIgnorePattern(pattern: string): Promise<boolean> {
-		const normalizedPattern = pattern.trim();
-		if (!normalizedPattern || normalizedPattern.startsWith('#')) {
-			throw new Error('Enter a non-empty ignore pattern');
-		}
-
-		const current = await this.readGitIgnore();
-		const lines = current.split(/\r?\n/);
-		if (lines.includes(normalizedPattern)) return false;
-
-		const separator = current.length > 0 && !current.endsWith('\n') ? '\n' : '';
-		await this.app.vault.adapter.write('.gitignore', `${current}${separator}${normalizedPattern}\n`);
-		return true;
+		const manager = await this.ensureGitManager();
+		if (!manager) throw new Error('Unable to prepare the Git backend');
+		return (await manager.addIgnorePattern(pattern)).changed;
 	}
 
 	private async readGitIgnore(): Promise<string> {
-		const adapter = this.app.vault.adapter;
-		// Read the adapter directly first. Some mobile vault indexes report a
-		// hidden file as absent even though the underlying adapter can read it.
-		try {
-			return await adapter.read('.gitignore');
-		} catch (error: any) {
-			if (await adapter.exists('.gitignore')) throw error;
-			await adapter.write('.gitignore', '');
-			new Notice('Created .gitignore');
-			return '';
-		}
+		const manager = await this.ensureGitManager();
+		if (!manager) return '';
+		return manager.readGitignore();
 	}
 
-	async ensureGitManager(requireRemote: boolean = false): Promise<GitManager | null> {
+	async ensureGitManager(requireRemote: boolean = false): Promise<ObsidianGitBackend | null> {
 		if (this.gitManager) return this.gitManager;
 
 		const vaultPath = '.';
-		
-		const hasRepo = await this.detectRealGitRepo();
-		if (!hasRepo && requireRemote && !this.settings.repoUrl) {
-			log.warn('GitSyncPlugin', 'No .git repo found in vault');
-			return null;
-		}
 
 		if (!this.settings.repoUrl && requireRemote) {
+			log.warn('GitSyncPlugin', 'No remote URL configured');
 			return null;
 		}
 
 		const credentials = await this.getGitCredentials(false);
 
-		// Status bar is optional (may be null on mobile)
-		const statusEl = this.statusBarItem || undefined;
-
-		this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
+		this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
 		
 		return this.gitManager;
 	}
@@ -689,7 +704,7 @@ export default class GitSyncPlugin extends Plugin {
 	/** Run one repository mutation through the shared lifecycle boundary. */
 	async runGitMutation<T>(
 		name: string,
-		operation: (manager: GitManager, signal: AbortSignal) => Promise<T>,
+		operation: (manager: ObsidianGitBackend, signal: AbortSignal) => Promise<T>,
 	): Promise<T> {
 		return this.operationCoordinator.run(name, async ({ signal }) => {
 			const manager = await this.ensureGitManager();
@@ -706,7 +721,7 @@ export default class GitSyncPlugin extends Plugin {
 		});
 	}
 
-	async checkRepositoryHealth(): Promise<import('./gitManager').RepositoryHealth> {
+	async checkRepositoryHealth(): Promise<RepositoryHealthSummary> {
 		const startedAt = Date.now();
 		log.info('Maintenance', 'Repository health check started');
 		try {
@@ -732,7 +747,7 @@ export default class GitSyncPlugin extends Plugin {
 		}
 	}
 
-	async previewRepositoryRebuild(): Promise<import('./gitManager').RepositoryRebuildPreview> {
+	async previewRepositoryRebuild(): Promise<RepositoryRebuildPreview> {
 		return this.runGitMutation('Preview repository rebuild', async (manager) => {
 			await this.refreshGitCredentials();
 			if (!this.settings.repoUrl) throw new Error('Set a remote repository URL before comparing a rebuild.');
@@ -740,15 +755,15 @@ export default class GitSyncPlugin extends Plugin {
 		});
 	}
 
-	async previewIndexRepair(): Promise<import('./gitManager').RepositoryIndexRepairPreview> {
+	async previewIndexRepair(): Promise<RepositoryIndexRepairPreview> {
 		return this.runGitMutation('Preview Git index repair', async (manager) => manager.previewIndexRepair());
 	}
 
-	async previewLatestRepositoryIndexBackup(): Promise<import('./gitManager').RepositoryIndexBackupPreview | null> {
+	async previewLatestRepositoryIndexBackup(): Promise<RepositoryIndexBackupPreview | null> {
 		return this.runGitMutation('Preview Git index backup restore', async (manager) => manager.previewLatestIndexBackup());
 	}
 
-	async rebuildRepositoryIndex(): Promise<import('./gitManager').RepositoryIndexRepairResult> {
+	async rebuildRepositoryIndex(): Promise<RepositoryIndexRepairResult> {
 		return this.runGitMutation('Repair Git index', async (manager) => manager.rebuildIndexFromHead());
 	}
 
@@ -762,7 +777,7 @@ export default class GitSyncPlugin extends Plugin {
 	async initializeNewRepo(): Promise<void> {
 		await this.runGitMutation('Initialize repository', async (manager) => {
 			try {
-				// Keep initialization inside GitManager so it receives the same
+				// Keep initialization inside the Git backend so it receives the same
 				// operation signal as clone, pull, push, and sync.
 				await manager.initializeRepo('', this.settings.branchName || 'main');
 				log.info('GitSyncPlugin', 'New git repository initialized in vault');
@@ -1160,6 +1175,43 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 		const authentication = this.createSettingsSection(containerEl, sections[1]);
 		new Setting(authentication)
+			.setName('Authentication method')
+			.setDesc('Use a stored PAT, or sign in to GitHub without pasting a token.')
+			.addDropdown(dropdown => dropdown
+				.addOption('pat', 'Personal Access Token')
+				.addOption('github', 'Sign in with GitHub')
+				.setValue(this.plugin.settings.authMethod)
+				.onChange(async (value) => {
+					this.plugin.settings.authMethod = value as 'pat' | 'github';
+					await this.plugin.saveSettings();
+				}));
+		new Setting(authentication)
+			.setName('GitHub OAuth client ID')
+			.setDesc('Required for GitHub sign-in. This is the public client ID of the plugin OAuth App.')
+			.addText(text => text
+				.setPlaceholder('Your registered GitHub OAuth App client ID')
+				.setValue(this.plugin.settings.githubClientId)
+				.onChange(async (value) => {
+					this.plugin.settings.githubClientId = value.trim();
+					await this.plugin.saveSettings();
+				}));
+		new Setting(authentication)
+			.setName('GitHub sign-in')
+			.setDesc('Authorize this plugin in GitHub, then store the resulting credential securely.')
+			.addButton(button => button
+				.setButtonText('Sign in with GitHub')
+				.onClick(async () => {
+					button.setDisabled(true);
+					try {
+						await this.plugin.authenticateWithGitHub();
+						new Notice('GitHub credential stored securely');
+					} catch (error: any) {
+						new Notice(`GitHub sign-in failed: ${error?.message || String(error)}`);
+					} finally {
+						button.setDisabled(false);
+					}
+				}));
+		new Setting(authentication)
 			.setName('Username')
 			.setDesc('Git username (optional when using a Personal Access Token)')
 			.addText(text => text
@@ -1258,9 +1310,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 							return;
 						}
 						new Notice('Testing remote connection…');
-						const { testRemoteConnection } = await import('./gitManager');
-						const credentials = await this.plugin.getGitCredentials();
-						await testRemoteConnection({ ...credentials });
+						await this.plugin.testRemoteConnection();
 						new Notice('Remote connection successful. You can now clone it or initialize a local repository.');
 					} catch (error: any) {
 						new Notice(`Remote connection test failed: ${error?.message || String(error)}`);

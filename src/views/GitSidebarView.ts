@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
-import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../gitManager';
+import { GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../backend/obsidianAdapter';
 import { log } from '../logger';
 import { SidebarReadModel } from '../sidebarReadModel';
 
@@ -548,18 +548,18 @@ export class GitSidebarView extends ItemView {
         let hasReal = this.hasRealRepo;
         if (readRepository) {
             try {
-                hasReal = await this.plugin.detectRealGitRepo();
+                hasReal = this.plugin.gitManager ? await this.plugin.gitManager.hasRepository() : false;
             } catch (e) {
-                log.warn('GitSidebar', 'detectRealGitRepo failed', e);
+                log.warn('GitSidebar', 'repository check failed', e);
             }
             this.hasRealRepo = hasReal;
             if (!hasReal) this.sidebarSnapshot = null;
 
             if (hasReal && this.plugin.gitManager) {
                 try {
-                    // One statusMatrix read supplies the header's staged count
-                    // and all Changes-tab rows. Branch/ahead/behind are read as
-                    // part of the same immutable view model.
+                    // One local statusMatrix read supplies the staged count and
+                    // all Changes-tab rows. Remote comparison is an explicit,
+                    // slower read and is not on this first render path.
                     this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
                 } catch (e) {
                     // Keep the last successful view during a transient mobile
@@ -588,6 +588,9 @@ export class GitSidebarView extends ItemView {
         const comparison = snapshot?.comparison || (repositoryStatusAvailable ? 'up-to-date' : 'unavailable');
 
         this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+        if (readRepository && initialized && this.hasRemote && this.plugin.gitManager && snapshot) {
+            void this.updateRemoteComparison(generation);
+        }
         this.stagedCount = snapshot?.staged.length || 0;
         this.contentContainer.empty();
 
@@ -616,6 +619,31 @@ export class GitSidebarView extends ItemView {
         if (!this.isCurrentRender(generation)) return;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
         if (footerEl) this.renderFooter(footerEl);
+    }
+
+    private async updateRemoteComparison(generation: number): Promise<void> {
+        const manager = this.plugin.gitManager;
+        if (!manager) return;
+        try {
+            const comparison = await manager.getStatus();
+            if (!this.isCurrentRender(generation) || !this.sidebarSnapshot) return;
+            this.sidebarSnapshot = {
+                ...this.sidebarSnapshot,
+                ...comparison,
+                repositoryStatusAvailable: true,
+            };
+            this.renderHeader(
+                this.sidebarSnapshot.branch,
+                this.sidebarSnapshot.ahead,
+                this.sidebarSnapshot.behind,
+                true,
+                true,
+                true,
+                this.sidebarSnapshot.comparison,
+            );
+        } catch (error) {
+            log.debug('GitSidebar', 'Remote comparison unavailable after local refresh', error);
+        }
     }
 
     private async renderUninitializedContent(hasReal: boolean): Promise<void> {
@@ -1100,8 +1128,9 @@ export class GitSidebarView extends ItemView {
                 if (cached !== null) {
                     commits = cached;
                 } else {
-                    const password = await this.plugin.resolveGitPassword();
-                    commits = await GitManager.fetchRemoteCommitsFromGitHub(remoteUrl, password, branch, 25);
+                    commits = this.plugin.gitManager
+                        ? await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch, 25)
+                        : [];
                     if (commits.length === 0 && this.plugin.gitManager) {
                         // Non-GitHub remotes still use their fetched origin ref.
                         commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
@@ -1226,11 +1255,9 @@ export class GitSidebarView extends ItemView {
                 // GitHub reads when a row is collapsed and expanded again.
             } else if (this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl && !this.hasRealRepo) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
-                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-                    this.plugin.settings.repoUrl,
-                    await this.plugin.resolveGitPassword(),
-                    oid
-                );
+                const remoteFiles = this.plugin.gitManager
+                    ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid)
+                    : [];
                 if (remoteFiles) {
                     files = remoteFiles;
                 }
@@ -1248,11 +1275,9 @@ export class GitSidebarView extends ItemView {
             // try GitHub API for shallow clones as well.
             if (files.length === 0 && this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
-                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-                    this.plugin.settings.repoUrl,
-                    await this.plugin.resolveGitPassword(),
-                    oid
-                );
+                const remoteFiles = this.plugin.gitManager
+                    ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid)
+                    : [];
                 if (remoteFiles) {
                     files = remoteFiles;
                 }

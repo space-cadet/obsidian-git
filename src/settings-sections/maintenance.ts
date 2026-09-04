@@ -1,15 +1,15 @@
 import { Setting } from 'obsidian';
+import { RepositoryHealthSummary } from '../backend/obsidianAdapter';
 import {
-	RepositoryHealth,
 	RepositoryIndexBackupPreview,
 	RepositoryIndexRepairPreview,
 	RepositoryIndexRepairResult,
 	RepositoryRebuildPreview,
-} from '../gitManager';
+} from '../backend/types';
 
 interface MaintenancePlugin {
 	settings: { repoUrl: string };
-	checkRepositoryHealth(): Promise<RepositoryHealth>;
+	checkRepositoryHealth(): Promise<RepositoryHealthSummary>;
 	previewIndexRepair(): Promise<RepositoryIndexRepairPreview>;
 	rebuildRepositoryIndex(): Promise<RepositoryIndexRepairResult>;
 	previewLatestRepositoryIndexBackup(): Promise<RepositoryIndexBackupPreview | null>;
@@ -43,7 +43,7 @@ function showOperationResult(containerEl: HTMLElement, text: string): void {
 	result.createEl('div', { text, cls: 'git-maintenance-result-text' });
 }
 
-function healthDescription(health: RepositoryHealth): string {
+function healthDescription(health: RepositoryHealthSummary): string {
 	if (health.state === 'missing') return 'No .git repository was found in this vault.';
 	if (health.state === 'damaged') return health.reason || 'Git repository metadata needs repair.';
 	return `Healthy repository on ${health.branch || 'the current branch'}${health.hasCommits ? '.' : ' with no commits yet.'}`;

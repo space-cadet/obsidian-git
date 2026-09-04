@@ -92,7 +92,7 @@ export class ObsidianFsAdapter {
     /**
      * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
      * Node-compatible 'utf8' string for text; no encoding means binary.
-     * 
+     *
      * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
      * We use Node.js fs via window.require (Electron desktop) as a fallback.
      */

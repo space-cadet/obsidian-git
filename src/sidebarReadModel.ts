@@ -1,4 +1,4 @@
-import type { GitCommit } from './gitManager';
+import type { GitCommit } from './backend/obsidianAdapter';
 import type { LogEntry } from './logger';
 
 export interface SidebarCommitCache {
