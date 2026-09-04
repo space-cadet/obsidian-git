@@ -127,6 +127,14 @@ test('sidebar avoids rebuilding an unchanged Changes snapshot', () => {
   assert.match(sidebarSource, /this\.renderedStatusRevision !== this\.statusRevision/);
 });
 
+test('sidebar distinguishes untracked files from staged additions', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /status === 'untracked'\s*\? '\?'/);
+  assert.match(sidebarSource, /status === 'added'\s*\? 'A'/);
+  assert.match(sidebarSource, /status === 'untracked'\s*\? 'git-status-untracked'/);
+});
+
 test('sidebar keeps retained activity history and commit source controls visible', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');

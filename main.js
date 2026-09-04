@@ -24561,8 +24561,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         (0, import_obsidian5.setIcon)(stageBtn, sectionClass === "staged" ? "square-check" : "square");
         stageBtn.addClass(sectionClass === "staged" ? "git-file-stage-checked" : "git-file-stage-empty");
         const status2 = statusByPath.get(filepath);
-        const statusLabel = status2 === "deleted" ? "D" : status2 === "added" || status2 === "untracked" ? "A" : "M";
-        const statusClass = status2 === "deleted" ? "git-status-deleted" : status2 === "modified" || status2 === "staged" ? "git-status-modified" : "git-status-added";
+        const statusLabel = status2 === "deleted" ? "D" : status2 === "untracked" ? "?" : status2 === "added" ? "A" : "M";
+        const statusClass = status2 === "deleted" ? "git-status-deleted" : status2 === "untracked" ? "git-status-untracked" : status2 === "modified" || status2 === "staged" ? "git-status-modified" : "git-status-added";
         row.createSpan({ text: statusLabel, cls: `git-status-icon ${statusClass}` });
         const pathEl = row.createSpan({ text: filepath, cls: "git-file-path" });
         pathEl.setAttr("title", filepath);
@@ -25823,7 +25823,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "09e40d9d8ec4703e5d8e36b08a890c0ad78b0780" : "unknown";
+var GIT_COMMIT_HASH = true ? "4376c4c5ac1ccd8165e5a2531fc7cddee4ebc156" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

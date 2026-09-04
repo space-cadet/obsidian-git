@@ -1153,11 +1153,15 @@ export class GitSidebarView extends ItemView {
                 const status = statusByPath.get(filepath);
                 const statusLabel = status === 'deleted'
                     ? 'D'
-                    : status === 'added' || status === 'untracked'
+                    : status === 'untracked'
+                        ? '?'
+                        : status === 'added'
                         ? 'A'
                         : 'M';
                 const statusClass = status === 'deleted'
                     ? 'git-status-deleted'
+                    : status === 'untracked'
+                        ? 'git-status-untracked'
                     : status === 'modified' || status === 'staged'
                         ? 'git-status-modified'
                         : 'git-status-added';
