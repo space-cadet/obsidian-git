@@ -20812,6 +20812,11 @@ var import_obsidian8 = require("obsidian");
 // src/adapters/ObsidianFsAdapter.ts
 var ObsidianFsAdapter = class {
   constructor(adapter, dir) {
+    // readdir() validates entries on mobile because the vault index can be
+    // briefly stale. Keep those validated stats for the immediately
+    // following lstat() made by isomorphic-git's worktree walker so the
+    // adapter bridge is not called twice for every entry.
+    this.validatedStats = /* @__PURE__ */ new Map();
     // Direct fs methods — isomorphic-git may call these directly (not just via promises)
     this.readFile = this.readFileImpl.bind(this);
     this.writeFile = this.writeFileImpl.bind(this);
@@ -20891,6 +20896,13 @@ var ObsidianFsAdapter = class {
     const path = this.resolve(filepath);
     const encoding = typeof options === "string" ? options : options == null ? void 0 : options.encoding;
     if (encoding === "utf8") {
+      const nodeFile2 = this.nodePathFor(path);
+      if (nodeFile2) {
+        try {
+          return await nodeFile2.fs.promises.readFile(nodeFile2.fullPath, { encoding: "utf8" });
+        } catch (e) {
+        }
+      }
       return this.adapter.read(path);
     }
     const nodeFile = this.nodePathFor(path);
@@ -20916,21 +20928,36 @@ var ObsidianFsAdapter = class {
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
    */
   async writeFileImpl(filepath, data) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        if (typeof data === "string") {
+          await nodeFile.fs.promises.writeFile(nodeFile.fullPath, data, "utf8");
+          (_a = this.writeProgress) == null ? void 0 : _a.call(this, path, new TextEncoder().encode(data).byteLength);
+          return;
+        }
+        const bytes = data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : new TextEncoder().encode(String(data));
+        await nodeFile.fs.promises.writeFile(nodeFile.fullPath, bytes);
+        (_b = this.writeProgress) == null ? void 0 : _b.call(this, path, bytes.byteLength);
+        return;
+      } catch (e) {
+      }
+    }
     if (typeof data === "string") {
       await this.adapter.write(path, data);
-      (_a = this.writeProgress) == null ? void 0 : _a.call(this, path, new TextEncoder().encode(data).byteLength);
+      (_c = this.writeProgress) == null ? void 0 : _c.call(this, path, new TextEncoder().encode(data).byteLength);
     } else if (data instanceof Uint8Array) {
       await this.adapter.writeBinary(path, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-      (_b = this.writeProgress) == null ? void 0 : _b.call(this, path, data.byteLength);
+      (_d = this.writeProgress) == null ? void 0 : _d.call(this, path, data.byteLength);
     } else if (data instanceof ArrayBuffer) {
       await this.adapter.writeBinary(path, data);
-      (_c = this.writeProgress) == null ? void 0 : _c.call(this, path, data.byteLength);
+      (_e = this.writeProgress) == null ? void 0 : _e.call(this, path, data.byteLength);
     } else {
       const text = String(data);
       await this.adapter.write(path, text);
-      (_d = this.writeProgress) == null ? void 0 : _d.call(this, path, new TextEncoder().encode(text).byteLength);
+      (_f = this.writeProgress) == null ? void 0 : _f.call(this, path, new TextEncoder().encode(text).byteLength);
     }
   }
   async mkdirImpl(filepath, _options) {
@@ -20978,7 +21005,7 @@ var ObsidianFsAdapter = class {
       const candidatePath = path === "." ? relativePath : `${path}/${relativePath}`;
       try {
         const stat = await this.adapter.stat(candidatePath);
-        return stat ? relativePath : null;
+        return stat ? { relativePath, candidatePath, stat } : null;
       } catch (error) {
         if ((error == null ? void 0 : error.code) === "ENOENT" || /no such file|not found/i.test((error == null ? void 0 : error.message) || "")) {
           return null;
@@ -20986,7 +21013,11 @@ var ObsidianFsAdapter = class {
         throw error;
       }
     }));
-    return existingEntries.filter((entry) => entry !== null);
+    for (const entry of existingEntries) {
+      if (entry)
+        this.validatedStats.set(entry.candidatePath, entry.stat);
+    }
+    return existingEntries.filter((entry) => entry !== null).map((entry) => entry.relativePath);
   }
   async unlinkImpl(filepath) {
     var _a, _b;
@@ -21008,12 +21039,20 @@ var ObsidianFsAdapter = class {
       } catch (e) {
       }
     }
+    const validated = this.validatedStats.get(path);
+    if (validated) {
+      this.validatedStats.delete(path);
+      return this.toNodeStat(validated);
+    }
     const stat = await this.adapter.stat(path);
     if (!stat) {
       const err = new Error(`ENOENT: no such file or directory, stat '${path}'`);
       err.code = "ENOENT";
       throw err;
     }
+    return this.toNodeStat(stat);
+  }
+  toNodeStat(stat) {
     return {
       isFile: () => stat.type === "file",
       isDirectory: () => stat.type === "folder",
@@ -21575,15 +21614,25 @@ var GitBackend = class {
   }
   async stage(path) {
     this.assertPath(path);
-    const state = await this.pathStatus(path);
-    if (state === "ignored")
-      throw new Error(`Path "${path}" is ignored by .gitignore`);
-    if (state === "deleted" || state === "*deleted") {
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
+    const worktreePath = this.repositoryPath(path);
+    let present = true;
+    try {
+      await this.fileSystem.lstat(worktreePath);
+    } catch (error) {
+      if (!isMissingPath(error))
+        throw error;
+      present = false;
+    }
+    if (!present && tracked.has(path)) {
       await remove({ fs: this.ports.fs, dir: this.dir, filepath: path });
-    } else if (state !== "absent" && state !== "*absent") {
-      await add({ fs: this.ports.fs, dir: this.dir, filepath: path });
-    } else {
+    } else if (!present) {
       throw new Error(`Path "${path}" is not present in the worktree`);
+    } else {
+      if (!tracked.has(path) && await this.isIgnored(path)) {
+        throw new Error(`Path "${path}" is ignored by .gitignore`);
+      }
+      await add({ fs: this.ports.fs, dir: this.dir, filepath: path });
     }
     return { path, staged: true };
   }
@@ -21591,16 +21640,29 @@ var GitBackend = class {
     const requested = uniquePaths(paths);
     const succeeded = [];
     const failed = [];
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
     const states = await Promise.all(requested.map(async (path) => {
       try {
         this.assertPath(path);
-        return { path, state: await this.pathStatus(path), error: null };
+        let present2 = true;
+        try {
+          await this.fileSystem.lstat(this.repositoryPath(path));
+        } catch (error) {
+          if (!isMissingPath(error))
+            throw error;
+          present2 = false;
+        }
+        if (!present2)
+          return { path, state: tracked.has(path) ? "deleted" : "absent", error: null };
+        if (!tracked.has(path) && await this.isIgnored(path))
+          return { path, state: "ignored", error: null };
+        return { path, state: "present", error: null };
       } catch (error) {
         return { path, state: null, error };
       }
     }));
-    const present = states.filter(({ state }) => state !== null && state !== "deleted" && state !== "*deleted" && state !== "absent" && state !== "*absent" && state !== "ignored").map(({ path }) => path);
-    const deleted = states.filter(({ state }) => state === "deleted" || state === "*deleted").map(({ path }) => path);
+    const present = states.filter(({ state }) => state === "present").map(({ path }) => path);
+    const deleted = states.filter(({ state }) => state === "deleted").map(({ path }) => path);
     for (const { path, state, error } of states.filter(({ state: state2, error: error2 }) => error2 || state2 === "ignored" || state2 === "absent" || state2 === "*absent")) {
       failed.push({ path, message: error ? errorMessage(error) : state === "ignored" ? `Path "${path}" is ignored by .gitignore` : `Path "${path}" is not present in the worktree` });
     }
@@ -24953,7 +25015,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "f8df6f1970183df04c9b081aa2886d7776380a40" : "unknown";
+var GIT_COMMIT_HASH = true ? "bdbe4b195fa83e0adc7d4661f26cdd51c6f5e112" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

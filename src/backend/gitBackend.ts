@@ -458,14 +458,30 @@ export class GitBackend {
 
   async stage(path: string): Promise<StageResult> {
     this.assertPath(path);
-    const state = await this.pathStatus(path);
-    if (state === 'ignored') throw new Error(`Path "${path}" is ignored by .gitignore`);
-    if (state === 'deleted' || state === '*deleted') {
+
+    // Do not call git.status({ filepath }) here. That looks targeted, but
+    // isomorphic-git still resolves the HEAD tree, reads the index, and may
+    // hash the worktree file before git.add() repeats those reads. On mobile
+    // DataAdapters this duplicate path is especially expensive.
+    const tracked = new Set(await git.listFiles({ fs: this.ports.fs, dir: this.dir }));
+    const worktreePath = this.repositoryPath(path);
+    let present = true;
+    try {
+      await this.fileSystem.lstat(worktreePath);
+    } catch (error) {
+      if (!isMissingPath(error)) throw error;
+      present = false;
+    }
+
+    if (!present && tracked.has(path)) {
       await git.remove({ fs: this.ports.fs, dir: this.dir, filepath: path });
-    } else if (state !== 'absent' && state !== '*absent') {
-      await git.add({ fs: this.ports.fs, dir: this.dir, filepath: path });
-    } else {
+    } else if (!present) {
       throw new Error(`Path "${path}" is not present in the worktree`);
+    } else {
+      if (!tracked.has(path) && await this.isIgnored(path)) {
+        throw new Error(`Path "${path}" is ignored by .gitignore`);
+      }
+      await git.add({ fs: this.ports.fs, dir: this.dir, filepath: path });
     }
     return { path, staged: true };
   }
@@ -475,19 +491,30 @@ export class GitBackend {
     const succeeded: string[] = [];
     const failed: Array<{ path: string; message: string }> = [];
 
-    // Classify only the requested paths. This is a bounded targeted read, not
-    // a repository-wide status scan. Present files can then be written in one
-    // index transaction, while tracked deletions use remove().
+    // Read the index once to classify the requested paths. This does not
+    // enumerate the worktree or resolve the HEAD tree. Present files can then
+    // be written in one index transaction, while tracked deletions use
+    // remove().
+    const tracked = new Set(await git.listFiles({ fs: this.ports.fs, dir: this.dir }));
     const states = await Promise.all(requested.map(async (path) => {
       try {
         this.assertPath(path);
-        return { path, state: await this.pathStatus(path), error: null };
+        let present = true;
+        try {
+          await this.fileSystem.lstat(this.repositoryPath(path));
+        } catch (error) {
+          if (!isMissingPath(error)) throw error;
+          present = false;
+        }
+        if (!present) return { path, state: tracked.has(path) ? 'deleted' : 'absent', error: null };
+        if (!tracked.has(path) && await this.isIgnored(path)) return { path, state: 'ignored', error: null };
+        return { path, state: 'present', error: null };
       } catch (error) {
         return { path, state: null, error };
       }
     }));
-    const present = states.filter(({ state }) => state !== null && state !== 'deleted' && state !== '*deleted' && state !== 'absent' && state !== '*absent' && state !== 'ignored').map(({ path }) => path);
-    const deleted = states.filter(({ state }) => state === 'deleted' || state === '*deleted').map(({ path }) => path);
+    const present = states.filter(({ state }) => state === 'present').map(({ path }) => path);
+    const deleted = states.filter(({ state }) => state === 'deleted').map(({ path }) => path);
     for (const { path, state, error } of states.filter(({ state, error }) => error || state === 'ignored' || state === 'absent' || state === '*absent')) {
       failed.push({ path, message: error ? errorMessage(error) : state === 'ignored' ? `Path "${path}" is ignored by .gitignore` : `Path "${path}" is not present in the worktree` });
     }

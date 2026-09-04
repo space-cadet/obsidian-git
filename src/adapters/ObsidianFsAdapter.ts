@@ -11,6 +11,11 @@ export class ObsidianFsAdapter {
     private adapter: DataAdapter;
     private dir: string;
     private writeProgress?: (path: string, bytes: number) => void;
+    // readdir() validates entries on mobile because the vault index can be
+    // briefly stale. Keep those validated stats for the immediately
+    // following lstat() made by isomorphic-git's worktree walker so the
+    // adapter bridge is not called twice for every entry.
+    private readonly validatedStats = new Map<string, Stat>();
 
     constructor(adapter: DataAdapter, dir: string) {
         this.adapter = adapter;
@@ -101,6 +106,14 @@ export class ObsidianFsAdapter {
         const encoding = typeof options === 'string' ? options : options?.encoding;
 
         if (encoding === 'utf8') {
+            const nodeFile = this.nodePathFor(path);
+            if (nodeFile) {
+                try {
+                    return await nodeFile.fs.promises.readFile(nodeFile.fullPath, { encoding: 'utf8' });
+                } catch {
+                    // Fall back to the DataAdapter below.
+                }
+            }
             return this.adapter.read(path);
         }
 
@@ -138,6 +151,27 @@ export class ObsidianFsAdapter {
      */
     private async writeFileImpl(filepath: string, data: string | Uint8Array | ArrayBuffer): Promise<void> {
         const path = this.resolve(filepath);
+
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                if (typeof data === 'string') {
+                    await nodeFile.fs.promises.writeFile(nodeFile.fullPath, data, 'utf8');
+                    this.writeProgress?.(path, new TextEncoder().encode(data).byteLength);
+                    return;
+                }
+                const bytes = data instanceof Uint8Array
+                    ? data
+                    : data instanceof ArrayBuffer
+                        ? new Uint8Array(data)
+                        : new TextEncoder().encode(String(data));
+                await nodeFile.fs.promises.writeFile(nodeFile.fullPath, bytes);
+                this.writeProgress?.(path, bytes.byteLength);
+                return;
+            } catch {
+                // Fall back to the DataAdapter below.
+            }
+        }
 
         if (typeof data === 'string') {
             await this.adapter.write(path, data);
@@ -213,7 +247,7 @@ export class ObsidianFsAdapter {
             const candidatePath = path === '.' ? relativePath : `${path}/${relativePath}`;
             try {
                 const stat = await this.adapter.stat(candidatePath);
-                return stat ? relativePath : null;
+                return stat ? { relativePath, candidatePath, stat } : null;
             } catch (error: any) {
                 if (error?.code === 'ENOENT' || /no such file|not found/i.test(error?.message || '')) {
                     return null;
@@ -222,7 +256,12 @@ export class ObsidianFsAdapter {
             }
         }));
 
-        return existingEntries.filter((entry): entry is string => entry !== null);
+        for (const entry of existingEntries) {
+            if (entry) this.validatedStats.set(entry.candidatePath, entry.stat);
+        }
+        return existingEntries
+            .filter((entry): entry is { relativePath: string; candidatePath: string; stat: Stat } => entry !== null)
+            .map((entry) => entry.relativePath);
     }
 
     private async unlinkImpl(filepath: string): Promise<void> {
@@ -248,6 +287,12 @@ export class ObsidianFsAdapter {
             }
         }
 
+        const validated = this.validatedStats.get(path);
+        if (validated) {
+            this.validatedStats.delete(path);
+            return this.toNodeStat(validated);
+        }
+
         const stat: Stat | null = await this.adapter.stat(path);
 
         if (!stat) {
@@ -256,6 +301,10 @@ export class ObsidianFsAdapter {
             throw err;
         }
 
+        return this.toNodeStat(stat);
+    }
+
+    private toNodeStat(stat: Stat): any {
         // Map Obsidian Stat to Node-like stat object
         return {
             isFile: () => stat.type === 'file',
