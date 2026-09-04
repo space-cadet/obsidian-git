@@ -149,6 +149,7 @@ test('ObsidianFsAdapter lstat does not follow a broken desktop symlink', async (
     const adapter = new ObsidianFsAdapter(dataAdapter, '.');
     const stat = await adapter.promises.lstat('broken-link');
     assert.equal(stat.isSymbolicLink(), true);
+    assert.equal(await adapter.promises.readlink('broken-link'), 'missing-target');
     await assert.rejects(adapter.promises.stat('broken-link'), { code: 'ENOENT' });
   } finally {
     globalThis.window = previousWindow;
@@ -164,6 +165,7 @@ test('ObsidianFsAdapter status walk skips a broken symlink inside an ignored dir
     execFileSync('git', ['init', '--quiet', vaultDirectory]);
     writeFileSync(join(vaultDirectory, '.gitignore'), 'node_modules/\n');
     writeFileSync(join(vaultDirectory, 'visible.md'), 'visible untracked file');
+    symlinkSync('visible.md', join(vaultDirectory, 'linked-note'));
     mkdirSync(join(vaultDirectory, 'node_modules'), { recursive: true });
     symlinkSync('missing-target', join(vaultDirectory, 'node_modules', 'broken-link'));
     globalThis.window = { require: createRequire(import.meta.url), process };
@@ -175,7 +177,7 @@ test('ObsidianFsAdapter status walk skips a broken symlink inside an ignored dir
     const adapter = new ObsidianFsAdapter(dataAdapter, '.');
     process.chdir(vaultDirectory);
     const matrix = await git.statusMatrix({ fs: adapter.promises, dir: '.' });
-    assert.deepEqual(matrix.map(([path]) => path).sort(), ['.gitignore', 'visible.md']);
+    assert.deepEqual(matrix.map(([path]) => path).sort(), ['.gitignore', 'linked-note', 'visible.md']);
   } finally {
     process.chdir(previousWorkingDirectory);
     globalThis.window = previousWindow;

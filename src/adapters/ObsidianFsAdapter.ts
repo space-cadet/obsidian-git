@@ -355,7 +355,16 @@ export class ObsidianFsAdapter {
     }
 
     private async readlinkImpl(filepath: string): Promise<string> {
-        // Obsidian doesn't expose symlinks; throw as if not a symlink
+        const path = this.resolve(filepath);
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            // Desktop Git walkers read a link's target after lstat identifies
+            // it as a symbolic link. Do not route this through DataAdapter:
+            // it has no symlink API and rejects every readlink call.
+            return nodeFile.fs.promises.readlink(nodeFile.fullPath, { encoding: 'utf8' });
+        }
+
+        // Obsidian's mobile and virtual adapters do not expose symlinks.
         const err: any = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
         err.code = 'EINVAL';
         throw err;

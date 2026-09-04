@@ -21098,6 +21098,11 @@ var ObsidianFsAdapter = class {
     };
   }
   async readlinkImpl(filepath) {
+    const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      return nodeFile.fs.promises.readlink(nodeFile.fullPath, { encoding: "utf8" });
+    }
     const err = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
     err.code = "EINVAL";
     throw err;
@@ -25818,7 +25823,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "9a663e112fac01d47ea11d45cfa81830672edf66" : "unknown";
+var GIT_COMMIT_HASH = true ? "09e40d9d8ec4703e5d8e36b08a890c0ad78b0780" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
