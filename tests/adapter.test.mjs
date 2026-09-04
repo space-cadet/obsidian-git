@@ -113,3 +113,22 @@ test('ObsidianFsAdapter uses native desktop files for Git metadata', async () =>
     rmSync(vaultDirectory, { recursive: true, force: true });
   }
 });
+
+test('ObsidianFsAdapter uses the CommonJS loader when window.require is unavailable', async () => {
+  const vaultDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-native-global-require-'));
+  const previousWindow = globalThis.window;
+  try {
+    writeFileSync(join(vaultDirectory, 'untracked.md'), 'new file');
+    globalThis.window = { process };
+    const dataAdapter = {
+      getBasePath() { return vaultDirectory; },
+      async list() { return { files: [], folders: [] }; },
+      async stat() { return null; },
+    };
+    const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+    assert.deepEqual(await adapter.promises.readdir('.'), ['untracked.md']);
+  } finally {
+    globalThis.window = previousWindow;
+    rmSync(vaultDirectory, { recursive: true, force: true });
+  }
+});

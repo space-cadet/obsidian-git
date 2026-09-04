@@ -136,17 +136,20 @@ export class GitSidebarView extends ItemView {
                 }
             }, 0);
         });
-        // Obsidian emits vault events for deletes made through the file
-        // manager (and for external changes once its watcher notices them).
-        // Refresh the status snapshot immediately instead of waiting for the
-        // periodic timer or requiring a second navigation.
-        this.registerEvent(this.app.vault.on('delete', () => {
+        // Reconcile every vault change once Obsidian's watcher notices it.
+        // A Changes view that only reacts to deletes can retain an empty
+        // snapshot while newly created or modified untracked files accumulate.
+        const refreshAfterVaultChange = () => {
             if (this.containerEl.isConnected) {
                 void this.refresh({ force: true }).catch((error) => {
-                    log.debug('GitSidebar', 'Delete-triggered refresh failed', error);
+                    log.debug('GitSidebar', 'Vault-change refresh failed', error);
                 });
             }
-        }));
+        };
+        this.registerEvent(this.app.vault.on('create', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('modify', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('delete', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('rename', refreshAfterVaultChange));
 
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');

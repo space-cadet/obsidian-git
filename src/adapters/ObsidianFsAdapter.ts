@@ -70,20 +70,20 @@ export class ObsidianFsAdapter {
         return filepath;
     }
 
-    /**
-     * Check if we're running in Electron desktop (has Node.js fs via window.require)
-     */
-    private isNodeAvailable(): boolean {
-        return typeof window !== 'undefined' && 
-               !!(window as any).require &&
-               !!(window as any).process;
+    /** Resolve Electron's CommonJS loader in both legacy and context-isolated desktop windows. */
+    private nodeRequire(): ((moduleName: string) => any) | null {
+        if (typeof require === 'function') return require;
+        const windowRequire = typeof window !== 'undefined' ? (window as any).require : null;
+        if (typeof windowRequire === 'function') return windowRequire;
+        const globalRequire = (globalThis as any).require;
+        return typeof globalRequire === 'function' ? globalRequire : null;
     }
 
     /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
     private nodePathFor(path: string): { fs: any; path: any; fullPath: string } | null {
-        if (!this.isNodeAvailable()) return null;
+        const nodeRequire = this.nodeRequire();
+        if (!nodeRequire) return null;
         try {
-            const nodeRequire = (window as any).require;
             const nodeFs = nodeRequire('fs');
             const nodePath = nodeRequire('path');
             const basePath = (this.adapter as any).getBasePath?.();

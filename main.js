@@ -20862,19 +20862,23 @@ var ObsidianFsAdapter = class {
     }
     return filepath;
   }
-  /**
-   * Check if we're running in Electron desktop (has Node.js fs via window.require)
-   */
-  isNodeAvailable() {
-    return typeof window !== "undefined" && !!window.require && !!window.process;
+  /** Resolve Electron's CommonJS loader in both legacy and context-isolated desktop windows. */
+  nodeRequire() {
+    if (typeof require === "function")
+      return require;
+    const windowRequire = typeof window !== "undefined" ? window.require : null;
+    if (typeof windowRequire === "function")
+      return windowRequire;
+    const globalRequire = globalThis.require;
+    return typeof globalRequire === "function" ? globalRequire : null;
   }
   /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
   nodePathFor(path) {
     var _a, _b;
-    if (!this.isNodeAvailable())
+    const nodeRequire = this.nodeRequire();
+    if (!nodeRequire)
       return null;
     try {
-      const nodeRequire = window.require;
       const nodeFs = nodeRequire("fs");
       const nodePath = nodeRequire("path");
       const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
@@ -23666,13 +23670,17 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         }
       }, 0);
     });
-    this.registerEvent(this.app.vault.on("delete", () => {
+    const refreshAfterVaultChange = () => {
       if (this.containerEl.isConnected) {
         void this.refresh({ force: true }).catch((error) => {
-          log2.debug("GitSidebar", "Delete-triggered refresh failed", error);
+          log2.debug("GitSidebar", "Vault-change refresh failed", error);
         });
       }
-    }));
+    };
+    this.registerEvent(this.app.vault.on("create", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("modify", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("delete", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("rename", refreshAfterVaultChange));
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
     void this.refresh().catch((error) => {
@@ -25742,7 +25750,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "a1705389f96aad5a3513834f63f1b9ba40fb1ab5" : "unknown";
+var GIT_COMMIT_HASH = true ? "3271658b89abd4619f40de29ddca59ec5e2e07e9" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
