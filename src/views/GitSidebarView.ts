@@ -4,6 +4,7 @@ import { GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState 
 import { parseGitHubRepositoryUrl } from '../backend/githubApi';
 import { log } from '../logger';
 import { SidebarReadModel } from '../sidebarReadModel';
+import { createProgressModal } from '../ui/GitProgressModal';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
@@ -454,6 +455,7 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
             .onClick(async () => {
+                let progress: ReturnType<typeof createProgressModal> | null = null;
                 try {
                     if (!this.plugin.gitManager) {
                         new Notice('Git not initialized');
@@ -463,14 +465,22 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    progress = createProgressModal(this.app, 'Pulling from remote');
                     await this.plugin.runGitMutation('Pull from remote', async (manager) => {
                         await this.plugin.refreshGitCredentials();
-                        await manager.pull(this.plugin.settings.branchName);
+                        manager.setProgressHandle(progress!);
+                        try {
+                            await manager.pull(this.plugin.settings.branchName);
+                            progress!.complete('Pull complete');
+                        } finally {
+                            manager.setProgressHandle(undefined);
+                        }
                     });
                     new Notice('Pulled from remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
+                    progress?.fail(e);
                     new Notice('Pull failed: ' + e.message);
                 }
             });
@@ -482,6 +492,7 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
             .onClick(async () => {
+                let progress: ReturnType<typeof createProgressModal> | null = null;
                 try {
                     if (!this.plugin.gitManager) {
                         new Notice('Git not initialized');
@@ -491,14 +502,22 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    progress = createProgressModal(this.app, 'Pushing to remote');
                     await this.plugin.runGitMutation('Push to remote', async (manager) => {
                         await this.plugin.refreshGitCredentials();
-                        await manager.push(this.plugin.settings.branchName);
+                        manager.setProgressHandle(progress!);
+                        try {
+                            await manager.push(this.plugin.settings.branchName);
+                            progress!.complete('Push complete');
+                        } finally {
+                            manager.setProgressHandle(undefined);
+                        }
                     });
                     new Notice('Pushed to remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
+                    progress?.fail(e);
                     new Notice('Push failed: ' + e.message);
                 }
             });

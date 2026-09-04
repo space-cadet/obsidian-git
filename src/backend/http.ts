@@ -44,11 +44,19 @@ function asBodyIterable(body: Uint8Array): AsyncIterable<Uint8Array> {
 }
 
 export class GitProtocolHttp {
+  private progress?: ProgressSink;
+
   constructor(
     private readonly transport: HttpTransport,
     private readonly credentials?: () => Promise<GitCredential | null>,
-    private readonly progress?: ProgressSink,
-  ) {}
+    progress?: ProgressSink,
+  ) {
+    this.progress = progress;
+  }
+
+  setProgressSink(progress?: ProgressSink): void {
+    this.progress = progress;
+  }
 
   async request(config: any): Promise<any> {
     const credential = this.credentials ? await this.credentials() : null;

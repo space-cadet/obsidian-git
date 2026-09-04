@@ -25,6 +25,18 @@ import {
 
 type MatrixRow = [string, number, number, number];
 
+export class PullBlockedError extends Error {
+  constructor(readonly paths: string[]) {
+    const displayed = paths.slice(0, 30);
+    super(
+      `Pull blocked: local changes would be overwritten by remote updates:\n${displayed.map((path) => `• ${path}`).join('\n')}`
+      + (paths.length > displayed.length ? `\n• …and ${paths.length - displayed.length} more file(s)` : '')
+      + '\n\nCommit, stash, or discard these local changes before pulling.',
+    );
+    this.name = 'PullBlockedError';
+  }
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -100,6 +112,10 @@ export class GitBackend {
 
   configure(config: Partial<GitBackendConfig>): void {
     Object.assign(this.config, config);
+  }
+
+  setProgressSink(progress?: ProgressSink): void {
+    this.http.setProgressSink(progress);
   }
 
   async hasRepository(): Promise<boolean> {
@@ -587,6 +603,7 @@ export class GitBackend {
   async pull(): Promise<RemoteResult> {
     this.requireRemote();
     const branch = this.config.branch;
+    this.progress?.message?.('Fetching remote changes…');
     await git.fetch({
       fs: this.ports.fs,
       http: this.http,
@@ -596,15 +613,24 @@ export class GitBackend {
       singleBranch: true,
       onAuth: () => this.auth(),
     });
-    const fetched = await git.resolveRef({ fs: this.ports.fs, dir: this.dir, ref: 'FETCH_HEAD' });
+    const fetched = await this.resolveRefOrNull(`refs/remotes/origin/${branch}`)
+      || await this.resolveRefOrNull('FETCH_HEAD');
+    if (!fetched) throw new Error(`Pull failed: fetched remote ${branch}, but no remote-tracking ref was written`);
     const local = await this.resolveRefOrNull(`refs/heads/${branch}`);
     if (!local) {
+      this.progress?.message?.('Checking whether the remote files are safe to apply…');
       await this.assertCheckoutSafe(fetched);
+      this.progress?.message?.('Updating local branch…');
       await git.writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch}`, value: fetched, force: true });
+      this.progress?.message?.('Checking out remote files…');
       await git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch });
       return { branch, oid: fetched };
     }
     if (local === fetched) return { branch, oid: local, alreadyCurrent: true };
+    this.progress?.message?.('Checking local changes before merge…');
+    const blockedPaths = await this.findPullOverwritePaths(local, fetched);
+    if (blockedPaths.length > 0) throw new PullBlockedError(blockedPaths);
+    this.progress?.message?.('Applying remote changes…');
     await git.merge({
       fs: this.ports.fs,
       dir: this.dir,
@@ -615,12 +641,14 @@ export class GitBackend {
       author: this.config.author,
       committer: this.config.author,
     });
+    this.progress?.message?.('Checking out updated files…');
     await git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch });
     return { branch, oid: fetched };
   }
 
   async push(force = false): Promise<RemoteResult> {
     this.requireRemote();
+    this.progress?.message?.('Uploading local changes…');
     await git.push({
       fs: this.ports.fs,
       http: this.http,
@@ -630,6 +658,7 @@ export class GitBackend {
       force,
       onAuth: () => this.auth(),
     });
+    this.progress?.message?.('Confirming remote branch…');
     const oid = await this.resolveRefOrNull(`refs/heads/${this.config.branch}`);
     if (oid) {
       await git.writeRef({
@@ -860,6 +889,18 @@ export class GitBackend {
   private async readCommitTree(oid: string): Promise<Map<string, string>> {
     const commit: any = await git.readCommit({ fs: this.ports.fs, dir: this.dir, oid });
     return this.readTree(commit.commit.tree);
+  }
+
+  private async findPullOverwritePaths(localOid: string, remoteOid: string): Promise<string[]> {
+    const [status, localTree, remoteTree] = await Promise.all([
+      this.status(),
+      this.readCommitTree(localOid),
+      this.readCommitTree(remoteOid),
+    ]);
+    return status.files
+      .filter((file) => file.worktree || file.staged)
+      .map((file) => file.path)
+      .filter((path) => localTree.get(path) !== remoteTree.get(path));
   }
 
   private async readTree(treeOid: string, prefix = ''): Promise<Map<string, string>> {

@@ -16,6 +16,7 @@ import { log, LogLevel } from './logger';
 import { FileLogger } from './fileLogger';
 import { VIEW_TYPE_GIT_SIDEBAR, GitSidebarView } from './views/GitSidebarView';
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from './updater/PluginUpdater';
+import { createProgressModal } from './ui/GitProgressModal';
 import { GIT_BRANCH, GIT_COMMIT_HASH } from './buildInfo';
 import {
 	credentialStoreFromApp,
@@ -217,13 +218,21 @@ export default class GitSyncPlugin extends Plugin {
 			name: 'Pull from remote',
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Pull triggered from command palette');
+				const progress = createProgressModal(this.app, 'Pulling from remote');
 				try {
 					await this.runGitMutation('Pull from remote', async (manager) => {
 						await this.refreshGitCredentials();
-						await manager.pull(this.settings.branchName);
+						manager.setProgressHandle(progress);
+						try {
+							await manager.pull(this.settings.branchName);
+							progress.complete('Pull complete');
+						} finally {
+							manager.setProgressHandle(undefined);
+						}
 					});
 					new Notice('Git pull completed successfully');
 				} catch (error: any) {
+					progress.fail(error);
 					log.error('GitSyncPlugin', 'Pull failed', error);
 					new Notice(`Git pull failed: ${error.message}`);
 				}
@@ -235,13 +244,21 @@ export default class GitSyncPlugin extends Plugin {
 			name: 'Push to remote',
 			callback: async () => {
 				log.info('GitSyncPlugin', 'Push triggered from command palette');
+				const progress = createProgressModal(this.app, 'Pushing to remote');
 				try {
 					await this.runGitMutation('Push to remote', async (manager) => {
 						await this.refreshGitCredentials();
-						await manager.push(this.settings.branchName);
+						manager.setProgressHandle(progress);
+						try {
+							await manager.push(this.settings.branchName);
+							progress.complete('Push complete');
+						} finally {
+							manager.setProgressHandle(undefined);
+						}
 					});
 					new Notice('Git push completed successfully');
 				} catch (error: any) {
+					progress.fail(error);
 					log.error('GitSyncPlugin', 'Push failed', error);
 					new Notice(`Git push failed: ${error.message}`);
 				}

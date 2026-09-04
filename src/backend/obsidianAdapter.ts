@@ -50,6 +50,11 @@ export interface RepositoryHealthSummary {
   reason?: string;
 }
 
+export interface GitOperationProgress {
+  onMessage(text: string): void;
+  onTransfer(event: { bytesLoaded: number; bytesTotal: number; lengthComputable: boolean }): void;
+}
+
 function toCredential(credentials: ObsidianGitCredentials): GitCredential {
   return {
     username: credentials.username || 'x-access-token',
@@ -129,6 +134,17 @@ export class ObsidianGitBackend {
   setOperationSignal(_signal: AbortSignal | null): void {
     // Cancellation belongs to the host lifecycle. The backend remains a
     // direct operation surface and does not depend on the coordinator.
+  }
+
+  setProgressHandle(progress?: GitOperationProgress): void {
+    this.backend.setProgressSink(progress ? {
+      message: (text) => progress.onMessage(text),
+      progress: (loaded, total) => progress.onTransfer({
+        bytesLoaded: loaded,
+        bytesTotal: total || loaded,
+        lengthComputable: total !== undefined,
+      }),
+    } : undefined);
   }
 
   async initializeRepo(repoUrl: string, branch: string): Promise<void> {
