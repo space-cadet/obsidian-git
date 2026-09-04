@@ -86,6 +86,7 @@ export default class GitSyncPlugin extends Plugin {
 	fileLogger: FileLogger | null = null;
 	private credentialStore: CredentialStore | null = null;
 	private credentialStorageError: Error | null = null;
+	private gitManagerPromise: Promise<ObsidianGitBackend | null> | null = null;
 	private readonly operationCoordinator = new OperationCoordinator();
 	private operationLifecycleUnsubscribe: (() => void) | null = null;
 
@@ -686,19 +687,26 @@ export default class GitSyncPlugin extends Plugin {
 
 	async ensureGitManager(requireRemote: boolean = false): Promise<ObsidianGitBackend | null> {
 		if (this.gitManager) return this.gitManager;
+		if (this.gitManagerPromise) return this.gitManagerPromise;
 
-		const vaultPath = '.';
+		this.gitManagerPromise = (async () => {
+			const vaultPath = '.';
 
-		if (!this.settings.repoUrl && requireRemote) {
-			log.warn('GitSyncPlugin', 'No remote URL configured');
-			return null;
+			if (!this.settings.repoUrl && requireRemote) {
+				log.warn('GitSyncPlugin', 'No remote URL configured');
+				return null;
+			}
+
+			const credentials = await this.getGitCredentials(false);
+			this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
+			return this.gitManager;
+		})();
+
+		try {
+			return await this.gitManagerPromise;
+		} finally {
+			this.gitManagerPromise = null;
 		}
-
-		const credentials = await this.getGitCredentials(false);
-
-		this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
-		
-		return this.gitManager;
 	}
 
 	/** Run one repository mutation through the shared lifecycle boundary. */

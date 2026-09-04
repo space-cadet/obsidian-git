@@ -43,11 +43,21 @@ export class GitSidebarView extends ItemView {
     private logUnsubscribe: (() => void) | null = null;
     private logRenderScheduled = false;
     private mutationInFlight = false;
+    private repositoryStateKnown = false;
+    private repositoryReadInFlight: Promise<void> | null = null;
+    private statusRevision = 0;
+    private renderedStatusRevision = -1;
+    private renderedHeaderKey: string | null = null;
+    private renderedFooterKey: string | null = null;
+    private commitInFlight = false;
+    private ignorePatternInFlight = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
         this.plugin = plugin;
         this.readModel = getSidebarReadModel(plugin);
+        this.sidebarSnapshot = this.readModel.getStatusSnapshot();
+        this.repositoryStateKnown = this.sidebarSnapshot !== null;
     }
 
     getViewType(): string {
@@ -65,6 +75,11 @@ export class GitSidebarView extends ItemView {
     async onOpen(): Promise<void> {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
+        this.tabContainers.clear();
+        this.renderedTabs.clear();
+        this.renderedStatusRevision = -1;
+        this.renderedHeaderKey = null;
+        this.renderedFooterKey = null;
         container.addClass('git-sidebar-container');
         // The sidebar uses the compact layout by default; there is no larger
         // alternative because the repository header must leave room for files.
@@ -112,7 +127,9 @@ export class GitSidebarView extends ItemView {
             window.setTimeout(() => {
                 this.logRenderScheduled = false;
                 if (this.activeTab === 'log' && this.containerEl.isConnected) {
-                    void this.refresh({ readRepository: false });
+                    void this.refresh({ readRepository: false }).catch((error) => {
+                        log.debug('GitSidebar', 'Log refresh failed', error);
+                    });
                 }
             }, 0);
         });
@@ -121,17 +138,26 @@ export class GitSidebarView extends ItemView {
         // Refresh the status snapshot immediately instead of waiting for the
         // periodic timer or requiring a second navigation.
         this.registerEvent(this.app.vault.on('delete', () => {
-            if (this.containerEl.isConnected) void this.refresh({ force: true });
+            if (this.containerEl.isConnected) {
+                void this.refresh({ force: true }).catch((error) => {
+                    log.debug('GitSidebar', 'Delete-triggered refresh failed', error);
+                });
+            }
         }));
 
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');
         this.renderFooter(footer);
 
-        // Initial load
-        await this.refresh();
+        // Initial repository reads must not hold the view open. The shell and
+        // the last known snapshot are usable immediately; refresh reconciles
+        // them in the background.
+        void this.refresh().catch((error) => {
+            log.warn('GitSidebar', 'Initial sidebar refresh failed', error);
+        });
 
-        // Auto-refresh with configured interval
+        // Auto-refresh with configured interval. The refresh path is
+        // single-flight, so a slow mobile read cannot spawn another scan.
         this.startAutoRefresh();
     }
 
@@ -151,8 +177,10 @@ export class GitSidebarView extends ItemView {
         const ms = this.plugin.settings.refreshInterval * 1000;
         if (ms > 0) {
             this.refreshInterval = window.setInterval(() => {
-                if (this.containerEl.isShown()) {
-                    this.refresh();
+                if (this.containerEl.isShown() && !this.repositoryReadInFlight) {
+                    void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+                        log.debug('GitSidebar', 'Automatic sidebar refresh failed', error);
+                    });
                 }
             }, ms);
         }
@@ -224,6 +252,8 @@ export class GitSidebarView extends ItemView {
         pane.empty();
         this.renderStatusTab(this.sidebarSnapshot, pane);
         this.renderedTabs.add('status');
+        this.renderedStatusRevision = this.statusRevision;
+        this.renderedFooterKey = null;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
         if (footerEl) this.renderFooter(footerEl);
     }
@@ -235,6 +265,8 @@ export class GitSidebarView extends ItemView {
         button.setAttr('aria-busy', 'true');
         try {
             await this.refresh({ force: true });
+        } catch (error: any) {
+            new Notice('Refresh failed: ' + (error?.message || String(error)));
         } finally {
             if (button.isConnected) {
                 button.disabled = false;
@@ -277,10 +309,12 @@ export class GitSidebarView extends ItemView {
                     'data-tab': tab.id
                 }
             });
-            btn.addEventListener('click', async () => {
+            btn.addEventListener('click', () => {
                 this.activeTab = tab.id;
                 this.renderTabs();
-                await this.refresh({ readRepository: false });
+                void this.refresh({ readRepository: false }).catch((error) => {
+                    log.debug('GitSidebar', 'Tab refresh failed', error);
+                });
             });
         }
     }
@@ -475,7 +509,8 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-primary');
 
         const commit = async () => {
-            if (!this.plugin.gitManager) return;
+            if (!this.plugin.gitManager || this.commitInFlight) return;
+            this.commitInFlight = true;
             commitButton.setDisabled(true).setButtonText('Committing…');
             try {
                 await this.plugin.runGitMutation('Commit changes', async (manager) => {
@@ -488,11 +523,16 @@ export class GitSidebarView extends ItemView {
             } catch (e: any) {
                 commitButton.setDisabled(false).setButtonText('Commit');
                 new Notice('Commit failed: ' + e.message);
+            } finally {
+                this.commitInFlight = false;
             }
         };
         commitButton.onClick(commit);
         input.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') void commit();
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void commit();
+            }
         });
         modal.open();
         window.setTimeout(() => input.inputEl.focus(), 0);
@@ -552,51 +592,100 @@ export class GitSidebarView extends ItemView {
 
     // ─── Main refresh ───
 
-    async refresh(options: { readRepository?: boolean; force?: boolean } = {}): Promise<void> {
+    async refresh(options: { readRepository?: boolean; force?: boolean; skipIfRepositoryReadInFlight?: boolean } = {}): Promise<void> {
         const generation = ++this.renderGeneration;
         const readRepository = options.readRepository !== false;
 
-        // A user-requested refresh must not leave the previous file list on
-        // screen if the adapter reports a transient stale-index/path error.
-        // The next successful status scan replaces this snapshot atomically.
-        if (readRepository && options.force) this.sidebarSnapshot = null;
-
-        // Manager construction is intentionally read-only. It is also needed
-        // for the remote/API history fallback when the vault has no .git.
-        if (!this.plugin.gitManager) {
-            await this.plugin.ensureGitManager();
+        if (readRepository) {
+            // Paint the cached state before awaiting the adapter. On the first
+            // ever read this is the loading state; on later view instances it
+            // is the last known Changes list.
+            await this.renderCurrentState(generation, false);
+            await this.refreshRepositoryStatus(options.skipIfRepositoryReadInFlight === true);
+            if (!this.isCurrentRender(generation)) return;
+        } else {
+            // Manager construction is needed by local/remote history, but it
+            // must not be part of the initial Changes-pane critical path.
+            if (!this.plugin.gitManager) await this.plugin.ensureGitManager();
+            if (!this.isCurrentRender(generation)) return;
         }
-        if (!this.isCurrentRender(generation)) return;
+
+        await this.renderCurrentState(generation, readRepository);
+    }
+
+    private async refreshRepositoryStatus(skipIfInFlight: boolean): Promise<void> {
+        if (this.repositoryReadInFlight) {
+            if (skipIfInFlight) return;
+            // A manual refresh requested during a read waits for that read; it
+            // does not start a competing statusMatrix traversal. Automatic
+            // refreshes also return immediately because the result will be
+            // painted by the read that is already running.
+            await this.repositoryReadInFlight;
+            return;
+        }
+
+        const read = this.readRepositoryStatus();
+        this.repositoryReadInFlight = read;
+        try {
+            await read;
+        } finally {
+            if (this.repositoryReadInFlight === read) this.repositoryReadInFlight = null;
+        }
+    }
+
+    private async readRepositoryStatus(): Promise<void> {
+        const manager = await this.plugin.ensureGitManager();
+        if (!manager) {
+            const changed = !this.repositoryStateKnown || this.hasRealRepo || this.sidebarSnapshot !== null;
+            this.repositoryStateKnown = true;
+            this.hasRealRepo = false;
+            this.sidebarSnapshot = null;
+            this.readModel.invalidateStatus();
+            if (changed) this.statusRevision += 1;
+            return;
+        }
 
         let hasReal = this.hasRealRepo;
-        if (readRepository) {
-            try {
-                hasReal = this.plugin.gitManager ? await this.plugin.gitManager.hasRepository() : false;
-            } catch (e) {
-                log.warn('GitSidebar', 'repository check failed', e);
-            }
-            this.hasRealRepo = hasReal;
-            if (!hasReal) this.sidebarSnapshot = null;
-
-            if (hasReal && this.plugin.gitManager) {
-                try {
-                    // One local statusMatrix read supplies the staged count and
-                    // all Changes-tab rows. Remote comparison is an explicit,
-                    // slower read and is not on this first render path.
-                    this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
-                } catch (e) {
-                    // Keep the last successful view during a transient mobile
-                    // filesystem/index failure during background refreshes. A
-                    // user-requested refresh must not continue showing a stale
-                    // deleted path, so clear it and render an honest error.
-                    log.warn('GitSidebar', 'Failed to read repository snapshot', e);
-                    if (options.force) this.sidebarSnapshot = null;
-                }
-            }
+        try {
+            hasReal = await manager.hasRepository();
+            this.repositoryStateKnown = true;
+        } catch (error) {
+            log.warn('GitSidebar', 'repository check failed', error);
+            return;
         }
-        if (!this.isCurrentRender(generation)) return;
+        this.hasRealRepo = hasReal;
+        if (!hasReal) {
+            const changed = this.sidebarSnapshot !== null;
+            this.sidebarSnapshot = null;
+            this.readModel.invalidateStatus();
+            if (changed) this.statusRevision += 1;
+            return;
+        }
 
+        try {
+            // Keep the existing snapshot visible while the slow read runs.
+            // The completed snapshot is swapped in atomically below.
+            const snapshot = await manager.getSidebarStatusSnapshot();
+            const changed = !this.statusSnapshotsEqual(this.sidebarSnapshot, snapshot);
+            this.sidebarSnapshot = snapshot;
+            this.readModel.setStatusSnapshot(snapshot);
+            if (changed) this.statusRevision += 1;
+        } catch (error) {
+            log.warn('GitSidebar', 'Failed to read repository snapshot', error);
+        }
+    }
+
+    private async renderCurrentState(generation: number, readRepository: boolean): Promise<void> {
+        if (!this.isCurrentRender(generation)) return;
+        if (!this.repositoryStateKnown && !this.sidebarSnapshot) {
+            this.renderLoadingState();
+            return;
+        }
+
+        const activeTab = this.activeTab;
+        const hasReal = this.hasRealRepo || this.sidebarSnapshot !== null;
         const initialized = hasReal;
+
         this.hasRemote = !!this.plugin.settings.repoUrl;
         this.isLocalOnly = !this.hasRemote;
         if (this.readModel.getRemoteRepositoryUrl() && this.readModel.getRemoteRepositoryUrl() !== this.plugin.settings.repoUrl) {
@@ -610,7 +699,21 @@ export class GitSidebarView extends ItemView {
         const repositoryStatusAvailable = snapshot?.repositoryStatusAvailable !== false;
         const comparison = snapshot?.comparison || (repositoryStatusAvailable ? 'up-to-date' : 'unavailable');
 
-        this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+        const headerKey = JSON.stringify({
+            tab: activeTab,
+            branch,
+            ahead,
+            behind,
+            initialized,
+            hasReal,
+            repositoryStatusAvailable,
+            comparison,
+            localOnly: this.isLocalOnly,
+        });
+        if (this.renderedHeaderKey !== headerKey) {
+            this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+            this.renderedHeaderKey = headerKey;
+        }
         if (readRepository && initialized && this.hasRemote && this.plugin.gitManager && snapshot) {
             void this.updateRemoteComparison(generation);
         }
@@ -618,24 +721,26 @@ export class GitSidebarView extends ItemView {
         // Remote history is an independent read capability. Keep it available
         // when the local repository is absent, while local Changes/Log content
         // still explains how to initialize the vault.
-        const remoteHistoryOnly = this.activeTab === 'commits'
+        const remoteHistoryOnly = activeTab === 'commits'
             && this.commitsViewMode === 'remote'
             && this.hasRemote;
         if (!initialized && !remoteHistoryOnly) {
-            const pane = this.tabContainer(this.activeTab);
+            const pane = this.tabContainer(activeTab);
             pane.empty();
             await this.renderUninitializedContent(hasReal, pane);
-            this.renderedTabs.add(this.activeTab);
+            if (!this.isCurrentRender(generation)) return;
+            this.renderedTabs.add(activeTab);
         } else {
-            const shouldRender = !this.renderedTabs.has(this.activeTab)
-                || (this.activeTab === 'status' && readRepository)
-                || (this.activeTab === 'log' && !this.readModel.getLogEntries());
-            const pane = this.tabContainer(this.activeTab);
+            const shouldRender = !this.renderedTabs.has(activeTab)
+                || (activeTab === 'status' && this.renderedStatusRevision !== this.statusRevision)
+                || (activeTab === 'log' && !this.readModel.getLogEntries());
+            const pane = this.tabContainer(activeTab);
             if (shouldRender) {
                 pane.empty();
-                switch (this.activeTab) {
+                switch (activeTab) {
                     case 'status':
                         this.renderStatusTab(snapshot, pane);
+                        this.renderedStatusRevision = this.statusRevision;
                         break;
                     case 'commits':
                         await this.renderCommitsTab(generation, pane);
@@ -644,13 +749,41 @@ export class GitSidebarView extends ItemView {
                         await this.renderLogTabInto(generation, pane);
                         break;
                 }
-                this.renderedTabs.add(this.activeTab);
+                if (!this.isCurrentRender(generation)) return;
+                this.renderedTabs.add(activeTab);
             }
         }
 
         if (!this.isCurrentRender(generation)) return;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
-        if (footerEl) this.renderFooter(footerEl);
+        const footerKey = `${activeTab}|${this.stagedCount}|${this.hasRemote}|${!!this.plugin.gitManager}`;
+        if (footerEl && this.renderedFooterKey !== footerKey) {
+            this.renderFooter(footerEl);
+            this.renderedFooterKey = footerKey;
+        }
+    }
+
+    private statusSnapshotsEqual(
+        left: GitSidebarStatusSnapshot | null,
+        right: GitSidebarStatusSnapshot,
+    ): boolean {
+        if (!left) return false;
+        if (
+            left.branch !== right.branch
+            || left.ahead !== right.ahead
+            || left.behind !== right.behind
+            || left.comparison !== right.comparison
+            || left.repositoryStatusAvailable !== right.repositoryStatusAvailable
+            || left.staged.length !== right.staged.length
+            || left.unstaged.length !== right.unstaged.length
+            || left.detailedStatus.length !== right.detailedStatus.length
+        ) return false;
+        return left.staged.every((path, index) => path === right.staged[index])
+            && left.unstaged.every((path, index) => path === right.unstaged[index])
+            && left.detailedStatus.every((file, index) => {
+                const next = right.detailedStatus[index];
+                return file.filepath === next.filepath && file.status === next.status;
+            });
     }
 
     private async updateRemoteComparison(generation: number): Promise<void> {
@@ -1081,8 +1214,15 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-primary');
 
         const submit = async () => {
+            if (this.ignorePatternInFlight) return;
             try {
                 const pattern = input.getValue().trim();
+                if (!pattern) {
+                    new Notice('Enter a Git ignore pattern');
+                    return;
+                }
+                this.ignorePatternInFlight = true;
+                addButton.setDisabled(true).setButtonText('Adding…');
                 const added = await this.plugin.addGitIgnorePattern(pattern);
                 modal.close();
                 new Notice(added
@@ -1091,12 +1231,20 @@ export class GitSidebarView extends ItemView {
                 await this.refresh();
             } catch (e: any) {
                 new Notice(`Could not update .gitignore: ${e.message}`);
+            } finally {
+                this.ignorePatternInFlight = false;
+                if (addButton.buttonEl.isConnected) {
+                    addButton.setDisabled(false).setButtonText('Add pattern');
+                }
             }
         };
 
         addButton.onClick(submit);
         input.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') void submit();
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void submit();
+            }
         });
         modal.open();
         window.setTimeout(() => input.inputEl.focus(), 0);
@@ -1112,20 +1260,24 @@ export class GitSidebarView extends ItemView {
             cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'local' ? ' git-commits-toggle-active' : ''),
             attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'local') }
         });
-        localBtn.addEventListener('click', async () => {
+        localBtn.addEventListener('click', () => {
             this.commitsViewMode = 'local';
             this.invalidateTab('commits');
-            await this.refresh({ readRepository: false });
+            void this.refresh({ readRepository: false }).catch((error) => {
+                log.debug('GitSidebar', 'Local commit view refresh failed', error);
+            });
         });
         const remoteBtn = toggleBar.createEl('button', {
             text: 'Remote',
             cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'remote' ? ' git-commits-toggle-active' : ''),
             attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'remote') }
         });
-        remoteBtn.addEventListener('click', async () => {
+        remoteBtn.addEventListener('click', () => {
             this.commitsViewMode = 'remote';
             this.invalidateTab('commits');
-            await this.refresh({ readRepository: false });
+            void this.refresh({ readRepository: false }).catch((error) => {
+                log.debug('GitSidebar', 'Remote commit view refresh failed', error);
+            });
         });
 
         const loading = this.commitsViewMode === 'remote'
@@ -1440,31 +1592,35 @@ export class GitSidebarView extends ItemView {
             .setTitle('Clear log')
             .setIcon('trash-2')
             .onClick(async () => {
-                log.clear();
-                await this.plugin.fileLogger?.clear();
-                this.readModel.setLogEntries([]);
-                new Notice('Activity log cleared');
-                this.invalidateTab('log');
-                await this.refresh({ readRepository: false });
+                try {
+                    log.clear();
+                    await this.plugin.fileLogger?.clear();
+                    this.readModel.setLogEntries([]);
+                    new Notice('Activity log cleared');
+                    this.invalidateTab('log');
+                    await this.refresh({ readRepository: false });
+                } catch (e: any) {
+                    new Notice('Could not clear log: ' + e.message);
+                }
             }));
         menu.addItem((item) => item
             .setTitle('Copy details')
             .setIcon('copy')
             .onClick(async () => {
-                if (!this.readModel.getLogEntries()) {
-                    const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
-                    log.mergePersistedEntries(persisted);
-                    this.readModel.setLogEntries(log.getEntries());
-                }
-                const entries = [...(this.readModel.getLogEntries() || [])].reverse();
-                const details = entries.length === 0
-                    ? 'No activity yet'
-                    : entries.map((entry) => {
-                        const time = new Date(entry.timestamp).toISOString();
-                        const data = entry.data ? `\n${typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data)}` : '';
-                        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
-                    }).join('\n');
                 try {
+                    if (!this.readModel.getLogEntries()) {
+                        const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+                        log.mergePersistedEntries(persisted);
+                        this.readModel.setLogEntries(log.getEntries());
+                    }
+                    const entries = [...(this.readModel.getLogEntries() || [])].reverse();
+                    const details = entries.length === 0
+                        ? 'No activity yet'
+                        : entries.map((entry) => {
+                            const time = new Date(entry.timestamp).toISOString();
+                            const data = entry.data ? `\n${typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data)}` : '';
+                            return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+                        }).join('\n');
                     await navigator.clipboard.writeText(details);
                     new Notice('Log details copied');
                 } catch (e: any) {

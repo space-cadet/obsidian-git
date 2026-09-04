@@ -106,6 +106,27 @@ test('async sidebar reads guard log and commit-detail responses against stale re
   assert.match(sidebarSource, /if \(!this\.isCurrentRender\(generation\) \|\| !row\.isConnected\) return;/);
 });
 
+test('sidebar initial load does not await the repository-wide read', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const onOpenSource = sidebarSource.slice(
+    sidebarSource.indexOf('async onOpen()'),
+    sidebarSource.indexOf('\n    async onClose()', sidebarSource.indexOf('async onOpen()')),
+  );
+
+  assert.match(onOpenSource, /void this\.refresh\(\)\.catch/);
+  assert.doesNotMatch(onOpenSource, /await this\.refresh\(\)/);
+  assert.match(sidebarSource, /private repositoryReadInFlight: Promise<void> \| null = null/);
+  assert.match(sidebarSource, /if \(this\.repositoryReadInFlight\)/);
+});
+
+test('sidebar avoids rebuilding an unchanged Changes snapshot', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /private statusSnapshotsEqual\(/);
+  assert.match(sidebarSource, /const changed = !this\.statusSnapshotsEqual\(this\.sidebarSnapshot, snapshot\)/);
+  assert.match(sidebarSource, /this\.renderedStatusRevision !== this\.statusRevision/);
+});
+
 test('sidebar keeps retained activity history and commit source controls visible', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');

@@ -23057,10 +23057,20 @@ var import_obsidian4 = require("obsidian");
 // src/sidebarReadModel.ts
 var SidebarReadModel = class {
   constructor() {
+    this.statusSnapshot = null;
     this.remoteCommits = null;
     this.localCommits = null;
     this.commitDetails = /* @__PURE__ */ new Map();
     this.logEntries = null;
+  }
+  getStatusSnapshot() {
+    return this.statusSnapshot;
+  }
+  setStatusSnapshot(snapshot) {
+    this.statusSnapshot = snapshot;
+  }
+  invalidateStatus() {
+    this.statusSnapshot = null;
   }
   getRemoteCommits(repoUrl, branch2) {
     var _a;
@@ -23133,8 +23143,18 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.logUnsubscribe = null;
     this.logRenderScheduled = false;
     this.mutationInFlight = false;
+    this.repositoryStateKnown = false;
+    this.repositoryReadInFlight = null;
+    this.statusRevision = 0;
+    this.renderedStatusRevision = -1;
+    this.renderedHeaderKey = null;
+    this.renderedFooterKey = null;
+    this.commitInFlight = false;
+    this.ignorePatternInFlight = false;
     this.plugin = plugin;
     this.readModel = getSidebarReadModel(plugin);
+    this.sidebarSnapshot = this.readModel.getStatusSnapshot();
+    this.repositoryStateKnown = this.sidebarSnapshot !== null;
   }
   getViewType() {
     return VIEW_TYPE_GIT_SIDEBAR;
@@ -23148,6 +23168,11 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
+    this.tabContainers.clear();
+    this.renderedTabs.clear();
+    this.renderedStatusRevision = -1;
+    this.renderedHeaderKey = null;
+    this.renderedFooterKey = null;
     container.addClass("git-sidebar-container");
     container.addClass("git-sidebar-density-compact");
     container.setAttr("role", "region");
@@ -23181,17 +23206,24 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       window.setTimeout(() => {
         this.logRenderScheduled = false;
         if (this.activeTab === "log" && this.containerEl.isConnected) {
-          void this.refresh({ readRepository: false });
+          void this.refresh({ readRepository: false }).catch((error) => {
+            log2.debug("GitSidebar", "Log refresh failed", error);
+          });
         }
       }, 0);
     });
     this.registerEvent(this.app.vault.on("delete", () => {
-      if (this.containerEl.isConnected)
-        void this.refresh({ force: true });
+      if (this.containerEl.isConnected) {
+        void this.refresh({ force: true }).catch((error) => {
+          log2.debug("GitSidebar", "Delete-triggered refresh failed", error);
+        });
+      }
     }));
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
-    await this.refresh();
+    void this.refresh().catch((error) => {
+      log2.warn("GitSidebar", "Initial sidebar refresh failed", error);
+    });
     this.startAutoRefresh();
   }
   async onClose() {
@@ -23207,8 +23239,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const ms = this.plugin.settings.refreshInterval * 1e3;
     if (ms > 0) {
       this.refreshInterval = window.setInterval(() => {
-        if (this.containerEl.isShown()) {
-          this.refresh();
+        if (this.containerEl.isShown() && !this.repositoryReadInFlight) {
+          void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+            log2.debug("GitSidebar", "Automatic sidebar refresh failed", error);
+          });
         }
       }, ms);
     }
@@ -23275,6 +23309,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     pane.empty();
     this.renderStatusTab(this.sidebarSnapshot, pane);
     this.renderedTabs.add("status");
+    this.renderedStatusRevision = this.statusRevision;
+    this.renderedFooterKey = null;
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
     if (footerEl)
       this.renderFooter(footerEl);
@@ -23287,6 +23323,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     button.setAttr("aria-busy", "true");
     try {
       await this.refresh({ force: true });
+    } catch (error) {
+      new import_obsidian4.Notice("Refresh failed: " + ((error == null ? void 0 : error.message) || String(error)));
     } finally {
       if (button.isConnected) {
         button.disabled = false;
@@ -23324,10 +23362,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
           "data-tab": tab.id
         }
       });
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         this.activeTab = tab.id;
         this.renderTabs();
-        await this.refresh({ readRepository: false });
+        void this.refresh({ readRepository: false }).catch((error) => {
+          log2.debug("GitSidebar", "Tab refresh failed", error);
+        });
       });
     }
   }
@@ -23466,8 +23506,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     new import_obsidian4.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => modal.close());
     const commitButton = new import_obsidian4.ButtonComponent(actions).setButtonText("Commit").setClass("git-btn-primary");
     const commit2 = async () => {
-      if (!this.plugin.gitManager)
+      if (!this.plugin.gitManager || this.commitInFlight)
         return;
+      this.commitInFlight = true;
       commitButton.setDisabled(true).setButtonText("Committing\u2026");
       try {
         await this.plugin.runGitMutation("Commit changes", async (manager) => {
@@ -23480,12 +23521,16 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       } catch (e) {
         commitButton.setDisabled(false).setButtonText("Commit");
         new import_obsidian4.Notice("Commit failed: " + e.message);
+      } finally {
+        this.commitInFlight = false;
       }
     };
     commitButton.onClick(commit2);
     input.inputEl.addEventListener("keydown", (event) => {
-      if (event.key === "Enter")
+      if (event.key === "Enter") {
+        event.preventDefault();
         void commit2();
+      }
     });
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
@@ -23533,35 +23578,84 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   async refresh(options = {}) {
     const generation = ++this.renderGeneration;
     const readRepository = options.readRepository !== false;
-    if (readRepository && options.force)
-      this.sidebarSnapshot = null;
-    if (!this.plugin.gitManager) {
-      await this.plugin.ensureGitManager();
-    }
-    if (!this.isCurrentRender(generation))
-      return;
-    let hasReal = this.hasRealRepo;
     if (readRepository) {
-      try {
-        hasReal = this.plugin.gitManager ? await this.plugin.gitManager.hasRepository() : false;
-      } catch (e) {
-        log2.warn("GitSidebar", "repository check failed", e);
-      }
-      this.hasRealRepo = hasReal;
-      if (!hasReal)
-        this.sidebarSnapshot = null;
-      if (hasReal && this.plugin.gitManager) {
-        try {
-          this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
-        } catch (e) {
-          log2.warn("GitSidebar", "Failed to read repository snapshot", e);
-          if (options.force)
-            this.sidebarSnapshot = null;
-        }
-      }
+      await this.renderCurrentState(generation, false);
+      await this.refreshRepositoryStatus(options.skipIfRepositoryReadInFlight === true);
+      if (!this.isCurrentRender(generation))
+        return;
+    } else {
+      if (!this.plugin.gitManager)
+        await this.plugin.ensureGitManager();
+      if (!this.isCurrentRender(generation))
+        return;
     }
+    await this.renderCurrentState(generation, readRepository);
+  }
+  async refreshRepositoryStatus(skipIfInFlight) {
+    if (this.repositoryReadInFlight) {
+      if (skipIfInFlight)
+        return;
+      await this.repositoryReadInFlight;
+      return;
+    }
+    const read = this.readRepositoryStatus();
+    this.repositoryReadInFlight = read;
+    try {
+      await read;
+    } finally {
+      if (this.repositoryReadInFlight === read)
+        this.repositoryReadInFlight = null;
+    }
+  }
+  async readRepositoryStatus() {
+    const manager = await this.plugin.ensureGitManager();
+    if (!manager) {
+      const changed = !this.repositoryStateKnown || this.hasRealRepo || this.sidebarSnapshot !== null;
+      this.repositoryStateKnown = true;
+      this.hasRealRepo = false;
+      this.sidebarSnapshot = null;
+      this.readModel.invalidateStatus();
+      if (changed)
+        this.statusRevision += 1;
+      return;
+    }
+    let hasReal = this.hasRealRepo;
+    try {
+      hasReal = await manager.hasRepository();
+      this.repositoryStateKnown = true;
+    } catch (error) {
+      log2.warn("GitSidebar", "repository check failed", error);
+      return;
+    }
+    this.hasRealRepo = hasReal;
+    if (!hasReal) {
+      const changed = this.sidebarSnapshot !== null;
+      this.sidebarSnapshot = null;
+      this.readModel.invalidateStatus();
+      if (changed)
+        this.statusRevision += 1;
+      return;
+    }
+    try {
+      const snapshot = await manager.getSidebarStatusSnapshot();
+      const changed = !this.statusSnapshotsEqual(this.sidebarSnapshot, snapshot);
+      this.sidebarSnapshot = snapshot;
+      this.readModel.setStatusSnapshot(snapshot);
+      if (changed)
+        this.statusRevision += 1;
+    } catch (error) {
+      log2.warn("GitSidebar", "Failed to read repository snapshot", error);
+    }
+  }
+  async renderCurrentState(generation, readRepository) {
     if (!this.isCurrentRender(generation))
       return;
+    if (!this.repositoryStateKnown && !this.sidebarSnapshot) {
+      this.renderLoadingState();
+      return;
+    }
+    const activeTab = this.activeTab;
+    const hasReal = this.hasRealRepo || this.sidebarSnapshot !== null;
     const initialized = hasReal;
     this.hasRemote = !!this.plugin.settings.repoUrl;
     this.isLocalOnly = !this.hasRemote;
@@ -23574,25 +23668,42 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     const behind = (snapshot == null ? void 0 : snapshot.behind) || 0;
     const repositoryStatusAvailable = (snapshot == null ? void 0 : snapshot.repositoryStatusAvailable) !== false;
     const comparison = (snapshot == null ? void 0 : snapshot.comparison) || (repositoryStatusAvailable ? "up-to-date" : "unavailable");
-    this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+    const headerKey = JSON.stringify({
+      tab: activeTab,
+      branch: branch2,
+      ahead,
+      behind,
+      initialized,
+      hasReal,
+      repositoryStatusAvailable,
+      comparison,
+      localOnly: this.isLocalOnly
+    });
+    if (this.renderedHeaderKey !== headerKey) {
+      this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+      this.renderedHeaderKey = headerKey;
+    }
     if (readRepository && initialized && this.hasRemote && this.plugin.gitManager && snapshot) {
       void this.updateRemoteComparison(generation);
     }
     this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
-    const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
+    const remoteHistoryOnly = activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
     if (!initialized && !remoteHistoryOnly) {
-      const pane = this.tabContainer(this.activeTab);
+      const pane = this.tabContainer(activeTab);
       pane.empty();
       await this.renderUninitializedContent(hasReal, pane);
-      this.renderedTabs.add(this.activeTab);
+      if (!this.isCurrentRender(generation))
+        return;
+      this.renderedTabs.add(activeTab);
     } else {
-      const shouldRender = !this.renderedTabs.has(this.activeTab) || this.activeTab === "status" && readRepository || this.activeTab === "log" && !this.readModel.getLogEntries();
-      const pane = this.tabContainer(this.activeTab);
+      const shouldRender = !this.renderedTabs.has(activeTab) || activeTab === "status" && this.renderedStatusRevision !== this.statusRevision || activeTab === "log" && !this.readModel.getLogEntries();
+      const pane = this.tabContainer(activeTab);
       if (shouldRender) {
         pane.empty();
-        switch (this.activeTab) {
+        switch (activeTab) {
           case "status":
             this.renderStatusTab(snapshot, pane);
+            this.renderedStatusRevision = this.statusRevision;
             break;
           case "commits":
             await this.renderCommitsTab(generation, pane);
@@ -23601,14 +23712,29 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
             await this.renderLogTabInto(generation, pane);
             break;
         }
-        this.renderedTabs.add(this.activeTab);
+        if (!this.isCurrentRender(generation))
+          return;
+        this.renderedTabs.add(activeTab);
       }
     }
     if (!this.isCurrentRender(generation))
       return;
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
-    if (footerEl)
+    const footerKey = `${activeTab}|${this.stagedCount}|${this.hasRemote}|${!!this.plugin.gitManager}`;
+    if (footerEl && this.renderedFooterKey !== footerKey) {
       this.renderFooter(footerEl);
+      this.renderedFooterKey = footerKey;
+    }
+  }
+  statusSnapshotsEqual(left, right) {
+    if (!left)
+      return false;
+    if (left.branch !== right.branch || left.ahead !== right.ahead || left.behind !== right.behind || left.comparison !== right.comparison || left.repositoryStatusAvailable !== right.repositoryStatusAvailable || left.staged.length !== right.staged.length || left.unstaged.length !== right.unstaged.length || left.detailedStatus.length !== right.detailedStatus.length)
+      return false;
+    return left.staged.every((path, index2) => path === right.staged[index2]) && left.unstaged.every((path, index2) => path === right.unstaged[index2]) && left.detailedStatus.every((file, index2) => {
+      const next = right.detailedStatus[index2];
+      return file.filepath === next.filepath && file.status === next.status;
+    });
   }
   async updateRemoteComparison(generation) {
     const manager = this.plugin.gitManager;
@@ -23951,20 +24077,35 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     new import_obsidian4.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => modal.close());
     const addButton = new import_obsidian4.ButtonComponent(actions).setButtonText("Add pattern").setClass("git-btn-primary");
     const submit = async () => {
+      if (this.ignorePatternInFlight)
+        return;
       try {
         const pattern = input.getValue().trim();
+        if (!pattern) {
+          new import_obsidian4.Notice("Enter a Git ignore pattern");
+          return;
+        }
+        this.ignorePatternInFlight = true;
+        addButton.setDisabled(true).setButtonText("Adding\u2026");
         const added = await this.plugin.addGitIgnorePattern(pattern);
         modal.close();
         new import_obsidian4.Notice(added ? `Added ${pattern} to .gitignore` : `${pattern} is already in .gitignore`);
         await this.refresh();
       } catch (e) {
         new import_obsidian4.Notice(`Could not update .gitignore: ${e.message}`);
+      } finally {
+        this.ignorePatternInFlight = false;
+        if (addButton.buttonEl.isConnected) {
+          addButton.setDisabled(false).setButtonText("Add pattern");
+        }
       }
     };
     addButton.onClick(submit);
     input.inputEl.addEventListener("keydown", (event) => {
-      if (event.key === "Enter")
+      if (event.key === "Enter") {
+        event.preventDefault();
         void submit();
+      }
     });
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
@@ -23977,20 +24118,24 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       cls: "git-commits-toggle-btn" + (this.commitsViewMode === "local" ? " git-commits-toggle-active" : ""),
       attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "local") }
     });
-    localBtn.addEventListener("click", async () => {
+    localBtn.addEventListener("click", () => {
       this.commitsViewMode = "local";
       this.invalidateTab("commits");
-      await this.refresh({ readRepository: false });
+      void this.refresh({ readRepository: false }).catch((error) => {
+        log2.debug("GitSidebar", "Local commit view refresh failed", error);
+      });
     });
     const remoteBtn = toggleBar.createEl("button", {
       text: "Remote",
       cls: "git-commits-toggle-btn" + (this.commitsViewMode === "remote" ? " git-commits-toggle-active" : ""),
       attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "remote") }
     });
-    remoteBtn.addEventListener("click", async () => {
+    remoteBtn.addEventListener("click", () => {
       this.commitsViewMode = "remote";
       this.invalidateTab("commits");
-      await this.refresh({ readRepository: false });
+      void this.refresh({ readRepository: false }).catch((error) => {
+        log2.debug("GitSidebar", "Remote commit view refresh failed", error);
+      });
     });
     const loading = this.commitsViewMode === "remote" ? listContainer.createEl("p", { text: "Loading remote commits\u2026", cls: "git-empty-state" }) : null;
     try {
@@ -24237,28 +24382,32 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }));
     menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(async () => {
       var _a;
-      log2.clear();
-      await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
-      this.readModel.setLogEntries([]);
-      new import_obsidian4.Notice("Activity log cleared");
-      this.invalidateTab("log");
-      await this.refresh({ readRepository: false });
+      try {
+        log2.clear();
+        await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
+        this.readModel.setLogEntries([]);
+        new import_obsidian4.Notice("Activity log cleared");
+        this.invalidateTab("log");
+        await this.refresh({ readRepository: false });
+      } catch (e) {
+        new import_obsidian4.Notice("Could not clear log: " + e.message);
+      }
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
       var _a;
-      if (!this.readModel.getLogEntries()) {
-        const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
-        log2.mergePersistedEntries(persisted);
-        this.readModel.setLogEntries(log2.getEntries());
-      }
-      const entries = [...this.readModel.getLogEntries() || []].reverse();
-      const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
-        const time = new Date(entry.timestamp).toISOString();
-        const data = entry.data ? `
-${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "";
-        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
-      }).join("\n");
       try {
+        if (!this.readModel.getLogEntries()) {
+          const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+          log2.mergePersistedEntries(persisted);
+          this.readModel.setLogEntries(log2.getEntries());
+        }
+        const entries = [...this.readModel.getLogEntries() || []].reverse();
+        const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
+          const time = new Date(entry.timestamp).toISOString();
+          const data = entry.data ? `
+${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "";
+          return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+        }).join("\n");
         await navigator.clipboard.writeText(details);
         new import_obsidian4.Notice("Log details copied");
       } catch (e) {
@@ -25066,7 +25215,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "eaded78f87491d4869106121ad6b5afcc76eb964" : "unknown";
+var GIT_COMMIT_HASH = true ? "0648ff1783002759720fe7ee540e1b520e188df6" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
@@ -25552,6 +25701,7 @@ var GitSyncPlugin = class extends import_obsidian8.Plugin {
     this.fileLogger = null;
     this.credentialStore = null;
     this.credentialStorageError = null;
+    this.gitManagerPromise = null;
     this.operationCoordinator = new OperationCoordinator();
     this.operationLifecycleUnsubscribe = null;
   }
@@ -26088,14 +26238,23 @@ var GitSyncPlugin = class extends import_obsidian8.Plugin {
   async ensureGitManager(requireRemote = false) {
     if (this.gitManager)
       return this.gitManager;
-    const vaultPath = ".";
-    if (!this.settings.repoUrl && requireRemote) {
-      log2.warn("GitSyncPlugin", "No remote URL configured");
-      return null;
+    if (this.gitManagerPromise)
+      return this.gitManagerPromise;
+    this.gitManagerPromise = (async () => {
+      const vaultPath = ".";
+      if (!this.settings.repoUrl && requireRemote) {
+        log2.warn("GitSyncPlugin", "No remote URL configured");
+        return null;
+      }
+      const credentials = await this.getGitCredentials(false);
+      this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
+      return this.gitManager;
+    })();
+    try {
+      return await this.gitManagerPromise;
+    } finally {
+      this.gitManagerPromise = null;
     }
-    const credentials = await this.getGitCredentials(false);
-    this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
-    return this.gitManager;
   }
   /** Run one repository mutation through the shared lifecycle boundary. */
   async runGitMutation(name, operation) {
