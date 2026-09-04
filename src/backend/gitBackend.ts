@@ -670,6 +670,16 @@ export class GitBackend {
     }));
   }
 
+  /** Read the attached branch ref without scanning the worktree. */
+  async currentBranch(): Promise<string | null> {
+    try {
+      return (await git.currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false })) || null;
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
   async remoteHistory(branch = this.config.branch, limit = 25): Promise<GitCommit[]> {
     let commits: any[];
     try {

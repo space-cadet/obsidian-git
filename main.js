@@ -21812,6 +21812,16 @@ var GitBackend = class {
       };
     });
   }
+  /** Read the attached branch ref without scanning the worktree. */
+  async currentBranch() {
+    try {
+      return await currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false }) || null;
+    } catch (error) {
+      if (isMissing(error))
+        return null;
+      throw error;
+    }
+  }
   async remoteHistory(branch2 = this.config.branch, limit = 25) {
     let commits;
     try {
@@ -22375,7 +22385,7 @@ var ObsidianGitBackend = class {
     };
   }
   async getCurrentBranch() {
-    return (await this.backend.status()).branch || this.config.branch;
+    return await this.backend.currentBranch() || this.config.branch;
   }
   async getLog(limit = 25) {
     return (await this.backend.history(limit)).map(toLegacyCommit);
@@ -23117,6 +23127,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     this.isLocalOnly = false;
     this.hasRealRepo = false;
     this.sidebarSnapshot = null;
+    this.tabContainers = /* @__PURE__ */ new Map();
+    this.renderedTabs = /* @__PURE__ */ new Set();
     this.renderGeneration = 0;
     this.logUnsubscribe = null;
     this.logRenderScheduled = false;
@@ -23213,6 +23225,24 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   }
   invalidateRemoteCommitsCache() {
     this.readModel.invalidateHistory();
+    this.invalidateTab("commits");
+  }
+  tabContainer(tab) {
+    let pane = this.tabContainers.get(tab);
+    if (!pane) {
+      pane = this.contentContainer.createDiv("git-sidebar-tab-pane");
+      pane.setAttr("data-tab", tab);
+      this.tabContainers.set(tab, pane);
+    }
+    for (const [otherTab, otherPane] of this.tabContainers) {
+      otherPane.toggleAttribute("hidden", otherTab !== tab);
+    }
+    return pane;
+  }
+  invalidateTab(tab) {
+    var _a;
+    this.renderedTabs.delete(tab);
+    (_a = this.tabContainers.get(tab)) == null ? void 0 : _a.empty();
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
@@ -23241,8 +23271,10 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
   repaintStatusSnapshot() {
     if (this.activeTab !== "status")
       return;
-    this.contentContainer.empty();
-    this.renderStatusTab(this.sidebarSnapshot);
+    const pane = this.tabContainer("status");
+    pane.empty();
+    this.renderStatusTab(this.sidebarSnapshot, pane);
+    this.renderedTabs.add("status");
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
     if (footerEl)
       this.renderFooter(footerEl);
@@ -23547,21 +23579,29 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       void this.updateRemoteComparison(generation);
     }
     this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
-    this.contentContainer.empty();
     const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
     if (!initialized && !remoteHistoryOnly) {
-      await this.renderUninitializedContent(hasReal);
+      const pane = this.tabContainer(this.activeTab);
+      pane.empty();
+      await this.renderUninitializedContent(hasReal, pane);
+      this.renderedTabs.add(this.activeTab);
     } else {
-      switch (this.activeTab) {
-        case "status":
-          this.renderStatusTab(snapshot);
-          break;
-        case "commits":
-          await this.renderCommitsTab(generation);
-          break;
-        case "log":
-          await this.renderLogTab(generation);
-          break;
+      const shouldRender = !this.renderedTabs.has(this.activeTab) || this.activeTab === "status" && readRepository || this.activeTab === "log" && !this.readModel.getLogEntries();
+      const pane = this.tabContainer(this.activeTab);
+      if (shouldRender) {
+        pane.empty();
+        switch (this.activeTab) {
+          case "status":
+            this.renderStatusTab(snapshot, pane);
+            break;
+          case "commits":
+            await this.renderCommitsTab(generation, pane);
+            break;
+          case "log":
+            await this.renderLogTabInto(generation, pane);
+            break;
+        }
+        this.renderedTabs.add(this.activeTab);
       }
     }
     if (!this.isCurrentRender(generation))
@@ -23596,8 +23636,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       log2.debug("GitSidebar", "Remote comparison unavailable after local refresh", error);
     }
   }
-  async renderUninitializedContent(hasReal) {
-    const wrapper = this.contentContainer.createDiv("git-uninit-container");
+  async renderUninitializedContent(hasReal, target = this.contentContainer) {
+    const wrapper = target.createDiv("git-uninit-container");
     if (!hasReal) {
       wrapper.createEl("p", {
         text: "No git repository found in this vault.",
@@ -23661,9 +23701,9 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     }
   }
   // ─── Tab renders ───
-  renderStatusTab(snapshot) {
+  renderStatusTab(snapshot, target = this.contentContainer) {
     var _a;
-    const container = this.contentContainer.createDiv("git-status-container");
+    const container = target.createDiv("git-status-container");
     try {
       if (!snapshot) {
         container.createEl("p", { text: "Unable to read repository status", cls: "git-empty-state" });
@@ -23929,8 +23969,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
   }
-  async renderCommitsTab(generation) {
-    const listContainer = this.contentContainer.createDiv("git-log-list");
+  async renderCommitsTab(generation, target = this.contentContainer) {
+    const listContainer = target.createDiv("git-log-list");
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
       text: "Local",
@@ -23939,6 +23979,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     localBtn.addEventListener("click", async () => {
       this.commitsViewMode = "local";
+      this.invalidateTab("commits");
       await this.refresh({ readRepository: false });
     });
     const remoteBtn = toggleBar.createEl("button", {
@@ -23948,6 +23989,7 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     });
     remoteBtn.addEventListener("click", async () => {
       this.commitsViewMode = "remote";
+      this.invalidateTab("commits");
       await this.refresh({ readRepository: false });
     });
     const loading = this.commitsViewMode === "remote" ? listContainer.createEl("p", { text: "Loading remote commits\u2026", cls: "git-empty-state" }) : null;
@@ -24025,8 +24067,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         const toggle = meta.createSpan({ cls: "git-commit-toggle", attr: { "aria-hidden": "true" } });
         toggle.setText(isExpanded ? "\u2304" : "\u203A");
         row.addEventListener("click", async (e) => {
-          const target = e.target;
-          if (target.closest("a") || target.closest("button"))
+          const target2 = e.target;
+          if (target2.closest("a") || target2.closest("button"))
             return;
           const currentlyExpanded = this.expandedCommitOids.has(commit2.oid);
           if (currentlyExpanded) {
@@ -24133,8 +24175,11 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
     await this.renderCommitsTab(this.renderGeneration);
   }
   async renderLogTab(generation) {
+    await this.renderLogTabInto(generation, this.contentContainer);
+  }
+  async renderLogTabInto(generation, target) {
     var _a;
-    const listContainer = this.contentContainer.createDiv("git-log-list");
+    const listContainer = target.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
     const currentLogEntries = log2.getEntries();
@@ -24196,8 +24241,8 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
       this.readModel.setLogEntries([]);
       new import_obsidian4.Notice("Activity log cleared");
-      this.contentContainer.empty();
-      await this.renderLogTab(this.renderGeneration);
+      this.invalidateTab("log");
+      await this.refresh({ readRepository: false });
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
       var _a;
@@ -25021,7 +25066,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "823c2e0a642cc27d778e415a50317a1543564315" : "unknown";
+var GIT_COMMIT_HASH = true ? "eaded78f87491d4869106121ad6b5afcc76eb964" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

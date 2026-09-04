@@ -192,7 +192,7 @@ export class ObsidianGitBackend {
   }
 
   async getCurrentBranch(): Promise<string> {
-    return (await this.backend.status()).branch || this.config.branch;
+    return (await this.backend.currentBranch()) || this.config.branch;
   }
 
   async getLog(limit = 25): Promise<GitCommit[]> {

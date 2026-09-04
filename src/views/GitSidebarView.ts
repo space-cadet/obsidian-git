@@ -37,6 +37,8 @@ export class GitSidebarView extends ItemView {
     private hasRealRepo: boolean = false;
     private sidebarSnapshot: GitSidebarStatusSnapshot | null = null;
     private readonly readModel: SidebarReadModel;
+    private readonly tabContainers = new Map<SidebarTab, HTMLElement>();
+    private readonly renderedTabs = new Set<SidebarTab>();
     private renderGeneration = 0;
     private logUnsubscribe: (() => void) | null = null;
     private logRenderScheduled = false;
@@ -170,6 +172,25 @@ export class GitSidebarView extends ItemView {
 
     private invalidateRemoteCommitsCache(): void {
         this.readModel.invalidateHistory();
+        this.invalidateTab('commits');
+    }
+
+    private tabContainer(tab: SidebarTab): HTMLElement {
+        let pane = this.tabContainers.get(tab);
+        if (!pane) {
+            pane = this.contentContainer.createDiv('git-sidebar-tab-pane');
+            pane.setAttr('data-tab', tab);
+            this.tabContainers.set(tab, pane);
+        }
+        for (const [otherTab, otherPane] of this.tabContainers) {
+            otherPane.toggleAttribute('hidden', otherTab !== tab);
+        }
+        return pane;
+    }
+
+    private invalidateTab(tab: SidebarTab): void {
+        this.renderedTabs.delete(tab);
+        this.tabContainers.get(tab)?.empty();
     }
 
     private isCurrentRender(generation: number): boolean {
@@ -199,8 +220,10 @@ export class GitSidebarView extends ItemView {
 
     private repaintStatusSnapshot(): void {
         if (this.activeTab !== 'status') return;
-        this.contentContainer.empty();
-        this.renderStatusTab(this.sidebarSnapshot);
+        const pane = this.tabContainer('status');
+        pane.empty();
+        this.renderStatusTab(this.sidebarSnapshot, pane);
+        this.renderedTabs.add('status');
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
         if (footerEl) this.renderFooter(footerEl);
     }
@@ -592,8 +615,6 @@ export class GitSidebarView extends ItemView {
             void this.updateRemoteComparison(generation);
         }
         this.stagedCount = snapshot?.staged.length || 0;
-        this.contentContainer.empty();
-
         // Remote history is an independent read capability. Keep it available
         // when the local repository is absent, while local Changes/Log content
         // still explains how to initialize the vault.
@@ -601,18 +622,29 @@ export class GitSidebarView extends ItemView {
             && this.commitsViewMode === 'remote'
             && this.hasRemote;
         if (!initialized && !remoteHistoryOnly) {
-            await this.renderUninitializedContent(hasReal);
+            const pane = this.tabContainer(this.activeTab);
+            pane.empty();
+            await this.renderUninitializedContent(hasReal, pane);
+            this.renderedTabs.add(this.activeTab);
         } else {
-            switch (this.activeTab) {
-                case 'status':
-                    this.renderStatusTab(snapshot);
-                    break;
-                case 'commits':
-                    await this.renderCommitsTab(generation);
-                    break;
-                case 'log':
-                    await this.renderLogTab(generation);
-                    break;
+            const shouldRender = !this.renderedTabs.has(this.activeTab)
+                || (this.activeTab === 'status' && readRepository)
+                || (this.activeTab === 'log' && !this.readModel.getLogEntries());
+            const pane = this.tabContainer(this.activeTab);
+            if (shouldRender) {
+                pane.empty();
+                switch (this.activeTab) {
+                    case 'status':
+                        this.renderStatusTab(snapshot, pane);
+                        break;
+                    case 'commits':
+                        await this.renderCommitsTab(generation, pane);
+                        break;
+                    case 'log':
+                        await this.renderLogTabInto(generation, pane);
+                        break;
+                }
+                this.renderedTabs.add(this.activeTab);
             }
         }
 
@@ -646,8 +678,8 @@ export class GitSidebarView extends ItemView {
         }
     }
 
-    private async renderUninitializedContent(hasReal: boolean): Promise<void> {
-        const wrapper = this.contentContainer.createDiv('git-uninit-container');
+    private async renderUninitializedContent(hasReal: boolean, target = this.contentContainer): Promise<void> {
+        const wrapper = target.createDiv('git-uninit-container');
         
         if (!hasReal) {
             wrapper.createEl('p', { 
@@ -740,8 +772,8 @@ export class GitSidebarView extends ItemView {
 
     // ─── Tab renders ───
 
-    private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null): void {
-        const container = this.contentContainer.createDiv('git-status-container');
+    private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null, target = this.contentContainer): void {
+        const container = target.createDiv('git-status-container');
 
         try {
             if (!snapshot) {
@@ -1070,8 +1102,8 @@ export class GitSidebarView extends ItemView {
         window.setTimeout(() => input.inputEl.focus(), 0);
     }
 
-    private async renderCommitsTab(generation: number): Promise<void> {
-        const listContainer = this.contentContainer.createDiv('git-log-list');
+    private async renderCommitsTab(generation: number, target = this.contentContainer): Promise<void> {
+        const listContainer = target.createDiv('git-log-list');
 
         // Toggle bar: Local / Remote
         const toggleBar = listContainer.createDiv('git-commits-toggle-bar');
@@ -1082,6 +1114,7 @@ export class GitSidebarView extends ItemView {
         });
         localBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'local';
+            this.invalidateTab('commits');
             await this.refresh({ readRepository: false });
         });
         const remoteBtn = toggleBar.createEl('button', {
@@ -1091,6 +1124,7 @@ export class GitSidebarView extends ItemView {
         });
         remoteBtn.addEventListener('click', async () => {
             this.commitsViewMode = 'remote';
+            this.invalidateTab('commits');
             await this.refresh({ readRepository: false });
         });
 
@@ -1327,7 +1361,11 @@ export class GitSidebarView extends ItemView {
     }
 
     private async renderLogTab(generation: number): Promise<void> {
-        const listContainer = this.contentContainer.createDiv('git-log-list');
+        await this.renderLogTabInto(generation, this.contentContainer);
+    }
+
+    private async renderLogTabInto(generation: number, target: HTMLElement): Promise<void> {
+        const listContainer = target.createDiv('git-log-list');
 
         const toolbar = listContainer.createDiv('git-log-toolbar');
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
@@ -1406,8 +1444,8 @@ export class GitSidebarView extends ItemView {
                 await this.plugin.fileLogger?.clear();
                 this.readModel.setLogEntries([]);
                 new Notice('Activity log cleared');
-                this.contentContainer.empty();
-                await this.renderLogTab(this.renderGeneration);
+                this.invalidateTab('log');
+                await this.refresh({ readRepository: false });
             }));
         menu.addItem((item) => item
             .setTitle('Copy details')
