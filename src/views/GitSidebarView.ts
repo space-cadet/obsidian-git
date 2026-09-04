@@ -1,6 +1,7 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
 import { GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../backend/obsidianAdapter';
+import { parseGitHubRepositoryUrl } from '../backend/githubApi';
 import { log } from '../logger';
 import { SidebarReadModel } from '../sidebarReadModel';
 
@@ -1347,12 +1348,35 @@ export class GitSidebarView extends ItemView {
                 if (cached !== null) {
                     commits = cached;
                 } else {
-                    commits = this.plugin.gitManager
-                        ? await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch, 25)
-                        : [];
-                    if (commits.length === 0 && this.plugin.gitManager) {
-                        // Non-GitHub remotes still use their fetched origin ref.
-                        commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                    const isGitHub = parseGitHubRepositoryUrl(remoteUrl) !== null;
+                    if (!this.plugin.gitManager) {
+                        log.error(
+                            'GitSidebar',
+                            `Remote commit fetch skipped (source=${isGitHub ? 'github-api' : 'local-remote-ref'}, branch=${branch}): Git backend unavailable`,
+                            new Error('Git backend unavailable'),
+                        );
+                    } else {
+                        // The manager is created without secrets so normal local
+                        // reads stay cheap. Resolve the credential immediately
+                        // before this authenticated remote read.
+                        await this.plugin.refreshGitCredentials();
+                        log.info('GitSidebar', 'Fetching remote commit history', {
+                            branch,
+                            source: isGitHub ? 'github-api' : 'local-remote-ref',
+                        });
+                        commits = await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch, 25);
+                        log.info('GitSidebar', 'Remote commit history fetched', {
+                            branch,
+                            source: isGitHub ? 'github-api' : 'local-remote-ref',
+                            count: commits.length,
+                        });
+                        if (commits.length === 0 && !isGitHub) {
+                            // Non-GitHub remotes still use their fetched origin ref.
+                            log.warn('GitSidebar', 'Remote API returned no commits; using local remote-tracking ref', { branch });
+                            commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                        } else if (commits.length === 0) {
+                            log.warn('GitSidebar', 'GitHub returned no remote commits', { branch });
+                        }
                     }
                 }
                 this.readModel.setRemoteCommits(remoteUrl, branch, commits);
@@ -1440,7 +1464,12 @@ export class GitSidebarView extends ItemView {
             }
         } catch (e: any) {
             loading?.remove();
-            log.debug('GitSidebar', 'Failed to get commit log', e);
+            const error = e instanceof Error ? e : new Error(String(e));
+            log.error(
+                'GitSidebar',
+                `Failed to get commit log (mode=${this.commitsViewMode}, branch=${this.plugin.settings.branchName || 'main'})`,
+                error,
+            );
             const msg = e.message || String(e);
             if (msg.includes('Could not find') || msg.includes('refs/head') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
                 listContainer.empty();

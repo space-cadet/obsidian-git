@@ -22464,7 +22464,7 @@ var ObsidianGitBackend = class {
   async fetchRemoteCommits(repoUrl, branch2, limit = 25) {
     const credential = await this.credentials.getCredential();
     if (!(credential == null ? void 0 : credential.password))
-      return [];
+      throw new Error("Remote credential unavailable for remote commit history");
     const api = new GitHubApi(this.backendTransport(), credential.password);
     return (await api.listCommits(repoUrl, branch2, limit)).map((commit2) => ({
       oid: commit2.oid,
@@ -24192,9 +24192,31 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
         if (cached !== null) {
           commits = cached;
         } else {
-          commits = this.plugin.gitManager ? await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch2, 25) : [];
-          if (commits.length === 0 && this.plugin.gitManager) {
-            commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
+          const isGitHub = parseGitHubRepositoryUrl(remoteUrl) !== null;
+          if (!this.plugin.gitManager) {
+            log2.error(
+              "GitSidebar",
+              `Remote commit fetch skipped (source=${isGitHub ? "github-api" : "local-remote-ref"}, branch=${branch2}): Git backend unavailable`,
+              new Error("Git backend unavailable")
+            );
+          } else {
+            await this.plugin.refreshGitCredentials();
+            log2.info("GitSidebar", "Fetching remote commit history", {
+              branch: branch2,
+              source: isGitHub ? "github-api" : "local-remote-ref"
+            });
+            commits = await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch2, 25);
+            log2.info("GitSidebar", "Remote commit history fetched", {
+              branch: branch2,
+              source: isGitHub ? "github-api" : "local-remote-ref",
+              count: commits.length
+            });
+            if (commits.length === 0 && !isGitHub) {
+              log2.warn("GitSidebar", "Remote API returned no commits; using local remote-tracking ref", { branch: branch2 });
+              commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
+            } else if (commits.length === 0) {
+              log2.warn("GitSidebar", "GitHub returned no remote commits", { branch: branch2 });
+            }
           }
         }
         this.readModel.setRemoteCommits(remoteUrl, branch2, commits);
@@ -24269,7 +24291,12 @@ var GitSidebarView = class extends import_obsidian4.ItemView {
       }
     } catch (e) {
       loading == null ? void 0 : loading.remove();
-      log2.debug("GitSidebar", "Failed to get commit log", e);
+      const error = e instanceof Error ? e : new Error(String(e));
+      log2.error(
+        "GitSidebar",
+        `Failed to get commit log (mode=${this.commitsViewMode}, branch=${this.plugin.settings.branchName || "main"})`,
+        error
+      );
       const msg = e.message || String(e);
       if (msg.includes("Could not find") || msg.includes("refs/head") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
         listContainer.empty();
@@ -25244,7 +25271,7 @@ var AvailableBuildsModal = class extends import_obsidian5.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "056df8ba703a7b45a7a5505dea20499d0cf9c230" : "unknown";
+var GIT_COMMIT_HASH = true ? "a6964619564baddea32d9a8f1978d6e31745df18" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

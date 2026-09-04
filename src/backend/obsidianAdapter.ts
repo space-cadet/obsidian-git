@@ -265,7 +265,7 @@ export class ObsidianGitBackend {
 
   async fetchRemoteCommits(repoUrl: string, branch: string, limit = 25): Promise<GitCommit[]> {
     const credential = await this.credentials.getCredential();
-    if (!credential?.password) return [];
+    if (!credential?.password) throw new Error('Remote credential unavailable for remote commit history');
     const api = new GitHubApi(this.backendTransport(), credential.password);
     return (await api.listCommits(repoUrl, branch, limit)).map((commit) => ({
       oid: commit.oid,
