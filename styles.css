@@ -588,6 +588,41 @@
     padding: 4px 0;
 }
 
+.git-selection-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary-alt);
+}
+
+.git-selection-count {
+    flex: 1;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.git-selection-btn {
+    padding: 3px 10px;
+    border: none;
+    border-radius: 6px;
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.git-selection-btn:hover {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.git-selection-primary {
+    color: var(--text-accent);
+}
+
 /* File row — mobile-style clean layout */
 .git-file-row {
     display: flex;
@@ -601,6 +636,12 @@
 
 .git-file-row:hover {
     background: var(--background-modifier-hover);
+}
+
+.git-file-row-selected,
+.git-file-row-selected:hover {
+    background: var(--background-modifier-hover);
+    box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 /* Status icon — clean text marker like mobile (purple M, not boxed) */
@@ -1838,12 +1879,18 @@
     padding: 8px 24px;
     border-top: 1px solid var(--git-sidebar-divider);
     border-left: 0;
-    cursor: default;
+    cursor: pointer;
 }
 
 .git-file-row:hover {
     background: var(--git-sidebar-muted-surface);
     border-left-color: transparent;
+}
+
+.git-file-row-selected,
+.git-file-row-selected:hover {
+    background: var(--background-modifier-hover);
+    box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 .git-file-stage-toggle {

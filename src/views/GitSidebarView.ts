@@ -70,6 +70,8 @@ export class GitSidebarView extends ItemView {
     private renderedFooterKey: string | null = null;
     private readonly uncommittedFilters = new Set<ChangeFilterStatus>(changeFilterStatuses.map(({ status }) => status));
     private uncommittedSort: UncommittedSort = 'path-asc';
+    private readonly selectedFilePaths = new Set<string>();
+    private readonly selectionAnchorBySection = new Map<'staged' | 'unstaged', string>();
     private commitInFlight = false;
     private ignorePatternInFlight = false;
 
@@ -1001,6 +1003,13 @@ export class GitSidebarView extends ItemView {
             const statusByPath = new Map(
                 detailedStatus.map((file) => [file.filepath, file.status] as const)
             );
+            const visiblePaths = new Set([...staged, ...unstaged]);
+            for (const filepath of this.selectedFilePaths) {
+                if (!visiblePaths.has(filepath)) this.selectedFilePaths.delete(filepath);
+            }
+            for (const [sectionClass, filepath] of this.selectionAnchorBySection) {
+                if (!visiblePaths.has(filepath)) this.selectionAnchorBySection.delete(sectionClass);
+            }
             this.stagedCount = staged.length;
 
             // ── Staged section ── (always show, default collapsed if empty)
@@ -1021,6 +1030,28 @@ export class GitSidebarView extends ItemView {
                     new Notice(result.failed.length > 0
                         ? `Unstaged ${result.unstaged.length} of ${result.requested} files.`
                         : 'All files unstaged');
+                },
+                async (paths) => {
+                    const result = await this.plugin.runGitMutation('Unstage selected files', async (manager) => {
+                        const unstaged: string[] = [];
+                        const failed: Array<{ filepath: string; message: string }> = [];
+                        for (const filepath of paths) {
+                            try {
+                                await manager.unstageFile(filepath);
+                                unstaged.push(filepath);
+                            } catch (error: any) {
+                                failed.push({ filepath, message: error?.message || String(error) });
+                            }
+                        }
+                        return { requested: paths.length, unstaged, failed };
+                    });
+                    for (const filepath of result.unstaged) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'unstaged');
+                    }
+                    new Notice(result.failed.length > 0
+                        ? `Unstaged ${result.unstaged.length} of ${result.requested} selected files.`
+                        : `Unstaged ${result.unstaged.length} selected file${result.unstaged.length === 1 ? '' : 's'}.`);
                 }
             );
 
@@ -1050,6 +1081,16 @@ export class GitSidebarView extends ItemView {
                     for (const filepath of result.staged) {
                         this.applyFileMutationToSnapshot(filepath, 'staged');
                     }
+                },
+                async (paths) => {
+                    const result = await this.plugin.runGitMutation('Stage selected files', async (manager) => manager.addAll(paths));
+                    for (const filepath of result.staged) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'staged');
+                    }
+                    new Notice(result.failed.length > 0
+                        ? `Staged ${result.staged.length} of ${result.requested} selected files.`
+                        : `Staged ${result.staged.length} selected file${result.staged.length === 1 ? '' : 's'}.`);
                 }
             , { totalFiles: unstaged.length, showChangeControls: true });
 
@@ -1122,11 +1163,12 @@ export class GitSidebarView extends ItemView {
         container: HTMLElement,
         title: string,
         files: string[],
-        sectionClass: string,
+        sectionClass: 'staged' | 'unstaged',
         bulkLabel: string,
         statusByPath: Map<string, GitFileStatus['status']>,
         onAction: (filepath: string) => Promise<void>,
         onBulk: () => Promise<void>,
+        onSelected: (filepaths: string[]) => Promise<void>,
         options: { totalFiles?: number; showChangeControls?: boolean } = {},
     ): void {
         const totalFiles = options.totalFiles ?? files.length;
@@ -1248,6 +1290,49 @@ export class GitSidebarView extends ItemView {
         });
 
         const list = section.createDiv('git-status-section-list');
+
+        if (files.length > 0) {
+            const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+            const selectionToolbar = list.createDiv('git-selection-toolbar');
+            selectionToolbar.createSpan({
+                text: selected.length > 0 ? `${selected.length} selected` : 'Select files',
+                cls: 'git-selection-count',
+            });
+            const selectAll = selectionToolbar.createEl('button', {
+                text: selected.length === files.length ? 'Clear selection' : 'Select all',
+                cls: 'git-selection-btn',
+                attr: { type: 'button' },
+            });
+            selectAll.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (selected.length === files.length) {
+                    for (const filepath of files) this.selectedFilePaths.delete(filepath);
+                } else {
+                    for (const filepath of files) this.selectedFilePaths.add(filepath);
+                }
+                this.repaintStatusSnapshot();
+            });
+            if (selected.length > 0) {
+                const selectedAction = selectionToolbar.createEl('button', {
+                    text: sectionClass === 'staged' ? 'Unstage selected' : 'Stage selected',
+                    cls: 'git-selection-btn git-selection-primary',
+                    attr: { type: 'button' },
+                });
+                selectedAction.addEventListener('click', async (event) => {
+                    event.stopPropagation();
+                    if (this.mutationInFlight) return;
+                    this.setMutationBusy(true);
+                    try {
+                        await onSelected(selected);
+                        this.repaintStatusSnapshot();
+                    } catch (error: any) {
+                        new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} selected failed: ${error?.message || String(error)}`);
+                    } finally {
+                        this.setMutationBusy(false);
+                    }
+                });
+            }
+        }
         
         if (files.length === 0) {
             const emptyMsg = sectionClass === 'staged' 
@@ -1257,6 +1342,33 @@ export class GitSidebarView extends ItemView {
         } else {
             for (const filepath of files) {
                 const row = list.createDiv('git-file-row');
+
+                row.setAttr('role', 'option');
+                row.setAttr('aria-selected', String(this.selectedFilePaths.has(filepath)));
+                if (this.selectedFilePaths.has(filepath)) row.addClass('git-file-row-selected');
+                row.addEventListener('click', (event) => {
+                    const mouseEvent = event as MouseEvent;
+                    if (this.mutationInFlight) return;
+                    const anchor = this.selectionAnchorBySection.get(sectionClass);
+                    const currentIndex = files.indexOf(filepath);
+                    if (mouseEvent.shiftKey && anchor && files.includes(anchor)) {
+                        const anchorIndex = files.indexOf(anchor);
+                        const start = Math.min(anchorIndex, currentIndex);
+                        const end = Math.max(anchorIndex, currentIndex);
+                        for (const selectedPath of files.slice(start, end + 1)) {
+                            this.selectedFilePaths.add(selectedPath);
+                        }
+                    } else if (mouseEvent.metaKey || mouseEvent.ctrlKey) {
+                        if (this.selectedFilePaths.has(filepath)) this.selectedFilePaths.delete(filepath);
+                        else this.selectedFilePaths.add(filepath);
+                        this.selectionAnchorBySection.set(sectionClass, filepath);
+                    } else {
+                        for (const selectedPath of files) this.selectedFilePaths.delete(selectedPath);
+                        this.selectedFilePaths.add(filepath);
+                        this.selectionAnchorBySection.set(sectionClass, filepath);
+                    }
+                    this.repaintStatusSnapshot();
+                });
 
                 const stageBtn = row.createEl('button', {
                     cls: 'git-file-stage-toggle',
@@ -1382,7 +1494,7 @@ export class GitSidebarView extends ItemView {
     private setMutationBusy(busy: boolean): void {
         this.mutationInFlight = busy;
         const controls = this.contentContainer?.querySelectorAll<HTMLButtonElement>(
-            '.git-file-stage-toggle, .git-status-section-action',
+            '.git-file-stage-toggle, .git-status-section-action, .git-selection-btn',
         ) || [];
         controls.forEach((control) => {
             control.disabled = busy;

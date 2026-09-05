@@ -23736,6 +23736,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.renderedFooterKey = null;
     this.uncommittedFilters = new Set(changeFilterStatuses.map(({ status: status2 }) => status2));
     this.uncommittedSort = "path-asc";
+    this.selectedFilePaths = /* @__PURE__ */ new Set();
+    this.selectionAnchorBySection = /* @__PURE__ */ new Map();
     this.commitInFlight = false;
     this.ignorePatternInFlight = false;
     this.plugin = plugin;
@@ -24485,6 +24487,15 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       const statusByPath = new Map(
         detailedStatus.map((file) => [file.filepath, file.status])
       );
+      const visiblePaths = /* @__PURE__ */ new Set([...staged, ...unstaged]);
+      for (const filepath of this.selectedFilePaths) {
+        if (!visiblePaths.has(filepath))
+          this.selectedFilePaths.delete(filepath);
+      }
+      for (const [sectionClass, filepath] of this.selectionAnchorBySection) {
+        if (!visiblePaths.has(filepath))
+          this.selectionAnchorBySection.delete(sectionClass);
+      }
       this.stagedCount = staged.length;
       this.renderCollapsibleSection(
         container,
@@ -24507,6 +24518,26 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             this.applyFileMutationToSnapshot(filepath, "unstaged");
           }
           new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} files.` : "All files unstaged");
+        },
+        async (paths) => {
+          const result = await this.plugin.runGitMutation("Unstage selected files", async (manager) => {
+            const unstaged2 = [];
+            const failed = [];
+            for (const filepath of paths) {
+              try {
+                await manager.unstageFile(filepath);
+                unstaged2.push(filepath);
+              } catch (error) {
+                failed.push({ filepath, message: (error == null ? void 0 : error.message) || String(error) });
+              }
+            }
+            return { requested: paths.length, unstaged: unstaged2, failed };
+          });
+          for (const filepath of result.unstaged) {
+            this.selectedFilePaths.delete(filepath);
+            this.applyFileMutationToSnapshot(filepath, "unstaged");
+          }
+          new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} selected files.` : `Unstaged ${result.unstaged.length} selected file${result.unstaged.length === 1 ? "" : "s"}.`);
         }
       );
       const visibleUnstaged = this.filteredAndSortedUnstagedFiles(unstaged, statusByPath);
@@ -24539,6 +24570,14 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           for (const filepath of result.staged) {
             this.applyFileMutationToSnapshot(filepath, "staged");
           }
+        },
+        async (paths) => {
+          const result = await this.plugin.runGitMutation("Stage selected files", async (manager) => manager.addAll(paths));
+          for (const filepath of result.staged) {
+            this.selectedFilePaths.delete(filepath);
+            this.applyFileMutationToSnapshot(filepath, "staged");
+          }
+          new import_obsidian5.Notice(result.failed.length > 0 ? `Staged ${result.staged.length} of ${result.requested} selected files.` : `Staged ${result.staged.length} selected file${result.staged.length === 1 ? "" : "s"}.`);
         },
         { totalFiles: unstaged.length, showChangeControls: true }
       );
@@ -24593,7 +24632,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       return left.localeCompare(right);
     });
   }
-  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk, options = {}) {
+  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk, onSelected, options = {}) {
     var _a, _b;
     const totalFiles = (_a = options.totalFiles) != null ? _a : files.length;
     const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
@@ -24695,12 +24734,88 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       toggle.setAttr("aria-expanded", String(currentlyCollapsed));
     });
     const list = section.createDiv("git-status-section-list");
+    if (files.length > 0) {
+      const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+      const selectionToolbar = list.createDiv("git-selection-toolbar");
+      selectionToolbar.createSpan({
+        text: selected.length > 0 ? `${selected.length} selected` : "Select files",
+        cls: "git-selection-count"
+      });
+      const selectAll = selectionToolbar.createEl("button", {
+        text: selected.length === files.length ? "Clear selection" : "Select all",
+        cls: "git-selection-btn",
+        attr: { type: "button" }
+      });
+      selectAll.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (selected.length === files.length) {
+          for (const filepath of files)
+            this.selectedFilePaths.delete(filepath);
+        } else {
+          for (const filepath of files)
+            this.selectedFilePaths.add(filepath);
+        }
+        this.repaintStatusSnapshot();
+      });
+      if (selected.length > 0) {
+        const selectedAction = selectionToolbar.createEl("button", {
+          text: sectionClass === "staged" ? "Unstage selected" : "Stage selected",
+          cls: "git-selection-btn git-selection-primary",
+          attr: { type: "button" }
+        });
+        selectedAction.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (this.mutationInFlight)
+            return;
+          this.setMutationBusy(true);
+          try {
+            await onSelected(selected);
+            this.repaintStatusSnapshot();
+          } catch (error) {
+            new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} selected failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+          } finally {
+            this.setMutationBusy(false);
+          }
+        });
+      }
+    }
     if (files.length === 0) {
       const emptyMsg = sectionClass === "staged" ? "No staged files" : totalFiles > 0 ? "No files match the selected filters" : "No uncommitted changes";
       list.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
     } else {
       for (const filepath of files) {
         const row = list.createDiv("git-file-row");
+        row.setAttr("role", "option");
+        row.setAttr("aria-selected", String(this.selectedFilePaths.has(filepath)));
+        if (this.selectedFilePaths.has(filepath))
+          row.addClass("git-file-row-selected");
+        row.addEventListener("click", (event) => {
+          const mouseEvent = event;
+          if (this.mutationInFlight)
+            return;
+          const anchor = this.selectionAnchorBySection.get(sectionClass);
+          const currentIndex = files.indexOf(filepath);
+          if (mouseEvent.shiftKey && anchor && files.includes(anchor)) {
+            const anchorIndex = files.indexOf(anchor);
+            const start = Math.min(anchorIndex, currentIndex);
+            const end = Math.max(anchorIndex, currentIndex);
+            for (const selectedPath of files.slice(start, end + 1)) {
+              this.selectedFilePaths.add(selectedPath);
+            }
+          } else if (mouseEvent.metaKey || mouseEvent.ctrlKey) {
+            if (this.selectedFilePaths.has(filepath))
+              this.selectedFilePaths.delete(filepath);
+            else
+              this.selectedFilePaths.add(filepath);
+            this.selectionAnchorBySection.set(sectionClass, filepath);
+          } else {
+            for (const selectedPath of files)
+              this.selectedFilePaths.delete(selectedPath);
+            this.selectedFilePaths.add(filepath);
+            this.selectionAnchorBySection.set(sectionClass, filepath);
+          }
+          this.repaintStatusSnapshot();
+        });
         const stageBtn = row.createEl("button", {
           cls: "git-file-stage-toggle",
           attr: {
@@ -24791,7 +24906,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     var _a;
     this.mutationInFlight = busy;
     const controls = ((_a = this.contentContainer) == null ? void 0 : _a.querySelectorAll(
-      ".git-file-stage-toggle, .git-status-section-action"
+      ".git-file-stage-toggle, .git-status-section-action, .git-selection-btn"
     )) || [];
     controls.forEach((control) => {
       control.disabled = busy;
@@ -26034,7 +26149,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "e8935efdcd5c7b5c1801758db0d07838b09dfd3e" : "unknown";
+var GIT_COMMIT_HASH = true ? "ceab44cd578ca8cd2106720d9e1cc9a2567ce6a2" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

@@ -210,3 +210,16 @@ test('bulk sidebar mutations repaint without a second repository read', () => {
   assert.match(sidebarSource, /for \(const filepath of result\.unstaged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'unstaged'\)/);
   assert.match(sidebarSource, /for \(const filepath of result\.staged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'staged'\)/);
 });
+
+test('staged and uncommitted lists support range and modifier-key selection', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /private readonly selectedFilePaths = new Set<string>\(\)/);
+  assert.match(sidebarSource, /private readonly selectionAnchorBySection/);
+  assert.match(sidebarSource, /mouseEvent\.shiftKey/);
+  assert.match(sidebarSource, /mouseEvent\.metaKey \|\| mouseEvent\.ctrlKey/);
+  assert.match(sidebarSource, /Stage selected/);
+  assert.match(sidebarSource, /Unstage selected/);
+  assert.match(sidebarSource, /manager\.addAll\(paths\)/);
+  assert.match(sidebarSource, /manager\.unstageFile\(filepath\)/);
+});
