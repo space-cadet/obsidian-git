@@ -1,5 +1,9 @@
 import { DataAdapter } from "obsidian";
+import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
+
+const browserGlobal = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
+browserGlobal.Buffer ??= Buffer;
 
 export type RepositoryState =
 	| { kind: "checking"; repositoryPath: string }
