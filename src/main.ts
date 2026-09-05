@@ -199,6 +199,8 @@ class GitSyncView extends ItemView {
 	private activeTab = "Changes";
 	private repositoryState: RepositoryState | null = null;
 	private changes: ChangedFile[] | null = null;
+	private readonly selectedPaths = new Set<string>();
+	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
 	private committing = false;
 	private refreshGeneration = 0;
@@ -237,22 +239,8 @@ class GitSyncView extends ItemView {
 		root.empty();
 		root.addClass("git-sync-sidebar");
 
-		const header = root.createDiv({ cls: "git-sync-header" });
-		const headerRow = header.createDiv({ cls: "git-sync-header-row" });
-		headerRow.createDiv({ cls: "git-sync-title", text: "Git Sync" });
-		const settingsButton = headerRow.createEl("button", {
-			cls: "git-sync-settings-button",
-			attr: { type: "button", "aria-label": "Open Git Sync settings", title: "Open Settings" },
-		});
-		setIcon(settingsButton, "settings");
-		settingsButton.addEventListener("click", () => this.openSettings());
-		const repository = this.plugin.settings.repositoryPath.trim();
-		header.createDiv({
-			cls: "git-sync-repository",
-			text: repository || "No repository configured",
-		});
-
-		const tabs = root.createDiv({ cls: "git-sync-tabs", attr: { role: "tablist" } });
+		const topbar = root.createDiv({ cls: "git-sync-topbar" });
+		const tabs = topbar.createDiv({ cls: "git-sync-tabs", attr: { role: "tablist" } });
 		for (const tabName of ["Changes", "Commits", "Log"]) {
 			const tab = tabs.createEl("button", {
 				text: tabName,
@@ -265,6 +253,13 @@ class GitSyncView extends ItemView {
 			});
 		}
 
+		const settingsButton = topbar.createEl("button", {
+			cls: "git-sync-settings-button",
+			attr: { type: "button", "aria-label": "Open Git Sync settings", title: "Open Settings" },
+		});
+		setIcon(settingsButton, "settings");
+		settingsButton.addEventListener("click", () => this.openSettings());
+		const repository = this.plugin.settings.repositoryPath.trim();
 		this.renderRepositoryContext(root, repository);
 
 		const content = root.createDiv({ cls: "git-sync-content" });
@@ -309,6 +304,7 @@ class GitSyncView extends ItemView {
 
 		if (this.activeTab === "Changes") {
 			this.renderChanges(content);
+			this.renderChangesActionBar(root);
 			return;
 		}
 
@@ -371,6 +367,10 @@ class GitSyncView extends ItemView {
 		if (state.kind === "ready") {
 			try {
 				this.changes = await readChanges(this.app.vault.adapter, repositoryPath);
+				const availablePaths = new Set(this.changes.map((change) => change.path));
+				for (const selectedPath of this.selectedPaths) {
+					if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+				}
 				this.changesError = null;
 			} catch (error) {
 				this.changes = null;
@@ -386,46 +386,175 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderChanges(content: HTMLElement): void {
-		content.createDiv({ cls: "git-sync-state-title", text: "Changes" });
 		if (this.changesError) {
 			content.createEl("p", { text: this.changesError, cls: "git-sync-state-description" });
-			this.addRefreshButton(content);
 			return;
 		}
 		if (!this.changes) {
 			content.createEl("p", { text: "Reading local changes…", cls: "git-sync-state-description" });
 			return;
 		}
-		if (this.changes.length === 0) {
-			content.createEl("p", { text: "Working tree is clean.", cls: "git-sync-state-description" });
-			this.addRefreshButton(content);
-			return;
-		}
+		const staged = this.changes.filter((change) => change.staged);
+		const uncommitted = this.changes.filter((change) => !change.staged);
+		this.renderChangeSection(content, "staged", "STAGED", staged, "Unstage selected");
+		this.renderChangeSection(content, "uncommitted", "UNCOMMITTED CHANGES", uncommitted, "Stage selected");
 
-		const list = content.createEl("ul", { cls: "git-sync-changes-list" });
-		for (const change of this.changes) {
-			const item = list.createEl("li", { cls: "git-sync-change" });
-			const details = item.createDiv({ cls: "git-sync-change-details" });
-			details.createDiv({ text: change.path, cls: "git-sync-change-path" });
-			details.createDiv({ text: change.status, cls: "git-sync-change-status" });
-			const action = item.createEl("button", {
-				text: change.staged ? "Unstage" : "Stage",
-				attr: { type: "button" },
-			});
-			action.disabled = this.committing;
-			action.addEventListener("click", () => void this.toggleStage(change));
-		}
-
-		const stagedCount = this.changes.filter((change) => change.staged).length;
+		const stagedCount = staged.length;
 		const commit = content.createDiv({ cls: "git-sync-commit" });
-		commit.createDiv({ text: `${stagedCount} file${stagedCount === 1 ? "" : "s"} staged`, cls: "git-sync-change-status" });
+		commit.createDiv({ text: "Commit staged changes", cls: "git-sync-commit-title" });
+		commit.createDiv({ text: `${stagedCount} file${stagedCount === 1 ? "" : "s"} staged`, cls: "git-sync-commit-meta" });
 		const message = commit.createEl("textarea", {
 			attr: { placeholder: "Commit message", "aria-label": "Commit message", rows: "3" },
 		});
-		const commitButton = commit.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
+		const commitActions = commit.createDiv({ cls: "git-sync-commit-actions" });
+		const commitButton = commitActions.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
 		commitButton.disabled = stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
-		this.addRefreshButton(content);
+	}
+
+	private renderChangeSection(
+		content: HTMLElement,
+		section: "staged" | "uncommitted",
+		title: string,
+		changes: ChangedFile[],
+		bulkAction: string,
+	): void {
+		const sectionEl = content.createDiv({ cls: "git-sync-change-section" });
+		const header = sectionEl.createDiv({ cls: "git-sync-change-section-header" });
+		header.createDiv({ cls: "git-sync-section-title", text: title });
+		header.createDiv({ cls: "git-sync-section-count", text: String(changes.length) });
+		const collapse = header.createEl("button", {
+			cls: "git-sync-icon-button",
+			attr: { type: "button", "aria-label": `${this.collapsedSections.has(section) ? "Expand" : "Collapse"} ${title}` },
+		});
+		setIcon(collapse, this.collapsedSections.has(section) ? "chevron-right" : "chevron-down");
+		collapse.addEventListener("click", () => {
+			if (this.collapsedSections.has(section)) this.collapsedSections.delete(section);
+			else this.collapsedSections.add(section);
+			this.render();
+		});
+
+		if (this.collapsedSections.has(section)) return;
+
+		const selectedInSection = changes.filter((change) => this.selectedPaths.has(change.path));
+		const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
+		toolbar.createDiv({ cls: "git-sync-select-label", text: "Select files" });
+		const clear = toolbar.createEl("button", { text: "Clear selection", attr: { type: "button" } });
+		clear.disabled = selectedInSection.length === 0;
+		clear.addEventListener("click", () => {
+			for (const change of changes) this.selectedPaths.delete(change.path);
+			this.render();
+		});
+		const action = toolbar.createEl("button", { text: bulkAction, attr: { type: "button" } });
+		action.disabled = selectedInSection.length === 0 || this.committing;
+		action.addEventListener("click", () => void this.applySelectedStage(section === "staged"));
+
+		if (changes.length === 0) {
+			sectionEl.createDiv({ cls: "git-sync-section-empty", text: section === "staged" ? "No staged files" : "No uncommitted changes" });
+			return;
+		}
+
+		const list = sectionEl.createEl("ul", { cls: "git-sync-changes-list" });
+		for (const change of changes) this.renderChangeRow(list, change);
+	}
+
+	private renderChangeRow(list: HTMLElement, change: ChangedFile): void {
+		const item = list.createEl("li", { cls: "git-sync-change" });
+		const checkbox = item.createEl("input", {
+			attr: { type: "checkbox", "aria-label": `Select ${change.path}` },
+		});
+		checkbox.checked = this.selectedPaths.has(change.path);
+		checkbox.disabled = this.committing;
+		checkbox.addEventListener("change", () => {
+			if (checkbox.checked) this.selectedPaths.add(change.path);
+			else this.selectedPaths.delete(change.path);
+			this.render();
+		});
+
+		const code = item.createSpan({ cls: "git-sync-change-code", text: changeCode(change.status) });
+		code.setAttribute("data-change-status", change.status);
+		const path = item.createDiv({ cls: "git-sync-change-path", text: change.path });
+		path.setAttribute("title", change.path);
+		const action = item.createEl("button", {
+			cls: "git-sync-change-menu",
+			attr: {
+				type: "button",
+				"aria-label": `${change.staged ? "Unstage" : "Stage"} ${change.path}`,
+				title: change.staged ? "Unstage" : "Stage",
+			},
+		});
+		setIcon(action, "more-horizontal");
+		action.disabled = this.committing;
+		action.addEventListener("click", () => void this.toggleStage(change));
+	}
+
+	private renderChangesActionBar(root: HTMLElement): void {
+		const bar = root.createDiv({ cls: "git-sync-bottom-bar" });
+		const selectAll = bar.createEl("button", {
+			cls: "git-sync-bottom-action is-primary",
+			attr: { type: "button", "aria-label": "Select all changed files", title: "Select all" },
+		});
+		setIcon(selectAll, "check-square");
+		selectAll.addEventListener("click", () => {
+			this.selectAllChanges();
+			this.render();
+		});
+
+		const stage = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Stage selected files", title: "Stage selected" },
+		});
+		setIcon(stage, "arrow-down-to-line");
+		stage.disabled = !this.hasSelectedUncommitted() || this.committing;
+		stage.addEventListener("click", () => void this.applySelectedStage(false));
+
+		const unstage = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Unstage selected files", title: "Unstage selected" },
+		});
+		setIcon(unstage, "arrow-up-to-line");
+		unstage.disabled = !this.hasSelectedStaged() || this.committing;
+		unstage.addEventListener("click", () => void this.applySelectedStage(true));
+
+		const refresh = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Refresh repository", title: "Refresh repository" },
+		});
+		setIcon(refresh, "refresh-cw");
+		refresh.addEventListener("click", () => void this.refreshRepositoryState());
+	}
+
+	private selectAllChanges(): void {
+		for (const change of this.changes ?? []) this.selectedPaths.add(change.path);
+	}
+
+	private hasSelectedStaged(): boolean {
+		return (this.changes ?? []).some((change) => change.staged && this.selectedPaths.has(change.path));
+	}
+
+	private hasSelectedUncommitted(): boolean {
+		return (this.changes ?? []).some((change) => !change.staged && this.selectedPaths.has(change.path));
+	}
+
+	private async applySelectedStage(unstage: boolean): Promise<void> {
+		const selected = (this.changes ?? []).filter((change) =>
+			this.selectedPaths.has(change.path) && change.staged === unstage,
+		);
+		if (selected.length === 0) return;
+
+		try {
+			for (const change of selected) {
+				if (unstage) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				else await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
+				this.selectedPaths.delete(change.path);
+			}
+			await this.refreshRepositoryState();
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to update selected files.";
+			this.plugin.recordActivity(`Could not update selected files: ${detail}`);
+			new Notice(detail);
+		}
 	}
 
 	private async toggleStage(change: ChangedFile): Promise<void> {
@@ -707,5 +836,19 @@ function repositoryActivityMessage(state: RepositoryState): string {
 			return `Could not read repository: ${state.message}`;
 		case "checking":
 			return `Checking repository at ${state.repositoryPath}.`;
+	}
+}
+
+function changeCode(status: string): string {
+	switch (status) {
+		case "Untracked":
+			return "?";
+		case "Added":
+			return "A";
+		case "Deleted":
+		case "Added, deleted":
+			return "D";
+		default:
+			return "M";
 	}
 }
