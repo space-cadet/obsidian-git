@@ -1,5 +1,14 @@
 import { GitCredential, HttpRequest, HttpResponse, HttpTransport, ProgressSink } from './types';
 
+export interface GitHttpRequestTiming {
+  requestId: number;
+  method: string;
+  elapsedMs: number;
+  status?: number;
+  responseBytes?: number;
+  outcome: 'completed' | 'failed';
+}
+
 function statusMessage(status: number): string {
   const messages: Record<number, string> = {
     200: 'OK',
@@ -46,11 +55,13 @@ function asBodyIterable(body: Uint8Array): AsyncIterable<Uint8Array> {
 export class GitProtocolHttp {
   private progress?: ProgressSink;
   private operationSignal: AbortSignal | null = null;
+  private nextRequestId = 1;
 
   constructor(
     private readonly transport: HttpTransport,
     private readonly credentials?: () => Promise<GitCredential | null>,
     progress?: ProgressSink,
+    private readonly onRequestTiming?: (timing: GitHttpRequestTiming) => void,
   ) {
     this.progress = progress;
   }
@@ -74,24 +85,45 @@ export class GitProtocolHttp {
       headers.Authorization = `Basic ${encoded}`;
     }
 
-    const response = await this.transport.request({
-      url: config.url,
-      method: config.method || 'GET',
-      headers,
-      body,
-      signal: this.operationSignal || undefined,
-    });
-    this.throwIfAborted();
-    this.progress?.progress?.(response.body.byteLength, response.body.byteLength);
+    const method = config.method || 'GET';
+    const requestId = this.nextRequestId++;
+    const startedAt = Date.now();
+    try {
+      const response = await this.transport.request({
+        url: config.url,
+        method,
+        headers,
+        body,
+        signal: this.operationSignal || undefined,
+      });
+      this.throwIfAborted();
+      this.onRequestTiming?.({
+        requestId,
+        method,
+        elapsedMs: Date.now() - startedAt,
+        status: response.status,
+        responseBytes: response.body.byteLength,
+        outcome: 'completed',
+      });
+      this.progress?.progress?.(response.body.byteLength, response.body.byteLength);
 
-    return {
-      url: config.url,
-      method: config.method || 'GET',
-      statusCode: response.status,
-      statusMessage: statusMessage(response.status),
-      headers: response.headers,
-      body: asBodyIterable(response.body),
-    };
+      return {
+        url: config.url,
+        method,
+        statusCode: response.status,
+        statusMessage: statusMessage(response.status),
+        headers: response.headers,
+        body: asBodyIterable(response.body),
+      };
+    } catch (error) {
+      this.onRequestTiming?.({
+        requestId,
+        method,
+        elapsedMs: Date.now() - startedAt,
+        outcome: 'failed',
+      });
+      throw error;
+    }
   }
 
   private throwIfAborted(): void {

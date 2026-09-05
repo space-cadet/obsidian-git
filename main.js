@@ -21478,10 +21478,12 @@ function asBodyIterable(body) {
   };
 }
 var GitProtocolHttp = class {
-  constructor(transport, credentials, progress) {
+  constructor(transport, credentials, progress, onRequestTiming) {
     this.transport = transport;
     this.credentials = credentials;
+    this.onRequestTiming = onRequestTiming;
     this.operationSignal = null;
+    this.nextRequestId = 1;
     this.progress = progress;
   }
   setProgressSink(progress) {
@@ -21491,7 +21493,7 @@ var GitProtocolHttp = class {
     this.operationSignal = signal;
   }
   async request(config) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     this.throwIfAborted();
     const credential = this.credentials ? await this.credentials() : null;
     const body = await collectBody(config.body);
@@ -21500,23 +21502,44 @@ var GitProtocolHttp = class {
       const encoded = this.encodeBasic(`${credential.username}:${credential.password}`);
       headers.Authorization = `Basic ${encoded}`;
     }
-    const response = await this.transport.request({
-      url: config.url,
-      method: config.method || "GET",
-      headers,
-      body,
-      signal: this.operationSignal || void 0
-    });
-    this.throwIfAborted();
-    (_b = (_a = this.progress) == null ? void 0 : _a.progress) == null ? void 0 : _b.call(_a, response.body.byteLength, response.body.byteLength);
-    return {
-      url: config.url,
-      method: config.method || "GET",
-      statusCode: response.status,
-      statusMessage: statusMessage(response.status),
-      headers: response.headers,
-      body: asBodyIterable(response.body)
-    };
+    const method = config.method || "GET";
+    const requestId = this.nextRequestId++;
+    const startedAt = Date.now();
+    try {
+      const response = await this.transport.request({
+        url: config.url,
+        method,
+        headers,
+        body,
+        signal: this.operationSignal || void 0
+      });
+      this.throwIfAborted();
+      (_a = this.onRequestTiming) == null ? void 0 : _a.call(this, {
+        requestId,
+        method,
+        elapsedMs: Date.now() - startedAt,
+        status: response.status,
+        responseBytes: response.body.byteLength,
+        outcome: "completed"
+      });
+      (_c = (_b = this.progress) == null ? void 0 : _b.progress) == null ? void 0 : _c.call(_b, response.body.byteLength, response.body.byteLength);
+      return {
+        url: config.url,
+        method,
+        statusCode: response.status,
+        statusMessage: statusMessage(response.status),
+        headers: response.headers,
+        body: asBodyIterable(response.body)
+      };
+    } catch (error) {
+      (_d = this.onRequestTiming) == null ? void 0 : _d.call(this, {
+        requestId,
+        method,
+        elapsedMs: Date.now() - startedAt,
+        outcome: "failed"
+      });
+      throw error;
+    }
   }
   throwIfAborted() {
     var _a;
@@ -21620,7 +21643,11 @@ var GitBackend = class {
         var _a;
         return ((_a = ports.credentials) == null ? void 0 : _a.getCredential()) || null;
       },
-      progress
+      progress,
+      (timing) => {
+        var _a;
+        return (_a = ports.diagnostics) == null ? void 0 : _a.info("Git HTTP request timing", timing);
+      }
     );
   }
   configure(config) {
@@ -22177,54 +22204,78 @@ var GitBackend = class {
     return { oid, message: trimmed };
   }
   async pull() {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     this.requireRemote();
-    await this.setRemote(this.config.remoteUrl);
-    this.throwIfAborted();
     const branch2 = this.config.branch;
-    (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Fetching remote changes\u2026");
-    await fetch({
-      fs: this.ports.fs,
-      http: this.http,
-      dir: this.dir,
-      remote: "origin",
-      ref: branch2,
-      singleBranch: true,
-      onAuth: () => this.auth()
-    });
-    const fetched = await this.resolveRefOrNull(`refs/remotes/origin/${branch2}`) || await this.resolveRefOrNull("FETCH_HEAD");
-    if (!fetched)
-      throw new Error(`Pull failed: fetched remote ${branch2}, but no remote-tracking ref was written`);
-    const local = await this.resolveRefOrNull(`refs/heads/${branch2}`);
-    if (!local) {
-      (_d = (_c = this.progress) == null ? void 0 : _c.message) == null ? void 0 : _d.call(_c, "Checking whether the remote files are safe to apply\u2026");
-      await this.assertCheckoutSafe(fetched);
-      (_f = (_e = this.progress) == null ? void 0 : _e.message) == null ? void 0 : _f.call(_e, "Updating local branch\u2026");
-      await writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch2}`, value: fetched, force: true });
-      (_h = (_g = this.progress) == null ? void 0 : _g.message) == null ? void 0 : _h.call(_g, "Checking out remote files\u2026");
-      await checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 });
+    const startedAt = Date.now();
+    const phaseTimings = {};
+    let outcome = "failed";
+    const measure = async (phase, operation) => {
+      const phaseStartedAt = Date.now();
+      try {
+        return await operation();
+      } finally {
+        phaseTimings[phase] = Date.now() - phaseStartedAt;
+      }
+    };
+    try {
+      await measure("remoteSetupMs", () => this.setRemote(this.config.remoteUrl));
+      this.throwIfAborted();
+      (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Fetching remote changes\u2026");
+      await measure("fetchMs", () => fetch({
+        fs: this.ports.fs,
+        http: this.http,
+        dir: this.dir,
+        remote: "origin",
+        ref: branch2,
+        singleBranch: true,
+        onAuth: () => this.auth()
+      }));
+      const fetched = await measure("resolveFetchedRefMs", async () => await this.resolveRefOrNull(`refs/remotes/origin/${branch2}`) || await this.resolveRefOrNull("FETCH_HEAD"));
+      if (!fetched)
+        throw new Error(`Pull failed: fetched remote ${branch2}, but no remote-tracking ref was written`);
+      const local = await measure("resolveLocalRefMs", () => this.resolveRefOrNull(`refs/heads/${branch2}`));
+      if (!local) {
+        (_d = (_c = this.progress) == null ? void 0 : _c.message) == null ? void 0 : _d.call(_c, "Checking whether the remote files are safe to apply\u2026");
+        await measure("checkoutSafetyMs", () => this.assertCheckoutSafe(fetched));
+        (_f = (_e = this.progress) == null ? void 0 : _e.message) == null ? void 0 : _f.call(_e, "Updating local branch\u2026");
+        await measure("writeLocalRefMs", () => writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch2}`, value: fetched, force: true }));
+        (_h = (_g = this.progress) == null ? void 0 : _g.message) == null ? void 0 : _h.call(_g, "Checking out remote files\u2026");
+        await measure("checkoutMs", () => checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 }));
+        outcome = "completed";
+        return { branch: branch2, oid: fetched };
+      }
+      if (local === fetched) {
+        outcome = "already-current";
+        return { branch: branch2, oid: local, alreadyCurrent: true };
+      }
+      (_j = (_i = this.progress) == null ? void 0 : _i.message) == null ? void 0 : _j.call(_i, "Checking local changes before merge\u2026");
+      const blockedPaths = await measure("localSafetyCheckMs", () => this.findPullOverwritePaths(local, fetched));
+      if (blockedPaths.length > 0)
+        throw new PullBlockedError(blockedPaths);
+      (_l = (_k = this.progress) == null ? void 0 : _k.message) == null ? void 0 : _l.call(_k, "Applying remote changes\u2026");
+      await measure("mergeMs", () => merge({
+        fs: this.ports.fs,
+        dir: this.dir,
+        ours: branch2,
+        theirs: fetched,
+        fastForward: true,
+        fastForwardOnly: true,
+        author: this.config.author,
+        committer: this.config.author
+      }));
+      (_n = (_m = this.progress) == null ? void 0 : _m.message) == null ? void 0 : _n.call(_m, "Checking out updated files\u2026");
+      await measure("checkoutMs", () => checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 }));
+      outcome = "completed";
       return { branch: branch2, oid: fetched };
+    } finally {
+      (_o = this.ports.diagnostics) == null ? void 0 : _o.info("Pull timing summary", {
+        branch: branch2,
+        outcome,
+        totalMs: Date.now() - startedAt,
+        ...phaseTimings
+      });
     }
-    if (local === fetched)
-      return { branch: branch2, oid: local, alreadyCurrent: true };
-    (_j = (_i = this.progress) == null ? void 0 : _i.message) == null ? void 0 : _j.call(_i, "Checking local changes before merge\u2026");
-    const blockedPaths = await this.findPullOverwritePaths(local, fetched);
-    if (blockedPaths.length > 0)
-      throw new PullBlockedError(blockedPaths);
-    (_l = (_k = this.progress) == null ? void 0 : _k.message) == null ? void 0 : _l.call(_k, "Applying remote changes\u2026");
-    await merge({
-      fs: this.ports.fs,
-      dir: this.dir,
-      ours: branch2,
-      theirs: fetched,
-      fastForward: true,
-      fastForwardOnly: true,
-      author: this.config.author,
-      committer: this.config.author
-    });
-    (_n = (_m = this.progress) == null ? void 0 : _m.message) == null ? void 0 : _n.call(_m, "Checking out updated files\u2026");
-    await checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 });
-    return { branch: branch2, oid: fetched };
   }
   async push(force = false) {
     var _a, _b, _c, _d;
@@ -26293,8 +26344,8 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "34c37a564c92ab1f571575e451948f7f17ce1052" : "unknown";
-var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
+var GIT_COMMIT_HASH = true ? "263f3ac02142189afcdb94d0569a3f15a19543b8" : "unknown";
+var GIT_BRANCH = true ? "main" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";

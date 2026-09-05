@@ -342,19 +342,35 @@ test('remote testing is read-only and does not require a local repository', asyn
 
 test('Git protocol transport obtains credentials through a port and returns git response shape', async () => {
   const requests = [];
+  const timings = [];
   const transport = {
     async request(request) {
       requests.push(request);
       return { status: 200, headers: { 'content-type': 'application/x-git-upload-pack-result' }, body: new Uint8Array([1, 2]), text: '' };
     },
   };
-  const http = new GitProtocolHttp(transport, async () => ({ username: 'x-access-token', password: 'secret', source: 'github' }));
+  const http = new GitProtocolHttp(
+    transport,
+    async () => ({ username: 'x-access-token', password: 'secret', source: 'github' }),
+    undefined,
+    (timing) => timings.push(timing),
+  );
   const response = await http.request({ url: 'https://github.com/example/repo.git', method: 'GET', body: (async function* () { yield new Uint8Array([3]); })() });
   assert.match(requests[0].headers.Authorization, /^Basic /);
   assert.equal(response.statusCode, 200);
   const chunks = [];
   for await (const chunk of response.body) chunks.push([...chunk]);
   assert.deepEqual(chunks, [[1, 2]]);
+  assert.deepEqual(timings, [{
+    requestId: 1,
+    method: 'GET',
+    elapsedMs: timings[0].elapsedMs,
+    status: 200,
+    responseBytes: 2,
+    outcome: 'completed',
+  }]);
+  assert.equal(typeof timings[0].elapsedMs, 'number');
+  assert.equal(JSON.stringify(timings[0]).includes('secret'), false);
 });
 
 test('GitHub device authorization handles pending approval and returns a Git credential', async () => {

@@ -110,6 +110,7 @@ export class GitBackend {
       ports.transport,
       async () => ports.credentials?.getCredential() || null,
       progress,
+      (timing) => ports.diagnostics?.info('Git HTTP request timing', timing),
     );
   }
 
@@ -673,50 +674,78 @@ export class GitBackend {
 
   async pull(): Promise<RemoteResult> {
     this.requireRemote();
-    await this.setRemote(this.config.remoteUrl as string);
-    this.throwIfAborted();
     const branch = this.config.branch;
-    this.progress?.message?.('Fetching remote changes…');
-    await git.fetch({
-      fs: this.ports.fs,
-      http: this.http,
-      dir: this.dir,
-      remote: 'origin',
-      ref: branch,
-      singleBranch: true,
-      onAuth: () => this.auth(),
-    });
-    const fetched = await this.resolveRefOrNull(`refs/remotes/origin/${branch}`)
-      || await this.resolveRefOrNull('FETCH_HEAD');
-    if (!fetched) throw new Error(`Pull failed: fetched remote ${branch}, but no remote-tracking ref was written`);
-    const local = await this.resolveRefOrNull(`refs/heads/${branch}`);
-    if (!local) {
-      this.progress?.message?.('Checking whether the remote files are safe to apply…');
-      await this.assertCheckoutSafe(fetched);
-      this.progress?.message?.('Updating local branch…');
-      await git.writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch}`, value: fetched, force: true });
-      this.progress?.message?.('Checking out remote files…');
-      await git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch });
+    const startedAt = Date.now();
+    const phaseTimings: Record<string, number> = {};
+    let outcome: 'completed' | 'already-current' | 'failed' = 'failed';
+    const measure = async <T>(phase: string, operation: () => Promise<T>): Promise<T> => {
+      const phaseStartedAt = Date.now();
+      try {
+        return await operation();
+      } finally {
+        phaseTimings[phase] = Date.now() - phaseStartedAt;
+      }
+    };
+
+    try {
+      await measure('remoteSetupMs', () => this.setRemote(this.config.remoteUrl as string));
+      this.throwIfAborted();
+      this.progress?.message?.('Fetching remote changes…');
+      await measure('fetchMs', () => git.fetch({
+        fs: this.ports.fs,
+        http: this.http,
+        dir: this.dir,
+        remote: 'origin',
+        ref: branch,
+        singleBranch: true,
+        onAuth: () => this.auth(),
+      }));
+      const fetched = await measure('resolveFetchedRefMs', async () => (
+        await this.resolveRefOrNull(`refs/remotes/origin/${branch}`)
+          || await this.resolveRefOrNull('FETCH_HEAD')
+      ));
+      if (!fetched) throw new Error(`Pull failed: fetched remote ${branch}, but no remote-tracking ref was written`);
+      const local = await measure('resolveLocalRefMs', () => this.resolveRefOrNull(`refs/heads/${branch}`));
+      if (!local) {
+        this.progress?.message?.('Checking whether the remote files are safe to apply…');
+        await measure('checkoutSafetyMs', () => this.assertCheckoutSafe(fetched));
+        this.progress?.message?.('Updating local branch…');
+        await measure('writeLocalRefMs', () => git.writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch}`, value: fetched, force: true }));
+        this.progress?.message?.('Checking out remote files…');
+        await measure('checkoutMs', () => git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch }));
+        outcome = 'completed';
+        return { branch, oid: fetched };
+      }
+      if (local === fetched) {
+        outcome = 'already-current';
+        return { branch, oid: local, alreadyCurrent: true };
+      }
+      this.progress?.message?.('Checking local changes before merge…');
+      const blockedPaths = await measure('localSafetyCheckMs', () => this.findPullOverwritePaths(local, fetched));
+      if (blockedPaths.length > 0) throw new PullBlockedError(blockedPaths);
+      this.progress?.message?.('Applying remote changes…');
+      await measure('mergeMs', () => git.merge({
+        fs: this.ports.fs,
+        dir: this.dir,
+        ours: branch,
+        theirs: fetched,
+        fastForward: true,
+        fastForwardOnly: true,
+        author: this.config.author,
+        committer: this.config.author,
+      }));
+      this.progress?.message?.('Checking out updated files…');
+      await measure('checkoutMs', () => git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch }));
+      outcome = 'completed';
       return { branch, oid: fetched };
+    } finally {
+      this.ports.diagnostics?.info('Pull timing summary', {
+        branch,
+        outcome,
+        totalMs: Date.now() - startedAt,
+        ...phaseTimings,
+      });
     }
-    if (local === fetched) return { branch, oid: local, alreadyCurrent: true };
-    this.progress?.message?.('Checking local changes before merge…');
-    const blockedPaths = await this.findPullOverwritePaths(local, fetched);
-    if (blockedPaths.length > 0) throw new PullBlockedError(blockedPaths);
-    this.progress?.message?.('Applying remote changes…');
-    await git.merge({
-      fs: this.ports.fs,
-      dir: this.dir,
-      ours: branch,
-      theirs: fetched,
-      fastForward: true,
-      fastForwardOnly: true,
-      author: this.config.author,
-      committer: this.config.author,
-    });
-    this.progress?.message?.('Checking out updated files…');
-    await git.checkout({ fs: this.ports.fs, dir: this.dir, ref: branch });
-    return { branch, oid: fetched };
   }
 
   async push(force = false): Promise<RemoteResult> {
