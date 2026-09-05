@@ -15,4 +15,12 @@ visible shell and Settings so the product has a visual anchor immediately.
 10. T10 Platform integration and verification
 
 Each component owns its small state, operations, UI, and focused checks.
+
+## Current implementation status
+
+- T1 and T2: sidebar shell, settings tab, and sidebar Settings entry point are implemented.
+- T3: read-only local repository discovery is implemented; initialization remains pending.
+- T5: live in-memory Activity is implemented; persistence, clear, and export remain pending.
+- T9: updater and branch development releases are implemented; real-host installation remains pending.
+- T10: local and GitHub build evidence exists; desktop and mobile acceptance remain pending.
 Dependencies are added only when a component cannot function without them.

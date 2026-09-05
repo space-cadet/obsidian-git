@@ -12,6 +12,12 @@ state to the feature components.
 - Explicit repository initialization
 - Current branch and local status
 
+## Implemented state
+
+The plugin validates a vault-relative repository path, reads it through the
+Obsidian vault adapter, and reports repository presence, branch, and HEAD
+without writing files. Explicit repository initialization remains pending.
+
 ## KISS boundary
 
 Keep filesystem and Git access behind small interfaces. Do not add repository

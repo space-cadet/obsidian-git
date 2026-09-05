@@ -11,6 +11,8 @@ Give the user a simple place to configure the repository used by the plugin.
 - Branch name
 - Save and basic validation
 - Clear settings feedback
+- Updater channel, startup-check, auto-install, and build-browser controls
+- Sidebar Open Settings action
 
 ## KISS boundary
 
@@ -19,5 +21,6 @@ credential flows until the basic configuration workflow requires them.
 
 ## Completion evidence
 
-The user can open Settings, enter valid values, save them, reopen Settings, and
-see clear feedback for invalid required values.
+Settings are registered and the sidebar opens the plugin tab directly. The
+repository, remote, branch, updater, save, and validation controls are
+implemented. Published-build reopen/save verification remains open.

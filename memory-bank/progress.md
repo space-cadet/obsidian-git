@@ -7,7 +7,16 @@
 - Registered the component-based task tree.
 - Started the fresh session with T1 and T2 active.
 
+## 2026-09-06
+
+- Built and published the sidebar shell, Settings entry point, and read-only
+  local repository state.
+- Added the visible Activity tab with in-memory operation messages.
+- Added the branch-aware updater and GitHub branch development releases.
+- Passed local TypeScript, production-build, and whitespace checks and the
+  related GitHub build-and-release workflows.
+
 ## Next
 
-- Implement and verify the new UI shell.
-- Implement and verify the Settings panel.
+- Verify updater installation, reload, and rollback in Obsidian.
+- Implement the Changes panel.

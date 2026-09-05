@@ -1,17 +1,18 @@
 # Active Context
 
-*Last Updated: 2026-09-05 23:35:25 IST*
+*Last Updated: 2026-09-06 03:55:17 IST*
 
 ## Current Focus
 
-- **T1: Plugin UI Shell** — first implementation component
-- **T2: Settings Panel** — follows the shell and is also active
+- **T1, T2, T3, T5, T9** — implemented KISS shell, settings, local read,
+  activity, updater, and branch-release path
+- **T10** — real-host installation, reload, and mobile verification remain
 
 ## Current State
 
-The old Memory Bank is archived. The plugin itself is not being carried into
-this branch. The fresh implementation starts with a visible shell and usable
-Settings panel before repository or sync components are built.
+The fresh implementation now has a visible sidebar, Settings entry point,
+read-only local repository state, in-memory Activity, and a published updater.
+Changes, commits, remote sync, and real-host updater verification remain.
 
 ## Current Decisions
 
@@ -21,6 +22,6 @@ Settings panel before repository or sync components are built.
 
 ## Next Actions
 
-1. Build the sidebar shell and its basic states.
-2. Build Settings against the shell.
-3. Verify the visual anchor in Obsidian before adding the next component.
+1. Verify updater installation, reload, and rollback in Obsidian.
+2. Implement the Changes panel.
+3. Add durable Activity history only when its workflow needs it.

@@ -12,13 +12,16 @@ all later components.
 - Tab navigation
 - Repository header area
 - Simple loading, empty, and error states
+- Sidebar Open Settings action
+- One read-only local repository snapshot for the visible state
 
 ## KISS boundary
 
-The shell does not read Git state, manage remote operations, or contain a
-general UI framework. It should render predictable static states first.
+The shell stays direct. It may request one read-only local repository snapshot,
+but does not manage remote operations, mutations, or a general UI framework.
 
 ## Completion evidence
 
-The new plugin loads in Obsidian and the sidebar remains usable while switching
-between its initial tabs.
+The plugin sidebar and its tabs were visually confirmed in Obsidian. Loading,
+missing-repository, and repository-error states are implemented. Real-host
+unload verification remains open.

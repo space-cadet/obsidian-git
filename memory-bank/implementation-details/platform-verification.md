@@ -21,3 +21,10 @@ matrix before a platform-specific failure is observed.
 
 Each supported platform has recorded results for loading, configuration, local
 changes, commit, and the remote workflow that the platform supports.
+
+## Current evidence
+
+TypeScript, production-build, and whitespace checks passed locally. GitHub
+build-and-release workflows passed for the sidebar, local repository, activity,
+updater, and sidebar Settings changes. Desktop installation/reload and Android
+or iOS acceptance have not been performed.
