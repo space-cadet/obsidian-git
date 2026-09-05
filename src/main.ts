@@ -8,7 +8,16 @@ import {
 	WorkspaceLeaf,
 } from "obsidian";
 import { GIT_BRANCH, GIT_COMMIT_HASH } from "./build-info";
-import { inspectLocalRepository, RepositoryState, validateRepositoryPath } from "./repository";
+import {
+	ChangedFile,
+	commitChanges,
+	inspectLocalRepository,
+	readChanges,
+	RepositoryState,
+	stageFile,
+	unstageFile,
+	validateRepositoryPath,
+} from "./repository";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
@@ -17,6 +26,8 @@ interface GitSyncSettings {
 	repositoryPath: string;
 	remoteUrl: string;
 	branchName: string;
+	authorName: string;
+	authorEmail: string;
 	checkForUpdates: boolean;
 	updateChannel: "stable" | "dev";
 	autoUpdate: boolean;
@@ -32,6 +43,8 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	repositoryPath: ".",
 	remoteUrl: "",
 	branchName: "main",
+	authorName: "",
+	authorEmail: "",
 	checkForUpdates: true,
 	updateChannel: "dev",
 	autoUpdate: false,
@@ -184,6 +197,9 @@ class GitSyncView extends ItemView {
 	private readonly plugin: GitSyncPlugin;
 	private activeTab = "Changes";
 	private repositoryState: RepositoryState | null = null;
+	private changes: ChangedFile[] | null = null;
+	private changesError: string | null = null;
+	private committing = false;
 	private refreshGeneration = 0;
 	private lastRepositoryActivity = "";
 
@@ -287,6 +303,11 @@ class GitSyncView extends ItemView {
 			return;
 		}
 
+		if (this.activeTab === "Changes") {
+			this.renderChanges(content);
+			return;
+		}
+
 		content.createDiv({ cls: "git-sync-state-title", text: this.activeTab });
 		content.createEl("p", {
 			text: `Local repository ready on ${this.repositoryState.branch}.`,
@@ -298,10 +319,7 @@ class GitSyncView extends ItemView {
 				cls: "git-sync-state-description",
 			});
 		}
-		content.createEl("p", {
-			text: "Changes and commit actions are next.",
-			cls: "git-sync-state-description",
-		});
+		content.createEl("p", { text: "Commit history is next.", cls: "git-sync-state-description" });
 		this.addRefreshButton(content);
 	}
 
@@ -319,8 +337,114 @@ class GitSyncView extends ItemView {
 		const state = await inspectLocalRepository(this.app.vault.adapter, repositoryPath);
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.repositoryState = state;
+		if (state.kind === "ready") {
+			try {
+				this.changes = await readChanges(this.app.vault.adapter, repositoryPath);
+				this.changesError = null;
+			} catch (error) {
+				this.changes = null;
+				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
+			}
+		} else {
+			this.changes = null;
+			this.changesError = null;
+		}
+		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.recordRepositoryActivity(state);
 		this.render();
+	}
+
+	private renderChanges(content: HTMLElement): void {
+		content.createDiv({ cls: "git-sync-state-title", text: "Changes" });
+		if (this.changesError) {
+			content.createEl("p", { text: this.changesError, cls: "git-sync-state-description" });
+			this.addRefreshButton(content);
+			return;
+		}
+		if (!this.changes) {
+			content.createEl("p", { text: "Reading local changes…", cls: "git-sync-state-description" });
+			return;
+		}
+		if (this.changes.length === 0) {
+			content.createEl("p", { text: "Working tree is clean.", cls: "git-sync-state-description" });
+			this.addRefreshButton(content);
+			return;
+		}
+
+		const list = content.createEl("ul", { cls: "git-sync-changes-list" });
+		for (const change of this.changes) {
+			const item = list.createEl("li", { cls: "git-sync-change" });
+			const details = item.createDiv({ cls: "git-sync-change-details" });
+			details.createDiv({ text: change.path, cls: "git-sync-change-path" });
+			details.createDiv({ text: change.status, cls: "git-sync-change-status" });
+			const action = item.createEl("button", {
+				text: change.staged ? "Unstage" : "Stage",
+				attr: { type: "button" },
+			});
+			action.disabled = this.committing;
+			action.addEventListener("click", () => void this.toggleStage(change));
+		}
+
+		const stagedCount = this.changes.filter((change) => change.staged).length;
+		const commit = content.createDiv({ cls: "git-sync-commit" });
+		commit.createDiv({ text: `${stagedCount} file${stagedCount === 1 ? "" : "s"} staged`, cls: "git-sync-change-status" });
+		const message = commit.createEl("textarea", {
+			attr: { placeholder: "Commit message", "aria-label": "Commit message", rows: "3" },
+		});
+		const commitButton = commit.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
+		commitButton.disabled = stagedCount === 0 || this.committing;
+		commitButton.addEventListener("click", () => void this.commit(message.value));
+		this.addRefreshButton(content);
+	}
+
+	private async toggleStage(change: ChangedFile): Promise<void> {
+		try {
+			if (change.staged) {
+				await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				this.plugin.recordActivity(`Unstaged ${change.path}.`);
+			} else {
+				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				this.plugin.recordActivity(`Staged ${change.path}.`);
+			}
+			await this.refreshRepositoryState();
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to update staging.";
+			this.plugin.recordActivity(`Could not update ${change.path}: ${detail}`);
+			new Notice(detail);
+		}
+	}
+
+	private async commit(message: string): Promise<void> {
+		const trimmedMessage = message.trim();
+		if (!trimmedMessage) {
+			new Notice("Enter a commit message.");
+			return;
+		}
+		const authorName = this.plugin.settings.authorName.trim();
+		const authorEmail = this.plugin.settings.authorEmail.trim();
+		if (!authorName || !authorEmail) {
+			new Notice("Enter your commit name and email in Git Sync settings.");
+			this.openSettings();
+			return;
+		}
+		this.committing = true;
+		this.render();
+		try {
+			const oid = await commitChanges(this.app.vault.adapter, this.plugin.settings.repositoryPath, trimmedMessage, {
+				name: authorName,
+				email: authorEmail,
+			});
+			this.plugin.recordActivity(`Committed ${oid.slice(0, 7)}: ${trimmedMessage}`);
+			new Notice("Commit created.");
+			await this.refreshRepositoryState();
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to create the commit.";
+			this.plugin.recordActivity(`Commit failed: ${detail}`);
+			new Notice(detail);
+		} finally {
+			this.committing = false;
+			this.render();
+		}
 	}
 
 	private recordRepositoryActivity(state: RepositoryState): void {
@@ -491,10 +615,37 @@ class GitSyncSettingTab extends PluginSettingTab {
 				});
 			});
 
+		containerEl.createEl("h3", { text: "Commit identity" });
+		containerEl.createEl("p", {
+			text: "Used only when creating local commits.",
+			cls: "setting-item-description",
+		});
+		new Setting(containerEl)
+			.setName("Commit name")
+			.setDesc("Your name in new Git commits.")
+			.addText((text) => {
+				text.setPlaceholder("Your name");
+				text.setValue(this.plugin.settings.authorName);
+				text.onChange((value) => {
+					this.plugin.settings.authorName = value.trim();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Commit email")
+			.setDesc("Your email address in new Git commits.")
+			.addText((text) => {
+				text.setPlaceholder("you@example.com");
+				text.setValue(this.plugin.settings.authorEmail);
+				text.onChange((value) => {
+					this.plugin.settings.authorEmail = value.trim();
+				});
+			});
+
 		const feedback = containerEl.createDiv({ cls: "git-sync-settings-feedback" });
 		new Setting(containerEl)
 			.setName("Save settings")
-			.setDesc("Repository path and branch are required.")
+			.setDesc("Repository path and branch are required. Commit identity is needed before committing.")
 			.addButton((button) => {
 				button.setButtonText("Save");
 				button.setCta();
