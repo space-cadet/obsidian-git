@@ -7,7 +7,9 @@ import {
 	Setting,
 	WorkspaceLeaf,
 } from "obsidian";
+import { GIT_BRANCH, GIT_COMMIT_HASH } from "./build-info";
 import { inspectLocalRepository, RepositoryState, validateRepositoryPath } from "./repository";
+import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 
@@ -15,6 +17,10 @@ interface GitSyncSettings {
 	repositoryPath: string;
 	remoteUrl: string;
 	branchName: string;
+	checkForUpdates: boolean;
+	updateChannel: "stable" | "dev";
+	autoUpdate: boolean;
+	lastUpdateCheck: number;
 }
 
 interface ActivityEntry {
@@ -26,11 +32,16 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	repositoryPath: ".",
 	remoteUrl: "",
 	branchName: "main",
+	checkForUpdates: true,
+	updateChannel: "dev",
+	autoUpdate: false,
+	lastUpdateCheck: 0,
 };
 
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
 	private activity: ActivityEntry[] = [];
+	private updater: PluginUpdater | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -48,7 +59,17 @@ export default class GitSyncPlugin extends Plugin {
 			callback: () => void this.activateView(),
 		});
 		this.addSettingTab(new GitSyncSettingTab(this.app, this));
+		this.updater = new PluginUpdater(this.app, this.manifest.id);
+		this.addCommand({
+			id: "check-for-updates",
+			name: "Check for plugin updates",
+			callback: () => void this.checkForUpdates(true),
+		});
 		this.recordActivity("Git Sync started.");
+
+		if (this.settings.checkForUpdates && Date.now() - this.settings.lastUpdateCheck > 24 * 60 * 60 * 1000) {
+			void this.checkForUpdates(false);
+		}
 	}
 
 	onunload(): void {
@@ -94,6 +115,59 @@ export default class GitSyncPlugin extends Plugin {
 
 	getActivity(): readonly ActivityEntry[] {
 		return this.activity;
+	}
+
+	async checkForUpdates(manual: boolean): Promise<void> {
+		if (!this.updater) return;
+		const result = await this.updater.checkForUpdate({
+			currentVersion: this.manifest.version,
+			currentCommit: GIT_COMMIT_HASH,
+			currentBranch: GIT_BRANCH,
+			channel: this.settings.updateChannel,
+		});
+		this.settings.lastUpdateCheck = Date.now();
+		await this.saveData(this.settings);
+
+		if (result.kind === "available") {
+			this.recordActivity(`Update available: ${result.release.tag_name}.`);
+			if (this.settings.autoUpdate && !result.release.prerelease) {
+				try {
+					const tempDir = await this.updater.downloadAndValidate(result.release);
+					await this.updater.installUpdate(tempDir);
+					this.recordActivity(`Installed stable update ${result.release.tag_name}.`);
+					new Notice("Stable update installed. Reload Obsidian to apply it.");
+				} catch (error) {
+					const message = error instanceof Error ? error.message : "Unable to install the update.";
+					this.recordActivity(`Automatic update failed: ${message}`);
+					if (manual) new Notice(`Update failed: ${message}`);
+				}
+				return;
+			}
+			new UpdateAvailableModal(this.app, result, async () => {
+				const tempDir = await this.updater!.downloadAndValidate(result.release);
+				await this.updater!.installUpdate(tempDir);
+				this.recordActivity(`Installed update ${result.release.tag_name}.`);
+			}).open();
+			return;
+		}
+
+		if (result.kind === "up-to-date") {
+			this.recordActivity("Update check: current build is up to date.");
+			if (manual) new Notice(`Git Sync is up to date (${result.currentVersion}).`);
+			return;
+		}
+
+		this.recordActivity(`Update check: ${result.message}`);
+		if (manual) new Notice(result.message);
+	}
+
+	showAvailableBuilds(): void {
+		if (!this.updater) return;
+		new AvailableBuildsModal(this.app, this.updater, async (build) => {
+			const tempDir = await this.updater!.downloadAndValidate(build.release);
+			await this.updater!.installUpdate(tempDir);
+			this.recordActivity(`Installed development build ${build.release.tag_name}.`);
+		}).open();
 	}
 
 	refreshViews(): void {
@@ -331,6 +405,63 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.repositoryPath = value.trim();
 				});
 			});
+
+		containerEl.createEl("h3", { text: "Updates" });
+		new Setting(containerEl)
+			.setName("Check for updates on startup")
+			.setDesc("Checks GitHub releases at most once per day.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.checkForUpdates).onChange(async (value) => {
+					this.plugin.settings.checkForUpdates = value;
+					await this.plugin.saveSettings();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Release channel")
+			.setDesc("Development builds follow this branch; stable builds use the latest stable release.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("dev", "Development")
+					.addOption("stable", "Stable")
+					.setValue(this.plugin.settings.updateChannel)
+					.onChange(async (value) => {
+						this.plugin.settings.updateChannel = value as "stable" | "dev";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Auto-install stable updates")
+			.setDesc("Installs stable releases without prompting. Development builds always require confirmation.")
+			.addToggle((toggle) =>
+				toggle.setValue(this.plugin.settings.autoUpdate).onChange(async (value) => {
+					this.plugin.settings.autoUpdate = value;
+					await this.plugin.saveData(this.plugin.settings);
+					this.plugin.recordActivity("Saved updater settings.");
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Check now")
+			.setDesc(`Installed version ${this.plugin.manifest.version}.`)
+			.addButton((button) =>
+				button.setButtonText("Check for updates").setCta().onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText("Checking…");
+					try {
+						await this.plugin.checkForUpdates(true);
+					} finally {
+						button.setButtonText("Check for updates");
+						button.setDisabled(false);
+					}
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Available branch builds")
+			.setDesc("Browse and install published development builds from any branch.")
+			.addButton((button) => button.setButtonText("Browse builds").onClick(() => this.plugin.showAvailableBuilds()));
 
 		new Setting(containerEl)
 			.setName("Remote URL")
