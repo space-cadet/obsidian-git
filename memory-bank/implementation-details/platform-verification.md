@@ -28,3 +28,12 @@ TypeScript, production-build, and whitespace checks passed locally. GitHub
 build-and-release workflows passed for the sidebar, local repository, activity,
 updater, and sidebar Settings changes. Desktop installation/reload and Android
 or iOS acceptance have not been performed.
+
+## Current session evidence
+
+- pnpm 9 `install --frozen-lockfile` and the production build passed.
+- The temporary local Git flow passed through untracked, staged, committed, and
+  clean states.
+- Mobile initially exposed `Buffer is not defined`; the Buffer polyfill fix was
+  pushed in `8a90e91`, after which the user observed the Changes panel rendering.
+- Full installed-host reload, commit-and-clean, and rollback checks remain open.

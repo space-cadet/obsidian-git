@@ -6,6 +6,22 @@
 
 ## 2026-09-06
 
+#### 04:45:17 IST - T4, T9, T10, INFRA: Record local Changes workflow, mobile repair, release correction, and CI verification
+- Modified `memory-bank/tasks.md` - Moved T4 into active implementation status
+- Modified `memory-bank/tasks/T4.md` - Recorded Changes implementation and open host acceptance
+- Modified `memory-bank/tasks/T9.md` - Recorded rolling-release timestamp correction
+- Modified `memory-bank/tasks/T10.md` - Recorded pnpm, mobile runtime, and open host evidence
+- Modified `memory-bank/implementation-details/changes-panel.md` - Recorded implementation and UI follow-up
+- Modified `memory-bank/implementation-details/updater-release.md` - Recorded `updated_at` release handling
+- Modified `memory-bank/implementation-details/platform-verification.md` - Recorded current platform evidence
+- Modified `memory-bank/implementation-details/component-map.md` - Updated T4, T9, and T10 status
+- Modified `memory-bank/activeContext.md` - Set next UI and host-verification focus
+- Modified `memory-bank/session_cache.md` - Recorded this session's work and remaining gates
+- Modified `memory-bank/progress.md` - Recorded Changes, release, and mobile progress
+- Modified `memory-bank/changelog.md` - Added T4, T9, and T10 session entries
+- Modified `memory-bank/errorLog.md` - Recorded resolved pnpm and Buffer failures
+- Created `memory-bank/sessions/2026-09-06-changes-release-runtime.md` - Recorded the session title and evidence
+
 #### 03:55:17 IST - T1, T2, T3, T5, T9, INFRA: Record approved KISS sidebar, local state, activity, updater, and branch releases
 - Modified `memory-bank/tasks.md` - Updated active task registry and status summary
 - Modified `memory-bank/tasks/T1.md` - Recorded sidebar implementation and remaining unload verification

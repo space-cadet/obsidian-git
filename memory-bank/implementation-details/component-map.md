@@ -20,7 +20,10 @@ Each component owns its small state, operations, UI, and focused checks.
 
 - T1 and T2: sidebar shell, settings tab, and sidebar Settings entry point are implemented.
 - T3: read-only local repository discovery is implemented; initialization remains pending.
+- T4: local Changes list, stage/unstage, commit controls, and DataAdapter Git
+  operations are implemented; installed-host commit-and-clean verification and
+  UI polish remain pending.
 - T5: live in-memory Activity is implemented; persistence, clear, and export remain pending.
-- T9: updater and branch development releases are implemented; real-host installation remains pending.
-- T10: local and GitHub build evidence exists; desktop and mobile acceptance remain pending.
+- T9: updater and rolling branch-release ordering are implemented; real-host installation remains pending.
+- T10: local, GitHub, and mobile Changes-rendering evidence exists; full desktop/mobile acceptance remains pending.
 Dependencies are added only when a component cannot function without them.

@@ -8,6 +8,10 @@
   installation, rollback, and branch development releases. - T9, INFRA
 - Recorded local and GitHub build evidence; real-host install/reload checks
   remain open. - T10
+- Added the local Changes workflow, including DataAdapter-backed status,
+  stage/unstage, commit, and mobile Buffer support. - T4, T10
+- Corrected rolling branch-build ordering and timestamp display to use release
+  `updated_at`. - T9
 
 ## 2026-09-05
 

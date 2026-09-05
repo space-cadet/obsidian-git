@@ -20,6 +20,11 @@ daily/manual checks, stable-only automatic installation, identity validation,
 backup, and rollback. The published build has not yet been installed, reloaded,
 or forced through a rollback in Obsidian.
 
+Rolling branch releases are updated in place. Browse Builds therefore sorts by
+GitHub `updated_at` and displays that value; `published_at` can remain the
+original release publication time and must not be treated as the current build
+time. This correction was pushed in `2a8dead`.
+
 ## KISS boundary
 
 Keep release handling separate from Git sync. Stable and development channels

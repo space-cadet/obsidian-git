@@ -1,12 +1,12 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 03:55:17 IST*
+*Last Updated: 2026-09-06 04:45:17 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
-**Focus Task**: T9: Updater and Release
-**Session File**: `sessions/2026-09-06-night.md`
-**Status**: 🔄 Active: 6, Paused: 0, Completed: 0
+**Focus Task**: T4, T9, T10: Changes workflow, release correction, and runtime verification
+**Session File**: `sessions/2026-09-06-changes-release-runtime.md`
+**Status**: 🔄 Active: 7, Paused: 0, Completed: 0
 
 ## Overview
 
@@ -32,8 +32,8 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T9: Verify updater installation, reload, and rollback in Obsidian.
-2. T4: Implement the Changes panel.
+1. T4: Polish the Changes panel without changing working mechanics.
+2. T9/T10: Verify installed-host updater and platform workflows.
 
 ## 2026-09-06 Update
 
@@ -42,6 +42,23 @@ Build the Settings panel immediately after the shell with only the configuration
 - T5: visible in-memory Activity is implemented; persistence remains pending.
 - T9: updater and branch development releases are published; real-host install remains pending.
 - T10: local and GitHub build evidence passed; desktop/mobile acceptance remains pending.
+
+## 2026-09-06 Session Update
+
+### Current Session Tasks
+
+- T4: Changes workflow implemented; UI polish and installed-host commit check remain.
+- T9: rolling release timestamp/order correction implemented; host updater checks remain.
+- T10: pnpm/mobile evidence recorded; full platform acceptance remains.
+
+- T4: implemented local file listing, stage/unstage, commit message, commit,
+  DataAdapter-backed Git operations, and the mobile Buffer polyfill.
+- T9: corrected Browse Builds to sort rolling releases by `updated_at`.
+- T10: pnpm 9 frozen install/build and the Bufferless local Git integration
+  check passed; the user observed the mobile Changes panel rendering.
+- Pushed commits: `ef328d1`, `c675818`, `2a8dead`, and `8a90e91`.
+- Remaining: UI polish and full installed-host commit, reload, rollback, and
+  remote acceptance.
 
 ## System Status
 

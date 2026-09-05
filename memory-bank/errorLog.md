@@ -6,3 +6,11 @@
   expected `database/test_output/` files that the test did not create. The
   fresh SQLite schema and database initialization succeeded. No mb-core source
   was changed.
+
+## 2026-09-06
+
+- **pnpm workspace config**: a generated `pnpm-workspace.yaml` caused pnpm 9
+  frozen installs to fail with `packages field missing or empty`; the file was
+  removed in `c675818`.
+- **Mobile Git runtime**: `Buffer is not defined` occurred when Changes invoked
+  `isomorphic-git`; a browser Buffer polyfill was added in `8a90e91`.
