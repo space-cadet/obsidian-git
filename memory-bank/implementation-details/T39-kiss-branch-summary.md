@@ -3,7 +3,7 @@
 *Recorded: 2026-09-05*
 *Branch: `rewrite/git-backend-kiss`*
 *Baseline: `main` at `f8df6f1`*
-*Current commit: `1823084`*
+*Current commit: `681b108`*
 
 ## Purpose
 
@@ -20,6 +20,21 @@ sidebar, logging, progress, and maintenance surfaces.
 
 The branch also carries the latest Changes-tab interaction work and removes the
 retired implementation after the replacement tests were in place.
+
+## PR Review Fixes — 2026-09-05
+
+Commit `681b108` addresses all six automated review findings:
+
+- automatic sync staging filters the plugin-owned
+  `.obsidian/plugins/obsidian-git-sync/` path;
+- pull and push reconcile `origin` with the configured remote URL;
+- operation cancellation reaches the backend and HTTP request boundary;
+- unstaging omits `HEAD` resolution for an unborn repository;
+- bulk staging uses bounded batches of 32 paths;
+- GitHub API commit history and file details allow anonymous public requests.
+
+Focused regression coverage was added for the new behavior. The branch was
+pushed to `origin/rewrite/git-backend-kiss` at `681b108`.
 
 ## Major implementation areas
 
@@ -130,8 +145,11 @@ The final cleanup verification passed:
 - artifact check;
 - `git diff --check`.
 
-The branch was pushed to `origin/rewrite/git-backend-kiss` at commit
-`1823084`. The working tree was clean after the push.
+The review-fix verification also passed TypeScript compilation and the rewrite
+suite increased to 20 passing tests. The generated `main.js` artifact matches
+the pushed source commit.
+
+The working tree was clean after the review-fix push.
 
 ## Acceptance boundary
 

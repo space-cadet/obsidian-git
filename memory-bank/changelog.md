@@ -1,3 +1,14 @@
+## 2026-09-05 — T39 PR review fixes
+
+- Fixed all six automated review findings in pushed commit `681b108`:
+  automatic plugin-file staging, remote reconciliation, cancellation
+  propagation, unborn unstage, bounded bulk staging, and anonymous public
+  GitHub history.
+- Added focused regression tests and verified 59 general tests, 20 rewrite
+  tests, 10 isomorphic-git checks, production build, artifact identity,
+  TypeScript compilation, and `git diff --check`.
+- PR merge and real Obsidian/device/live-remote acceptance remain open.
+
 ## 2026-09-04 — T38 KISS rewrite-plan revision
 
 - Revised the live product and rewrite records around KISS: “Keep It Simple,

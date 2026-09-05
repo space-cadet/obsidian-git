@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-05 15:04:04 IST*
+*Last Updated: 2026-09-05 18:29:26 IST*
 
 ## Current Tasks
 
@@ -448,8 +448,11 @@
 
 - T39 is now registered in `tasks.md` and its complete implementation is
   summarized in `implementation-details/T39-kiss-branch-summary.md`.
-- The branch is at `1823084` on `rewrite/git-backend-kiss`, with the retired
+- The branch is at `681b108` on `rewrite/git-backend-kiss`, with the retired
   backend and obsolete tests removed.
+- PR review fixes cover automatic staging exclusions, remote reconciliation,
+  cancellation, unborn unstage, bounded staging, and anonymous public GitHub
+  history; focused and full verification pass.
 - Automated verification is recorded as complete. Real Obsidian desktop/mobile,
   intermediate-width, live-remote, device-flow, and release acceptance remain
   the next evidence work.

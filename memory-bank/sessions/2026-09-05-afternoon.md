@@ -32,3 +32,14 @@ backend branch implementation and Changes-tab work
 - Real Obsidian desktop/mobile, intermediate-width and keyboard/modal layout,
   live remote freshness, registered device-flow, and release-installation
   acceptance remain open.
+
+## PR Review Fix Continuation — 2026-09-05 18:29:26 IST
+
+- Fixed and pushed all six automated PR findings in commit `681b108`.
+- Added focused tests for plugin-owned staging exclusion, unborn unstage,
+  cancellation, and anonymous public GitHub history.
+- Full verification passed: 59 general tests, 20 rewrite tests, 10
+  isomorphic-git checks, production build, artifact identity, TypeScript, and
+  `git diff --check`.
+- PR merge remains pending; runtime desktop/mobile and live remote acceptance
+  remain separate open evidence.
