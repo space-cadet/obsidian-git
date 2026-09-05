@@ -227,6 +227,12 @@ class GitSyncView extends ItemView {
 			cls: "git-sync-repository",
 			text: repository || "No repository configured",
 		});
+		const settingsButton = header.createEl("button", {
+			text: "Open Settings",
+			cls: "git-sync-open-settings",
+			attr: { type: "button" },
+		});
+		settingsButton.addEventListener("click", () => this.openSettings());
 
 		const tabs = root.createDiv({ cls: "git-sync-tabs", attr: { role: "tablist" } });
 		for (const tabName of ["Changes", "Commits", "Activity"]) {

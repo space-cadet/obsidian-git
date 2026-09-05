@@ -24,6 +24,10 @@
 	white-space: nowrap;
 }
 
+.git-sync-open-settings {
+	margin-top: 10px;
+}
+
 .git-sync-tabs {
 	display: flex;
 	gap: 2px;
