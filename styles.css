@@ -6,8 +6,15 @@
 }
 
 .git-sync-header {
-	padding: 14px 12px 10px;
+	padding: 12px 12px 10px;
 	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-header-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
 }
 
 .git-sync-title {
@@ -24,19 +31,33 @@
 	white-space: nowrap;
 }
 
-.git-sync-open-settings {
-	margin-top: 10px;
+.git-sync-settings-button,
+.git-sync-context-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+}
+
+.git-sync-settings-button svg,
+.git-sync-context-action svg {
+	width: 17px;
+	height: 17px;
 }
 
 .git-sync-tabs {
 	display: flex;
-	gap: 2px;
-	padding: 6px 8px 0;
+	gap: 0;
+	padding: 4px 8px 0;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .git-sync-tab {
-	padding: 6px 8px;
+	flex: 1 1 0;
+	padding: 8px 8px 7px;
 	border: 0;
 	border-bottom: 2px solid transparent;
 	background: transparent;
@@ -51,6 +72,69 @@
 
 .git-sync-tab.is-active {
 	border-bottom-color: var(--interactive-accent);
+}
+
+.git-sync-repository-context {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+	padding: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-branch-context {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+	flex: 1 1 52%;
+}
+
+.git-sync-branch-icon {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.git-sync-branch-icon svg {
+	width: 22px;
+	height: 22px;
+}
+
+.git-sync-branch-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: var(--font-monospace);
+	font-weight: 600;
+}
+
+.git-sync-comparison-status {
+	display: flex;
+	align-items: flex-start;
+	gap: 7px;
+	min-width: 0;
+	flex: 0 1 48%;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+}
+
+.git-sync-comparison-icon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--text-warning);
+}
+
+.git-sync-comparison-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.git-sync-comparison-text {
+	min-width: 0;
+	line-height: 1.35;
 }
 
 .git-sync-content {

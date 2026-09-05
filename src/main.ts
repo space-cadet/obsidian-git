@@ -5,6 +5,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	setIcon,
 	WorkspaceLeaf,
 } from "obsidian";
 import { GIT_BRANCH, GIT_COMMIT_HASH } from "./build-info";
@@ -237,21 +238,22 @@ class GitSyncView extends ItemView {
 		root.addClass("git-sync-sidebar");
 
 		const header = root.createDiv({ cls: "git-sync-header" });
-		header.createDiv({ cls: "git-sync-title", text: "Git Sync" });
+		const headerRow = header.createDiv({ cls: "git-sync-header-row" });
+		headerRow.createDiv({ cls: "git-sync-title", text: "Git Sync" });
+		const settingsButton = headerRow.createEl("button", {
+			cls: "git-sync-settings-button",
+			attr: { type: "button", "aria-label": "Open Git Sync settings", title: "Open Settings" },
+		});
+		setIcon(settingsButton, "settings");
+		settingsButton.addEventListener("click", () => this.openSettings());
 		const repository = this.plugin.settings.repositoryPath.trim();
 		header.createDiv({
 			cls: "git-sync-repository",
 			text: repository || "No repository configured",
 		});
-		const settingsButton = header.createEl("button", {
-			text: "Open Settings",
-			cls: "git-sync-open-settings",
-			attr: { type: "button" },
-		});
-		settingsButton.addEventListener("click", () => this.openSettings());
 
 		const tabs = root.createDiv({ cls: "git-sync-tabs", attr: { role: "tablist" } });
-		for (const tabName of ["Changes", "Commits", "Activity"]) {
+		for (const tabName of ["Changes", "Commits", "Log"]) {
 			const tab = tabs.createEl("button", {
 				text: tabName,
 				cls: tabName === this.activeTab ? "git-sync-tab is-active" : "git-sync-tab",
@@ -263,8 +265,10 @@ class GitSyncView extends ItemView {
 			});
 		}
 
+		this.renderRepositoryContext(root, repository);
+
 		const content = root.createDiv({ cls: "git-sync-content" });
-		if (this.activeTab === "Activity") {
+		if (this.activeTab === "Log") {
 			this.renderActivity(content);
 			return;
 		}
@@ -321,6 +325,33 @@ class GitSyncView extends ItemView {
 		}
 		content.createEl("p", { text: "Commit history is next.", cls: "git-sync-state-description" });
 		this.addRefreshButton(content);
+	}
+
+	private renderRepositoryContext(root: HTMLElement, repository: string): void {
+		const context = root.createDiv({ cls: "git-sync-repository-context" });
+		const branch = context.createDiv({ cls: "git-sync-branch-context" });
+		const branchIcon = branch.createSpan({ cls: "git-sync-branch-icon" });
+		setIcon(branchIcon, "git-branch");
+		const branchName = this.repositoryState?.kind === "ready"
+			? this.repositoryState.branch
+			: this.plugin.settings.branchName.trim() || "No branch";
+		branch.createSpan({ cls: "git-sync-branch-name", text: branchName });
+
+		const refreshButton = branch.createEl("button", {
+			cls: "git-sync-context-action",
+			attr: { type: "button", "aria-label": "Refresh repository", title: "Refresh repository" },
+		});
+		setIcon(refreshButton, "refresh-cw");
+		refreshButton.disabled = !repository;
+		refreshButton.addEventListener("click", () => void this.refreshRepositoryState());
+
+		const comparison = context.createDiv({ cls: "git-sync-comparison-status" });
+		const comparisonIcon = comparison.createSpan({ cls: "git-sync-comparison-icon" });
+		setIcon(comparisonIcon, "alert-circle");
+		comparison.createDiv({
+			cls: "git-sync-comparison-text",
+			text: repository ? "Repository comparison unavailable" : "Repository not configured",
+		});
 	}
 
 	async refreshRepositoryState(): Promise<void> {
@@ -455,7 +486,7 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderActivity(content: HTMLElement): void {
-		content.createDiv({ cls: "git-sync-state-title", text: "Activity" });
+		content.createDiv({ cls: "git-sync-state-title", text: "Log" });
 		const entries = this.plugin.getActivity();
 		if (entries.length === 0) {
 			content.createEl("p", {
