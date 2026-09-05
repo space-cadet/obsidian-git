@@ -1,6 +1,18 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 20:18:35 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
+
+## 2026-09-05 T40 UI Rendering Lifecycle Plan
+
+- Source audit confirmed that the Activity panel rereads persisted history and
+  rebuilds retained rows for live log events; this is distinct from Git pull
+  time.
+- Changes selection and mutation outcomes rebuild the full pane, vault events
+  can request repeated status reads, and the progress modal rebuilds fixed
+  subtrees on every update.
+- Created `rewrite/ui-complexity-refactor` for a targeted refactor that keeps
+  the approved UI while replacing these update paths. Automated and real
+  Obsidian acceptance remain separate.
 
 ## 2026-09-05 KISS Backend Branch Closeout
 

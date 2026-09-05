@@ -1,8 +1,18 @@
 # Active Context
 
-*Last Updated: 2026-09-05 18:54:05 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
 
 ## Current Tasks
+
+### T40: UI Rendering Lifecycle Refactor — 🔄
+- **Scope**: Remove demonstrated full-rebuild update paths from Activity,
+  Changes, vault refresh handling, and the progress modal while preserving the
+  approved UI presentation.
+- **Status**: The source audit is complete. `rewrite/ui-complexity-refactor`
+  now holds the documented plan; no source implementation is claimed yet.
+- **Next**: Implement incremental Activity and Changes updates, coalesce vault
+  refreshes, reuse progress nodes, then record separate automated and real
+  Obsidian acceptance evidence.
 
 ### T38: Current Product Specification and Rewrite PRD Foundation — 🔄
 - **Scope**: Record the current product's user-visible features, UI, Settings,
@@ -13,7 +23,8 @@
   The PRD now explicitly defines a UI-preserving mechanics replacement and
   carries forward the proven `obsidian-ai`-derived updater behaviours.
 - **Next**: Review the specification and PRD. The next session will create the
-  rewrite task as the new origin task.
+  rewrite task as the new origin task. T40 is the approved targeted UI update
+  task and does not change the UI-preservation decision.
 
 ### T29: obsidian-git Plugin — 🔄 sidebar and updater implementation pending runtime acceptance
 - **Scope**: Complete Git sync plugin for Obsidian using isomorphic-git

@@ -1,12 +1,12 @@
 ---
-source_branch: main
-source_commit: 8dac512ee44e2109d9cc88d4a5c8b37f723af37d
+source_branch: rewrite/ui-complexity-refactor
+source_commit: bfe42cffb9d747f478fe13cb56d1b72a3d9af684
 ---
 
 # Obsidian Git Sync Plugin — Rewrite Product Requirements Document
 
 *Created: 2026-09-04 11:05:03 IST*
-*Last Updated: 2026-09-04 20:18:35 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
 *Status: Draft for user review*
 *Source: [Current Product Specification](product-spec.md)*
 
@@ -175,6 +175,15 @@ The replacement must remain usable in narrow Obsidian sidebars and mobile
 WebViews. Text, buttons, scroll regions, modal controls, and the focused
 `.gitignore` editor must remain accessible when the mobile keyboard changes the
 visible viewport.
+
+### PRD-UI-08: Live update responsiveness
+
+Live Activity, file-status, and progress updates must preserve the user's
+current interaction state where the visible collection has not changed. In
+particular, routine new Activity records must not disrupt reading position, and
+routine selection or progress updates must not recreate unrelated visible
+controls. This requirement specifies observed behaviour, not a rendering
+framework, cache, or DOM structure.
 
 ## 7. Settings requirements
 

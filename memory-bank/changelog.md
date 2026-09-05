@@ -1,3 +1,10 @@
+## 2026-09-05 — T40 UI rendering lifecycle plan
+
+- Recorded the demonstrated Activity, Changes, refresh-fanout, and progress
+  rendering defects and created T40 on `rewrite/ui-complexity-refactor`.
+- The plan preserves the approved sidebar, Settings, dialogs, updater, and
+  backend; it does not authorize a full UI rewrite.
+
 ## 2026-09-05 — T39 PR review fixes
 
 - Fixed all six automated review findings in pushed commit `681b108`:

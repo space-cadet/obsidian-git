@@ -1,7 +1,25 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-05 18:54:05 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
+
+#### 21:00:52 IST - T40: Record UI rendering lifecycle refactor handoff
+
+- Created `memory-bank/tasks/T40.md` - Defined targeted Activity, Changes, refresh, and progress update criteria.
+- Created `memory-bank/implementation-details/T40-ui-rendering-lifecycle.md` - Recorded source audit evidence and implementation plan.
+- Updated `memory-bank/tasks.md` - Registered T40 and refreshed active-task counts.
+- Updated `memory-bank/tasks/T29a.md` - Corrected the live Activity rebuild claim and linked T40 ownership.
+- Updated `memory-bank/tasks/T35d.md` - Separated pull display timing from transport ownership.
+- Updated `memory-bank/tasks/T35f.md` - Added behavioural rendering-lifecycle coverage requirements.
+- Updated `memory-bank/tasks/T38.md` - Recorded the targeted UI refactor decision.
+- Updated `memory-bank/product-spec.md` - Recorded the observed Activity responsiveness defect.
+- Updated `memory-bank/product-prd.md` - Added live-update responsiveness requirements.
+- Updated `memory-bank/activeContext.md` - Set T40 as the next implementation focus.
+- Updated `memory-bank/session_cache.md` - Recorded the new branch, session handoff, and title.
+- Updated `memory-bank/progress.md` - Recorded the UI lifecycle plan milestone.
+- Updated `memory-bank/changelog.md` - Added the T40 planning entry.
+- Created `memory-bank/sessions/2026-09-05-evening.md` - Recorded this session and next implementation work.
+- Created `memory-bank/edits/2026-09-05/210052-T40-ui-rendering-lifecycle-plan.md` - Recorded the update chunk.
 
 #### 18:54:05 IST - T39: Record PR merge and session title
 

@@ -1,12 +1,12 @@
 ---
-source_branch: main
-source_commit: 8dac512ee44e2109d9cc88d4a5c8b37f723af37d
+source_branch: rewrite/ui-complexity-refactor
+source_commit: bfe42cffb9d747f478fe13cb56d1b72a3d9af684
 ---
 
 # Obsidian Git Sync Plugin — Current Product Specification
 
 *Created: 2026-09-04 11:05:03 IST*
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
 *Status: Current product baseline for PRD preparation*
 
 ## Purpose
@@ -182,6 +182,10 @@ The Log actions menu contains:
 - `Copy details` — copies the retained entries and details to the clipboard.
 
 When there are no entries it shows `No activity yet`.
+
+Current source has a recorded Activity-update defect: receiving a live entry
+can rebuild the retained Activity list and disrupt responsiveness. T40 owns the
+repair; source and build evidence do not establish its desktop or mobile result.
 
 ### Uninitialised and unavailable states
 
@@ -539,6 +543,7 @@ requirements.
 | Remote commit files unavailable locally | GitHub fallback is attempted for supported remotes | Source; automated |
 | Shallow history lacks commit details | Empty/unavailable details message is shown | Source |
 | Persisted and live log entry overlap | Duplicate visible entries are removed | Source; automated |
+| Live Activity entry while reading history | Current implementation can rebuild retained history and delay display | Source audit; user-observed timing |
 | No retained log entries | `No activity yet` is shown | Source |
 | Log export or clipboard failure | Failure notice is shown | Source |
 | Desktop heap/storage metric unavailable | Metric shows `N/A` or filesystem-unavailable text | Source |

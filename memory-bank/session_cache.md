@@ -1,13 +1,22 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-05 18:54:05 IST*
+*Last Updated: 2026-09-05 21:00:52 IST*
 
 ## Current Session
-**Started**: 2026-09-05 05:50:10 IST
-**Focus Task**: T29, T29a, T35b, T35c, T35f, T38 sidebar verification and documentation
-**Session File**: `memory-bank/sessions/2026-09-05-early-morning.md`
-**Status**: ✅ CLOSED
+**Started**: 2026-09-05 21:00:52 IST
+**Focus Task**: T29a, T35d, T35f, T40 UI rendering-lifecycle diagnosis and handoff
+**Session File**: `memory-bank/sessions/2026-09-05-evening.md`
+**Status**: 🔄 ACTIVE
+
+**Session Title**: T29a, T35d, T35f, T40: Diagnose pull-display latency and plan the UI rendering refactor
+
+**Branch**: `rewrite/ui-complexity-refactor`, created from clean `main` at
+`bfe42cf` for the next implementation session.
+
+**Current Handoff**: The source audit confirms high-cost full rebuild paths in
+Activity, Changes, vault refresh fanout, and the progress modal. T40 owns a
+targeted update-mechanics refactor; no full UI rewrite is authorized.
 
 **Branch Closeout**: T39 KISS backend implementation and dead-code cleanup
 are recorded through commit `681b108` (cleanup landed in `1823084`). The branch summary is
@@ -61,9 +70,9 @@ commit-message template remains absent because mb-core reported its bundled
 source file was missing.
 
 ## Overview
-- Active: 5 parents (T29, T34, T35, T36, T38; T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f active) | Planned: 2 (T34b, T34c) | Completed: 2 tracked milestones (T29 progress, T33 complete)
-- Last Session: 2026-09-03 afternoon (maintenance, diagnostics, and mobile-ref follow-up)
-- Current Period: afternoon
+- Active: 7 parents (T29, T34, T35, T36, T38, T39, T40; T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f active) | Planned: 2 (T34b, T34c) | Completed: 2 tracked milestones (T29 progress, T33 complete)
+- Last Session: 2026-09-05 evening (UI rendering lifecycle diagnosis and handoff)
+- Current Period: evening
 
 ## Implementation Plan — 2026-09-03 18:26 IST
 
@@ -224,12 +233,14 @@ fresh vault; explicit Clone Remote remains the only initialization path.
   investigation and must not be inferred from desktop or automated tests.
 
 ## Session History (Recent)
-1. `sessions/2026-09-03-afternoon.md` — T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
-2. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
-3. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
-4. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
-5. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
-6. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
+
+1. `sessions/2026-09-05-evening.md` — T29a, T35d, T35f, T40: Diagnose pull-display latency and plan the UI rendering refactor
+2. `sessions/2026-09-03-afternoon.md` — T29, T35b, T35d, T36, T37: Reconcile reliability records and assess a plugin rewrite
+3. `sessions/2026-09-02-afternoon.md` — T29, T29a, T30, T35b, T35c, T35e: Sidebar redesign, updater repair, build browsing, performance, and remote-recovery audit
+4. `sessions/2026-08-18-afternoon.md` — T29: Finalize contextual sidebar UX and publish Memory Bank closeout
+5. `sessions/2026-08-12-afternoon.md` — T29/T35b gitignore controls and acceptance follow-up
+6. `sessions/2026-08-12-startup-clone-fix.md` — T35c startup clone regression fix
+7. `sessions/2026-08-11-secure-storage.md` — T35a minimal SecretStorage implementation
 
 ## Current Sidebar Follow-up Checkpoint — 2026-09-04 01:42:44 IST
 
