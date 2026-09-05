@@ -9,6 +9,14 @@
   TypeScript compilation, and `git diff --check`.
 - PR merge and real Obsidian/device/live-remote acceptance remain open.
 
+## 2026-09-05 — T39 PR merge
+
+- Merged PR #1 into `main` at `d5229cf`.
+- Fast-forwarded local `main` to match `origin/main` and verified a clean
+  worktree.
+- Kept real Obsidian desktop/mobile, live remote, device-flow, and release
+  acceptance as open evidence boundaries.
+
 ## 2026-09-04 — T38 KISS rewrite-plan revision
 
 - Revised the live product and rewrite records around KISS: “Keep It Simple,

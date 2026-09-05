@@ -1,12 +1,12 @@
 # Session 2026-09-05 - Afternoon
 
 *Created: 2026-09-05 15:04:04 IST*
-*Last Updated: 2026-09-05 15:04:04 IST*
+*Last Updated: 2026-09-05 18:54:05 IST*
 
 ## Focus Task
 
-T29, T29a, T35b, T35c, T35f, T36, T37, T38, T39: Record the complete KISS
-backend branch implementation and Changes-tab work
+T29, T29a, T34, T35a/b/c/f, T36, T37, T38, T39: fix PR review findings, update
+Memory Bank, merge PR, and fast-forward main
 
 **Status**: ✅ CLOSED
 
@@ -33,7 +33,7 @@ backend branch implementation and Changes-tab work
   live remote freshness, registered device-flow, and release-installation
   acceptance remain open.
 
-## PR Review Fix Continuation — 2026-09-05 18:29:26 IST
+## PR Review Fix and Merge Closeout — 2026-09-05 18:54:05 IST
 
 - Fixed and pushed all six automated PR findings in commit `681b108`.
 - Added focused tests for plugin-owned staging exclusion, unborn unstage,
@@ -41,5 +41,8 @@ backend branch implementation and Changes-tab work
 - Full verification passed: 59 general tests, 20 rewrite tests, 10
   isomorphic-git checks, production build, artifact identity, TypeScript, and
   `git diff --check`.
-- PR merge remains pending; runtime desktop/mobile and live remote acceptance
-  remain separate open evidence.
+- PR #1 merged into `main` at `d5229cf`.
+- Local `main` was fast-forwarded to match `origin/main`; the worktree is
+  clean.
+- Runtime desktop/mobile and live remote acceptance remain separate open
+  evidence.

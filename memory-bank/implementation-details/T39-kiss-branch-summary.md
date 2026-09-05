@@ -3,7 +3,8 @@
 *Recorded: 2026-09-05*
 *Branch: `rewrite/git-backend-kiss`*
 *Baseline: `main` at `f8df6f1`*
-*Current commit: `681b108`*
+*Current implementation commit: `681b108`*
+*Merged into `main`: `d5229cf`*
 
 ## Purpose
 
@@ -150,6 +151,12 @@ suite increased to 20 passing tests. The generated `main.js` artifact matches
 the pushed source commit.
 
 The working tree was clean after the review-fix push.
+
+## Merge Closeout — 2026-09-05
+
+PR #1 was merged into `main` at `d5229cf`. The local workspace was switched
+to `main` and fast-forwarded to the same commit as `origin/main`. The review
+fixes and Memory Bank record are therefore part of the merged mainline.
 
 ## Acceptance boundary
 

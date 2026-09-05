@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-05 18:29:26 IST*
+*Last Updated: 2026-09-05 18:54:05 IST*
 
 ## Current Session
 **Started**: 2026-09-05 05:50:10 IST
@@ -16,11 +16,15 @@ verification passed, while real Obsidian, live-remote, device-flow, and release
 acceptance remain open.
 
 **PR Review Fix Continuation**: Commit `681b108` records and pushes all six
-automated review fixes. Full verification passed; the PR remains open pending
-merge, and real Obsidian, live-remote, device-flow, and release acceptance
-remain open.
+automated review fixes. Full verification passed; PR #1 was subsequently
+merged into `main`, while real Obsidian, live-remote, device-flow, and release
+acceptance remain open.
 
-**Session Title**: T29, T29a, T35b, T35c, T35f, T38: Verify and document sidebar status, multi-select, and release evidence
+**Merge Closeout**: PR #1 merged into `main` at `d5229cf`. Local `main` was
+fast-forwarded to match `origin/main`; the worktree is clean. Runtime
+Obsidian, live-remote, device-flow, and release acceptance remain open.
+
+**Session Title**: T29, T29a, T34, T35a/b/c/f, T36, T37, T38, T39: fix PR review findings, update Memory Bank, merge PR, and fast-forward main
 
 **Verification**: `CI=true pnpm test` passed with 59 general tests, 20 rewrite
 tests, 10 isomorphic-git checks, artifact identity, TypeScript compilation, and

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-05 18:29:26 IST*
+*Last Updated: 2026-09-05 18:54:05 IST*
 
 ## Current Tasks
 
@@ -448,7 +448,8 @@
 
 - T39 is now registered in `tasks.md` and its complete implementation is
   summarized in `implementation-details/T39-kiss-branch-summary.md`.
-- The branch is at `681b108` on `rewrite/git-backend-kiss`, with the retired
+- The implementation branch reached `681b108` and was merged into `main` at
+  `d5229cf`, with the retired
   backend and obsolete tests removed.
 - PR review fixes cover automatic staging exclusions, remote reconciliation,
   cancellation, unborn unstage, bounded staging, and anonymous public GitHub
