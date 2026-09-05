@@ -8,7 +8,9 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "check:artifact": "node scripts/check-artifact-identity.mjs",
     "archive": "node scripts/build-archive.mjs",
-    "test": "pnpm run build && pnpm run check:artifact && node --test tests/*.test.mjs && node test-isomorphic-git.mjs",
+    "test:rewrite": "node --test tests/rewrite/*.test.mjs",
+    "test:rewrite:github": "node scripts/test-rewrite-github-auth.mjs",
+    "test": "pnpm run build && pnpm run check:artifact && node --test tests/*.test.mjs && node --test tests/rewrite/*.test.mjs && node test-isomorphic-git.mjs",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
   "keywords": [

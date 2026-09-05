@@ -1,6 +1,6 @@
 # Product Context
 
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
 
 Obsidian Git Sync is an Obsidian plugin for tracking a vault with Git on
 desktop and mobile. Its current product surface includes the Git sidebar,
@@ -16,9 +16,10 @@ The first rewrite PRD draft is recorded in
 the rewrite task and branch are created.
 
 The rewrite direction is UI-preserving: retain the existing Settings panel,
-sidebar layout, styles, dialogs, and proven updater experience, while replacing
-the Git/repository mechanics and the path by which their results update the
-UI.
+sidebar layout, styles, dialogs, and proven updater experience. Replace only
+the Git or state-update code that cannot support a demonstrated user workflow
+with a simpler direct implementation. No particular module structure is part
+of the product decision.
 
 The approved sidebar visual references remain in
 [`assets/ui-mockups/`](assets/ui-mockups/). The current product specification

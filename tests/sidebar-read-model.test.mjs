@@ -36,6 +36,25 @@ test('history caches are keyed by their repository and branch', () => {
   assert.equal(model.getLocalCommits('develop'), null);
 });
 
+test('the last status snapshot survives view recreation until invalidated', () => {
+  const model = new SidebarReadModel();
+  const snapshot = {
+    branch: 'main',
+    ahead: 0,
+    behind: 0,
+    comparison: 'up-to-date',
+    detailedStatus: [{ filepath: 'README.md', status: 'modified' }],
+    staged: [],
+    unstaged: ['README.md'],
+  };
+
+  model.setStatusSnapshot(snapshot);
+  assert.strictEqual(model.getStatusSnapshot(), snapshot);
+
+  model.invalidateStatus();
+  assert.equal(model.getStatusSnapshot(), null);
+});
+
 test('commit details and log entries survive view recreation until invalidated', () => {
   const model = new SidebarReadModel();
   const files = [{ filepath: 'README.md', status: 'modified' }];

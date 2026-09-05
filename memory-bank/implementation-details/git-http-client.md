@@ -148,3 +148,9 @@ complete response before the iterator starts.
 - `src/gitManager.ts` — GitHttpClient implementation
 - Obsidian API docs: `requestUrl` function
 - isomorphic-git docs: HTTP client interface
+
+The current KISS branch replaces the retired `GitHttpClient` ownership path
+with the backend transport boundary under `src/backend/`. The historical
+details above remain useful for the response-buffering and mobile acceptance
+constraints; current implementation and verification are recorded in
+`implementation-details/T39-kiss-branch-summary.md`.

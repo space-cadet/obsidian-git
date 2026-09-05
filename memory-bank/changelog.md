@@ -1,3 +1,26 @@
+## 2026-09-05 — T39 PR review fixes
+
+- Fixed all six automated review findings in pushed commit `681b108`:
+  automatic plugin-file staging, remote reconciliation, cancellation
+  propagation, unborn unstage, bounded bulk staging, and anonymous public
+  GitHub history.
+- Added focused regression tests and verified 59 general tests, 20 rewrite
+  tests, 10 isomorphic-git checks, production build, artifact identity,
+  TypeScript compilation, and `git diff --check`.
+- PR merge and real Obsidian/device/live-remote acceptance remain open.
+
+## 2026-09-04 — T38 KISS rewrite-plan revision
+
+- Revised the live product and rewrite records around KISS: “Keep It Simple,
+  Stupid.”
+- Made demonstrated user behaviour the requirement and treated coordinators,
+  caches, read models, event systems, and source-structure tests as optional
+  implementation choices.
+- Replaced the active rewrite next steps with real Obsidian/device workflow
+  checks, specific fixes for observed failures, focused tests, and PRD approval
+  before any rewrite task or branch is created.
+- Preserved dated session records as historical records.
+
 ## 2026-09-04 — T29a/T35b/T35f bulk action repaint
 
 - Fixed Stage all and Unstage all so they repaint Changes immediately after
@@ -208,6 +231,18 @@
   new origin task.
 - No source code or UI layout was changed.
 
+## 2026-09-05 — Sidebar Status and Multi-Select Verification
+
+- Documented the desktop status adapter fix for ordinary-file `readlink`
+  failures and broken ignored symlinks.
+- Recorded Changes-tab status filters, sorting, review/discard, sticky headers,
+  and section-scoped multi-select actions.
+- Clarified that only the Settings Sync Now action was removed; ribbon and
+  command-palette manual sync remain available.
+- Verified 83 general tests, 16 rewrite tests, 10 isomorphic-git checks,
+  artifact identity, and `git diff --check`; runtime Obsidian acceptance is
+  still pending.
+
 ## 2026-09-04 — T38 UI-preserving mechanics rewrite
 
 - Clarified the PRD so the existing Settings panel, sidebar layout, styles,
@@ -216,3 +251,14 @@
   result-to-UI path behind a small product-facing interface.
 - Added the proven `obsidian-ai`-derived updater behaviour and safety rules to
   the rewrite requirements without copying its source structure.
+## 2026-09-05 — T39 KISS backend branch closeout
+
+- Recorded the platform-neutral backend, Obsidian adapter, direct Git operation
+  results, authentication boundaries, repository safety, and retained UI
+  integration.
+- Recorded the Changes-tab status, filtering, sorting, sticky headers,
+  multi-select, selected-file actions, and immediate mutation repainting.
+- Removed the retired GitManager implementation and obsolete tests in commit
+  `1823084`; rewired conformance checks to the active backend.
+- Automated verification passed; real Obsidian desktop/mobile, live remote,
+  device-flow, and release acceptance remain open.

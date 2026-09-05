@@ -6,7 +6,7 @@ source_commit: 8dac512ee44e2109d9cc88d4a5c8b37f723af37d
 # Obsidian Git Sync Plugin — Rewrite Product Requirements Document
 
 *Created: 2026-09-04 11:05:03 IST*
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
 *Status: Draft for user review*
 *Source: [Current Product Specification](product-spec.md)*
 
@@ -43,16 +43,16 @@ The existing Settings panel, sidebar layout, styles, labels, dialogs, menus,
 and progress presentation are the baseline to carry forward. They may be
 reused directly where they already satisfy this PRD.
 
-The replacement mechanics must provide a small product-facing interface for
-the actual user actions: read state, stage, unstage, commit, pull, push, sync,
-initialize, clone, history, health, and repair. It returns clear state and
-operation results. It does not render the DOM, show notices, or decide the
-layout.
+The replacement must provide direct, understandable paths for the actual user
+actions: read state, stage, unstage, commit, pull, push, sync, initialize,
+clone, history, health, and repair. Git work must return clear state and
+operation results; the UI must present those results and remain responsible for
+its own layout and messages.
 
-The existing UI consumes those results and performs the visible update once.
-The Git mechanics do not repaint the UI, and the UI does not perform Git work
-itself. This is a separation of responsibility, not a requirement to create a
-large collection of new modules.
+Keep the handoff between Git work and the UI direct. A small shared helper may
+be used when it removes demonstrated duplication, but this PRD does not require
+a coordinator, event system, read-model module, cache store, or any other
+particular collection of implementation modules.
 
 ## 3. Goals
 
@@ -95,7 +95,7 @@ large collection of new modules.
 
 ### Daily remote work
 
-1. User chooses Pull, Push, or Sync now.
+1. User chooses Pull, Push, or the retained ribbon/command-palette Sync now.
 2. The product shows progress where the operation supports it.
 3. The product reports success, no changes, conflict, cancellation, or
    failure.
@@ -259,7 +259,7 @@ must require explicit confirmation before overwriting remote history.
 
 ### PRD-FN-06: Sync
 
-Sync now and automatic sync must pull first when a remote is configured, then
+The retained ribbon/command-palette Sync now and automatic sync must pull first when a remote is configured, then
 stage local changes, commit when changes exist, and push when a remote exists.
 Without a remote, sync must create a local commit only. With no changes, it
 must report that there are no changes to commit.
@@ -366,6 +366,9 @@ reports as ignored.
 These are constraints on the new implementation, not a description of the
 current product.
 
+KISS means “Keep It Simple, Stupid.” The implementation should contain only
+the machinery needed to provide the documented user behaviour.
+
 - Start from the user-visible requirements in this PRD.
 - Keep one straightforward path for each user action.
 - Give each piece of behaviour one clear owner.
@@ -378,6 +381,9 @@ current product.
 - Do not preserve an old implementation detail solely for familiarity.
 - Keep user-facing errors and results explicit.
 - Make the smallest change needed to satisfy a requirement.
+- Do not add a global operation event system, a dedicated sidebar cache, or
+  source-structure checks unless a specific observed failure shows that the
+  simpler direct implementation cannot work.
 
 The acceptance target is behavioural equivalence with the product
 specification, not structural similarity to the current source.
@@ -403,7 +409,11 @@ The rewrite is acceptable only when all of the following are true:
 - Live remote authentication and repository access have been tested without
   exposing credentials.
 - The current implementation remains available for rollback until parity is
-demonstrated.
+  demonstrated.
+
+These acceptance requirements describe user-visible behaviour. They do not
+require a named coordinator, lifecycle event bus, sidebar read model, AST
+conformance test, or any other specific internal structure.
 
 ### Evidence layers
 

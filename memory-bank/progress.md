@@ -1,6 +1,30 @@
 # Project Progress
 
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-04 20:18:35 IST*
+
+## 2026-09-05 KISS Backend Branch Closeout
+
+- Implemented the platform-neutral backend and connected it to the retained
+  Obsidian UI, Settings, progress, diagnostics, maintenance, and updater paths.
+- Completed the Changes-tab status, filtering, sorting, sticky-header,
+  multi-select, review/discard, and direct-repaint work.
+- Removed the retired backend and obsolete tests in commit `1823084`.
+- Verification passed: 59 general tests, 16 replacement-backend tests, 10
+  isomorphic-git checks, production build, artifact check, and `git diff --check`.
+- Real Obsidian desktop/mobile, live remote, registered device-flow, and release
+  installation acceptance remain open.
+
+## 2026-09-04 KISS Rewrite Plan Revision
+
+- Revised the live rewrite planning direction to require only demonstrated
+  user behaviour, not a prescribed collection of modules or source checks.
+- Kept cancellation for long-running Git actions, prevention of conflicting
+  mutations, cleanup, and protection against stale view results as the only
+  generally justified shared concerns.
+- Marked the current operation wrapper, source conformance test, and sidebar
+  cache as implementation history rather than rewrite requirements.
+- No new architecture document or rewrite task is needed until the revised PRD
+  is reviewed and approved.
 
 ## 2026-09-04 Current Product Specification
 
@@ -20,13 +44,14 @@
 - Review remains open; the rewrite task and branch are deferred to the next
   session as the new origin task.
 
-## 2026-09-04 UI-Preserving Mechanics Rewrite Decision
+## 2026-09-04 Earlier UI-Preserving Mechanics Rewrite Draft
 
 - Updated the product specification and PRD to make clear that the existing
   Settings panel, sidebar layout, styles, dialogs, and updater experience are
   retained where they already satisfy the product contract.
-- Defined the rewrite scope as replacement of Git/repository mechanics and the
-  result-to-UI path behind a small product-facing interface.
+- The earlier draft described replacement of Git/repository mechanics and the
+  result-to-UI path behind a small product-facing interface; the current KISS
+  revision limits replacement to code that fails a demonstrated workflow.
 - Added the proven `obsidian-ai`-derived updater behaviours to the rewrite
   requirements without prescribing its source structure.
 
@@ -260,13 +285,13 @@
   smart-HTTP transport. T34b device flow and T34c device acceptance remain
   planned.
 
-## Active: Reliability, Security, and Architecture Hardening (T35)
+## Active: Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up (T35)
 
 - The August 11 architecture review is recorded as T35 with child tasks
   T35a-T35f. The read-only T35a/T35c source audit is complete.
 - T35a covers credential storage, redaction, and automatic staging exclusions.
-- T35b covers operation serialization, cancellation, view refreshes, and
-  progress lifecycle.
+- T35b covers preventing conflicting mutations, cancellation, view refreshes,
+  and progress cleanup.
 - T35c covers clone, local-only, empty-remote, and destructive replacement
   behavior.
 - T35d covers native transport consistency, response buffering, pack-index
@@ -276,9 +301,9 @@
 - T35f covers CI test execution, missing integration coverage, documentation,
   and generated-artifact drift.
 - T35a/T35c have a first narrow implementation slice; SecretStorage migration,
-  backup protection, lifecycle coordination, and device acceptance remain open.
+  backup protection, and device acceptance remain open.
 
-### T35a/T35c First KIRSS Implementation Slice (2026-08-11)
+### T35a/T35c First Credential-Safety Implementation Slice (2026-08-11)
 
 - Added central redaction for retained logger entries, console output, Notices,
   and exported log data.
@@ -301,7 +326,7 @@
 - Added one-time legacy password migration, per-vault secret IDs, secure input
   handling, and credential refresh before remote operations.
 - Added focused credential-store tests. Remaining work is mobile/desktop
-  acceptance, export inspection, and broader lifecycle hardening.
+  acceptance, export inspection, and broader lifecycle follow-up.
 
 ### T35c Startup Clone Regression Fix (2026-08-12)
 
@@ -399,7 +424,7 @@
 The v1.0.0 gate remains open. The review identified credential-exposure,
 concurrency, initialization-safety, mobile-transport, updater-integrity, and
 CI-coverage risks. T29 retains release ownership; T34 retains authentication
-ownership; T35 records and tracks shared hardening work.
+ownership; T35 records and tracks its shared follow-up work.
 
 ## Milestones
 
@@ -430,3 +455,13 @@ ownership; T35 records and tracks shared hardening work.
   Node tests, production build, artifact identity, smoke checks, and diff
   validation.
 - Real Obsidian desktop/mobile acceptance remains open.
+
+### 2026-09-05 — Sidebar Status and Multi-Select Verification
+
+- Verified the latest status-pipeline, filesystem adapter, filtering, sorting,
+  review/discard, sticky-header, and multi-select changes.
+- Recorded the adapter `readlink` failure and clarified the Settings-only
+  removal of Sync Now in the product records.
+- Automated verification passed with 83 general tests, 16 rewrite tests, 10
+  isomorphic-git checks, artifact identity, and `git diff --check`.
+- Real Obsidian desktop/mobile acceptance and live remote parity remain open.

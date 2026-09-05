@@ -1,4 +1,4 @@
-import type { GitCommit } from './gitManager';
+import type { GitCommit, GitSidebarStatusSnapshot } from './backend/obsidianAdapter';
 import type { LogEntry } from './logger';
 
 export interface SidebarCommitCache {
@@ -18,10 +18,23 @@ export interface SidebarRemoteCommitCache extends SidebarCommitCache {
  * discard history unnecessarily and cache behavior can be tested without DOM.
  */
 export class SidebarReadModel {
+    private statusSnapshot: GitSidebarStatusSnapshot | null = null;
     private remoteCommits: SidebarRemoteCommitCache | null = null;
     private localCommits: SidebarCommitCache | null = null;
     private commitDetails = new Map<string, GitCommit['files']>();
     private logEntries: LogEntry[] | null = null;
+
+    getStatusSnapshot(): GitSidebarStatusSnapshot | null {
+        return this.statusSnapshot;
+    }
+
+    setStatusSnapshot(snapshot: GitSidebarStatusSnapshot): void {
+        this.statusSnapshot = snapshot;
+    }
+
+    invalidateStatus(): void {
+        this.statusSnapshot = null;
+    }
 
     getRemoteCommits(repoUrl: string, branch: string): GitCommit[] | null {
         if (this.remoteCommits?.repoUrl !== repoUrl || this.remoteCommits.branch !== branch) return null;

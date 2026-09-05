@@ -3,7 +3,7 @@ source_branch: main
 source_commit: 4f7d04b1a2d5870cb32ddabd13e4ae822256eb3f
 ---
 
-# Plugin Rewrite Feasibility and Architecture Assessment
+# Plugin Rewrite Feasibility and User-Workflow Assessment
 
 *Created: 2026-09-03 19:58:37 IST*
 *Last Updated: 2026-09-04 00:05:23 IST*
@@ -11,9 +11,14 @@ source_commit: 4f7d04b1a2d5870cb32ddabd13e4ae822256eb3f
 
 ## Purpose
 
-Capture the architectural lessons from the recurring Obsidian Git failures and
-provide a decision framework for improving the current plugin versus rewriting
-it. This document records an assessment, not a rewrite decision.
+Capture the lessons from the recurring Obsidian Git failures and provide a
+decision framework for improving the current plugin versus replacing it. This
+document records an assessment, not a rewrite decision.
+
+The module recommendations recorded in earlier versions of this document are
+historical suggestions, not requirements. The current decision standard is
+KISS: begin with the smallest direct change that fixes a demonstrated user
+problem.
 
 ## Observed Architectural Pattern
 
@@ -59,18 +64,19 @@ proof that every module must be discarded.
 
 ## What the Current Fixes Demonstrate
 
-The latest source work shows that several boundaries can be introduced without
-a rewrite: shared status snapshots, stale-render protection, tab-specific
-caches, persistent log loading, opt-in metrics, operation-specific progress,
-and a staging-boundary ignore guard. Official isomorphic-git 1.41.9 also works
-for the tested tracked-ignore behavior, so a dependency fork is not currently
-the architectural remedy.
+The latest source work shows that several reported behaviours can be improved
+without replacing the plugin: status can be read once for a refresh, stale
+view results can be ignored, logs can include retained history, progress can
+describe the operation being performed, and staging can enforce Git ignore
+rules. Official isomorphic-git 1.41.9 also works for the tested
+tracked-but-ignored behaviour, so a dependency fork is not currently needed.
 
-The remaining failures are concentrated in proof and runtime behavior:
-single-coordinator coverage, unload cancellation, mobile ref visibility,
-native transport buffering, large-repository timing, visual acceptance, and
-release installation. That evidence should be collected before deciding that
-the current code is beyond repair.
+The remaining gaps are user acceptance and a small number of concrete safety
+questions: mobile ref visibility, native transport buffering, large-repository
+timing, visual acceptance, release installation, cancellation, and what should
+happen when two Git actions are requested together. These should be tested as
+user workflows. They are not evidence that a collection of new modules is
+required.
 
 ## Feasibility of a Clean Rewrite
 
@@ -95,40 +101,31 @@ The main rewrite risks are:
 
 ## Advisability
 
-A big-bang rewrite is not advised now. The current fixes demonstrate that the
-most important boundaries can be extracted incrementally, while a rewrite
-would multiply the number of unverified behaviors at exactly the point where
-mobile and release evidence is still incomplete.
+Do not start a rewrite or a broad extraction plan yet. First run the actual user
+workflows against the current plugin and record which ones work, still fail, or
+have not been tested.
 
-The advised path is:
+For a failing workflow, try the smallest direct fix first. The only generally
+justified shared behaviour at present is that a long Git action can be
+cancelled, that conflicting mutations do not damage the repository, and that
+an old asynchronous result is not shown in a changed view. Even these may be
+implemented locally if that keeps the code clearer.
 
-1. Freeze the current behavior in a conformance suite covering status,
-   ignore/staging, pull/push, recovery, cancellation, cache invalidation,
-   persistent logs, progress completion, and updater artifacts.
-2. Extract a single `OperationCoordinator` and explicit repository-state model
-   shared by commands, sidebar, settings, and auto-sync.
-3. Extract read models and stores with declared lifetimes and invalidation.
-4. Make the Obsidian adapter and native transport satisfy the same contract as
-   the Node test adapter, including refs, pack files, and cancellation limits.
-5. Migrate the sidebar and progress surfaces to those interfaces.
-6. Reassess rewrite versus continuation after real desktop and Android evidence.
-
-This produces most of the architectural value of a rewrite while preserving a
-rollback path. A clean rewrite should proceed only in a separate branch or
-package, with the existing plugin retained until parity is demonstrated.
+Consider a replacement only if the current implementation cannot meet a
+required workflow without more code and indirection than a small replacement
+would need. If that point is reached, keep the current plugin available and
+compare the replacement against the user workflows, not against a prescribed
+module structure.
 
 ## Go / No-Go Criteria
 
 Proceed toward a rewrite only if at least one of these becomes true:
 
-- The coordinator, state model, or adapter boundaries cannot be introduced
-  without pervasive coupling and repeated regressions.
-- The conformance suite exposes incompatible assumptions that cannot be
-  removed without breaking supported behavior.
-- Mobile filesystem/ref/transport constraints require a different core model
-  rather than better adapters and lifecycle ownership.
-- The maintenance cost of incremental extraction is measured to exceed the
-  cost of a parallel replacement with verified parity.
+- A required user workflow still fails after the smallest reasonable direct fix.
+- The current code cannot support the required mobile or repository behaviour
+  without adding substantially more complexity than a replacement would need.
+- A replacement can be compared against the current product with real desktop,
+  Android, and live-remote evidence.
 
 Do not authorize a rewrite solely because the UI has recurring bugs, because a
 single operation is slow, or because the code feels inconsistent. Those are
@@ -136,33 +133,22 @@ signals to improve boundaries and tests, not standalone rewrite criteria.
 
 ## Evidence Required Before a Decision
 
-- Full automated suite with concurrency and lifecycle coverage
+- Focused tests for the specific behaviours being changed
 - Obsidian desktop screenshots and operation traces
 - Android clone, pull, push, stage, delete-refresh, refs, and keyboard tests
 - Large-repository timing and memory measurements
 - Generated bundle/archive/updater identity checks
-- A documented compatibility matrix for supported settings and commands
+- A documented compatibility list for supported settings and commands
 
 ## Decision Status
 
 T37 is tentative and paused. No rewrite, fork, package replacement, or public
 release-track change is authorized by this document.
 
-## Matt Pocock-Style Deepening Review — 2026-09-04
+## Historical Architecture Review — 2026-09-04
 
 The saved report
-[`pocock-architecture-review.html`](pocock-architecture-review.html) applies
-module depth, locality, leverage, seam, and deletion-test reasoning to the
-current checkout. It identifies five candidates:
-
-1. Deepen operation ownership first.
-2. Deepen the repository operation module before splitting GitManager.
-3. Move sidebar data freshness and invalidation into a read module.
-4. Concentrate updater identity, installation, and rollback in one transaction.
-5. Make the filesystem adapter seam explicit only after measuring platform
-   differences.
-
-The first candidate has the highest leverage because it covers commands,
-sidebar actions, auto-sync, progress, cancellation, and unload behavior. T35b
-owns the implementation; T35f owns the conformance evidence. The report does
-not propose new interfaces or authorize a rewrite.
+[`pocock-architecture-review.html`](pocock-architecture-review.html) is a
+historical review of the current checkout. Its proposed extraction order and
+named modules are not part of the current plan and should not be used as
+rewrite requirements.

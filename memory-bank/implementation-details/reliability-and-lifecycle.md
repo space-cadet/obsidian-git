@@ -1,12 +1,17 @@
-# Reliability and Lifecycle Architecture
+# Git Operation and Lifecycle Notes
 
 *Created: 2026-08-11 02:03 IST*
 *Task: T35b, T35c*
 
 ## Purpose
 
-Define safe ownership of repository operations, initialization state, view
-refreshes, progress UI, and plugin shutdown.
+Record the concrete repository-operation, initialization, view-refresh,
+progress, and plugin-shutdown behaviour that must remain understandable and
+safe.
+
+This is an implementation record, not a required architecture for the rewrite.
+The named classes and proposed module lists below describe work that was tried
+or considered; they are not requirements to reproduce it.
 
 ## Current Structural Problem
 
@@ -16,27 +21,16 @@ the Git manager also performs direct filesystem and remote mutations. Clone,
 local-only, and empty-remote paths are inferred from errors rather than an
 explicit state model.
 
-## Operation Coordinator
+## Minimum Operation Behaviour
 
-All mutating operations should pass through one coordinator:
+The product needs a clear result for each Git action. Long-running actions must
+stop when the user cancels them, and two conflicting mutations must not run at
+the same time against the same repository. Every action must clean up its
+progress and temporary state after success, failure, or cancellation.
 
-```text
-request -> coordinator -> one active operation -> result/error -> refresh
-                         -> cancellation/unload boundary
-```
-
-The coordinator must serialize at least clone, pull, fetch, checkout, stage,
-commit, push, force-push, and full sync. Read-only status and history requests
-must either use a consistent snapshot or be invalidated when a mutation
-completes.
-
-Each operation should have:
-
-- an operation ID;
-- a cancellation or invalidation signal;
-- a progress owner;
-- a single success/error/finally cleanup path;
-- a safe user-facing error classification.
+The code may meet these needs with local guards and operation-specific cleanup.
+This document does not require one global coordinator, lifecycle event stream,
+operation-ID system, or named progress owner.
 
 ## Clone Recovery Boundary — 2026-08-12
 
@@ -54,11 +48,12 @@ The implementation must choose and document one explicit contract:
 - deliberately discard partial state, but tell the user that the operation is
   restart-only and never present the result as resumable.
 
-The preferred direction is a coordinator-owned recovery state with an
-operation ID, protected local state, explicit retry/resume, and no deletion of
-an existing `.git` until a validated replacement and rollback boundary exist.
-Visible worktree files may still appear only during checkout unless checkout
-is separately instrumented for incremental writes.
+The implementation should choose the simplest explicit recovery contract that
+the affected workflow needs. A marker, retained `.git` state, or protected
+backup may be enough; a coordinator or operation ID is not required. Existing
+`.git` must not be deleted until the replacement path has been validated and
+the user can recover from a failed replacement. Visible worktree files may
+still appear only during checkout unless checkout is separately instrumented.
 
 The progress modal's close control must also be assigned explicit semantics.
 Closing the surface currently only removes its DOM content; it does not cancel
@@ -74,10 +69,11 @@ fetch callbacks, and checkout callbacks. This establishes a bounded retry
 boundary but does not yet serialize all mutating entry points or provide
 durable operation metadata.
 
-## Repository State Model
+## Repository State Handling
 
-The implementation should distinguish these states rather than treating every
-initialization error as an empty repository:
+The implementation must distinguish the outcomes that affect a user action;
+it does not need a named state model. At minimum, the user must be able to tell
+the difference between:
 
 - `NoLocalRepository`
 - `LocalOnly`
@@ -96,27 +92,31 @@ validated and a rollback path exists.
 
 ## View and Timer Ownership
 
-The sidebar owns rendering only. It should request a view model from a host or
-service and discard responses whose generation ID is no longer current. Closing
-the view must stop timers and invalidate pending renders. Unloading the plugin
-must invalidate all repository operations and close progress surfaces.
+The sidebar should keep rendering and its display state understandable. If an
+asynchronous read can update a changed or detached view, that view needs a
+small generation or cancellation check. Closing the view must stop timers and
+discard work that should no longer update it. Unloading the plugin must stop
+work that the product presents as cancelled; no host/service view-model layer
+is required.
 
 ## Sidebar Read Snapshot and Remote-Only Access — 2026-09-02 / 2026-09-03
 
-The current sidebar refresh performs repeated repository status reads before
-rendering Changes, and tab switches repeat that shared work even when only the
-visible history source changes. The target read path is:
+The current sidebar refresh was observed to repeat repository status reads
+before rendering Changes, and tab switches repeated shared work even when only
+the visible history source changed. A direct read can fix this if the problem
+is still present; a shared snapshot or cache is optional.
+
+The earlier target read path was:
 
 ```text
 repository read -> immutable snapshot -> header / Changes / active tab
 ```
 
-The snapshot should contain the current branch, ahead/behind state, one status
-matrix, and derived staged/detailed groups. Commits and Log should load their
-own data without recalculating working-tree status. Local/Remote history should
-use a short-lived session cache and invalidate it after a repository mutation.
-Every asynchronous render must check a view generation or cancellation signal
-before updating the DOM.
+It proposed one snapshot containing branch, ahead/behind state, one status
+matrix, and derived groups. It also proposed separate history reads and a
+short-lived cache. These remain optional implementation choices. The required
+behaviour is simply that a changed view does not show an old result and that a
+refresh does not repeat an expensive read without a user-visible reason.
 
 The source implementation now derives the header, staged count, and Changes
 rows from one status matrix and invalidates stale refresh generations. If
@@ -141,31 +141,31 @@ opening the sidebar or browsing remote history.
 ## Progress Contract
 
 Progress helpers must expose separate `complete()` and `fail(error)` paths.
-Every caller must use a `finally` block to stop timers and release the progress
-owner. A failure must never pass through the success completion function.
+Every caller must stop timers and release progress state after success, failure,
+or cancellation. A failure must never pass through the success completion
+function. The cleanup can remain local to the operation.
 
 ## User-Reported Sidebar and Push Symptoms — 2026-09-03
 
 The first-load blank, repeated tab reads, false "Up to date" status, and
-session-only Log view all come from view reads being owned by a full DOM rebuild
-instead of a retained immutable view model. The target is one shared repository
-snapshot plus tab-specific caches, explicit loading/error states, and generation
-checks before any render.
+session-only Log view were observed as view-read problems. A direct read or
+small local refresh change should fix each one. A retained snapshot, tab cache,
+or generation check is justified only when it is the smallest clear fix for
+the specific failure.
 
 The push dialog is also using the clone progress vocabulary for a push request.
 Its byte counter measures the buffered response after `requestUrl` returns, not
 upload progress; callback silence therefore freezes the visible phase. The
-target is an operation-specific push contract, an independent elapsed timer,
-indeterminate transfer state when native streaming is unavailable, and a
-user-dismissed success state.
+required behaviour is an honest push result and progress display. Separate
+push phases, an elapsed timer, or an indeterminate transfer state are options
+only when the current UI cannot explain the result without them.
 
-## Target Service Boundaries
+## Implementation Options Considered
 
-- `SettingsStore`: validated settings and secret references.
-- `RemoteTransport`: Git smart HTTP, retry, timeout, and safe error mapping.
-- `RepositoryService`: local Git state and Git operations.
-- `OperationCoordinator`: mutation serialization and cancellation.
-- `GitSidebarViewModel`: immutable state for the view.
+Earlier review notes proposed separate settings, transport, repository,
+operation, and sidebar-state modules. Those names are retained here only as
+history. The rewrite should create a separate module only when it makes a
+specific required behaviour simpler.
 
 ## Current Source Audit — 2026-08-11
 
@@ -185,9 +185,8 @@ The first T35c slice classifies clone failures before deciding whether local
 initialization is allowed. The August 12 startup fix makes manager creation and
 sidebar refresh read-only: only an explicit Clone Remote action may call
 `initializeRepo()`, and normal sync refuses to run without a local repository.
-Existing `.git` replacement protection and the shared operation coordinator
-remain open; T35b is still the follow-on task for coordinating concurrent
-mutations.
+Existing `.git` replacement protection and the direct behaviour for competing
+mutations remain open; T35b is the follow-on task for that specific workflow.
 
 ## Related Tasks
 
@@ -244,7 +243,7 @@ it cannot bypass the operation signal.
 Focused lifecycle tests cover overlap rejection, cancellation, disposal,
 late-success rejection, terminal cleanup, and observer failures. This is a
 source-level checkpoint, not proof of real Obsidian desktop/mobile behavior;
-protected repository replacement and full device conformance remain open.
+protected repository replacement and real device workflow checks remain open.
 
 ## Sidebar Read-Model Checkpoint — 2026-09-04
 
@@ -295,6 +294,27 @@ partial bulk operation stays visible and honest without a second full scan.
 
 ## Session Closeout — 2026-09-04
 
-This session improved several sidebar lifecycle and staging paths, but it did
-not resolve the broader UI backlog. Real Obsidian desktop/mobile behavior,
-visual parity, and remaining UI issues must stay separate acceptance work.
+This session improved several sidebar and staging paths, but it did not resolve
+the broader UI backlog. Real Obsidian desktop/mobile behaviour, visual parity,
+and remaining UI issues must stay separate acceptance work.
+
+## Desktop Status Adapter Failure — 2026-09-05
+
+The Changes view could render no files even when Git reported tracked and
+untracked changes. The desktop adapter attempted `readlink` on an ordinary
+file path, producing `EINVAL`; the exception caused the working-tree status
+matrix to be discarded. The adapter now reads ordinary desktop files directly,
+handles actual symlinks through native metadata, and skips broken ignored
+symlinks without losing unrelated status rows. Status-pipeline diagnostics now
+retain repository, branch, count, comparison, and filesystem error context.
+
+## KISS Branch Closeout — 2026-09-05
+
+The replacement backend and retained sidebar now carry the lifecycle and
+reliability behavior described above without the retired GitManager boundary.
+The final branch summary records single-flight construction, cancellation and
+disposal boundaries, stale-result protection, direct mutation repainting,
+partial bulk results, filesystem refresh handling, and log deduplication.
+
+Automated verification passed on commit `1823084`; real Obsidian desktop/mobile
+and live repository acceptance remain separate evidence requirements.

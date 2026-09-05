@@ -1,12 +1,30 @@
 import { ItemView, WorkspaceLeaf, Notice, ButtonComponent, Modal, TextComponent, Menu, setIcon } from 'obsidian';
 import GitSyncPlugin from '../main';
-import { GitManager, GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../gitManager';
+import { GitFileStatus, GitCommit, GitSidebarStatusSnapshot, GitComparisonState } from '../backend/obsidianAdapter';
+import { parseGitHubRepositoryUrl } from '../backend/githubApi';
 import { log } from '../logger';
 import { SidebarReadModel } from '../sidebarReadModel';
+import { createProgressModal } from '../ui/GitProgressModal';
 
 export const VIEW_TYPE_GIT_SIDEBAR = 'git-sidebar-view';
 
 type SidebarTab = 'status' | 'commits' | 'log';
+type ChangeFilterStatus = Extract<GitFileStatus['status'], 'untracked' | 'added' | 'modified' | 'deleted'>;
+type UncommittedSort = 'path-asc' | 'path-desc' | 'status' | 'folder';
+
+const changeFilterStatuses: Array<{ status: ChangeFilterStatus; marker: string; label: string }> = [
+    { status: 'untracked', marker: '?', label: 'Untracked' },
+    { status: 'added', marker: 'A', label: 'Added' },
+    { status: 'modified', marker: 'M', label: 'Modified' },
+    { status: 'deleted', marker: 'D', label: 'Deleted' },
+];
+
+const uncommittedSortOptions: Array<{ value: UncommittedSort; label: string }> = [
+    { value: 'path-asc', label: 'Path (A–Z)' },
+    { value: 'path-desc', label: 'Path (Z–A)' },
+    { value: 'status', label: 'Status, then path' },
+    { value: 'folder', label: 'Folder, then name' },
+];
 
 // Keep immutable history data for the lifetime of the plugin, not only for
 // the lifetime of one ItemView instance. Obsidian can recreate a sidebar view
@@ -28,6 +46,7 @@ export class GitSidebarView extends ItemView {
     private headerContainer: HTMLElement;
     private tabsContainer: HTMLElement;
     private refreshInterval: number | null = null;
+    private remoteFetchInterval: number | null = null;
     private stagedCount: number = 0;
     private activeTab: SidebarTab = 'status';
     private commitsViewMode: 'local' | 'remote' = 'local';
@@ -37,15 +56,31 @@ export class GitSidebarView extends ItemView {
     private hasRealRepo: boolean = false;
     private sidebarSnapshot: GitSidebarStatusSnapshot | null = null;
     private readonly readModel: SidebarReadModel;
+    private readonly tabContainers = new Map<SidebarTab, HTMLElement>();
+    private readonly renderedTabs = new Set<SidebarTab>();
     private renderGeneration = 0;
     private logUnsubscribe: (() => void) | null = null;
     private logRenderScheduled = false;
     private mutationInFlight = false;
+    private repositoryStateKnown = false;
+    private repositoryReadInFlight: Promise<void> | null = null;
+    private statusRevision = 0;
+    private renderedStatusRevision = -1;
+    private renderedHeaderKey: string | null = null;
+    private renderedFooterKey: string | null = null;
+    private readonly uncommittedFilters = new Set<ChangeFilterStatus>(changeFilterStatuses.map(({ status }) => status));
+    private uncommittedSort: UncommittedSort = 'path-asc';
+    private readonly selectedFilePaths = new Set<string>();
+    private readonly selectionAnchorBySection = new Map<'staged' | 'unstaged', string>();
+    private commitInFlight = false;
+    private ignorePatternInFlight = false;
 
     constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
         super(leaf);
         this.plugin = plugin;
         this.readModel = getSidebarReadModel(plugin);
+        this.sidebarSnapshot = this.readModel.getStatusSnapshot();
+        this.repositoryStateKnown = this.sidebarSnapshot !== null;
     }
 
     getViewType(): string {
@@ -63,6 +98,11 @@ export class GitSidebarView extends ItemView {
     async onOpen(): Promise<void> {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
+        this.tabContainers.clear();
+        this.renderedTabs.clear();
+        this.renderedStatusRevision = -1;
+        this.renderedHeaderKey = null;
+        this.renderedFooterKey = null;
         container.addClass('git-sidebar-container');
         // The sidebar uses the compact layout by default; there is no larger
         // alternative because the repository header must leave room for files.
@@ -110,31 +150,47 @@ export class GitSidebarView extends ItemView {
             window.setTimeout(() => {
                 this.logRenderScheduled = false;
                 if (this.activeTab === 'log' && this.containerEl.isConnected) {
-                    void this.refresh({ readRepository: false });
+                    void this.refresh({ readRepository: false }).catch((error) => {
+                        log.debug('GitSidebar', 'Log refresh failed', error);
+                    });
                 }
             }, 0);
         });
-        // Obsidian emits vault events for deletes made through the file
-        // manager (and for external changes once its watcher notices them).
-        // Refresh the status snapshot immediately instead of waiting for the
-        // periodic timer or requiring a second navigation.
-        this.registerEvent(this.app.vault.on('delete', () => {
-            if (this.containerEl.isConnected) void this.refresh({ force: true });
-        }));
+        // Reconcile every vault change once Obsidian's watcher notices it.
+        // A Changes view that only reacts to deletes can retain an empty
+        // snapshot while newly created or modified untracked files accumulate.
+        const refreshAfterVaultChange = () => {
+            if (this.containerEl.isConnected) {
+                void this.refresh({ force: true }).catch((error) => {
+                    log.debug('GitSidebar', 'Vault-change refresh failed', error);
+                });
+            }
+        };
+        this.registerEvent(this.app.vault.on('create', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('modify', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('delete', refreshAfterVaultChange));
+        this.registerEvent(this.app.vault.on('rename', refreshAfterVaultChange));
 
         // 4. Footer actions
         const footer = container.createDiv('git-sidebar-footer');
         this.renderFooter(footer);
 
-        // Initial load
-        await this.refresh();
+        // Initial repository reads must not hold the view open. The shell and
+        // the last known snapshot are usable immediately; refresh reconciles
+        // them in the background.
+        void this.refresh().catch((error) => {
+            log.warn('GitSidebar', 'Initial sidebar refresh failed', error);
+        });
 
-        // Auto-refresh with configured interval
+        // Auto-refresh with configured interval. The refresh path is
+        // single-flight, so a slow mobile read cannot spawn another scan.
         this.startAutoRefresh();
+        this.startRemoteFetchSchedule();
     }
 
     async onClose(): Promise<void> {
         this.stopAutoRefresh();
+        this.stopRemoteFetchSchedule();
         this.logUnsubscribe?.();
         this.logUnsubscribe = null;
         // Invalidate any in-flight repository/history read before Obsidian
@@ -149,8 +205,10 @@ export class GitSidebarView extends ItemView {
         const ms = this.plugin.settings.refreshInterval * 1000;
         if (ms > 0) {
             this.refreshInterval = window.setInterval(() => {
-                if (this.containerEl.isShown()) {
-                    this.refresh();
+                if (this.containerEl.isShown() && !this.repositoryReadInFlight) {
+                    void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+                        log.debug('GitSidebar', 'Automatic sidebar refresh failed', error);
+                    });
                 }
             }, ms);
         }
@@ -168,8 +226,54 @@ export class GitSidebarView extends ItemView {
         this.startAutoRefresh();
     }
 
+    private startRemoteFetchSchedule(): void {
+        this.stopRemoteFetchSchedule();
+        const ms = this.plugin.settings.remoteFetchInterval * 60 * 1000;
+        if (ms > 0) {
+            this.remoteFetchInterval = window.setInterval(() => {
+                if (!this.containerEl.isShown() || !this.hasRemote
+                    || this.activeTab !== 'commits' || this.commitsViewMode !== 'remote') return;
+                this.invalidateRemoteCommitsCache();
+                void this.refresh({ readRepository: false, force: true }).catch((error) => {
+                    log.debug('GitSidebar', 'Scheduled remote commit fetch failed', error);
+                });
+            }, ms);
+        }
+    }
+
+    private stopRemoteFetchSchedule(): void {
+        if (this.remoteFetchInterval !== null) {
+            window.clearInterval(this.remoteFetchInterval);
+            this.remoteFetchInterval = null;
+        }
+    }
+
+    updateRemoteFetchInterval(minutes: number): void {
+        this.plugin.settings.remoteFetchInterval = minutes;
+        this.startRemoteFetchSchedule();
+    }
+
     private invalidateRemoteCommitsCache(): void {
         this.readModel.invalidateHistory();
+        this.invalidateTab('commits');
+    }
+
+    private tabContainer(tab: SidebarTab): HTMLElement {
+        let pane = this.tabContainers.get(tab);
+        if (!pane) {
+            pane = this.contentContainer.createDiv('git-sidebar-tab-pane');
+            pane.setAttr('data-tab', tab);
+            this.tabContainers.set(tab, pane);
+        }
+        for (const [otherTab, otherPane] of this.tabContainers) {
+            otherPane.toggleAttribute('hidden', otherTab !== tab);
+        }
+        return pane;
+    }
+
+    private invalidateTab(tab: SidebarTab): void {
+        this.renderedTabs.delete(tab);
+        this.tabContainers.get(tab)?.empty();
     }
 
     private isCurrentRender(generation: number): boolean {
@@ -182,13 +286,13 @@ export class GitSidebarView extends ItemView {
      * reconcile against Git, but the completed user action must not wait for a
      * second whole-vault status scan before becoming visible.
      */
-    private applyFileMutationToSnapshot(filepath: string, destination: 'staged' | 'unstaged'): void {
+    private applyFileMutationToSnapshot(filepath: string, destination: 'staged' | 'unstaged' | 'removed'): void {
         if (!this.sidebarSnapshot) return;
 
         const staged = this.sidebarSnapshot.staged.filter((path) => path !== filepath);
         const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
         if (destination === 'staged') staged.push(filepath);
-        else unstaged.push(filepath);
+        else if (destination === 'unstaged') unstaged.push(filepath);
 
         this.sidebarSnapshot = {
             ...this.sidebarSnapshot,
@@ -199,8 +303,12 @@ export class GitSidebarView extends ItemView {
 
     private repaintStatusSnapshot(): void {
         if (this.activeTab !== 'status') return;
-        this.contentContainer.empty();
-        this.renderStatusTab(this.sidebarSnapshot);
+        const pane = this.tabContainer('status');
+        pane.empty();
+        this.renderStatusTab(this.sidebarSnapshot, pane);
+        this.renderedTabs.add('status');
+        this.renderedStatusRevision = this.statusRevision;
+        this.renderedFooterKey = null;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
         if (footerEl) this.renderFooter(footerEl);
     }
@@ -212,6 +320,8 @@ export class GitSidebarView extends ItemView {
         button.setAttr('aria-busy', 'true');
         try {
             await this.refresh({ force: true });
+        } catch (error: any) {
+            new Notice('Refresh failed: ' + (error?.message || String(error)));
         } finally {
             if (button.isConnected) {
                 button.disabled = false;
@@ -229,7 +339,6 @@ export class GitSidebarView extends ItemView {
         setIcon(icon, 'git-branch');
         row.createSpan({ text: 'Loading repository…', cls: 'git-branch-name git-branch-uninit' });
         this.contentContainer.empty();
-        this.contentContainer.createEl('p', { text: 'Loading Git status…', cls: 'git-empty-state' });
     }
 
     // ─── Tabs ───
@@ -254,10 +363,12 @@ export class GitSidebarView extends ItemView {
                     'data-tab': tab.id
                 }
             });
-            btn.addEventListener('click', async () => {
+            btn.addEventListener('click', () => {
                 this.activeTab = tab.id;
                 this.renderTabs();
-                await this.refresh({ readRepository: false });
+                void this.refresh({ readRepository: false }).catch((error) => {
+                    log.debug('GitSidebar', 'Tab refresh failed', error);
+                });
             });
         }
     }
@@ -307,7 +418,7 @@ export class GitSidebarView extends ItemView {
             });
         }
 
-        const statusRow = this.headerContainer.createDiv('git-header-status');
+        const statusRow = branchRow.createDiv('git-header-status');
         const statusIcon = statusRow.createSpan({ cls: 'git-header-status-icon', attr: { 'aria-hidden': 'true' } });
         if (!initialized) {
             setIcon(statusIcon, 'circle-alert');
@@ -367,6 +478,7 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
             .onClick(async () => {
+                let progress: ReturnType<typeof createProgressModal> | null = null;
                 try {
                     if (!this.plugin.gitManager) {
                         new Notice('Git not initialized');
@@ -376,14 +488,22 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    progress = createProgressModal(this.app, 'Pulling from remote');
                     await this.plugin.runGitMutation('Pull from remote', async (manager) => {
                         await this.plugin.refreshGitCredentials();
-                        await manager.pull(this.plugin.settings.branchName);
+                        manager.setProgressHandle(progress!);
+                        try {
+                            await manager.pull(this.plugin.settings.branchName);
+                            progress!.complete('Pull complete');
+                        } finally {
+                            manager.setProgressHandle(undefined);
+                        }
                     });
                     new Notice('Pulled from remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
+                    progress?.fail(e);
                     new Notice('Pull failed: ' + e.message);
                 }
             });
@@ -395,6 +515,7 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-secondary')
             .setDisabled(!this.hasRemote)
             .onClick(async () => {
+                let progress: ReturnType<typeof createProgressModal> | null = null;
                 try {
                     if (!this.plugin.gitManager) {
                         new Notice('Git not initialized');
@@ -404,14 +525,22 @@ export class GitSidebarView extends ItemView {
                         new Notice('No remote configured');
                         return;
                     }
+                    progress = createProgressModal(this.app, 'Pushing to remote');
                     await this.plugin.runGitMutation('Push to remote', async (manager) => {
                         await this.plugin.refreshGitCredentials();
-                        await manager.push(this.plugin.settings.branchName);
+                        manager.setProgressHandle(progress!);
+                        try {
+                            await manager.push(this.plugin.settings.branchName);
+                            progress!.complete('Push complete');
+                        } finally {
+                            manager.setProgressHandle(undefined);
+                        }
                     });
                     new Notice('Pushed to remote');
                     this.invalidateRemoteCommitsCache();
                     await this.refresh();
                 } catch (e: any) {
+                    progress?.fail(e);
                     new Notice('Push failed: ' + e.message);
                 }
             });
@@ -452,7 +581,8 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-primary');
 
         const commit = async () => {
-            if (!this.plugin.gitManager) return;
+            if (!this.plugin.gitManager || this.commitInFlight) return;
+            this.commitInFlight = true;
             commitButton.setDisabled(true).setButtonText('Committing…');
             try {
                 await this.plugin.runGitMutation('Commit changes', async (manager) => {
@@ -465,11 +595,16 @@ export class GitSidebarView extends ItemView {
             } catch (e: any) {
                 commitButton.setDisabled(false).setButtonText('Commit');
                 new Notice('Commit failed: ' + e.message);
+            } finally {
+                this.commitInFlight = false;
             }
         };
         commitButton.onClick(commit);
         input.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') void commit();
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void commit();
+            }
         });
         modal.open();
         window.setTimeout(() => input.inputEl.focus(), 0);
@@ -529,51 +664,113 @@ export class GitSidebarView extends ItemView {
 
     // ─── Main refresh ───
 
-    async refresh(options: { readRepository?: boolean; force?: boolean } = {}): Promise<void> {
+    async refresh(options: { readRepository?: boolean; force?: boolean; skipIfRepositoryReadInFlight?: boolean } = {}): Promise<void> {
         const generation = ++this.renderGeneration;
         const readRepository = options.readRepository !== false;
 
-        // A user-requested refresh must not leave the previous file list on
-        // screen if the adapter reports a transient stale-index/path error.
-        // The next successful status scan replaces this snapshot atomically.
-        if (readRepository && options.force) this.sidebarSnapshot = null;
-
-        // Manager construction is intentionally read-only. It is also needed
-        // for the remote/API history fallback when the vault has no .git.
-        if (!this.plugin.gitManager) {
-            await this.plugin.ensureGitManager();
+        if (options.force && this.activeTab === 'commits' && this.commitsViewMode === 'remote') {
+            this.invalidateRemoteCommitsCache();
         }
-        if (!this.isCurrentRender(generation)) return;
+
+        if (readRepository) {
+            // Paint the cached state before awaiting the adapter. On the first
+            // ever read this is the loading state; on later view instances it
+            // is the last known Changes list.
+            await this.renderCurrentState(generation, false);
+            await this.refreshRepositoryStatus(options.skipIfRepositoryReadInFlight === true);
+            if (!this.isCurrentRender(generation)) return;
+        } else {
+            // Manager construction is needed by local/remote history, but it
+            // must not be part of the initial Changes-pane critical path.
+            if (!this.plugin.gitManager) await this.plugin.ensureGitManager();
+            if (!this.isCurrentRender(generation)) return;
+        }
+
+        await this.renderCurrentState(generation, readRepository);
+    }
+
+    private async refreshRepositoryStatus(skipIfInFlight: boolean): Promise<void> {
+        if (this.repositoryReadInFlight) {
+            if (skipIfInFlight) return;
+            // A manual refresh requested during a read waits for that read; it
+            // does not start a competing statusMatrix traversal. Automatic
+            // refreshes also return immediately because the result will be
+            // painted by the read that is already running.
+            await this.repositoryReadInFlight;
+            return;
+        }
+
+        const read = this.readRepositoryStatus();
+        this.repositoryReadInFlight = read;
+        try {
+            await read;
+        } finally {
+            if (this.repositoryReadInFlight === read) this.repositoryReadInFlight = null;
+        }
+    }
+
+    private async readRepositoryStatus(): Promise<void> {
+        const manager = await this.plugin.ensureGitManager();
+        if (!manager) {
+            const changed = !this.repositoryStateKnown || this.hasRealRepo || this.sidebarSnapshot !== null;
+            this.repositoryStateKnown = true;
+            this.hasRealRepo = false;
+            this.sidebarSnapshot = null;
+            this.readModel.invalidateStatus();
+            if (changed) this.statusRevision += 1;
+            return;
+        }
 
         let hasReal = this.hasRealRepo;
-        if (readRepository) {
-            try {
-                hasReal = await this.plugin.detectRealGitRepo();
-            } catch (e) {
-                log.warn('GitSidebar', 'detectRealGitRepo failed', e);
-            }
-            this.hasRealRepo = hasReal;
-            if (!hasReal) this.sidebarSnapshot = null;
-
-            if (hasReal && this.plugin.gitManager) {
-                try {
-                    // One statusMatrix read supplies the header's staged count
-                    // and all Changes-tab rows. Branch/ahead/behind are read as
-                    // part of the same immutable view model.
-                    this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
-                } catch (e) {
-                    // Keep the last successful view during a transient mobile
-                    // filesystem/index failure during background refreshes. A
-                    // user-requested refresh must not continue showing a stale
-                    // deleted path, so clear it and render an honest error.
-                    log.warn('GitSidebar', 'Failed to read repository snapshot', e);
-                    if (options.force) this.sidebarSnapshot = null;
-                }
-            }
+        try {
+            hasReal = await manager.hasRepository();
+            this.repositoryStateKnown = true;
+        } catch (error) {
+            log.warn('GitSidebar', 'repository check failed', error);
+            return;
         }
-        if (!this.isCurrentRender(generation)) return;
+        this.hasRealRepo = hasReal;
+        if (!hasReal) {
+            const changed = this.sidebarSnapshot !== null;
+            this.sidebarSnapshot = null;
+            this.readModel.invalidateStatus();
+            if (changed) this.statusRevision += 1;
+            return;
+        }
 
+        try {
+            // Keep the existing snapshot visible while the slow read runs.
+            // The completed snapshot is swapped in atomically below.
+            const snapshot = await manager.getSidebarStatusSnapshot();
+            const changed = !this.statusSnapshotsEqual(this.sidebarSnapshot, snapshot);
+            this.sidebarSnapshot = snapshot;
+            this.readModel.setStatusSnapshot(snapshot);
+            if (changed) this.statusRevision += 1;
+            log.info('GitStatus', 'Sidebar status snapshot applied', {
+                activeTab: this.activeTab,
+                changed,
+                repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+                detailedFiles: snapshot.detailedStatus.length,
+                stagedFiles: snapshot.staged.length,
+                unstagedFiles: snapshot.unstaged.length,
+                untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === 'untracked').length,
+            });
+        } catch (error) {
+            log.warn('GitSidebar', 'Failed to read repository snapshot', error);
+        }
+    }
+
+    private async renderCurrentState(generation: number, readRepository: boolean): Promise<void> {
+        if (!this.isCurrentRender(generation)) return;
+        if (!this.repositoryStateKnown && !this.sidebarSnapshot) {
+            this.renderLoadingState();
+            return;
+        }
+
+        const activeTab = this.activeTab;
+        const hasReal = this.hasRealRepo || this.sidebarSnapshot !== null;
         const initialized = hasReal;
+
         this.hasRemote = !!this.plugin.settings.repoUrl;
         this.isLocalOnly = !this.hasRemote;
         if (this.readModel.getRemoteRepositoryUrl() && this.readModel.getRemoteRepositoryUrl() !== this.plugin.settings.repoUrl) {
@@ -587,39 +784,120 @@ export class GitSidebarView extends ItemView {
         const repositoryStatusAvailable = snapshot?.repositoryStatusAvailable !== false;
         const comparison = snapshot?.comparison || (repositoryStatusAvailable ? 'up-to-date' : 'unavailable');
 
-        this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+        const headerKey = JSON.stringify({
+            tab: activeTab,
+            branch,
+            ahead,
+            behind,
+            initialized,
+            hasReal,
+            repositoryStatusAvailable,
+            comparison,
+            localOnly: this.isLocalOnly,
+        });
+        if (this.renderedHeaderKey !== headerKey) {
+            this.renderHeader(branch, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+            this.renderedHeaderKey = headerKey;
+        }
+        if (readRepository && initialized && this.hasRemote && this.plugin.gitManager && snapshot) {
+            void this.updateRemoteComparison(generation);
+        }
         this.stagedCount = snapshot?.staged.length || 0;
-        this.contentContainer.empty();
-
         // Remote history is an independent read capability. Keep it available
         // when the local repository is absent, while local Changes/Log content
         // still explains how to initialize the vault.
-        const remoteHistoryOnly = this.activeTab === 'commits'
+        const remoteHistoryOnly = activeTab === 'commits'
             && this.commitsViewMode === 'remote'
             && this.hasRemote;
         if (!initialized && !remoteHistoryOnly) {
-            await this.renderUninitializedContent(hasReal);
+            const pane = this.tabContainer(activeTab);
+            pane.empty();
+            await this.renderUninitializedContent(hasReal, pane);
+            if (!this.isCurrentRender(generation)) return;
+            this.renderedTabs.add(activeTab);
         } else {
-            switch (this.activeTab) {
-                case 'status':
-                    this.renderStatusTab(snapshot);
-                    break;
-                case 'commits':
-                    await this.renderCommitsTab(generation);
-                    break;
-                case 'log':
-                    await this.renderLogTab(generation);
-                    break;
+            const shouldRender = !this.renderedTabs.has(activeTab)
+                || (activeTab === 'status' && this.renderedStatusRevision !== this.statusRevision)
+                || (activeTab === 'log' && !this.readModel.getLogEntries());
+            const pane = this.tabContainer(activeTab);
+            if (shouldRender) {
+                pane.empty();
+                switch (activeTab) {
+                    case 'status':
+                        this.renderStatusTab(snapshot, pane);
+                        this.renderedStatusRevision = this.statusRevision;
+                        break;
+                    case 'commits':
+                        await this.renderCommitsTab(generation, pane);
+                        break;
+                    case 'log':
+                        await this.renderLogTabInto(generation, pane);
+                        break;
+                }
+                if (!this.isCurrentRender(generation)) return;
+                this.renderedTabs.add(activeTab);
             }
         }
 
         if (!this.isCurrentRender(generation)) return;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
-        if (footerEl) this.renderFooter(footerEl);
+        const footerKey = `${activeTab}|${this.stagedCount}|${this.hasRemote}|${!!this.plugin.gitManager}`;
+        if (footerEl && this.renderedFooterKey !== footerKey) {
+            this.renderFooter(footerEl);
+            this.renderedFooterKey = footerKey;
+        }
     }
 
-    private async renderUninitializedContent(hasReal: boolean): Promise<void> {
-        const wrapper = this.contentContainer.createDiv('git-uninit-container');
+    private statusSnapshotsEqual(
+        left: GitSidebarStatusSnapshot | null,
+        right: GitSidebarStatusSnapshot,
+    ): boolean {
+        if (!left) return false;
+        if (
+            left.branch !== right.branch
+            || left.ahead !== right.ahead
+            || left.behind !== right.behind
+            || left.comparison !== right.comparison
+            || left.repositoryStatusAvailable !== right.repositoryStatusAvailable
+            || left.staged.length !== right.staged.length
+            || left.unstaged.length !== right.unstaged.length
+            || left.detailedStatus.length !== right.detailedStatus.length
+        ) return false;
+        return left.staged.every((path, index) => path === right.staged[index])
+            && left.unstaged.every((path, index) => path === right.unstaged[index])
+            && left.detailedStatus.every((file, index) => {
+                const next = right.detailedStatus[index];
+                return file.filepath === next.filepath && file.status === next.status;
+            });
+    }
+
+    private async updateRemoteComparison(generation: number): Promise<void> {
+        const manager = this.plugin.gitManager;
+        if (!manager) return;
+        try {
+            const comparison = await manager.getStatus();
+            if (!this.isCurrentRender(generation) || !this.sidebarSnapshot) return;
+            this.sidebarSnapshot = {
+                ...this.sidebarSnapshot,
+                ...comparison,
+                repositoryStatusAvailable: true,
+            };
+            this.renderHeader(
+                this.sidebarSnapshot.branch,
+                this.sidebarSnapshot.ahead,
+                this.sidebarSnapshot.behind,
+                true,
+                true,
+                true,
+                this.sidebarSnapshot.comparison,
+            );
+        } catch (error) {
+            log.debug('GitSidebar', 'Remote comparison unavailable after local refresh', error);
+        }
+    }
+
+    private async renderUninitializedContent(hasReal: boolean, target = this.contentContainer): Promise<void> {
+        const wrapper = target.createDiv('git-uninit-container');
         
         if (!hasReal) {
             wrapper.createEl('p', { 
@@ -712,8 +990,8 @@ export class GitSidebarView extends ItemView {
 
     // ─── Tab renders ───
 
-    private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null): void {
-        const container = this.contentContainer.createDiv('git-status-container');
+    private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null, target = this.contentContainer): void {
+        const container = target.createDiv('git-status-container');
 
         try {
             if (!snapshot) {
@@ -725,6 +1003,13 @@ export class GitSidebarView extends ItemView {
             const statusByPath = new Map(
                 detailedStatus.map((file) => [file.filepath, file.status] as const)
             );
+            const visiblePaths = new Set([...staged, ...unstaged]);
+            for (const filepath of this.selectedFilePaths) {
+                if (!visiblePaths.has(filepath)) this.selectedFilePaths.delete(filepath);
+            }
+            for (const [sectionClass, filepath] of this.selectionAnchorBySection) {
+                if (!visiblePaths.has(filepath)) this.selectionAnchorBySection.delete(sectionClass);
+            }
             this.stagedCount = staged.length;
 
             // ── Staged section ── (always show, default collapsed if empty)
@@ -745,11 +1030,35 @@ export class GitSidebarView extends ItemView {
                     new Notice(result.failed.length > 0
                         ? `Unstaged ${result.unstaged.length} of ${result.requested} files.`
                         : 'All files unstaged');
+                },
+                async (paths) => {
+                    const result = await this.plugin.runGitMutation('Unstage selected files', async (manager) => {
+                        const unstaged: string[] = [];
+                        const failed: Array<{ filepath: string; message: string }> = [];
+                        for (const filepath of paths) {
+                            try {
+                                await manager.unstageFile(filepath);
+                                unstaged.push(filepath);
+                            } catch (error: any) {
+                                failed.push({ filepath, message: error?.message || String(error) });
+                            }
+                        }
+                        return { requested: paths.length, unstaged, failed };
+                    });
+                    for (const filepath of result.unstaged) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'unstaged');
+                    }
+                    new Notice(result.failed.length > 0
+                        ? `Unstaged ${result.unstaged.length} of ${result.requested} selected files.`
+                        : `Unstaged ${result.unstaged.length} selected file${result.unstaged.length === 1 ? '' : 's'}.`);
                 }
             );
 
             // ── Uncommitted section ── (always show, default collapsed if empty)
-            this.renderCollapsibleSection(container, 'Uncommitted Changes', unstaged, 'unstaged', 'Stage all', statusByPath,
+            const visibleUnstaged = this.filteredAndSortedUnstagedFiles(unstaged, statusByPath);
+            const bulkLabel = visibleUnstaged.length === unstaged.length ? 'Stage all' : 'Stage visible';
+            this.renderCollapsibleSection(container, 'Uncommitted Changes', visibleUnstaged, 'unstaged', bulkLabel, statusByPath,
                 async (fp) => {
                     await this.plugin.runGitMutation('Stage file', async (manager) => {
                         await manager.stageFile(fp);
@@ -758,7 +1067,7 @@ export class GitSidebarView extends ItemView {
                 },
                 async () => {
                     const result = await this.plugin.runGitMutation('Stage all files', async (manager) => {
-                        return manager.addAll(unstaged);
+                        return manager.addAll(visibleUnstaged);
                     });
                     if (result.failed.length > 0) {
                         const firstFailure = result.failed[0];
@@ -772,8 +1081,18 @@ export class GitSidebarView extends ItemView {
                     for (const filepath of result.staged) {
                         this.applyFileMutationToSnapshot(filepath, 'staged');
                     }
+                },
+                async (paths) => {
+                    const result = await this.plugin.runGitMutation('Stage selected files', async (manager) => manager.addAll(paths));
+                    for (const filepath of result.staged) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'staged');
+                    }
+                    new Notice(result.failed.length > 0
+                        ? `Staged ${result.staged.length} of ${result.requested} selected files.`
+                        : `Staged ${result.staged.length} selected file${result.staged.length === 1 ? '' : 's'}.`);
                 }
-            );
+            , { totalFiles: unstaged.length, showChangeControls: true });
 
         } catch (e: any) {
             log.warn('GitSidebar', 'Failed to get file status', e);
@@ -802,16 +1121,57 @@ export class GitSidebarView extends ItemView {
         }
     }
 
+    private filteredAndSortedUnstagedFiles(
+        files: readonly string[],
+        statusByPath: ReadonlyMap<string, GitFileStatus['status']>,
+    ): string[] {
+        const statusFor = (path: string): ChangeFilterStatus => {
+            const status = statusByPath.get(path);
+            return status === 'untracked' || status === 'added' || status === 'deleted'
+                ? status
+                : 'modified';
+        };
+        const splitPath = (path: string): [string, string] => {
+            const slash = path.lastIndexOf('/');
+            return slash === -1 ? ['', path] : [path.slice(0, slash), path.slice(slash + 1)];
+        };
+        const statusOrder: Record<ChangeFilterStatus, number> = {
+            untracked: 0,
+            added: 1,
+            modified: 2,
+            deleted: 3,
+        };
+
+        return files
+            .filter((path) => this.uncommittedFilters.has(statusFor(path)))
+            .sort((left, right) => {
+                if (this.uncommittedSort === 'path-desc') return right.localeCompare(left);
+                if (this.uncommittedSort === 'status') {
+                    const difference = statusOrder[statusFor(left)] - statusOrder[statusFor(right)];
+                    return difference || left.localeCompare(right);
+                }
+                if (this.uncommittedSort === 'folder') {
+                    const [leftFolder, leftName] = splitPath(left);
+                    const [rightFolder, rightName] = splitPath(right);
+                    return leftFolder.localeCompare(rightFolder) || leftName.localeCompare(rightName);
+                }
+                return left.localeCompare(right);
+            });
+    }
+
     private renderCollapsibleSection(
         container: HTMLElement,
         title: string,
         files: string[],
-        sectionClass: string,
+        sectionClass: 'staged' | 'unstaged',
         bulkLabel: string,
         statusByPath: Map<string, GitFileStatus['status']>,
         onAction: (filepath: string) => Promise<void>,
-        onBulk: () => Promise<void>
+        onBulk: () => Promise<void>,
+        onSelected: (filepaths: string[]) => Promise<void>,
+        options: { totalFiles?: number; showChangeControls?: boolean } = {},
     ): void {
+        const totalFiles = options.totalFiles ?? files.length;
         const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
         
         // Default: expanded if files exist, collapsed if empty
@@ -832,9 +1192,67 @@ export class GitSidebarView extends ItemView {
         
         // File count badge
         const countBadge = header.createSpan({ 
-            text: String(files.length), 
+            text: files.length === totalFiles ? String(totalFiles) : `${files.length}/${totalFiles}`,
             cls: 'git-status-section-count' 
         });
+
+        const headerControls: HTMLButtonElement[] = [];
+        if (options.showChangeControls) {
+            const filterBtn = header.createEl('button', {
+                cls: 'git-status-section-control',
+                attr: { type: 'button', 'aria-label': 'Filter uncommitted changes' },
+            }) as HTMLButtonElement;
+            setIcon(filterBtn, 'filter');
+            filterBtn.setAttr('title', `Filter statuses (${this.uncommittedFilters.size} of ${changeFilterStatuses.length} shown)`);
+            filterBtn.classList.toggle('is-active', this.uncommittedFilters.size !== changeFilterStatuses.length);
+            filterBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const menu = new Menu();
+                menu.addItem((item) => item
+                    .setTitle('All status types')
+                    .setChecked(this.uncommittedFilters.size === changeFilterStatuses.length)
+                    .onClick(() => {
+                        this.uncommittedFilters.clear();
+                        for (const { status } of changeFilterStatuses) this.uncommittedFilters.add(status);
+                        this.repaintStatusSnapshot();
+                    }));
+                menu.addSeparator();
+                for (const { status, marker, label } of changeFilterStatuses) {
+                    menu.addItem((item) => item
+                        .setTitle(`${marker} ${label}`)
+                        .setChecked(this.uncommittedFilters.has(status))
+                        .onClick(() => {
+                            if (this.uncommittedFilters.has(status)) this.uncommittedFilters.delete(status);
+                            else this.uncommittedFilters.add(status);
+                            this.repaintStatusSnapshot();
+                        }));
+                }
+                menu.showAtMouseEvent(event);
+            });
+            headerControls.push(filterBtn);
+
+            const sortBtn = header.createEl('button', {
+                cls: 'git-status-section-control',
+                attr: { type: 'button', 'aria-label': 'Sort uncommitted changes' },
+            }) as HTMLButtonElement;
+            setIcon(sortBtn, 'arrow-down-up');
+            sortBtn.setAttr('title', `Sort: ${uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)?.label}`);
+            sortBtn.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const menu = new Menu();
+                for (const option of uncommittedSortOptions) {
+                    menu.addItem((item) => item
+                        .setTitle(option.label)
+                        .setChecked(option.value === this.uncommittedSort)
+                        .onClick(() => {
+                            this.uncommittedSort = option.value;
+                            this.repaintStatusSnapshot();
+                        }));
+                }
+                menu.showAtMouseEvent(event);
+            });
+            headerControls.push(sortBtn);
+        }
         
         // Bulk action button (always visible)
         const bulkBtn = header.createEl('button', { cls: 'git-status-section-action' }) as HTMLButtonElement;
@@ -842,6 +1260,7 @@ export class GitSidebarView extends ItemView {
         bulkBtn.disabled = files.length === 0;
         bulkBtn.setAttr('title', bulkLabel);
         bulkBtn.setAttr('aria-label', bulkLabel);
+        headerControls.push(bulkBtn);
         bulkBtn.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (bulkBtn.disabled || this.mutationInFlight) return;
@@ -863,7 +1282,7 @@ export class GitSidebarView extends ItemView {
 
         // Toggle fold/unfold on header click (but not on bulk button)
         header.addEventListener('click', (e) => {
-            if (e.target === bulkBtn || bulkBtn.contains(e.target as Node)) return;
+            if (headerControls.some((control) => e.target === control || control.contains(e.target as Node))) return;
             const currentlyCollapsed = section.getAttr('data-collapsed') === 'true';
             section.setAttr('data-collapsed', String(!currentlyCollapsed));
             toggle.setText(!currentlyCollapsed ? '▸' : '▾');
@@ -871,15 +1290,111 @@ export class GitSidebarView extends ItemView {
         });
 
         const list = section.createDiv('git-status-section-list');
+
+        if (files.length > 0) {
+            const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+            const selectionToolbar = list.createDiv('git-selection-toolbar');
+            selectionToolbar.createSpan({
+                text: selected.length > 0 ? `${selected.length} selected` : 'Select files',
+                cls: 'git-selection-count',
+            });
+            const selectAll = selectionToolbar.createEl('button', {
+                text: selected.length === files.length ? 'Clear selection' : 'Select all',
+                cls: 'git-selection-btn',
+                attr: { type: 'button' },
+            });
+            selectAll.addEventListener('click', (event) => {
+                event.stopPropagation();
+                if (selected.length === files.length) {
+                    for (const filepath of files) this.selectedFilePaths.delete(filepath);
+                } else {
+                    for (const filepath of files) this.selectedFilePaths.add(filepath);
+                }
+                this.repaintStatusSnapshot();
+            });
+            if (selected.length > 0) {
+                const selectedAction = selectionToolbar.createEl('button', {
+                    text: sectionClass === 'staged' ? 'Unstage selected' : 'Stage selected',
+                    cls: 'git-selection-btn git-selection-primary',
+                    attr: { type: 'button' },
+                });
+                selectedAction.addEventListener('click', async (event) => {
+                    event.stopPropagation();
+                    if (this.mutationInFlight) return;
+                    this.setMutationBusy(true);
+                    try {
+                        await onSelected(selected);
+                        this.repaintStatusSnapshot();
+                    } catch (error: any) {
+                        new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} selected failed: ${error?.message || String(error)}`);
+                    } finally {
+                        this.setMutationBusy(false);
+                    }
+                });
+                if (sectionClass === 'unstaged') {
+                    const selectedUntracked = selected.filter((filepath) => statusByPath.get(filepath) === 'untracked');
+                    const selectedTracked = selected.filter((filepath) => statusByPath.get(filepath) !== 'untracked');
+                    if (selectedTracked.length > 0) {
+                        const revertAction = selectionToolbar.createEl('button', {
+                            text: 'Revert selected',
+                            cls: 'git-selection-btn git-selection-warning',
+                            attr: { type: 'button' },
+                        });
+                        revertAction.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            this.confirmDiscardSelected(selectedTracked, statusByPath);
+                        });
+                    }
+                    if (selectedUntracked.length > 0) {
+                        const deleteAction = selectionToolbar.createEl('button', {
+                            text: 'Delete selected',
+                            cls: 'git-selection-btn git-selection-warning',
+                            attr: { type: 'button' },
+                        });
+                        deleteAction.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            this.confirmDiscardSelected(selectedUntracked, statusByPath);
+                        });
+                    }
+                }
+            }
+        }
         
         if (files.length === 0) {
             const emptyMsg = sectionClass === 'staged' 
                 ? 'No staged files' 
-                : 'No uncommitted changes';
+                : totalFiles > 0 ? 'No files match the selected filters' : 'No uncommitted changes';
             list.createEl('p', { text: emptyMsg, cls: 'git-empty-state' });
         } else {
             for (const filepath of files) {
                 const row = list.createDiv('git-file-row');
+
+                row.setAttr('role', 'option');
+                row.setAttr('aria-selected', String(this.selectedFilePaths.has(filepath)));
+                if (this.selectedFilePaths.has(filepath)) row.addClass('git-file-row-selected');
+                row.addEventListener('click', (event) => {
+                    const mouseEvent = event as MouseEvent;
+                    if (this.mutationInFlight) return;
+                    const anchor = this.selectionAnchorBySection.get(sectionClass);
+                    const currentIndex = files.indexOf(filepath);
+                    if (mouseEvent.shiftKey && anchor && files.includes(anchor)) {
+                        const anchorIndex = files.indexOf(anchor);
+                        const start = Math.min(anchorIndex, currentIndex);
+                        const end = Math.max(anchorIndex, currentIndex);
+                        for (const selectedPath of files.slice(start, end + 1)) {
+                            this.selectedFilePaths.add(selectedPath);
+                        }
+                    } else if (mouseEvent.metaKey || mouseEvent.ctrlKey) {
+                        if (this.selectedFilePaths.has(filepath)) this.selectedFilePaths.delete(filepath);
+                        else this.selectedFilePaths.add(filepath);
+                        this.selectionAnchorBySection.set(sectionClass, filepath);
+                    } else {
+                        for (const selectedPath of files) this.selectedFilePaths.delete(selectedPath);
+                        this.selectedFilePaths.add(filepath);
+                        this.selectionAnchorBySection.set(sectionClass, filepath);
+                    }
+                    this.repaintStatusSnapshot();
+                });
 
                 const stageBtn = row.createEl('button', {
                     cls: 'git-file-stage-toggle',
@@ -895,11 +1410,15 @@ export class GitSidebarView extends ItemView {
                 const status = statusByPath.get(filepath);
                 const statusLabel = status === 'deleted'
                     ? 'D'
-                    : status === 'added' || status === 'untracked'
+                    : status === 'untracked'
+                        ? '?'
+                        : status === 'added'
                         ? 'A'
                         : 'M';
                 const statusClass = status === 'deleted'
                     ? 'git-status-deleted'
+                    : status === 'untracked'
+                        ? 'git-status-untracked'
                     : status === 'modified' || status === 'staged'
                         ? 'git-status-modified'
                         : 'git-status-added';
@@ -957,6 +1476,20 @@ export class GitSidebarView extends ItemView {
                                 new Notice('Could not open .gitignore: ' + err.message);
                             }
                         }));
+                    if (sectionClass === 'unstaged' && this.plugin.settings.reviewActionsEnabled) {
+                        menu.addItem((item) => item
+                            .setTitle('Review changes')
+                            .setIcon('columns-2')
+                            .onClick(() => this.openReviewModal(filepath)));
+                    }
+                    if (sectionClass === 'unstaged') {
+                        menu.addSeparator();
+                        menu.addItem((item) => item
+                            .setTitle(status === 'untracked' ? 'Discard untracked file…' : 'Discard changes…')
+                            .setIcon('undo-2')
+                            .setWarning(true)
+                            .onClick(() => this.confirmDiscard(filepath, status || 'modified')));
+                    }
                     menu.showAtMouseEvent(e);
                 });
 
@@ -987,7 +1520,7 @@ export class GitSidebarView extends ItemView {
     private setMutationBusy(busy: boolean): void {
         this.mutationInFlight = busy;
         const controls = this.contentContainer?.querySelectorAll<HTMLButtonElement>(
-            '.git-file-stage-toggle, .git-status-section-action',
+            '.git-file-stage-toggle, .git-status-section-action, .git-selection-btn',
         ) || [];
         controls.forEach((control) => {
             control.disabled = busy;
@@ -995,6 +1528,117 @@ export class GitSidebarView extends ItemView {
             if (busy) control.addClass('git-operation-busy');
             else control.removeClass('git-operation-busy');
         });
+    }
+
+    private confirmDiscard(filepath: string, status: GitFileStatus['status']): void {
+        const untracked = status === 'untracked';
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(untracked ? 'Discard untracked file?' : 'Discard changes?');
+        modal.contentEl.createEl('p', {
+            text: untracked
+                ? `“${filepath}” is not in Git. It will be moved to Obsidian’s trash.`
+                : `Restore “${filepath}” to its committed HEAD version. Its current changes will be lost.`,
+        });
+        const actions = modal.contentEl.createDiv('git-confirm-actions');
+        new ButtonComponent(actions).setButtonText('Cancel').onClick(() => modal.close());
+        new ButtonComponent(actions).setButtonText(untracked ? 'Move to trash' : 'Discard changes').setWarning().onClick(async () => {
+            try {
+                if (untracked) {
+                    const file = this.app.vault.getAbstractFileByPath(filepath);
+                    if (!file) throw new Error('File no longer exists in the vault');
+                    await this.app.vault.trash(file, false);
+                } else {
+                    await this.plugin.runGitMutation('Discard file changes', async (manager) => manager.discardFile(filepath));
+                }
+                this.applyFileMutationToSnapshot(filepath, 'removed');
+                this.repaintStatusSnapshot();
+                new Notice(untracked ? `Moved ${filepath} to trash` : `Restored ${filepath} from HEAD`);
+                modal.close();
+            } catch (error: any) {
+                new Notice(`Discard failed: ${error?.message || String(error)}`);
+            }
+        });
+        modal.open();
+    }
+
+    private confirmDiscardSelected(
+        filepaths: string[],
+        statusByPath: Map<string, GitFileStatus['status']>,
+    ): void {
+        const untracked = filepaths.every((filepath) => statusByPath.get(filepath) === 'untracked');
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(untracked ? 'Delete selected untracked files?' : 'Revert selected changes?');
+        modal.contentEl.createEl('p', {
+            text: untracked
+                ? `${filepaths.length} untracked file${filepaths.length === 1 ? '' : 's'} will be moved to Obsidian’s trash.`
+                : `${filepaths.length} file change${filepaths.length === 1 ? '' : 's'} will be restored to their committed HEAD versions.`,
+        });
+        const actions = modal.contentEl.createDiv('git-confirm-actions');
+        new ButtonComponent(actions).setButtonText('Cancel').onClick(() => modal.close());
+        new ButtonComponent(actions)
+            .setButtonText(untracked ? 'Move to trash' : 'Revert changes')
+            .setWarning()
+            .onClick(async () => {
+                const succeeded: string[] = [];
+                const failed: string[] = [];
+                this.setMutationBusy(true);
+                try {
+                    if (untracked) {
+                        for (const filepath of filepaths) {
+                            const file = this.app.vault.getAbstractFileByPath(filepath);
+                            if (!file) {
+                                failed.push(filepath);
+                                continue;
+                            }
+                            await this.app.vault.trash(file, false);
+                            succeeded.push(filepath);
+                        }
+                    } else {
+                        const result = await this.plugin.runGitMutation('Revert selected changes', async (manager) => {
+                            for (const filepath of filepaths) await manager.discardFile(filepath);
+                            return filepaths;
+                        });
+                        succeeded.push(...result);
+                    }
+                    for (const filepath of succeeded) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'removed');
+                    }
+                    this.repaintStatusSnapshot();
+                    new Notice(failed.length > 0
+                        ? `${untracked ? 'Deleted' : 'Reverted'} ${succeeded.length} of ${filepaths.length} selected files.`
+                        : `${untracked ? 'Moved' : 'Reverted'} ${succeeded.length} selected file${succeeded.length === 1 ? '' : 's'}.`);
+                    modal.close();
+                } catch (error: any) {
+                    new Notice(`Could not ${untracked ? 'delete' : 'revert'} selected files: ${error?.message || String(error)}`);
+                } finally {
+                    this.setMutationBusy(false);
+                }
+            });
+        modal.open();
+    }
+
+    private async openReviewModal(filepath: string): Promise<void> {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(`Review changes: ${filepath}`);
+        modal.contentEl.createEl('p', { text: 'Read-only comparison of the committed HEAD version and the current vault file.', cls: 'git-review-description' });
+        const panes = modal.contentEl.createDiv('git-review-panes');
+        const headPane = panes.createDiv('git-review-pane');
+        const worktreePane = panes.createDiv('git-review-pane');
+        headPane.createEl('h4', { text: 'HEAD' });
+        worktreePane.createEl('h4', { text: 'Working copy' });
+        const headContent = headPane.createEl('pre', { text: 'Loading…', cls: 'git-review-content' });
+        const worktreeContent = worktreePane.createEl('pre', { text: 'Loading…', cls: 'git-review-content' });
+        modal.open();
+        try {
+            const review = await this.plugin.gitManager?.reviewFile(filepath);
+            if (!review) throw new Error('Git backend unavailable');
+            headContent.setText(review.head ?? '(Not tracked in HEAD)');
+            worktreeContent.setText(review.worktree ?? '(Deleted from working copy)');
+        } catch (error: any) {
+            headContent.setText(`Could not load review: ${error?.message || String(error)}`);
+            worktreeContent.setText('');
+        }
     }
 
     private openIgnorePatternModal(): void {
@@ -1021,8 +1665,15 @@ export class GitSidebarView extends ItemView {
             .setClass('git-btn-primary');
 
         const submit = async () => {
+            if (this.ignorePatternInFlight) return;
             try {
                 const pattern = input.getValue().trim();
+                if (!pattern) {
+                    new Notice('Enter a Git ignore pattern');
+                    return;
+                }
+                this.ignorePatternInFlight = true;
+                addButton.setDisabled(true).setButtonText('Adding…');
                 const added = await this.plugin.addGitIgnorePattern(pattern);
                 modal.close();
                 new Notice(added
@@ -1031,19 +1682,27 @@ export class GitSidebarView extends ItemView {
                 await this.refresh();
             } catch (e: any) {
                 new Notice(`Could not update .gitignore: ${e.message}`);
+            } finally {
+                this.ignorePatternInFlight = false;
+                if (addButton.buttonEl.isConnected) {
+                    addButton.setDisabled(false).setButtonText('Add pattern');
+                }
             }
         };
 
         addButton.onClick(submit);
         input.inputEl.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') void submit();
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                void submit();
+            }
         });
         modal.open();
         window.setTimeout(() => input.inputEl.focus(), 0);
     }
 
-    private async renderCommitsTab(generation: number): Promise<void> {
-        const listContainer = this.contentContainer.createDiv('git-log-list');
+    private async renderCommitsTab(generation: number, target = this.contentContainer): Promise<void> {
+        const listContainer = target.createDiv('git-log-list');
 
         // Toggle bar: Local / Remote
         const toggleBar = listContainer.createDiv('git-commits-toggle-bar');
@@ -1052,18 +1711,24 @@ export class GitSidebarView extends ItemView {
             cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'local' ? ' git-commits-toggle-active' : ''),
             attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'local') }
         });
-        localBtn.addEventListener('click', async () => {
+        localBtn.addEventListener('click', () => {
             this.commitsViewMode = 'local';
-            await this.refresh({ readRepository: false });
+            this.invalidateTab('commits');
+            void this.refresh({ readRepository: false }).catch((error) => {
+                log.debug('GitSidebar', 'Local commit view refresh failed', error);
+            });
         });
         const remoteBtn = toggleBar.createEl('button', {
             text: 'Remote',
             cls: 'git-commits-toggle-btn' + (this.commitsViewMode === 'remote' ? ' git-commits-toggle-active' : ''),
             attr: { role: 'tab', 'aria-selected': String(this.commitsViewMode === 'remote') }
         });
-        remoteBtn.addEventListener('click', async () => {
+        remoteBtn.addEventListener('click', () => {
             this.commitsViewMode = 'remote';
-            await this.refresh({ readRepository: false });
+            this.invalidateTab('commits');
+            void this.refresh({ readRepository: false }).catch((error) => {
+                log.debug('GitSidebar', 'Remote commit view refresh failed', error);
+            });
         });
 
         const loading = this.commitsViewMode === 'remote'
@@ -1100,11 +1765,35 @@ export class GitSidebarView extends ItemView {
                 if (cached !== null) {
                     commits = cached;
                 } else {
-                    const password = await this.plugin.resolveGitPassword();
-                    commits = await GitManager.fetchRemoteCommitsFromGitHub(remoteUrl, password, branch, 25);
-                    if (commits.length === 0 && this.plugin.gitManager) {
-                        // Non-GitHub remotes still use their fetched origin ref.
-                        commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                    const isGitHub = parseGitHubRepositoryUrl(remoteUrl) !== null;
+                    if (!this.plugin.gitManager) {
+                        log.error(
+                            'GitSidebar',
+                            `Remote commit fetch skipped (source=${isGitHub ? 'github-api' : 'local-remote-ref'}, branch=${branch}): Git backend unavailable`,
+                            new Error('Git backend unavailable'),
+                        );
+                    } else {
+                        // The manager is created without secrets so normal local
+                        // reads stay cheap. Resolve the credential immediately
+                        // before this authenticated remote read.
+                        await this.plugin.refreshGitCredentials();
+                        log.info('GitSidebar', 'Fetching remote commit history', {
+                            branch,
+                            source: isGitHub ? 'github-api' : 'local-remote-ref',
+                        });
+                        commits = await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch, 25);
+                        log.info('GitSidebar', 'Remote commit history fetched', {
+                            branch,
+                            source: isGitHub ? 'github-api' : 'local-remote-ref',
+                            count: commits.length,
+                        });
+                        if (commits.length === 0 && !isGitHub) {
+                            // Non-GitHub remotes still use their fetched origin ref.
+                            log.warn('GitSidebar', 'Remote API returned no commits; using local remote-tracking ref', { branch });
+                            commits = await this.plugin.gitManager.getRemoteLog(branch, 25);
+                        } else if (commits.length === 0) {
+                            log.warn('GitSidebar', 'GitHub returned no remote commits', { branch });
+                        }
                     }
                 }
                 this.readModel.setRemoteCommits(remoteUrl, branch, commits);
@@ -1192,7 +1881,12 @@ export class GitSidebarView extends ItemView {
             }
         } catch (e: any) {
             loading?.remove();
-            log.debug('GitSidebar', 'Failed to get commit log', e);
+            const error = e instanceof Error ? e : new Error(String(e));
+            log.error(
+                'GitSidebar',
+                `Failed to get commit log (mode=${this.commitsViewMode}, branch=${this.plugin.settings.branchName || 'main'})`,
+                error,
+            );
             const msg = e.message || String(e);
             if (msg.includes('Could not find') || msg.includes('refs/head') || msg.includes('unknown revision') || msg.includes('Not a valid')) {
                 listContainer.empty();
@@ -1226,11 +1920,9 @@ export class GitSidebarView extends ItemView {
                 // GitHub reads when a row is collapsed and expanded again.
             } else if (this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl && !this.hasRealRepo) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
-                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-                    this.plugin.settings.repoUrl,
-                    await this.plugin.resolveGitPassword(),
-                    oid
-                );
+                const remoteFiles = this.plugin.gitManager
+                    ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid)
+                    : [];
                 if (remoteFiles) {
                     files = remoteFiles;
                 }
@@ -1248,11 +1940,9 @@ export class GitSidebarView extends ItemView {
             // try GitHub API for shallow clones as well.
             if (files.length === 0 && this.commitsViewMode === 'remote' && this.plugin.settings.repoUrl) {
                 detail.querySelector('.git-commit-detail-loading')?.setText('Fetching from GitHub...');
-                const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-                    this.plugin.settings.repoUrl,
-                    await this.plugin.resolveGitPassword(),
-                    oid
-                );
+                const remoteFiles = this.plugin.gitManager
+                    ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid)
+                    : [];
                 if (remoteFiles) {
                     files = remoteFiles;
                 }
@@ -1302,7 +1992,11 @@ export class GitSidebarView extends ItemView {
     }
 
     private async renderLogTab(generation: number): Promise<void> {
-        const listContainer = this.contentContainer.createDiv('git-log-list');
+        await this.renderLogTabInto(generation, this.contentContainer);
+    }
+
+    private async renderLogTabInto(generation: number, target: HTMLElement): Promise<void> {
+        const listContainer = target.createDiv('git-log-list');
 
         const toolbar = listContainer.createDiv('git-log-toolbar');
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
@@ -1377,31 +2071,35 @@ export class GitSidebarView extends ItemView {
             .setTitle('Clear log')
             .setIcon('trash-2')
             .onClick(async () => {
-                log.clear();
-                await this.plugin.fileLogger?.clear();
-                this.readModel.setLogEntries([]);
-                new Notice('Activity log cleared');
-                this.contentContainer.empty();
-                await this.renderLogTab(this.renderGeneration);
+                try {
+                    log.clear();
+                    await this.plugin.fileLogger?.clear();
+                    this.readModel.setLogEntries([]);
+                    new Notice('Activity log cleared');
+                    this.invalidateTab('log');
+                    await this.refresh({ readRepository: false });
+                } catch (e: any) {
+                    new Notice('Could not clear log: ' + e.message);
+                }
             }));
         menu.addItem((item) => item
             .setTitle('Copy details')
             .setIcon('copy')
             .onClick(async () => {
-                if (!this.readModel.getLogEntries()) {
-                    const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
-                    log.mergePersistedEntries(persisted);
-                    this.readModel.setLogEntries(log.getEntries());
-                }
-                const entries = [...(this.readModel.getLogEntries() || [])].reverse();
-                const details = entries.length === 0
-                    ? 'No activity yet'
-                    : entries.map((entry) => {
-                        const time = new Date(entry.timestamp).toISOString();
-                        const data = entry.data ? `\n${typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data)}` : '';
-                        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
-                    }).join('\n');
                 try {
+                    if (!this.readModel.getLogEntries()) {
+                        const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
+                        log.mergePersistedEntries(persisted);
+                        this.readModel.setLogEntries(log.getEntries());
+                    }
+                    const entries = [...(this.readModel.getLogEntries() || [])].reverse();
+                    const details = entries.length === 0
+                        ? 'No activity yet'
+                        : entries.map((entry) => {
+                            const time = new Date(entry.timestamp).toISOString();
+                            const data = entry.data ? `\n${typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data)}` : '';
+                            return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+                        }).join('\n');
                     await navigator.clipboard.writeText(details);
                     new Notice('Log details copied');
                 } catch (e: any) {

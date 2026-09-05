@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { buildSync } from 'esbuild';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 import Module from 'node:module';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
+import * as git from 'isomorphic-git';
 
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-adapter-tests-'));
 const bundlePath = join(temporaryDirectory, 'adapter.cjs');
@@ -109,6 +111,75 @@ test('ObsidianFsAdapter uses native desktop files for Git metadata', async () =>
     const value = await adapter.promises.readFile('.git/index');
     assert.equal(new TextDecoder().decode(value), 'DIRC-native-index');
   } finally {
+    globalThis.window = previousWindow;
+    rmSync(vaultDirectory, { recursive: true, force: true });
+  }
+});
+
+test('ObsidianFsAdapter uses the CommonJS loader when window.require is unavailable', async () => {
+  const vaultDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-native-global-require-'));
+  const previousWindow = globalThis.window;
+  try {
+    writeFileSync(join(vaultDirectory, 'untracked.md'), 'new file');
+    globalThis.window = { process };
+    const dataAdapter = {
+      getBasePath() { return vaultDirectory; },
+      async list() { return { files: [], folders: [] }; },
+      async stat() { return null; },
+    };
+    const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+    assert.deepEqual(await adapter.promises.readdir('.'), ['untracked.md']);
+  } finally {
+    globalThis.window = previousWindow;
+    rmSync(vaultDirectory, { recursive: true, force: true });
+  }
+});
+
+test('ObsidianFsAdapter lstat does not follow a broken desktop symlink', async () => {
+  const vaultDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-broken-symlink-'));
+  const previousWindow = globalThis.window;
+  try {
+    symlinkSync('missing-target', join(vaultDirectory, 'broken-link'));
+    globalThis.window = { require: createRequire(import.meta.url), process };
+    const dataAdapter = {
+      getBasePath() { return vaultDirectory; },
+      async list() { return { files: [], folders: [] }; },
+      async stat() { return null; },
+    };
+    const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+    const stat = await adapter.promises.lstat('broken-link');
+    assert.equal(stat.isSymbolicLink(), true);
+    assert.equal(await adapter.promises.readlink('broken-link'), 'missing-target');
+    await assert.rejects(adapter.promises.stat('broken-link'), { code: 'ENOENT' });
+  } finally {
+    globalThis.window = previousWindow;
+    rmSync(vaultDirectory, { recursive: true, force: true });
+  }
+});
+
+test('ObsidianFsAdapter status walk skips a broken symlink inside an ignored directory', async () => {
+  const vaultDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-status-broken-symlink-'));
+  const previousWindow = globalThis.window;
+  const previousWorkingDirectory = process.cwd();
+  try {
+    execFileSync('git', ['init', '--quiet', vaultDirectory]);
+    writeFileSync(join(vaultDirectory, '.gitignore'), 'node_modules/\n');
+    writeFileSync(join(vaultDirectory, 'visible.md'), 'visible untracked file');
+    symlinkSync('visible.md', join(vaultDirectory, 'linked-note'));
+    mkdirSync(join(vaultDirectory, 'node_modules'), { recursive: true });
+    symlinkSync('missing-target', join(vaultDirectory, 'node_modules', 'broken-link'));
+    globalThis.window = { require: createRequire(import.meta.url), process };
+    const dataAdapter = {
+      getBasePath() { return vaultDirectory; },
+      async list() { return { files: [], folders: [] }; },
+      async stat() { return null; },
+    };
+    const adapter = new ObsidianFsAdapter(dataAdapter, '.');
+    process.chdir(vaultDirectory);
+    const matrix = await git.statusMatrix({ fs: adapter.promises, dir: '.' });
+    assert.deepEqual(matrix.map(([path]) => path).sort(), ['.gitignore', 'linked-note', 'visible.md']);
+  } finally {
+    process.chdir(previousWorkingDirectory);
     globalThis.window = previousWindow;
     rmSync(vaultDirectory, { recursive: true, force: true });
   }

@@ -1,9 +1,82 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-04 11:36:55 IST*
+*Last Updated: 2026-09-05 18:29:26 IST*
+
+#### 18:29:26 IST - T39: Record PR review fixes
+
+- Updated `memory-bank/tasks/T39.md` - Recorded commit `681b108`, six review fixes, verification, and remaining acceptance boundaries.
+- Updated `memory-bank/implementation-details/T39-kiss-branch-summary.md` - Added the PR review fix record and updated branch parity.
+- Updated `memory-bank/tasks/T34.md` - Recorded anonymous public GitHub history behavior.
+- Updated `memory-bank/tasks/T35a.md` - Recorded plugin-owned automatic staging exclusion.
+- Updated `memory-bank/tasks/T35b.md` - Recorded cancellation propagation and bounded staging checks.
+- Updated `memory-bank/tasks/T35c.md` - Recorded unborn unstage and remote reconciliation fixes.
+- Updated `memory-bank/tasks/T35f.md` - Recorded focused and full verification evidence.
+- Updated `memory-bank/activeContext.md` - Updated the branch commit and review-fix status.
+- Updated `memory-bank/session_cache.md` - Recorded the review-fix continuation and open acceptance gates.
+- Updated `memory-bank/sessions/2026-09-05-afternoon.md` - Appended the review-fix continuation.
+- Updated `memory-bank/tasks.md` - Refreshed the Memory Bank timestamp.
 
 ---
+
+#### 15:04:04 IST - T39: Record KISS backend branch closeout
+
+- Updated `memory-bank/tasks.md` - Registered T39 and refreshed the registry counts and timestamp.
+- Updated `memory-bank/tasks/T29.md` - Recorded the branch-level backend and sidebar result.
+- Updated `memory-bank/tasks/T29a.md` - Recorded the Changes-tab implementation and acceptance boundary.
+- Updated `memory-bank/tasks/T35b.md` - Recorded backend lifecycle and sidebar read protections.
+- Updated `memory-bank/tasks/T35c.md` - Recorded repository safety and selected-file action boundaries.
+- Updated `memory-bank/tasks/T35f.md` - Recorded final cleanup and verification evidence.
+- Updated `memory-bank/tasks/T36.md` - Recorded the official isomorphic-git dependency outcome.
+- Updated `memory-bank/tasks/T37.md` - Recorded the KISS branch outcome.
+- Updated `memory-bank/tasks/T38.md` - Linked the implemented branch summary and acceptance boundary.
+- Updated `memory-bank/tasks/T39.md` - Recorded implementation, cleanup, verification, and remaining work.
+- Updated `memory-bank/implementation-details/rewrite-architecture.md` - Recorded the implemented backend boundary.
+- Updated `memory-bank/implementation-details/sidebar-ui-redesign.md` - Cross-referenced the final UI result.
+- Updated `memory-bank/implementation-details/reliability-and-lifecycle.md` - Recorded the final lifecycle and reliability result.
+- Updated `memory-bank/implementation-details/T34-remote-authentication.md` - Cross-referenced backend authentication support.
+- Updated `memory-bank/implementation-details/git-http-client.md` - Marked the retired transport ownership path as historical.
+- Updated `memory-bank/projectbrief.md` - Pointed the current core-component description to the active backend.
+- Updated `memory-bank/product-spec.md` - Pointed current Git/recovery evidence to the active backend.
+- Updated `memory-bank/tasks/T29.md` - Pointed current related files to the active backend.
+- Updated `memory-bank/tasks/T36.md` - Pointed current dependency-related files and tests to the active backend.
+- Updated `memory-bank/activeContext.md` - Recorded the branch closeout and next acceptance evidence.
+- Updated `memory-bank/progress.md` - Recorded the implementation milestone and open gates.
+- Updated `memory-bank/changelog.md` - Added the branch closeout entry.
+- Updated `memory-bank/session_cache.md` - Recorded the branch handoff and verification.
+- Created `memory-bank/sessions/2026-09-05-afternoon.md` - Recorded the closeout session.
+- Created `memory-bank/edits/2026-09-05/150404-T39-kiss-branch-closeout.md` - Recorded this Memory Bank update.
+
+---
+
+#### 05:50:10 IST - T29/T29a/T35b/T35c/T35f/T38: Verify sidebar status and multi-select
+- Updated `memory-bank/tasks/T29.md` - Recorded status classification and Changes-tab actions.
+- Updated `memory-bank/tasks/T29a.md` - Recorded sticky headers, toolbar, filters, sorting, and selection behavior.
+- Updated `memory-bank/tasks/T35b.md` - Recorded the desktop adapter `readlink` failure and status-matrix recovery.
+- Updated `memory-bank/tasks/T35c.md` - Recorded revert and Obsidian-trash safety for selected files.
+- Updated `memory-bank/tasks/T35f.md` - Recorded 83 general tests, 16 rewrite tests, 10 smoke checks, and artifact verification.
+- Updated `memory-bank/tasks/T38.md` - Clarified the Settings-only Sync Now removal in the product contract.
+- Updated `memory-bank/implementation-details/sidebar-ui-redesign.md` - Documented Changes-tab interaction behavior.
+- Updated `memory-bank/implementation-details/reliability-and-lifecycle.md` - Documented the adapter failure and fix.
+- Updated `memory-bank/product-spec.md` - Corrected manual-sync entry-point wording.
+- Updated `memory-bank/product-prd.md` - Corrected retained manual-sync requirements.
+- Updated `memory-bank/session_cache.md` - Closed the current session and recorded verification.
+- Updated `memory-bank/activeContext.md` - Added the session closeout and acceptance boundary.
+- Updated `memory-bank/progress.md` - Recorded the verification milestone.
+- Created `memory-bank/sessions/2026-09-05-early-morning.md` - Recorded the session scope, evidence, and remaining acceptance.
+- Created `memory-bank/edits/2026-09-05/055010-T29-sidebar-status-multiselect-verification.md` - Recorded the update scope and evidence boundary.
+- Modified `main.js` - Regenerated the embedded source commit identity.
+
+#### 20:18:35 IST - T38: Revise rewrite plan using KISS
+- Updated the current product and rewrite planning records so KISS means
+  “Keep It Simple, Stupid.”
+- Kept only demonstrated user behaviour as the rewrite requirement; named
+  coordinators, caches, read models, event systems, and source-structure tests
+  are implementation choices, not required design elements.
+- Replaced the active next steps with real Obsidian/device workflow checks,
+  specific fixes for observed failures, focused tests, and PRD approval before
+  any rewrite task or branch is created.
+- Created `memory-bank/edits/2026-09-04/201835-T38-kiss-plan-revision.md`.
 
 #### 11:36:55 IST - T29a/T35b/T35d/T35f/T37/T38: Define UI-preserving mechanics rewrite
 - Updated `memory-bank/product-spec.md` - Recorded the UI baseline and proven updater behaviours to carry forward.

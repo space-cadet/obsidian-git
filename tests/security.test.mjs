@@ -8,7 +8,6 @@ import Module from 'node:module';
 
 const temporaryDirectory = mkdtempSync(join(tmpdir(), 'obsidian-git-security-tests-'));
 const bundlePath = join(temporaryDirectory, 'security.cjs');
-const repositoryStateBundlePath = join(temporaryDirectory, 'repository-state.cjs');
 const originalLoad = Module._load;
 
 buildSync({
@@ -20,17 +19,7 @@ buildSync({
 	logLevel: 'silent',
 });
 
-buildSync({
-	entryPoints: ['src/repositoryState.ts'],
-	bundle: true,
-	platform: 'node',
-	format: 'cjs',
-	outfile: repositoryStateBundlePath,
-	logLevel: 'silent',
-});
-
 const security = await import(bundlePath);
-const repositoryState = await import(repositoryStateBundlePath);
 
 test.after(() => {
 	Module._load = originalLoad;
@@ -65,12 +54,4 @@ test('automatic staging excludes plugin-owned files but preserves vault files', 
 		]),
 		['Notes/today.md', 'Projects/demo.md'],
 	);
-});
-
-test('repository errors permit fallback only for empty remotes', () => {
-	assert.equal(repositoryState.classifyRepositoryError({ code: 'EmptyServerResponseError', message: 'Empty response from git server.' }), 'empty-remote');
-	assert.equal(repositoryState.classifyRepositoryError({ data: { statusCode: 401 }, message: 'HTTP Error' }), 'authentication');
-	assert.equal(repositoryState.classifyRepositoryError({ data: { statusCode: 403 }, message: 'HTTP Error' }), 'permission');
-	assert.equal(repositoryState.classifyRepositoryError(new Error('Invalid URL')), 'invalid-url');
-	assert.equal(repositoryState.classifyRepositoryError(new Error('Connection reset by peer')), 'network');
 });

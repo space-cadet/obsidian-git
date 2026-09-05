@@ -9005,7 +9005,7 @@ __export(isomorphic_git_exports, {
   listRemotes: () => listRemotes,
   listServerRefs: () => listServerRefs,
   listTags: () => listTags,
-  log: () => log,
+  log: () => log2,
   merge: () => merge,
   packObjects: () => packObjects,
   pull: () => pull,
@@ -14914,7 +14914,7 @@ async function getChanges({ fs, cache, gitdir, commit: commit2, shallow }) {
     }
   });
 }
-async function log({
+async function log2({
   fs,
   dir,
   gitdir = join(dir, ".git"),
@@ -16958,7 +16958,7 @@ async function writeTree({ fs, dir, gitdir = join(dir, ".git"), tree }) {
     throw err;
   }
 }
-var import_sha1, import_async_lock, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, InvalidRefNameError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyCommitError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, EMPTY_TREE_OID, bad, worthWalking, LINEBREAKS, _TreeMap, abbreviateRx, CREDENTIALS, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, scpLike, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
+var import_sha1, import_async_lock, import_crc_32, import_pako, import_pify, import_ignore, import_clean_git_ref, import_diff3, BaseError, UnmergedPathsError, InternalError, UnsafeFilepathError, BufferCursor, MAX_UINT32, supportsSubtleSHA1, GitIndex, lock, IndexCache, GitIndexManager, GitWalkerIndex, GitWalkSymbol, NotFoundError, ObjectTypeError, InvalidOidError, InvalidRefNameError, NoRefspecError, GitPackedRefs, GitRefSpec, GitRefSpecSet, num, bool, schema, SECTION_LINE_REGEX, SECTION_REGEX, VARIABLE_LINE_REGEX, VARIABLE_NAME_REGEX, VARIABLE_VALUE_COMMENT_REGEX, extractSectionLine, extractVariableLine, removeComments, hasOddNumberOfQuotes, removeQuotes, lower, getPath, normalizePath2, findLastIndex, GitConfig, GitConfigManager, refpaths, GIT_FILES, GitRefManager, GitTree, GitObject, StreamReader, supportsDecompressionStream, GitPackIndex, PackfileCache, AlreadyExistsError, AmbiguousError, CheckoutConflictError, CherryPickMergeCommitError, CherryPickRootCommitError, CommitNotFetchedError, EmptyCommitError, EmptyServerResponseError, FastForwardError, GitPushError, HttpError, InvalidFilepathError, MaxDepthError, MergeNotSupportedError, MergeConflictError, MissingNameError, MissingParameterError, MultipleGitError, ParseError, PushRejectedError, RemoteCapabilityError, SmartHttpError, UnknownTransportError, UrlParseError, UserCanceledError, IndexResetError, NoCommitError, Errors, GitAnnotatedTag, GitCommit, GitWalkerRepo, GitWalkerFs, flat, RunningMinimum, commands, FileSystem, GitIgnoreManager, supportsCompressionStream, EMPTY_TREE_OID, bad, worthWalking, LINEBREAKS, _TreeMap, abbreviateRx, CREDENTIALS, GitPktLine, corsProxify, updateHeaders, stringifyBody, GitRemoteHTTP, GitRemoteManager, scpLike, GitShallowManager, pkg, FIFO, GitSideBand, EMPTY_OID, types, GitRefStash, GitStashManager, index, isomorphic_git_default;
 var init_isomorphic_git = __esm({
   "node_modules/.pnpm/isomorphic-git@1.41.9/node_modules/isomorphic-git/index.js"() {
     import_sha1 = __toESM(require_sha1(), 1);
@@ -17751,7 +17751,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
     getPath = (section, subsection, name) => {
       return [lower(section), subsection, lower(name)].filter((a) => a != null).join(".");
     };
-    normalizePath = (path) => {
+    normalizePath2 = (path) => {
       const pathSegments = path.split(".");
       const section = pathSegments.shift();
       const name = pathSegments.pop();
@@ -17799,7 +17799,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
         return new _GitConfig(text);
       }
       async get(path, getall = false) {
-        const normalizedPath = normalizePath(path).path;
+        const normalizedPath = normalizePath2(path).path;
         const allValues = this.parsedConfig.filter((config) => config.path === normalizedPath).map(({ section, name, value }) => {
           const fn = schema[section] && schema[section][name];
           return fn ? fn(value) : value;
@@ -17828,7 +17828,7 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
           path: normalizedPath,
           sectionPath,
           isSection
-        } = normalizePath(path);
+        } = normalizePath2(path);
         const configIndex = findLastIndex(
           this.parsedConfig,
           (config) => config.path === normalizedPath
@@ -18996,10 +18996,10 @@ If you're a developer and you believe this is a bug in isomorphic-git, please fi
        * @param {string} statusMessage
        * @param {string} response
        */
-      constructor(statusCode, statusMessage, response) {
-        super(`HTTP Error: ${statusCode} ${statusMessage}`);
+      constructor(statusCode, statusMessage2, response) {
+        super(`HTTP Error: ${statusCode} ${statusMessage2}`);
         this.code = this.name = _HttpError.code;
-        this.data = { statusCode, statusMessage, response };
+        this.data = { statusCode, statusMessage: statusMessage2, response };
       }
     };
     HttpError.code = "HttpError";
@@ -20767,7 +20767,7 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
       listRemotes,
       listServerRefs,
       listTags,
-      log,
+      log: log2,
       merge,
       packObjects,
       pull,
@@ -20801,3178 +20801,6 @@ ${obj.gpgsig ? obj.gpgsig : ""}`;
   }
 });
 
-// src/security.ts
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-function redactSensitiveText(value, secrets = []) {
-  let result = String(value);
-  for (const secret of secrets) {
-    if (secret && secret.length >= 3) {
-      result = result.replace(new RegExp(escapeRegExp(secret), "g"), REDACTED);
-    }
-  }
-  result = result.replace(/(https?:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}@`);
-  result = result.replace(/(authorization\s*[:=]\s*)(?:basic|bearer)\s+[^\s,;]+/gi, `$1${REDACTED}`);
-  result = result.replace(/\bBasic\s+[A-Za-z0-9+/=]+/g, `Basic ${REDACTED}`);
-  result = result.replace(/\b(?:ghp|github_pat|glpat)-[A-Za-z0-9_-]+/g, REDACTED);
-  return result;
-}
-function redactSensitiveData(value, secrets = []) {
-  if (value === null || value === void 0)
-    return value;
-  if (typeof value === "string")
-    return redactSensitiveText(value, secrets);
-  if (typeof value !== "object")
-    return value;
-  if (value instanceof Error) {
-    return {
-      name: value.name,
-      message: redactSensitiveText(value.message, secrets),
-      stack: value.stack ? redactSensitiveText(value.stack, secrets) : void 0
-    };
-  }
-  if (Array.isArray(value))
-    return value.map((item) => redactSensitiveData(item, secrets));
-  const output = {};
-  for (const [key, item] of Object.entries(value)) {
-    output[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactSensitiveData(item, secrets);
-  }
-  return output;
-}
-function normalizeRemoteUrl(value) {
-  const url = value.trim();
-  if (/^[a-z][a-z\d+.-]*:\/\/[^\s/@]+@/i.test(url)) {
-    throw new Error("Repository URL must not contain embedded credentials");
-  }
-  return url;
-}
-function isProtectedSyncPath(filepath, pluginId = "obsidian-git-sync") {
-  const path = filepath.replace(/\\/g, "/").replace(/^\.\//, "");
-  const pluginPath = `.obsidian/plugins/${pluginId}`;
-  return path === pluginPath || path.startsWith(`${pluginPath}/`);
-}
-function filterAutomaticallyStagedPaths(paths) {
-  return paths.filter((filepath) => !isProtectedSyncPath(filepath));
-}
-var REDACTED, SENSITIVE_KEYS;
-var init_security = __esm({
-  "src/security.ts"() {
-    REDACTED = "[REDACTED]";
-    SENSITIVE_KEYS = /* @__PURE__ */ new Set([
-      "authorization",
-      "password",
-      "passwd",
-      "pat",
-      "secret",
-      "token",
-      "credential",
-      "credentials",
-      "cookie",
-      "set-cookie"
-    ]);
-  }
-});
-
-// src/logger.ts
-var import_obsidian, LogLevel, Logger, log2;
-var init_logger = __esm({
-  "src/logger.ts"() {
-    import_obsidian = require("obsidian");
-    init_security();
-    LogLevel = /* @__PURE__ */ ((LogLevel2) => {
-      LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
-      LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
-      LogLevel2[LogLevel2["WARN"] = 2] = "WARN";
-      LogLevel2[LogLevel2["ERROR"] = 3] = "ERROR";
-      return LogLevel2;
-    })(LogLevel || {});
-    Logger = class _Logger {
-      constructor() {
-        this.logLevel = 1 /* INFO */;
-        this.showNotices = true;
-        this.entries = [];
-        this.persistedEntries = [];
-        this.maxEntries = 500;
-        this.sensitiveValues = [];
-        this.recentNoticeTimes = /* @__PURE__ */ new Map();
-        this.noticeCooldownMs = 5 * 60 * 1e3;
-        this.fileLogSink = null;
-        this.listeners = /* @__PURE__ */ new Set();
-      }
-      /**
-       * Get the singleton instance of the logger
-       */
-      static getInstance() {
-        if (!_Logger.instance) {
-          _Logger.instance = new _Logger();
-        }
-        return _Logger.instance;
-      }
-      /**
-       * Get recent log entries for display
-       */
-      getEntries() {
-        const merged = /* @__PURE__ */ new Map();
-        const persisted = this.persistedEntries;
-        for (const entry of [...this.persistedEntries, ...this.entries]) {
-          const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
-          if (merged.has(exactKey))
-            continue;
-          const isLiveEntry = !persisted.includes(entry);
-          if (isLiveEntry && persisted.some(
-            (persistedEntry) => persistedEntry.level === entry.level && persistedEntry.namespace === entry.namespace && persistedEntry.message === entry.message && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250 && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
-          ))
-            continue;
-          merged.set(exactKey, entry);
-        }
-        return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
-      }
-      mergePersistedEntries(entries) {
-        this.persistedEntries = [...entries].slice(-this.maxEntries);
-      }
-      /** Subscribe to new entries so long-lived views can update without polling. */
-      subscribe(listener) {
-        this.listeners.add(listener);
-        return () => this.listeners.delete(listener);
-      }
-      /** Clear the in-memory activity log shown in the sidebar. */
-      clear() {
-        this.entries = [];
-        this.persistedEntries = [];
-      }
-      /**
-       * Export logs to a markdown file in the vault
-       */
-      async exportToFile(vault, filename) {
-        var _a;
-        const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-        const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
-        const normalizedPath = (0, import_obsidian.normalizePath)(path);
-        const folder = normalizedPath.split("/").slice(0, -1).join("/");
-        if (folder) {
-          try {
-            await vault.adapter.mkdir(folder);
-          } catch (e) {
-            if (!((_a = e.message) == null ? void 0 : _a.includes("already exists"))) {
-              throw e;
-            }
-          }
-        }
-        const lines = [
-          "# Obsidian Git Sync \u2014 Debug Log",
-          "",
-          `**Generated:** ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
-          `**Entries:** ${this.getEntries().length}`,
-          `**Log Level:** ${LogLevel[this.logLevel]}`,
-          "",
-          "---",
-          ""
-        ];
-        for (const entry of this.getEntries()) {
-          const time = new Date(entry.timestamp).toLocaleTimeString();
-          const emoji = entry.level === "error" ? "\u{1F534}" : entry.level === "warn" ? "\u26A0\uFE0F" : entry.level === "debug" ? "\u{1F50D}" : "\u2139\uFE0F";
-          lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} \u2014 ${time}`);
-          lines.push("");
-          lines.push(entry.message);
-          if (entry.data) {
-            lines.push("");
-            lines.push("```json");
-            try {
-              lines.push(JSON.stringify(entry.data, null, 2).slice(0, 2e3));
-            } catch (e) {
-              lines.push(String(entry.data).slice(0, 2e3));
-            }
-            lines.push("```");
-          }
-          lines.push("");
-          lines.push("---");
-          lines.push("");
-        }
-        const content = lines.join("\n");
-        await vault.adapter.write(path, content);
-        return path;
-      }
-      /**
-       * Set the maximum number of entries to keep in memory
-       */
-      setMaxEntries(max) {
-        this.maxEntries = max;
-      }
-      /**
-       * Set the minimum log level to display
-       */
-      setLogLevel(level) {
-        this.logLevel = level;
-      }
-      /**
-       * Set whether to show notices for warnings and errors
-       */
-      setShowNotices(show) {
-        this.showNotices = show;
-      }
-      /** Show a background warning/error once per message during the cooldown. */
-      showNotice(level, message) {
-        const key = `${level}:${message}`;
-        const now = Date.now();
-        const previous = this.recentNoticeTimes.get(key);
-        if (previous !== void 0 && now - previous < this.noticeCooldownMs)
-          return;
-        this.recentNoticeTimes.set(key, now);
-        if (this.recentNoticeTimes.size > 100) {
-          for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
-            if (now - timestamp >= this.noticeCooldownMs)
-              this.recentNoticeTimes.delete(noticeKey);
-          }
-        }
-        new import_obsidian.Notice(`[${level}] ${message}`);
-      }
-      setSensitiveValues(values) {
-        this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
-      }
-      /** Attach the plugin-owned persistent log sink without touching global console state. */
-      setFileLogSink(sink) {
-        this.fileLogSink = sink;
-      }
-      /**
-       * Log a debug message
-       */
-      debug(context, message, data) {
-        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-        const safeData = redactSensitiveData(data, this.sensitiveValues);
-        this.pushEntry("debug", context, safeMessage, safeData);
-        if (this.logLevel <= 0 /* DEBUG */) {
-          console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-        }
-      }
-      /**
-       * Log an info message
-       */
-      info(context, message, data) {
-        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-        const safeData = redactSensitiveData(data, this.sensitiveValues);
-        this.pushEntry("info", context, safeMessage, safeData);
-        if (this.logLevel <= 1 /* INFO */) {
-          console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-        }
-      }
-      /**
-       * Log a warning message
-       */
-      warn(context, message, data) {
-        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-        const safeData = redactSensitiveData(data, this.sensitiveValues);
-        this.pushEntry("warn", context, safeMessage, safeData);
-        if (this.logLevel <= 2 /* WARN */) {
-          console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
-          if (this.showNotices) {
-            this.showNotice("Warning", safeMessage);
-          }
-        }
-      }
-      /**
-       * Log an error message
-       */
-      error(context, message, error) {
-        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-        const safeError = redactSensitiveData(error, this.sensitiveValues);
-        const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : "";
-        this.pushEntry("error", context, safeMessage, safeError || errorText);
-        if (this.logLevel <= 3 /* ERROR */) {
-          console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || "");
-          if (error && typeof safeError === "object" && safeError && "stack" in safeError) {
-            console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
-          }
-          if (this.showNotices) {
-            this.showNotice("Error", `${safeMessage}${errorText ? `: ${errorText}` : ""}`);
-          }
-        }
-      }
-      pushEntry(level, namespace, message, data) {
-        var _a, _b;
-        const safeMessage = redactSensitiveText(message, this.sensitiveValues);
-        const safeData = redactSensitiveData(data, this.sensitiveValues);
-        this.entries.push({
-          timestamp: Date.now(),
-          level,
-          namespace,
-          message: safeMessage,
-          data: safeData
-        });
-        if (this.entries.length > this.maxEntries) {
-          this.entries = this.entries.slice(-this.maxEntries);
-        }
-        for (const listener of this.listeners) {
-          try {
-            listener();
-          } catch (e) {
-          }
-        }
-        const levelRank = {
-          debug: 0 /* DEBUG */,
-          info: 1 /* INFO */,
-          warn: 2 /* WARN */,
-          error: 3 /* ERROR */,
-          fatal: 3 /* ERROR */
-        };
-        if (((_a = levelRank[level]) != null ? _a : 1 /* INFO */) >= this.logLevel) {
-          (_b = this.fileLogSink) == null ? void 0 : _b.call(
-            this,
-            level,
-            `[Git Sync][${namespace}] ${safeMessage}`,
-            safeData || ""
-          );
-        }
-      }
-    };
-    log2 = Logger.getInstance();
-  }
-});
-
-// src/repositoryState.ts
-function errorDetails(error) {
-  var _a, _b, _c;
-  const value = error && typeof error === "object" ? error : {};
-  const data = value.data && typeof value.data === "object" ? value.data : {};
-  const message = error instanceof Error ? error.message : String(error);
-  const statusValue = (_c = (_b = (_a = data.statusCode) != null ? _a : data.status) != null ? _b : value.statusCode) != null ? _c : value.status;
-  const status2 = typeof statusValue === "number" ? statusValue : Number(statusValue);
-  return {
-    code: typeof value.code === "string" ? value.code : void 0,
-    message,
-    status: Number.isFinite(status2) ? status2 : void 0
-  };
-}
-function classifyRepositoryError(error) {
-  const { code, message, status: status2 } = errorDetails(error);
-  const text = message.toLowerCase();
-  if (code === "EmptyServerResponseError" || /empty response|no refs? found|no matching ref/.test(text)) {
-    return "empty-remote";
-  }
-  if (status2 === 401 || /401|unauthorized|authentication|invalid credential|bad credential/.test(text)) {
-    return "authentication";
-  }
-  if (status2 === 403 || status2 === 404 || /403|forbidden|permission denied|access denied/.test(text)) {
-    return "permission";
-  }
-  if (/invalid url|malformed url|bad url|not a valid url/.test(text))
-    return "invalid-url";
-  if (/econn|etimedout|timeout|network|socket|connection reset|fetch failed/.test(text)) {
-    return "network";
-  }
-  return "unknown";
-}
-function repositoryFailureMessage(kind) {
-  const messages = {
-    authentication: "Remote authentication failed. Check the saved credential.",
-    permission: "The remote repository denied access or was not found.",
-    "invalid-url": "The repository URL is invalid.",
-    network: "The remote repository could not be reached.",
-    "empty-remote": "The remote repository is empty.",
-    unknown: "The repository operation failed."
-  };
-  return messages[kind];
-}
-var RepositoryInitializationError;
-var init_repositoryState = __esm({
-  "src/repositoryState.ts"() {
-    RepositoryInitializationError = class extends Error {
-      constructor(kind, message) {
-        super(message);
-        this.name = "RepositoryInitializationError";
-        this.kind = kind;
-      }
-    };
-  }
-});
-
-// src/ui/GitProgressModal.ts
-function createProgressModal(app, operationName) {
-  const modal = new GitProgressModal(app, operationName);
-  modal.open();
-  return {
-    onProgress: (event) => modal.updateProgress(event),
-    onMessage: (text) => modal.updateMessage(text),
-    onTransfer: (event) => modal.updateTransfer(event),
-    complete: (message) => modal.complete(message),
-    fail: (error) => modal.fail(error),
-    signal: modal.signal
-  };
-}
-var import_obsidian2, CLONE_PHASE_ORDER, PUSH_PHASE_ORDER, GitProgressModal;
-var init_GitProgressModal = __esm({
-  "src/ui/GitProgressModal.ts"() {
-    import_obsidian2 = require("obsidian");
-    CLONE_PHASE_ORDER = [
-      "Remote communication",
-      "Fetching",
-      "Receiving objects",
-      "Resolving deltas",
-      "Checking out"
-    ];
-    PUSH_PHASE_ORDER = [
-      "Connecting to remote",
-      "Preparing upload",
-      "Uploading objects",
-      "Waiting for remote confirmation",
-      "Confirming branch"
-    ];
-    GitProgressModal = class extends import_obsidian2.Modal {
-      constructor(app, operationName) {
-        super(app);
-        this.phases = /* @__PURE__ */ new Map();
-        this.isComplete = false;
-        this.abortController = new AbortController();
-        this.bytesLoaded = 0;
-        this.bytesTotal = 0;
-        this.bytesPerSecond = 0;
-        this.lastTransferLoaded = 0;
-        this.lastTransferTime = 0;
-        this.objectsLoaded = 0;
-        this.objectsTotal = 0;
-        this.filesWritten = 0;
-        this.filesTotal = 0;
-        this.bytesWritten = 0;
-        this.elapsedTimer = null;
-        this.completedElapsedMs = null;
-        this.operationName = operationName;
-        this.phaseOrder = /push/i.test(operationName) ? PUSH_PHASE_ORDER : CLONE_PHASE_ORDER;
-        this.startTime = Date.now();
-        this.lastTransferTime = this.startTime;
-        for (const name of this.phaseOrder) {
-          this.phases.set(name, {
-            name,
-            status: "pending",
-            percent: 0,
-            loaded: 0,
-            total: 0
-          });
-        }
-      }
-      get signal() {
-        return this.abortController.signal;
-      }
-      onOpen() {
-        const { contentEl } = this;
-        contentEl.empty();
-        contentEl.addClass("git-progress-modal");
-        this.container = contentEl.createDiv("git-progress-container");
-        this.headerEl = this.container.createDiv("git-progress-header");
-        const titleEl = this.headerEl.createDiv("git-progress-title");
-        titleEl.setText(this.operationName);
-        const statusEl = this.headerEl.createDiv("git-progress-status");
-        statusEl.setText("Initializing...");
-        this.statsEl = this.container.createDiv("git-progress-statistics");
-        this.phasesEl = this.container.createDiv("git-progress-phases");
-        this.footerEl = this.container.createDiv("git-progress-footer");
-        this.elapsedTimer = window.setInterval(() => this.render(), 1e3);
-        this.render();
-      }
-      onClose() {
-        if (!this.isComplete) {
-          this.abortController.abort();
-        }
-        if (this.elapsedTimer !== null) {
-          window.clearInterval(this.elapsedTimer);
-          this.elapsedTimer = null;
-        }
-        this.contentEl.empty();
-      }
-      updateProgress(event) {
-        const payload = (event == null ? void 0 : event.payload) || event || {};
-        const phase = String(payload.phase || "");
-        if (!phase)
-          return;
-        const phaseName = this.formatPhaseName(phase);
-        const loaded = Number(payload.loaded || 0);
-        const total = Number(payload.total || 0);
-        if (phaseName === "Checking out") {
-          this.updateCheckout({ loaded, total, bytesWritten: Number(payload.bytesWritten || 0) });
-        } else if (phaseName === "Receiving objects" || phaseName === "Resolving deltas") {
-          this.objectsLoaded = loaded;
-          this.objectsTotal = total;
-        }
-        this.activatePhase(phaseName, loaded, total);
-        this.render();
-      }
-      updateTransfer(event) {
-        if (this.isComplete)
-          return;
-        const loaded = Math.max(0, Number(event.bytesLoaded || 0));
-        const total = Math.max(0, Number(event.bytesTotal || 0));
-        const now = Date.now();
-        const elapsedSeconds = (now - this.lastTransferTime) / 1e3;
-        const deltaBytes = loaded - this.lastTransferLoaded;
-        if (event.bytesPerSecond && event.bytesPerSecond > 0) {
-          this.bytesPerSecond = event.bytesPerSecond;
-        } else if (elapsedSeconds >= 0.05 && deltaBytes >= 0) {
-          this.bytesPerSecond = deltaBytes / elapsedSeconds;
-        }
-        this.bytesLoaded = Math.max(this.bytesLoaded, loaded);
-        this.bytesTotal = Math.max(this.bytesTotal, total);
-        this.lastTransferLoaded = loaded;
-        this.lastTransferTime = now;
-        this.activatePhase(this.isPush() ? "Waiting for remote confirmation" : "Fetching", loaded, total);
-        this.render();
-      }
-      updateCheckout(event) {
-        this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
-        this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
-        this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
-        this.activatePhase(this.isPush() ? "Confirming branch" : "Checking out", this.filesWritten, this.filesTotal);
-        this.render();
-      }
-      updateMessage(text) {
-        var _a;
-        if (!text || this.isComplete)
-          return;
-        const message = text.trim();
-        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-        statusEl == null ? void 0 : statusEl.setText(message);
-        const phaseName = this.inferPhaseFromMessage(message);
-        if (phaseName) {
-          this.activatePhase(phaseName);
-          this.render();
-        }
-      }
-      complete(message = "Completed") {
-        var _a;
-        if (this.isComplete)
-          return;
-        this.isComplete = true;
-        this.completedElapsedMs = Date.now() - this.startTime;
-        this.stopElapsedTimer();
-        for (const phase of this.phases.values()) {
-          if (phase.status !== "error") {
-            phase.status = "completed";
-            phase.percent = 100;
-            phase.detail = this.statusLabel("completed");
-          }
-        }
-        this.render();
-        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-        if (statusEl) {
-          statusEl.setText(message);
-          statusEl.addClass("git-progress-status-success");
-        }
-      }
-      fail(error) {
-        var _a;
-        if (this.isComplete)
-          return;
-        this.isComplete = true;
-        this.completedElapsedMs = Date.now() - this.startTime;
-        this.stopElapsedTimer();
-        for (const phase of this.phases.values()) {
-          if (phase.status === "active") {
-            phase.status = "error";
-            phase.detail = this.statusLabel("error");
-          }
-        }
-        this.render();
-        const message = error instanceof Error ? error.message : String(error);
-        const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-        if (statusEl) {
-          statusEl.setText(`Failed: ${message}`);
-          statusEl.addClass("git-progress-status-error");
-        }
-      }
-      activatePhase(name, loaded = 0, total = 0) {
-        const phase = this.phases.get(name);
-        if (!phase)
-          return;
-        const index2 = this.phaseOrder.indexOf(name);
-        for (let i = 0; i < index2; i++) {
-          const previous = this.phases.get(this.phaseOrder[i]);
-          if (previous && previous.status !== "error") {
-            previous.status = "completed";
-            previous.percent = 100;
-          }
-        }
-        phase.status = "active";
-        phase.loaded = loaded;
-        phase.total = total;
-        phase.percent = total > 0 ? Math.min(100, Math.round(loaded / total * 100)) : 0;
-        phase.detail = this.phaseDetail(name, loaded, total);
-      }
-      render() {
-        if (!this.statsEl || !this.phasesEl)
-          return;
-        this.renderStatistics();
-        this.renderPhases();
-        this.updateFooter();
-      }
-      stopElapsedTimer() {
-        if (this.elapsedTimer !== null) {
-          window.clearInterval(this.elapsedTimer);
-          this.elapsedTimer = null;
-        }
-      }
-      renderStatistics() {
-        this.statsEl.empty();
-        const transferTitle = this.statsEl.createDiv("git-progress-section-title");
-        transferTitle.setText("Transfer statistics");
-        const transfer = this.statsEl.createDiv("git-progress-stat-card");
-        this.addStatRow(transfer, "Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
-        this.addStatRow(transfer, this.isPush() ? "Response data" : "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
-        this.addStatRow(transfer, "Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
-        this.addStatRow(transfer, "ETA", this.estimateRemaining());
-        const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
-        checkoutTitle.setText(this.isPush() ? "Remote confirmation" : "Checkout progress");
-        const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
-        this.addStatRow(checkout2, "Files", this.countPair(this.filesWritten, this.filesTotal));
-        this.addStatRow(
-          checkout2,
-          "Written",
-          this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : "\u2014"
-        );
-      }
-      renderPhases() {
-        this.phasesEl.empty();
-        const title = this.phasesEl.createDiv("git-progress-section-title");
-        title.setText(this.isPush() ? "Push phases" : "Clone phases");
-        const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
-        for (const phase of this.phases.values()) {
-          const phaseEl = phaseCard.createDiv("git-progress-phase");
-          phaseEl.addClass(`git-progress-phase-${phase.status}`);
-          const iconEl = phaseEl.createDiv("git-progress-phase-icon");
-          iconEl.setText(this.getStatusIcon(phase.status));
-          const infoEl = phaseEl.createDiv("git-progress-phase-info");
-          const nameEl = infoEl.createDiv("git-progress-phase-name");
-          nameEl.setText(phase.name);
-          const detailEl = infoEl.createDiv("git-progress-phase-detail");
-          detailEl.setText(phase.detail || this.statusLabel(phase.status));
-          if (phase.status === "active" && phase.total > 0) {
-            const barContainer = infoEl.createDiv("git-progress-bar-container");
-            const bar = barContainer.createDiv("git-progress-bar");
-            const fill = bar.createDiv("git-progress-bar-fill");
-            fill.style.width = `${phase.percent}%`;
-            const label = barContainer.createDiv("git-progress-bar-label");
-            label.setText(`${phase.percent}%`);
-          }
-        }
-      }
-      addStatRow(parent, label, value) {
-        const row = parent.createDiv("git-progress-stat-row");
-        const labelEl = row.createSpan("git-progress-stat-label");
-        labelEl.setText(label);
-        const valueEl = row.createSpan("git-progress-stat-value");
-        valueEl.setText(value);
-      }
-      updateFooter() {
-        var _a;
-        if (!this.footerEl)
-          return;
-        const elapsed = (((_a = this.completedElapsedMs) != null ? _a : Date.now() - this.startTime) / 1e3).toFixed(1);
-        const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
-        const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
-        this.footerEl.empty();
-        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
-      }
-      countPair(loaded, total) {
-        if (loaded === 0 && total === 0)
-          return "\u2014";
-        return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"}`;
-      }
-      bytePair(loaded, total) {
-        if (loaded === 0 && total === 0)
-          return "\u2014";
-        return `${this.formatBytes(loaded)} / ${total > 0 ? this.formatBytes(total) : "?"}`;
-      }
-      estimateRemaining() {
-        if (this.bytesPerSecond <= 0 || this.bytesTotal <= 0 || this.bytesLoaded >= this.bytesTotal)
-          return "\u2014";
-        const seconds = Math.ceil((this.bytesTotal - this.bytesLoaded) / this.bytesPerSecond);
-        return `${seconds}s`;
-      }
-      phaseDetail(name, loaded, total) {
-        if (name === "Receiving objects" || name === "Resolving deltas") {
-          return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} objects`;
-        }
-        if (name === "Checking out") {
-          return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} files`;
-        }
-        if ((name === "Fetching" || name === "Uploading objects") && total > 0)
-          return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
-        if (name === "Waiting for remote confirmation" && total > 0)
-          return `${this.formatBytes(loaded)} / ${this.formatBytes(total)} response`;
-        return this.statusLabel("active");
-      }
-      statusLabel(status2) {
-        switch (status2) {
-          case "completed":
-            return "Completed";
-          case "active":
-            return "In progress";
-          case "error":
-            return "Failed";
-          default:
-            return "Pending";
-        }
-      }
-      inferPhaseFromMessage(message) {
-        const lower2 = message.toLowerCase();
-        if (this.isPush()) {
-          if (lower2.includes("confirm") || lower2.includes("remote result"))
-            return "Confirming branch";
-          if (lower2.includes("upload") || lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
-            return "Preparing upload";
-          if (lower2.includes("connect") || lower2.includes("remote"))
-            return "Connecting to remote";
-          return "Uploading objects";
-        }
-        if (lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
-          return "Fetching";
-        if (lower2.includes("receiving"))
-          return "Receiving objects";
-        if (lower2.includes("resolving deltas"))
-          return "Resolving deltas";
-        if (lower2.includes("checking out") || lower2.includes("writing files") || lower2.includes("updating workdir"))
-          return "Checking out";
-        if (lower2.includes("fetching") || lower2.includes("download") || lower2.includes("connecting"))
-          return "Fetching";
-        if (lower2.includes("remote") || lower2.includes("origin") || lower2.includes("preparing"))
-          return "Remote communication";
-        return null;
-      }
-      formatPhaseName(phase) {
-        if (this.isPush()) {
-          const pushMap = {
-            connecting: "Connecting to remote",
-            preparing: "Preparing upload",
-            enumeratingObjects: "Preparing upload",
-            countingObjects: "Preparing upload",
-            compressingObjects: "Preparing upload",
-            uploading: "Uploading objects",
-            receivingObjects: "Waiting for remote confirmation",
-            confirming: "Confirming branch"
-          };
-          return pushMap[phase] || (this.phaseOrder.includes(phase) ? phase : "Uploading objects");
-        }
-        const phaseMap = {
-          enumeratingObjects: "Fetching",
-          countingObjects: "Fetching",
-          compressingObjects: "Fetching",
-          receivingObjects: "Receiving objects",
-          "Receiving objects": "Receiving objects",
-          resolvingDeltas: "Resolving deltas",
-          "Resolving deltas": "Resolving deltas",
-          "Updating workdir": "Checking out",
-          checkingOut: "Checking out",
-          fetching: "Fetching"
-        };
-        return phaseMap[phase] || phase;
-      }
-      formatBytes(bytes) {
-        if (!bytes)
-          return "0 B";
-        const units = ["B", "KB", "MB", "GB"];
-        const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-        return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
-      }
-      formatRate(bytesPerSecond) {
-        return `${this.formatBytes(bytesPerSecond)}/s`;
-      }
-      getStatusIcon(status2) {
-        switch (status2) {
-          case "completed":
-            return "\u2713";
-          case "active":
-            return "\u25D0";
-          case "error":
-            return "\u2717";
-          default:
-            return "\u25CB";
-        }
-      }
-      isPush() {
-        return this.phaseOrder === PUSH_PHASE_ORDER;
-      }
-    };
-  }
-});
-
-// src/gitManager.ts
-var gitManager_exports = {};
-__export(gitManager_exports, {
-  GitManager: () => GitManager,
-  GitProgressEmitter: () => GitProgressEmitter,
-  arrayBufferToAsyncIterable: () => arrayBufferToAsyncIterable,
-  compareRepositoryPaths: () => compareRepositoryPaths,
-  createGitEmitter: () => createGitEmitter,
-  createProgressNotice: () => createProgressNotice,
-  testRemoteConnection: () => testRemoteConnection
-});
-function arrayBufferToAsyncIterable(arrayBuffer, chunkSize = 65536, onChunk, signal) {
-  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
-    throw new RangeError("chunkSize must be a positive integer");
-  }
-  return {
-    [Symbol.asyncIterator]: async function* () {
-      const view = new Uint8Array(arrayBuffer);
-      let bytesLoaded = 0;
-      onChunk == null ? void 0 : onChunk(0, view.length);
-      for (let offset = 0; offset < view.length; offset += chunkSize) {
-        if (signal == null ? void 0 : signal.aborted) {
-          const error = new Error("Git operation cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-        const end = Math.min(offset + chunkSize, view.length);
-        bytesLoaded = end;
-        onChunk == null ? void 0 : onChunk(bytesLoaded, view.length);
-        yield view.subarray(offset, end);
-      }
-    }
-  };
-}
-async function testRemoteConnection(credentials) {
-  const repoUrl = credentials.repoUrl ? normalizeRemoteUrl(credentials.repoUrl) : "";
-  if (!repoUrl) {
-    throw new Error("Please enter a repository URL first");
-  }
-  log2.setSensitiveValues([credentials.password]);
-  log2.info("GitManager", `Testing read-only remote connection to ${repoUrl}`);
-  await listServerRefs({
-    http: new GitHttpClient({ ...credentials, repoUrl }),
-    url: repoUrl
-  });
-  log2.info("GitManager", "Remote connection test succeeded");
-}
-function createGitEmitter(onProgress) {
-  const emitter = new GitProgressEmitter();
-  if (onProgress) {
-    emitter.on("progress", (e) => {
-      const p = (e == null ? void 0 : e.payload) || e || {};
-      onProgress(p.phase || "", p.loaded || 0, p.total || 0, p.lengthComputable || false);
-    });
-  }
-  return emitter;
-}
-function createProgressNotice(initialMessage) {
-  let notice = new import_obsidian3.Notice(initialMessage, 0);
-  const abortController = new AbortController();
-  const onProgress = (event) => {
-    const { phase, loaded, total } = event;
-    let msg = `${initialMessage} \u2014 ${phase || "working"}`;
-    if (total > 0) {
-      const pct = Math.round(loaded / total * 100);
-      msg += ` (${pct}%, ${loaded.toLocaleString()} / ${total.toLocaleString()} objects)`;
-    } else if (loaded > 0) {
-      msg += ` (${loaded.toLocaleString()} objects)`;
-    }
-    if (notice) {
-      notice.setMessage(msg);
-    }
-  };
-  const onTransfer = (event) => {
-    const loaded = formatProgressBytes(event.bytesLoaded);
-    const total = event.bytesTotal > 0 ? ` / ${formatProgressBytes(event.bytesTotal)}` : "";
-    if (notice)
-      notice.setMessage(`${initialMessage} \u2014 Data ${loaded}${total}`);
-  };
-  const onMessage = (text) => {
-    const msg = `${initialMessage} \u2014 ${text}`;
-    if (notice) {
-      notice.setMessage(msg);
-    }
-  };
-  const complete = () => {
-    if (notice) {
-      notice.hide();
-      notice = null;
-    }
-  };
-  return {
-    onProgress,
-    onMessage,
-    onTransfer,
-    complete,
-    fail: complete,
-    signal: abortController.signal
-  };
-}
-function formatProgressBytes(bytes) {
-  if (!bytes)
-    return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-  const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-  return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
-}
-async function mapWithConcurrency(items, concurrency, worker) {
-  if (items.length === 0)
-    return [];
-  const results = new Array(items.length);
-  let nextIndex = 0;
-  const workerCount = Math.min(Math.max(1, concurrency), items.length);
-  const run = async () => {
-    while (true) {
-      const index2 = nextIndex++;
-      if (index2 >= items.length)
-        return;
-      results[index2] = await worker(items[index2], index2);
-    }
-  };
-  await Promise.all(Array.from({ length: workerCount }, () => run()));
-  return results;
-}
-function isTransientMissingPath(error) {
-  var _a, _b;
-  const value = error;
-  const message = String((_b = (_a = value == null ? void 0 : value.message) != null ? _a : error) != null ? _b : "");
-  return (value == null ? void 0 : value.code) === "ENOENT" || /\bENOENT\b|no such file or directory/i.test(message);
-}
-function parseGitHubRepositoryUrl(repoUrl) {
-  const value = repoUrl.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
-  const httpsMatch = value.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (httpsMatch)
-    return { owner: httpsMatch[1], repo: httpsMatch[2] };
-  const sshMatch = value.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
-  if (sshMatch)
-    return { owner: sshMatch[1], repo: sshMatch[2] };
-  return null;
-}
-function isProtectedRepairPath(filepath) {
-  const normalized = filepath.replace(/^\.\//, "").replace(/^\/+/, "");
-  return normalized === ".git" || normalized.startsWith(".git/") || normalized === ".git-sync-repair" || normalized.startsWith(".git-sync-repair-") || normalized.startsWith(".obsidian/plugins/obsidian-git-sync/");
-}
-function compareRepositoryPaths(localFiles, remoteFiles) {
-  const localOnly = [];
-  const remoteOnly = [];
-  const conflicts = [];
-  const unchanged = [];
-  const paths = /* @__PURE__ */ new Set([...localFiles.keys(), ...remoteFiles.keys()]);
-  for (const filepath of [...paths].sort()) {
-    const local = localFiles.get(filepath);
-    const remote = remoteFiles.get(filepath);
-    if (local === void 0)
-      remoteOnly.push(filepath);
-    else if (remote === void 0)
-      localOnly.push(filepath);
-    else if (local === remote)
-      unchanged.push(filepath);
-    else
-      conflicts.push(filepath);
-  }
-  return { localOnly, remoteOnly, conflicts, unchanged };
-}
-var import_obsidian3, GitHttpClient, GitProgressEmitter, BULK_STAGE_BATCH_SIZE, MOBILE_IO_CONCURRENCY, GitManager;
-var init_gitManager = __esm({
-  "src/gitManager.ts"() {
-    init_isomorphic_git();
-    import_obsidian3 = require("obsidian");
-    init_logger();
-    init_security();
-    init_repositoryState();
-    init_GitProgressModal();
-    GitHttpClient = class {
-      constructor(credentials, options = {}) {
-        this.credentials = credentials;
-        this.signals = [options.signal, ...options.signals || []].filter(
-          (signal) => !!signal
-        );
-        this.onTransfer = options.onTransfer;
-        log2.setSensitiveValues([credentials.password]);
-      }
-      async request(config, attempt = 1) {
-        var _a, _b, _c, _d, _e, _f, _g;
-        const maxAttempts = 3;
-        this.throwIfAborted(config.signal);
-        log2.debug("GitHttpClient", `Requesting: ${config.method || "GET"} ${config.url}`);
-        const headers = {
-          ...config.headers
-        };
-        if (this.credentials.username && this.credentials.password) {
-          const auth = btoa(`${this.credentials.username}:${this.credentials.password}`);
-          headers["Authorization"] = `Basic ${auth}`;
-        }
-        let body;
-        if (config.body) {
-          body = await this.collectBody(config.body, config.signal);
-        }
-        try {
-          this.throwIfAborted(config.signal);
-          const response = await (0, import_obsidian3.requestUrl)({
-            url: config.url,
-            method: config.method || "GET",
-            headers,
-            body,
-            throw: false
-            // Don't throw on 4xx/5xx — let isomorphic-git handle Git errors
-          });
-          this.throwIfAborted(config.signal);
-          log2.debug("GitHttpClient", `Response status: ${response.status}`);
-          const total = ((_a = response.arrayBuffer) == null ? void 0 : _a.byteLength) || 0;
-          let lastLoaded = 0;
-          let lastTime = Date.now();
-          (_b = this.onTransfer) == null ? void 0 : _b.call(this, {
-            bytesLoaded: 0,
-            bytesTotal: total,
-            lengthComputable: total > 0
-          });
-          return {
-            url: config.url,
-            method: config.method || "GET",
-            statusCode: response.status,
-            statusMessage: this.getStatusMessage(response.status),
-            body: this.toAsyncIterator(response.arrayBuffer, (bytesLoaded) => {
-              var _a2;
-              const now = Date.now();
-              const elapsedSeconds = (now - lastTime) / 1e3;
-              const deltaBytes = bytesLoaded - lastLoaded;
-              const bytesPerSecond = elapsedSeconds >= 0.05 && deltaBytes >= 0 ? deltaBytes / elapsedSeconds : void 0;
-              lastLoaded = bytesLoaded;
-              lastTime = now;
-              (_a2 = this.onTransfer) == null ? void 0 : _a2.call(this, {
-                bytesLoaded,
-                bytesTotal: total,
-                bytesPerSecond,
-                lengthComputable: total > 0
-              });
-            }, config.signal),
-            headers: response.headers
-          };
-        } catch (error) {
-          const isRetryable = ((_c = error.message) == null ? void 0 : _c.includes("Connection reset")) || ((_d = error.message) == null ? void 0 : _d.includes("timeout")) || ((_e = error.message) == null ? void 0 : _e.includes("ETIMEDOUT")) || ((_f = error.message) == null ? void 0 : _f.includes("ECONNRESET")) || ((_g = error.message) == null ? void 0 : _g.includes("SocketException"));
-          if (isRetryable && attempt < maxAttempts) {
-            const delayMs = 1e3 * attempt;
-            log2.warn("GitHttpClient", `Request failed (attempt ${attempt}/${maxAttempts}): ${error.message}. Retrying in ${delayMs}ms...`);
-            await this.waitBeforeRetry(delayMs, config.signal);
-            return this.request(config, attempt + 1);
-          }
-          log2.error("GitHttpClient", `Request failed: ${error.message}`, error);
-          throw error;
-        }
-      }
-      throwIfAborted(requestSignal) {
-        if (this.signals.some((signal) => signal.aborted) || (requestSignal == null ? void 0 : requestSignal.aborted)) {
-          const error = new Error("Git operation cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-      }
-      /**
-       * Collect an async iterable of Uint8Arrays into a single ArrayBuffer
-       */
-      async collectBody(body, requestSignal) {
-        const chunks = [];
-        for await (const chunk of body) {
-          this.throwIfAborted(requestSignal);
-          chunks.push(chunk);
-        }
-        let totalLength = 0;
-        for (const chunk of chunks) {
-          totalLength += chunk.byteLength;
-        }
-        const result = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const chunk of chunks) {
-          result.set(chunk, offset);
-          offset += chunk.byteLength;
-        }
-        return result.buffer;
-      }
-      async waitBeforeRetry(delayMs, requestSignal) {
-        this.throwIfAborted(requestSignal);
-        await new Promise((resolve, reject) => {
-          let settled = false;
-          const signals = [...this.signals, requestSignal].filter(
-            (value) => !!value
-          );
-          const cleanup = () => signals.forEach((signal) => signal.removeEventListener("abort", onAbort));
-          const timer = setTimeout(() => {
-            settled = true;
-            cleanup();
-            resolve();
-          }, delayMs);
-          const onAbort = () => {
-            if (settled)
-              return;
-            settled = true;
-            clearTimeout(timer);
-            cleanup();
-            reject(Object.assign(new Error("Git operation cancelled"), { name: "AbortError" }));
-          };
-          for (const signal of signals) {
-            if (signal.aborted) {
-              onAbort();
-              return;
-            }
-            signal.addEventListener("abort", onAbort, { once: true });
-          }
-        });
-      }
-      /**
-       * Convert an ArrayBuffer into an async iterator of Uint8Arrays.
-       * 
-       * CHUNKING STRATEGY: Yield in 64KB chunks instead of the entire buffer at once.
-       * This allows isomorphic-git's packfile parser to process objects incrementally
-       * and potentially free memory between chunks, reducing peak memory usage on mobile.
-       * 
-       * Uses subarray() (view, not copy) to avoid additional memory allocation.
-       */
-      toAsyncIterator(arrayBuffer, onChunk, signal, chunkSize = 65536) {
-        return arrayBufferToAsyncIterable(arrayBuffer, chunkSize, onChunk, signal);
-      }
-      getStatusMessage(status2) {
-        const messages = {
-          200: "OK",
-          201: "Created",
-          204: "No Content",
-          401: "Unauthorized",
-          403: "Forbidden",
-          404: "Not Found"
-        };
-        return messages[status2] || "Unknown";
-      }
-    };
-    GitProgressEmitter = class _GitProgressEmitter {
-      constructor() {
-        this.listeners = /* @__PURE__ */ new Map();
-        this.currentPhase = "";
-      }
-      on(event, callback) {
-        if (!this.listeners.has(event)) {
-          this.listeners.set(event, []);
-        }
-        this.listeners.get(event).push(callback);
-      }
-      emit(event, data) {
-        const callbacks = this.listeners.get(event) || [];
-        for (const cb of callbacks) {
-          try {
-            cb(data);
-          } catch (e) {
-          }
-        }
-      }
-      /**
-       * Create an emitter that shows progress via Notice toasts
-       */
-      static withNotice(initialMessage) {
-        const emitter = new _GitProgressEmitter();
-        let notice = new import_obsidian3.Notice(initialMessage, 0);
-        emitter.on("progress", (event) => {
-          const { phase, loaded, total, lengthComputable } = (event == null ? void 0 : event.payload) || event || {};
-          if (phase && phase !== emitter.currentPhase) {
-            emitter.currentPhase = phase;
-          }
-          let msg = `${initialMessage} \u2014 ${phase || "working"}`;
-          if (lengthComputable && total > 0) {
-            const pct = Math.round(loaded / total * 100);
-            msg += ` (${pct}%, ${Math.round(loaded / 1024)}KB / ${Math.round(total / 1024)}KB)`;
-          } else if (loaded > 0) {
-            msg += ` (${Math.round(loaded / 1024)}KB)`;
-          }
-          if (notice) {
-            notice.setMessage(msg);
-          }
-        });
-        emitter.on("message", (event) => {
-          var _a;
-          const text = ((_a = event == null ? void 0 : event.payload) == null ? void 0 : _a.text) || (event == null ? void 0 : event.text) || String(event);
-          log2.debug("GitProgress", text);
-        });
-        emitter.on("complete", () => {
-          if (notice) {
-            notice.hide();
-            notice = null;
-          }
-        });
-        emitter.on("error", () => {
-          if (notice) {
-            notice.hide();
-            notice = null;
-          }
-        });
-        return emitter;
-      }
-      hideNotice() {
-      }
-    };
-    BULK_STAGE_BATCH_SIZE = 64;
-    MOBILE_IO_CONCURRENCY = 8;
-    GitManager = class _GitManager {
-      constructor(fs, dir, credentials, app, statusBarItem) {
-        this.statusBarItem = null;
-        this.operationSignal = null;
-        this.comparisonCache = null;
-        this.fs = fs;
-        this.dir = dir;
-        this.credentials = credentials;
-        this.app = app || null;
-        this.statusBarItem = statusBarItem || null;
-      }
-      /**
-       * Update the Git credentials
-       */
-      updateCredentials(credentials) {
-        this.credentials = credentials;
-        log2.setSensitiveValues([credentials.password]);
-        log2.debug("GitManager", "Credentials updated");
-      }
-      /** Attach the plugin-wide cancellation signal to the current mutation. */
-      setOperationSignal(signal) {
-        this.operationSignal = signal;
-      }
-      assertOperationActive() {
-        var _a;
-        if (!((_a = this.operationSignal) == null ? void 0 : _a.aborted))
-          return;
-        const error = new Error("Git operation cancelled");
-        error.name = "AbortError";
-        throw error;
-      }
-      /** Keep long vault scans cancellable and give Obsidian a chance to paint. */
-      async yieldToEventLoop() {
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      updateStatus(message) {
-        if (this.statusBarItem) {
-          this.statusBarItem.setText(`Git: ${message}`);
-        }
-        log2.info("GitManager", message);
-      }
-      createProgress(operationName) {
-        const progress = this.app ? createProgressModal(this.app, operationName) : createProgressNotice(operationName);
-        if (this.operationSignal) {
-          this.operationSignal.addEventListener("abort", () => {
-            progress.fail(new Error("Git operation cancelled"));
-          }, { once: true });
-        }
-        return progress;
-      }
-      createHttpClient(progress) {
-        return new GitHttpClient(this.credentials, {
-          signal: progress == null ? void 0 : progress.signal,
-          signals: [this.operationSignal || void 0],
-          onTransfer: progress == null ? void 0 : progress.onTransfer
-        });
-      }
-      setWriteProgress(callback) {
-        var _a;
-        const setProgress = (_a = this.fs) == null ? void 0 : _a.setWriteProgress;
-        if (typeof setProgress === "function")
-          setProgress(callback);
-      }
-      assertProgressActive(progress) {
-        this.assertOperationActive();
-        if (progress.signal.aborted) {
-          const error = new Error("Git operation cancelled");
-          error.name = "AbortError";
-          throw error;
-        }
-      }
-      /**
-       * Initialize a new repository or check if one exists
-       */
-      /**
-       * Ensure the 'origin' remote is configured with the given URL
-       */
-      async ensureRemote(repoUrl) {
-        try {
-          this.assertOperationActive();
-          const remoteUrl = normalizeRemoteUrl(repoUrl);
-          const remotes = await listRemotes({ fs: this.fs, dir: this.dir });
-          const hasOrigin = remotes.some((r) => r.remote === "origin");
-          if (!hasOrigin) {
-            log2.info("GitManager", "Adding remote origin");
-            await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: remoteUrl });
-          } else {
-            const origin = remotes.find((r) => r.remote === "origin");
-            if (origin && origin.url !== remoteUrl) {
-              log2.info("GitManager", "Updating remote origin");
-              await deleteRemote({ fs: this.fs, dir: this.dir, remote: "origin" });
-              try {
-                await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: remoteUrl });
-              } catch (error) {
-                try {
-                  await addRemote({ fs: this.fs, dir: this.dir, remote: "origin", url: origin.url });
-                } catch (restoreError) {
-                  log2.error("GitManager", "Could not restore the previous origin URL", restoreError);
-                }
-                throw error;
-              }
-            }
-          }
-        } catch (error) {
-          log2.error("GitManager", "Failed to ensure remote", error);
-          throw error;
-        }
-      }
-      async initializeRepo(repoUrl, branchName) {
-        try {
-          this.assertOperationActive();
-          const remoteUrl = repoUrl ? normalizeRemoteUrl(repoUrl) : "";
-          log2.debug("GitManager", `Initializing repository: ${remoteUrl || "(local only)"}, branch: ${branchName}`);
-          const isRepo = await this.isRepository();
-          if (!isRepo) {
-            if (!remoteUrl) {
-              await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-              this.updateStatus("Local repository initialized");
-              return true;
-            }
-            try {
-              log2.info("GitManager", `Cloning repository (branch: ${branchName})`);
-              await this.cloneRepository(remoteUrl, branchName, 1);
-              this.updateStatus("Repository cloned");
-              log2.info("GitManager", `Repository successfully cloned to ${this.dir}`);
-              return true;
-            } catch (cloneError) {
-              const kind = classifyRepositoryError(cloneError);
-              if (kind !== "empty-remote") {
-                log2.warn("GitManager", `Clone refused local fallback (${kind})`);
-                throw new RepositoryInitializationError(kind, repositoryFailureMessage(kind));
-              }
-              log2.info("GitManager", "Remote is empty; initializing a local repository");
-              this.updateStatus("Initializing local repository...");
-              log2.info("GitManager", `Initializing empty repo at ${this.dir}`);
-              await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-              await this.ensureRemote(remoteUrl);
-              this.updateStatus("Local repository initialized");
-              log2.info("GitManager", "Local repo initialized with remote configured");
-              return true;
-            }
-          }
-          if (remoteUrl) {
-            await this.ensureRemote(remoteUrl);
-          } else {
-            this.updateStatus("Repository ready");
-            return true;
-          }
-          this.updateStatus("Validating repository...");
-          log2.debug("GitManager", "Validating remote repository URL");
-          await listServerRefs({
-            http: this.createHttpClient(),
-            url: remoteUrl,
-            prefix: `refs/heads/${branchName}`,
-            onAuth: () => ({
-              username: this.credentials.username,
-              password: this.credentials.password
-            })
-          });
-          this.updateStatus("Repository validated");
-          log2.info("GitManager", `Repository exists and remote URL is valid`);
-          return true;
-        } catch (error) {
-          log2.error("GitManager", "Failed to initialize repository", error);
-          this.updateStatus("Failed to initialize");
-          throw error;
-        }
-      }
-      /**
-       * Check if the current directory is a local git repository
-       * Note: This only checks for local repository structure, not remote connectivity
-       */
-      async isRepository() {
-        try {
-          const gitHead = this.dir === "." ? ".git/HEAD" : `${this.dir}/.git/HEAD`;
-          await this.fs.stat(gitHead);
-          log2.debug("GitManager", `Local Git repository found`);
-          return true;
-        } catch (error) {
-          log2.debug("GitManager", `No local Git repository found`);
-          return false;
-        }
-      }
-      /**
-       * Distinguish a missing repository from a present but unreadable one.
-       * This check only reads metadata; it never repairs or replaces files.
-       */
-      async checkRepositoryHealth() {
-        var _a;
-        const gitDir = this.dir === "." ? ".git" : `${this.dir}/.git`;
-        try {
-          const stat = await this.fs.stat(gitDir);
-          if (!((_a = stat == null ? void 0 : stat.isDirectory) == null ? void 0 : _a.call(stat))) {
-            return { state: "missing", exists: false, healthy: false, branch: null, hasCommits: false, reason: "missing .git directory" };
-          }
-        } catch (e) {
-          return { state: "missing", exists: false, healthy: false, branch: null, hasCommits: false, reason: "missing .git directory" };
-        }
-        try {
-          const branch2 = await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
-          if (!branch2) {
-            return { state: "damaged", exists: true, healthy: false, branch: null, hasCommits: false, reason: "HEAD is not attached to a branch" };
-          }
-          let hasCommits = false;
-          try {
-            const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: "HEAD" });
-            await readCommit({ fs: this.fs, dir: this.dir, oid });
-            hasCommits = true;
-          } catch (error) {
-            const message = String((error == null ? void 0 : error.message) || error);
-            if (!/could not find|not found|unknown revision|does not exist|no such ref/i.test(message)) {
-              return { state: "damaged", exists: true, healthy: false, branch: branch2, hasCommits: false, reason: "HEAD commit cannot be read" };
-            }
-          }
-          await listRemotes({ fs: this.fs, dir: this.dir });
-          const indexHealth = await this.checkRepositoryIndex();
-          if (indexHealth.state === "empty" || indexHealth.state === "invalid") {
-            return {
-              state: "damaged",
-              exists: true,
-              healthy: false,
-              branch: branch2,
-              hasCommits,
-              reason: indexHealth.reason || "Git index cannot be read"
-            };
-          }
-          return { state: "healthy", exists: true, healthy: true, branch: branch2, hasCommits };
-        } catch (error) {
-          log2.warn("GitManager", "Repository health check failed", error);
-          return { state: "damaged", exists: true, healthy: false, branch: null, hasCommits: false, reason: "Git metadata cannot be read" };
-        }
-      }
-      /**
-       * Inspect the index without scanning the vault worktree. A missing index
-       * is valid for a newly-created repository; an existing empty or malformed
-       * index is repairable metadata damage.
-       */
-      async checkRepositoryIndex() {
-        const fs = this.fs.promises || this.fs;
-        const indexPath = this.repositoryGitPath("index");
-        let stat;
-        try {
-          stat = await fs.stat(indexPath);
-        } catch (error) {
-          if (isTransientMissingPath(error)) {
-            return { state: "missing", exists: false, size: null };
-          }
-          throw error;
-        }
-        const size = Number.isFinite(stat == null ? void 0 : stat.size) ? stat.size : null;
-        if (size === 0) {
-          return {
-            state: "empty",
-            exists: true,
-            size,
-            reason: "Git index is empty (.git/index)"
-          };
-        }
-        try {
-          await listFiles({ fs: this.fs, dir: this.dir });
-          return { state: "healthy", exists: true, size };
-        } catch (error) {
-          log2.warn("GitManager", "Git index validation failed", error);
-          return {
-            state: "invalid",
-            exists: true,
-            size,
-            reason: (error == null ? void 0 : error.message) || "Git index is malformed"
-          };
-        }
-      }
-      repositoryGitPath(filepath) {
-        return this.dir === "." ? `.git/${filepath}` : `${this.dir}/.git/${filepath}`;
-      }
-      async indexExists(fs) {
-        try {
-          await fs.stat(this.repositoryGitPath("index"));
-          return true;
-        } catch (error) {
-          if (isTransientMissingPath(error))
-            return false;
-          throw error;
-        }
-      }
-      async backupIndex(fs, prefix) {
-        if (!await this.indexExists(fs))
-          return null;
-        const indexPath = this.repositoryGitPath("index");
-        const backupPath = this.repositoryGitPath(`${prefix}-${Date.now()}`);
-        const value = await fs.readFile(indexPath);
-        await fs.writeFile(backupPath, value);
-        log2.info("GitManager", `Backed up Git index to ${backupPath}`);
-        return backupPath;
-      }
-      async removeIndexIfPresent(fs) {
-        try {
-          if (await this.indexExists(fs))
-            await fs.unlink(this.repositoryGitPath("index"));
-        } catch (error) {
-          if (!isTransientMissingPath(error))
-            throw error;
-        }
-      }
-      /**
-       * Calculate the worktree impact of an index rebuild without writing any
-       * Git metadata or changing vault files.
-       */
-      async previewIndexRepair() {
-        this.assertOperationActive();
-        const fs = this.fs.promises || this.fs;
-        const startedAt = Date.now();
-        log2.info("GitManager", "Git index repair preview started");
-        const index2 = await this.checkRepositoryIndex();
-        const headOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: "HEAD" });
-        const headCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
-        const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, "", true);
-        const trackedPaths = new Set(headFiles.keys());
-        const worktreeFiles = await this.readRepairWorktreePaths(fs, trackedPaths);
-        log2.debug("GitManager", "Git index repair preview discovered worktree paths", {
-          trackedFiles: headFiles.size,
-          worktreeFiles: worktreeFiles.size,
-          elapsedMs: Date.now() - startedAt
-        });
-        let comparedFiles = 0;
-        const comparisonResults = await mapWithConcurrency(
-          [...headFiles.entries()],
-          MOBILE_IO_CONCURRENCY,
-          async ([filepath, oid]) => {
-            this.assertOperationActive();
-            let comparison;
-            if (!worktreeFiles.has(filepath)) {
-              comparison = "deleted";
-            } else {
-              const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-              const value = await fs.readFile(fullPath);
-              const localOid = (await hashBlob({ object: value })).oid;
-              comparison = localOid === oid ? "unchanged" : "modified";
-            }
-            comparedFiles += 1;
-            if (comparedFiles % 50 === 0) {
-              log2.debug("GitManager", "Git index repair preview comparing tracked files", {
-                comparedFiles,
-                trackedFiles: headFiles.size,
-                elapsedMs: Date.now() - startedAt
-              });
-              await this.yieldToEventLoop();
-            }
-            return comparison;
-          }
-        );
-        const modifiedFiles = comparisonResults.filter((value) => value === "modified").length;
-        const deletedFiles = comparisonResults.filter((value) => value === "deleted").length;
-        const unchangedFiles = comparisonResults.filter((value) => value === "unchanged").length;
-        let untrackedFiles = 0;
-        for (const filepath of worktreeFiles) {
-          if (!trackedPaths.has(filepath))
-            untrackedFiles += 1;
-        }
-        const result = {
-          index: index2,
-          trackedFiles: headFiles.size,
-          modifiedFiles,
-          deletedFiles,
-          untrackedFiles,
-          unchangedFiles
-        };
-        log2.info("GitManager", "Git index repair preview completed", {
-          ...result,
-          elapsedMs: Date.now() - startedAt
-        });
-        return result;
-      }
-      /** Return a read-only description of the newest repair backup. */
-      async previewLatestIndexBackup() {
-        this.assertOperationActive();
-        const fs = this.fs.promises || this.fs;
-        const gitDir = this.dir === "." ? ".git" : `${this.dir}/.git`;
-        const entries = await fs.readdir(gitDir, { encoding: "utf8" });
-        const backups = entries.filter((entry) => /^index\.obsidian-git-backup-\d+$/.test(entry)).sort().reverse();
-        if (backups.length === 0)
-          return null;
-        const filename = backups[0];
-        const value = await fs.readFile(`${gitDir}/${filename}`);
-        const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
-        const magic = bytes.byteLength >= 4 ? String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) : "";
-        return { filename, size: bytes.byteLength, validFormat: magic === "DIRC" };
-      }
-      /**
-       * Rebuild the Git index from HEAD while leaving all vault files in place.
-       *
-       * The damaged index is backed up first. Current worktree files are added
-       * temporarily so isomorphic-git can create a valid index, then every HEAD
-       * path is reset to HEAD and temporary entries for new files are removed.
-       * This preserves modified, deleted, and untracked files, but staged state
-       * from the damaged index cannot be recovered.
-       */
-      async rebuildIndexFromHead() {
-        this.assertOperationActive();
-        const fs = this.fs.promises || this.fs;
-        const startedAt = Date.now();
-        log2.info("GitManager", "Git index repair started");
-        const indexPath = this.repositoryGitPath("index");
-        const lockPath = this.repositoryGitPath("index.lock");
-        const health = await this.checkRepositoryIndex();
-        if (health.state === "healthy") {
-          throw new Error("The Git index is already healthy; no repair is needed.");
-        }
-        try {
-          await fs.stat(lockPath);
-          throw new Error("Git index.lock exists. Another Git operation may be running; try again after it finishes.");
-        } catch (error) {
-          if (error instanceof Error && error.message.includes("Another Git operation"))
-            throw error;
-          if (!isTransientMissingPath(error))
-            throw error;
-        }
-        const headOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: "HEAD" });
-        const headCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: headOid });
-        const headFiles = await this.readTreeRecursiveAt(this.fs, this.dir, headCommit.commit.tree, "", true);
-        const worktreeFiles = await this.readRepairWorktreePaths(fs, new Set(headFiles.keys()));
-        const modifiedTrackedFiles = [];
-        const deletedTrackedFiles = [];
-        for (const [filepath, oid] of headFiles) {
-          this.assertOperationActive();
-          if (!worktreeFiles.has(filepath)) {
-            deletedTrackedFiles.push(filepath);
-            continue;
-          }
-          const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-          const value = await fs.readFile(fullPath);
-          if ((await hashBlob({ object: value })).oid !== oid) {
-            modifiedTrackedFiles.push(filepath);
-          }
-        }
-        let backupPath = null;
-        let originalIndex = null;
-        try {
-          if (await this.indexExists(fs)) {
-            const value = await fs.readFile(indexPath);
-            originalIndex = value instanceof Uint8Array ? value : new Uint8Array(value);
-            backupPath = await this.backupIndex(fs, "index.obsidian-git-backup");
-          }
-          await this.removeIndexIfPresent(fs);
-          const existingTrackedFiles = [...headFiles.keys()].filter((filepath) => worktreeFiles.has(filepath));
-          if (existingTrackedFiles.length > 0) {
-            log2.info("GitManager", "Adding existing tracked files while rebuilding Git index", {
-              files: existingTrackedFiles.length,
-              totalTrackedFiles: headFiles.size
-            });
-            await add({
-              fs: this.fs,
-              dir: this.dir,
-              filepath: existingTrackedFiles,
-              parallel: true,
-              force: true
-            });
-          }
-          const pathsToReset = [...modifiedTrackedFiles, ...deletedTrackedFiles];
-          let resetCount = 0;
-          for (const filepath of pathsToReset) {
-            this.assertOperationActive();
-            await resetIndex({ fs: this.fs, dir: this.dir, filepath, ref: "HEAD" });
-            resetCount += 1;
-            if (resetCount % 50 === 0) {
-              await this.yieldToEventLoop();
-            }
-          }
-          await listFiles({ fs: this.fs, dir: this.dir });
-          await statusMatrix({ fs: this.fs, dir: this.dir });
-          log2.info("GitManager", "Git index repair completed", {
-            trackedFiles: headFiles.size,
-            worktreeFiles: worktreeFiles.size,
-            modifiedFiles: modifiedTrackedFiles.length,
-            deletedFiles: deletedTrackedFiles.length,
-            elapsedMs: Date.now() - startedAt
-          });
-          return {
-            backupPath,
-            trackedFiles: headFiles.size,
-            worktreeFiles: worktreeFiles.size,
-            stagedStateRecovered: false
-          };
-        } catch (error) {
-          await this.removeIndexIfPresent(fs);
-          if (originalIndex !== null) {
-            await fs.writeFile(indexPath, originalIndex);
-          }
-          log2.error("GitManager", "Git index rebuild failed; original index restored", error);
-          throw error;
-        }
-      }
-      async readRepairWorktreePaths(fs, trackedPaths) {
-        const result = /* @__PURE__ */ new Set();
-        const startedAt = Date.now();
-        let examined = 0;
-        let missingEntries = 0;
-        const hasTrackedDescendant = (directory) => {
-          const prefix = `${directory}/`;
-          for (const trackedPath of trackedPaths) {
-            if (trackedPath.startsWith(prefix))
-              return true;
-          }
-          return false;
-        };
-        const isIgnored2 = async (filepath) => {
-          try {
-            return await isIgnored({ fs: this.fs, dir: this.dir, filepath });
-          } catch (error) {
-            log2.debug("GitManager", `Could not evaluate ignore rule for ${filepath}`, error);
-            return false;
-          }
-        };
-        const walk2 = async (relativeDir) => {
-          this.assertOperationActive();
-          const lookupPath = relativeDir || (this.dir === "." ? "." : this.dir);
-          const entries = await fs.readdir(lookupPath, { encoding: "utf8" });
-          for (const entry of entries) {
-            const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
-            if (isProtectedRepairPath(filepath))
-              continue;
-            const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-            let stat;
-            try {
-              stat = await fs.stat(fullPath);
-            } catch (error) {
-              if (isTransientMissingPath(error)) {
-                missingEntries += 1;
-                log2.debug("GitManager", "Skipping missing worktree entry during index repair scan", {
-                  filepath,
-                  missingEntries
-                });
-                continue;
-              }
-              throw error;
-            }
-            examined += 1;
-            if (stat.isDirectory()) {
-              if (!hasTrackedDescendant(filepath) && await isIgnored2(filepath))
-                continue;
-              await walk2(filepath);
-            } else if (stat.isFile()) {
-              if (trackedPaths.has(filepath) || !await isIgnored2(filepath)) {
-                result.add(filepath);
-              }
-            }
-            if (examined % 32 === 0) {
-              log2.debug("GitManager", "Git index repair scanning worktree", {
-                examined,
-                included: result.size,
-                elapsedMs: Date.now() - startedAt
-              });
-              await this.yieldToEventLoop();
-            }
-          }
-        };
-        await walk2("");
-        log2.info("GitManager", "Git index repair worktree scan completed", {
-          examined,
-          included: result.size,
-          missingEntries,
-          elapsedMs: Date.now() - startedAt
-        });
-        return result;
-      }
-      /**
-       * Restore the newest non-empty index backup created by a repair.
-       * The current index is backed up first so this action remains reversible.
-       */
-      async restoreLatestIndexBackup() {
-        this.assertOperationActive();
-        const fs = this.fs.promises || this.fs;
-        const gitDir = this.dir === "." ? ".git" : `${this.dir}/.git`;
-        const entries = await fs.readdir(gitDir, { encoding: "utf8" });
-        const backups = entries.filter((entry) => /^index\.obsidian-git-backup-\d+$/.test(entry)).sort().reverse();
-        if (backups.length === 0)
-          throw new Error("No Git index repair backup was found.");
-        const backupPath = `${gitDir}/${backups[0]}`;
-        const backup = await fs.readFile(backupPath);
-        const bytes = backup instanceof Uint8Array ? backup : new Uint8Array(backup);
-        if (bytes.byteLength === 0) {
-          throw new Error(`The newest Git index backup is empty: ${backups[0]}`);
-        }
-        let currentIndex = null;
-        if (await this.indexExists(fs)) {
-          const current = await fs.readFile(this.repositoryGitPath("index"));
-          currentIndex = current instanceof Uint8Array ? current : new Uint8Array(current);
-          await fs.writeFile(this.repositoryGitPath(`index.obsidian-git-pre-restore-${Date.now()}`), currentIndex);
-        }
-        try {
-          await fs.writeFile(this.repositoryGitPath("index"), bytes);
-          await listFiles({ fs: this.fs, dir: this.dir });
-          log2.info("GitManager", `Restored Git index backup ${backups[0]}`);
-          return backups[0];
-        } catch (error) {
-          await this.removeIndexIfPresent(fs);
-          if (currentIndex !== null) {
-            await fs.writeFile(this.repositoryGitPath("index"), currentIndex);
-          }
-          throw error;
-        }
-      }
-      /**
-       * Build a non-destructive comparison for repairing a repository. Remote
-       * objects are fetched into a temporary repository and removed afterwards;
-       * the current .git directory and vault files are never replaced here.
-       */
-      async previewRepositoryRebuild(repoUrl, branchName) {
-        this.assertOperationActive();
-        const temporaryDir = `${this.dir === "." ? "." : this.dir}/.git-sync-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        const fs = this.fs.promises || this.fs;
-        let remoteOid = null;
-        try {
-          await fs.mkdir(temporaryDir, { recursive: true });
-          await init({ fs: this.fs, dir: temporaryDir, defaultBranch: branchName });
-          await addRemote({
-            fs: this.fs,
-            dir: temporaryDir,
-            remote: "origin",
-            url: normalizeRemoteUrl(repoUrl)
-          });
-          try {
-            await fetch({
-              fs: this.fs,
-              http: this.createHttpClient(),
-              dir: temporaryDir,
-              remote: "origin",
-              ref: branchName,
-              depth: 1,
-              singleBranch: true,
-              onAuth: () => ({
-                username: this.credentials.username,
-                password: this.credentials.password
-              })
-            });
-            remoteOid = await resolveRef({
-              fs: this.fs,
-              dir: temporaryDir,
-              ref: `refs/remotes/origin/${branchName}`
-            });
-          } catch (error) {
-            if (classifyRepositoryError(error) !== "empty-remote")
-              throw error;
-          }
-          const localFiles = await this.readLocalFileFingerprints(fs);
-          const remoteFiles = /* @__PURE__ */ new Map();
-          if (remoteOid) {
-            const commit2 = await readCommit({ fs: this.fs, dir: temporaryDir, oid: remoteOid });
-            const tree = await this.readTreeRecursiveAt(this.fs, temporaryDir, commit2.commit.tree);
-            const fingerprints = await this.readTreeFingerprints(this.fs, temporaryDir, tree);
-            for (const [filepath, oid] of fingerprints)
-              remoteFiles.set(filepath, oid);
-          }
-          return {
-            branch: branchName,
-            remoteOid,
-            ...compareRepositoryPaths(localFiles, remoteFiles)
-          };
-        } finally {
-          try {
-            await fs.rmdir(temporaryDir, { recursive: true });
-          } catch (error) {
-            log2.warn("GitManager", "Could not remove temporary repository repair data", error);
-          }
-        }
-      }
-      async readLocalFileFingerprints(fs) {
-        const result = /* @__PURE__ */ new Map();
-        const walk2 = async (relativeDir) => {
-          this.assertOperationActive();
-          const lookupPath = relativeDir || (this.dir === "." ? "." : this.dir);
-          const entries = await fs.readdir(lookupPath, { encoding: "utf8" });
-          const candidateEntries = entries.filter((entry) => {
-            const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
-            return !isProtectedRepairPath(filepath);
-          });
-          const classifiedEntries = await mapWithConcurrency(candidateEntries, MOBILE_IO_CONCURRENCY, async (entry) => {
-            const filepath = relativeDir ? `${relativeDir}/${entry}` : entry;
-            const fullPath = this.dir === "." ? filepath : `${this.dir}/${filepath}`;
-            const stat = await fs.stat(fullPath);
-            return { filepath, fullPath, isDirectory: stat.isDirectory(), isFile: stat.isFile() };
-          });
-          const directories = classifiedEntries.filter((entry) => entry.isDirectory);
-          const files = classifiedEntries.filter((entry) => entry.isFile);
-          const fingerprints = await mapWithConcurrency(files, MOBILE_IO_CONCURRENCY, async ({ filepath, fullPath }) => {
-            const value = await fs.readFile(fullPath);
-            return [filepath, (await hashBlob({ object: value })).oid];
-          });
-          for (const [filepath, oid] of fingerprints)
-            result.set(filepath, oid);
-          for (const entry of directories)
-            await walk2(entry.filepath);
-        };
-        await walk2("");
-        return result;
-      }
-      async readTreeFingerprints(fs, dir, tree) {
-        const entries = await mapWithConcurrency(
-          [...tree.entries()],
-          MOBILE_IO_CONCURRENCY,
-          async ([filepath, blobOid]) => {
-            if (isProtectedRepairPath(filepath))
-              return null;
-            const { blob } = await readBlob({ fs, dir, oid: blobOid });
-            return [filepath, (await hashBlob({ object: blob })).oid];
-          }
-        );
-        return new Map(entries.filter((entry) => entry !== null));
-      }
-      /**
-       * Get remote commit log (from origin/branch)
-       * Falls back to GitHub API if local repo has no fetched origin refs
-       */
-      async getRemoteLog(branchName, maxCount = 20) {
-        try {
-          const commits = await log({
-            fs: this.fs,
-            dir: this.dir,
-            ref: `origin/${branchName}`,
-            depth: maxCount
-          });
-          return commits.map((c) => {
-            var _a, _b, _c, _d, _e;
-            return {
-              oid: c.oid,
-              message: ((_a = c.commit) == null ? void 0 : _a.message) || "",
-              author: ((_c = (_b = c.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
-              date: new Date((((_e = (_d = c.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
-              commit: c.commit
-            };
-          });
-        } catch (error) {
-          const msg = error.message || String(error);
-          if (msg.includes("Could not find") || msg.includes("unknown revision")) {
-            log2.info("GitManager", `No fetched origin/${branchName} \u2014 using GitHub API fallback`);
-          } else {
-            log2.warn("GitManager", `Local origin/${branchName} error, trying GitHub API fallback`, error);
-          }
-          return this.fetchRemoteCommitsViaApi(branchName, maxCount);
-        }
-      }
-      /**
-       * Fetch remote commits via GitHub REST API (no local repo required)
-       * Static version for use when no GitManager instance exists.
-       */
-      static async fetchRemoteCommitsFromGitHub(repoUrl, password, branchName, maxCount = 20) {
-        try {
-          const repository = parseGitHubRepositoryUrl(repoUrl);
-          if (!repository) {
-            log2.warn("GitManager", "Cannot fetch remote commits: not a GitHub repo URL");
-            return [];
-          }
-          const { owner, repo } = repository;
-          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branchName)}&per_page=${maxCount}`;
-          log2.debug("GitManager", `Fetching commits via GitHub API: ${apiUrl}`);
-          const headers = {
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
-          };
-          if (password) {
-            headers["Authorization"] = `Bearer ${password}`;
-          }
-          const response = await (0, import_obsidian3.requestUrl)({
-            url: apiUrl,
-            method: "GET",
-            headers,
-            throw: false
-          });
-          if (response.status !== 200) {
-            log2.warn("GitManager", `GitHub API returned ${response.status}`, response.text);
-            return [];
-          }
-          const data = JSON.parse(response.text);
-          if (!Array.isArray(data)) {
-            log2.warn("GitManager", "GitHub API returned non-array", data);
-            return [];
-          }
-          log2.info("GitManager", `Fetched ${data.length} commits from GitHub API for ${owner}/${repo}@${branchName}`);
-          return data.map((c) => {
-            var _a, _b, _c, _d, _e, _f;
-            return {
-              oid: c.sha || "",
-              message: ((_a = c.commit) == null ? void 0 : _a.message) || "",
-              author: ((_c = (_b = c.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || ((_d = c.author) == null ? void 0 : _d.login) || "Unknown",
-              date: new Date(((_f = (_e = c.commit) == null ? void 0 : _e.author) == null ? void 0 : _f.date) || 0),
-              commit: c.commit,
-              remote: true
-            };
-          });
-        } catch (error) {
-          log2.error("GitManager", "GitHub API commit fetch failed", error);
-          return [];
-        }
-      }
-      /**
-       * Fetch remote commits via GitHub REST API (instance method, delegates to static)
-       */
-      async fetchRemoteCommitsViaApi(branchName, maxCount = 20) {
-        return _GitManager.fetchRemoteCommitsFromGitHub(
-          this.credentials.repoUrl || "",
-          this.credentials.password,
-          branchName,
-          maxCount
-        );
-      }
-      /**
-       * Parse owner/repo from a GitHub repository URL
-       */
-      parseGitHubRepoUrl() {
-        const url = this.credentials.repoUrl;
-        if (!url)
-          return null;
-        let match = url.match(/github\.com\/([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-        if (match) {
-          return { owner: match[1], repo: match[2] };
-        }
-        match = url.match(/git@github\.com:([^\/]+)\/([^\/\.]+)(?:\.git)?$/);
-        if (match) {
-          return { owner: match[1], repo: match[2] };
-        }
-        return null;
-      }
-      /**
-       * Check if local repository has any commits
-       */
-      async hasLocalCommits() {
-        try {
-          const commits = await log({ fs: this.fs, dir: this.dir, ref: "HEAD", depth: 1 });
-          return commits.length > 0;
-        } catch (error) {
-          log2.error("GitManager", "Pending checkout validation failed", error);
-          return false;
-        }
-      }
-      /**
-       * Pull changes from the remote repository.
-       * For empty repos (no local commits), does a shallow fetch+checkout instead of full pull.
-       */
-      async pull(branchName) {
-        try {
-          this.assertOperationActive();
-          this.updateStatus("Pulling changes...");
-          if (this.credentials.repoUrl) {
-            await this.ensureRemote(this.credentials.repoUrl);
-          }
-          if (this.credentials.repoUrl && await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1)) {
-            await this.shallowFetchAndCheckout(branchName);
-            return;
-          }
-          const hasCommits = await this.hasLocalCommits();
-          if (!hasCommits) {
-            log2.info("GitManager", "No local commits \u2014 doing shallow fetch instead of pull");
-            await this.shallowFetchAndCheckout(branchName);
-            return;
-          }
-          const progress = this.createProgress("Pulling from remote");
-          const { onProgress, onMessage } = progress;
-          const pullStartTime = Date.now();
-          let pullTimer = null;
-          const startPullTimer = () => {
-            if (pullTimer)
-              window.clearInterval(pullTimer);
-            pullTimer = window.setInterval(() => {
-              const elapsed = ((Date.now() - pullStartTime) / 1e3).toFixed(1);
-              onMessage(`Downloading updates... (${elapsed}s elapsed)`);
-            }, 1e3);
-          };
-          const stopPullTimer = () => {
-            if (pullTimer) {
-              window.clearInterval(pullTimer);
-              pullTimer = null;
-            }
-          };
-          try {
-            startPullTimer();
-            await fetch({
-              fs: this.fs,
-              http: this.createHttpClient(progress),
-              dir: this.dir,
-              remote: "origin",
-              ref: branchName,
-              singleBranch: true,
-              onAuth: () => ({
-                username: this.credentials.username,
-                password: this.credentials.password
-              }),
-              onProgress,
-              onMessage
-            });
-            const [localOid, fetchHead] = await Promise.all([
-              resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` }),
-              resolveRef({ fs: this.fs, dir: this.dir, ref: "FETCH_HEAD" })
-            ]);
-            if (localOid === fetchHead) {
-              onMessage("Already up to date");
-            } else {
-              await merge({
-                fs: this.fs,
-                dir: this.dir,
-                ours: branchName,
-                theirs: fetchHead,
-                fastForward: true,
-                fastForwardOnly: true,
-                author: {
-                  name: this.credentials.author.name || "Obsidian Git",
-                  email: this.credentials.author.email || "obsidian@example.com"
-                },
-                committer: {
-                  name: this.credentials.author.name || "Obsidian Git",
-                  email: this.credentials.author.email || "obsidian@example.com"
-                }
-              });
-              await checkout({
-                fs: this.fs,
-                dir: this.dir,
-                ref: branchName,
-                onProgress
-              });
-            }
-            stopPullTimer();
-            progress.complete();
-            this.updateStatus("Pull completed");
-          } catch (error) {
-            stopPullTimer();
-            progress.fail(error);
-            throw error;
-          }
-        } catch (error) {
-          log2.error("GitManager", "Failed to pull changes", error);
-          this.updateStatus("Pull failed");
-          throw error;
-        }
-      }
-      /**
-       * Fetch and check out a shallow repository without using git.clone.
-       *
-       * isomorphic-git removes the git directory when git.clone fails. An
-       * explicit init + fetch + checkout sequence preserves the partial .git
-       * state, allowing a later Clone Remote retry to reuse it.
-       */
-      async shallowFetchAndCheckout(branchName) {
-        this.assertOperationActive();
-        const progress = this.createProgress("Fetching remote files");
-        const { onProgress, onMessage } = progress;
-        let downloadTimer = null;
-        const startTime = Date.now();
-        const startDownloadTimer = () => {
-          downloadTimer = window.setInterval(() => {
-            const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
-            onMessage(`Downloading from server... (${elapsed}s elapsed)`);
-          }, 1e3);
-        };
-        const stopDownloadTimer = () => {
-          if (downloadTimer !== null)
-            window.clearInterval(downloadTimer);
-          downloadTimer = null;
-        };
-        try {
-          this.updateStatus("Preparing resumable fetch...");
-          onMessage("Preparing resumable fetch...");
-          await this.ensureResumableRepository(branchName);
-          onMessage("Connecting to remote...");
-          const resumeCheckout = this.credentials.repoUrl ? await this.hasPendingCheckout(this.credentials.repoUrl, branchName, 1) : false;
-          if (resumeCheckout) {
-            onMessage("Fetch already complete; resuming checkout...");
-          } else {
-            startDownloadTimer();
-            await fetch({
-              fs: this.fs,
-              http: this.createHttpClient(progress),
-              dir: this.dir,
-              remote: "origin",
-              ref: branchName,
-              depth: 1,
-              singleBranch: true,
-              onAuth: () => ({
-                username: this.credentials.username,
-                password: this.credentials.password
-              }),
-              onProgress: (event) => {
-                this.assertProgressActive(progress);
-                onProgress(event);
-              },
-              onMessage: (text) => {
-                this.assertProgressActive(progress);
-                onMessage(text);
-              }
-            });
-            await this.markCheckoutPending(this.credentials.repoUrl || "", branchName, 1);
-          }
-          stopDownloadTimer();
-          onMessage(resumeCheckout ? "Resuming checkout..." : "Download complete, processing objects...");
-          await this.checkoutFetchedBranch(branchName, progress, onMessage);
-          await this.clearPendingCheckout();
-          progress.complete();
-          this.updateStatus("Repository fetched");
-        } catch (error) {
-          stopDownloadTimer();
-          progress.fail(error);
-          const msg = error.message || String(error);
-          if (msg.includes("Out Of Memory") || msg.includes("out of memory") || msg.includes("OOM") || msg.includes("allocation")) {
-            log2.error("GitManager", "Memory exhausted during fetch \u2014 repo may be too large for mobile", error);
-            throw new Error(
-              `Memory exhausted while downloading repository. The partial Git state was retained for a retry.
-
-Suggestions:
-\u2022 Try on desktop first
-\u2022 Remove large files (images, videos)
-\u2022 Use a smaller repository`
-            );
-          }
-          if (msg.includes("timeout") || msg.includes("ETIMEDOUT") || msg.includes("Connection reset")) {
-            log2.error("GitManager", "Network timeout during fetch", error);
-            throw new Error(
-              `Connection timed out while downloading. The partial Git state was retained for a retry.
-
-Try again with a faster connection or smaller repository.`
-            );
-          }
-          throw error;
-        }
-      }
-      async ensureResumableRepository(branchName) {
-        if (!await this.isRepository()) {
-          await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-        }
-        if (this.credentials.repoUrl)
-          await this.ensureRemote(this.credentials.repoUrl);
-      }
-      pendingCheckoutPath() {
-        return `${this.dir}/.git/obsidian-git-sync-checkout.json`;
-      }
-      /**
-       * A marker is written only after fetch has produced a complete local ref.
-       * Validate both the ref and its commit object before skipping a retry.
-       */
-      async hasPendingCheckout(repoUrl, branchName, depth) {
-        try {
-          const fs = this.fs.promises || this.fs;
-          const raw = await fs.readFile(this.pendingCheckoutPath(), { encoding: "utf8" });
-          const state = JSON.parse(String(raw));
-          if (state.version !== 1 || state.repoUrl !== normalizeRemoteUrl(repoUrl) || state.branchName !== branchName || state.depth !== depth || !state.oid)
-            return false;
-          const remoteOid = await resolveRef({
-            fs: this.fs,
-            dir: this.dir,
-            ref: `refs/remotes/origin/${branchName}`
-          });
-          if (remoteOid !== state.oid)
-            return false;
-          await readCommit({ fs: this.fs, dir: this.dir, oid: state.oid });
-          return true;
-        } catch (e) {
-          return false;
-        }
-      }
-      async markCheckoutPending(repoUrl, branchName, depth) {
-        const oid = await resolveRef({
-          fs: this.fs,
-          dir: this.dir,
-          ref: `refs/remotes/origin/${branchName}`
-        });
-        await readCommit({ fs: this.fs, dir: this.dir, oid });
-        const state = {
-          version: 1,
-          repoUrl: normalizeRemoteUrl(repoUrl),
-          branchName,
-          depth,
-          oid
-        };
-        const fs = this.fs.promises || this.fs;
-        await fs.writeFile(this.pendingCheckoutPath(), JSON.stringify(state), { encoding: "utf8" });
-      }
-      async clearPendingCheckout() {
-        try {
-          const fs = this.fs.promises || this.fs;
-          await fs.unlink(this.pendingCheckoutPath());
-        } catch (e) {
-        }
-      }
-      async checkoutFetchedBranch(branchName, progress, onMessage) {
-        this.assertOperationActive();
-        const remoteRef = `refs/remotes/origin/${branchName}`;
-        const oid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
-        log2.info("GitManager", `Fetched branch tip: ${oid.slice(0, 7)}`);
-        await this.assertCheckoutSafe(branchName, oid);
-        await writeRef({
-          fs: this.fs,
-          dir: this.dir,
-          ref: `refs/heads/${branchName}`,
-          value: oid,
-          force: true
-        });
-        onMessage("Writing files to vault...");
-        let bytesWritten = 0;
-        this.setWriteProgress((path, bytes) => {
-          if (path === ".git" || path.startsWith(".git/"))
-            return;
-          bytesWritten += bytes;
-          progress.onProgress({
-            phase: "Updating workdir",
-            loaded: 0,
-            total: 0,
-            bytesWritten
-          });
-        });
-        try {
-          await checkout({
-            fs: this.fs,
-            dir: this.dir,
-            ref: branchName,
-            force: true,
-            onProgress: (event) => {
-              this.assertProgressActive(progress);
-              progress.onProgress({ ...event, bytesWritten });
-            }
-          });
-        } finally {
-          this.setWriteProgress(void 0);
-        }
-        log2.info("GitManager", `Checked out ${branchName} at ${oid.slice(0, 7)}`);
-      }
-      async assertCheckoutSafe(branchName, remoteOid) {
-        var _a;
-        const fs = this.fs.promises || this.fs;
-        const commit2 = await readCommit({ fs: this.fs, dir: this.dir, oid: remoteOid });
-        const remoteTree = await this.readTreeRecursive(commit2.commit.tree);
-        const remoteFiles = await this.readTreeFingerprints(this.fs, this.dir, remoteTree);
-        const localFiles = await this.readLocalFileFingerprints(fs);
-        const comparison = compareRepositoryPaths(localFiles, remoteFiles);
-        const conflictingPrefixes = [...localFiles.keys()].filter(
-          (localPath) => [...remoteFiles.keys()].some(
-            (remotePath) => remotePath.startsWith(`${localPath}/`) && !localFiles.has(remotePath)
-          )
-        );
-        const conflicts = [.../* @__PURE__ */ new Set([...comparison.conflicts, ...conflictingPrefixes])].sort();
-        if (conflicts.length > 0) {
-          throw new Error(
-            `Clone stopped because existing vault files would be overwritten (${conflicts.slice(0, 3).join(", ")}${conflicts.length > 3 ? ", ..." : ""}). Review the repository rebuild comparison before trying again.`
-          );
-        }
-        for (const filepath of remoteFiles.keys()) {
-          try {
-            const stat = await fs.stat(this.dir === "." ? filepath : `${this.dir}/${filepath}`);
-            if (stat.isDirectory()) {
-              throw new Error(
-                `Clone stopped because the existing vault folder "${filepath}" would be replaced by a file. Review the repository rebuild comparison before trying again.`
-              );
-            }
-          } catch (error) {
-            if ((_a = error == null ? void 0 : error.message) == null ? void 0 : _a.startsWith("Clone stopped"))
-              throw error;
-            if (!isTransientMissingPath(error))
-              throw error;
-          }
-        }
-      }
-      /**
-       * Clone a repository with resumable progress tracking and shallow depth.
-       *
-       * This intentionally uses init + fetch + checkout instead of git.clone:
-       * isomorphic-git deletes its partial git directory when clone throws.
-       */
-      async cloneRepository(repoUrl, branchName, depth = 1) {
-        this.assertOperationActive();
-        const progress = this.createProgress(`Cloning ${branchName}`);
-        const { onProgress, onMessage } = progress;
-        const startTime = Date.now();
-        let cloneTimer = null;
-        try {
-          this.updateStatus("Preparing resumable clone...");
-          log2.info("GitManager", `Cloning ${repoUrl} (branch: ${branchName}, depth: ${depth})`);
-          onMessage("Preparing resumable clone...");
-          if (!await this.isRepository()) {
-            await init({ fs: this.fs, dir: this.dir, defaultBranch: branchName });
-          }
-          await this.ensureRemote(repoUrl);
-          const resumeCheckout = await this.hasPendingCheckout(repoUrl, branchName, depth);
-          if (resumeCheckout) {
-            onMessage("Fetch already complete; resuming checkout...");
-          } else {
-            if (typeof window !== "undefined") {
-              cloneTimer = window.setInterval(() => {
-                const elapsed = ((Date.now() - startTime) / 1e3).toFixed(1);
-                onMessage(`Waiting for remote response... (${elapsed}s elapsed)`);
-              }, 1e3);
-            }
-            await fetch({
-              fs: this.fs,
-              http: this.createHttpClient(progress),
-              dir: this.dir,
-              remote: "origin",
-              ref: branchName,
-              singleBranch: true,
-              depth,
-              onAuth: () => ({
-                username: this.credentials.username,
-                password: this.credentials.password
-              }),
-              onProgress: (event) => {
-                this.assertProgressActive(progress);
-                onProgress(event);
-              },
-              onMessage: (text) => {
-                this.assertProgressActive(progress);
-                onMessage(text);
-              }
-            });
-            await this.markCheckoutPending(repoUrl, branchName, depth);
-          }
-          onMessage(resumeCheckout ? "Resuming checkout..." : "Fetch complete; checking out files...");
-          await this.checkoutFetchedBranch(branchName, progress, onMessage);
-          await this.clearPendingCheckout();
-          progress.complete();
-          this.updateStatus("Repository cloned");
-          log2.info("GitManager", `Repository cloned successfully`);
-        } catch (error) {
-          progress.fail(error);
-          throw error;
-        } finally {
-          if (cloneTimer !== null)
-            window.clearInterval(cloneTimer);
-        }
-      }
-      /**
-       * Add all changes to staging
-       */
-      async addAll(files) {
-        try {
-          this.assertOperationActive();
-          const statusMatrixForStaging = await statusMatrix({
-            fs: this.fs,
-            dir: this.dir
-          });
-          const statusByPath = /* @__PURE__ */ new Map();
-          for (const row of statusMatrixForStaging)
-            statusByPath.set(row[0], row);
-          const requestedFiles = files ? filterAutomaticallyStagedPaths([...new Set(files)]) : filterAutomaticallyStagedPaths(
-            statusMatrixForStaging.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0])
-          );
-          const filesToStage = [];
-          const failed = [];
-          for (const filepath of requestedFiles) {
-            const row = statusByPath.get(filepath);
-            if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
-              failed.push({ filepath, message: `Path "${filepath}" is ignored by .gitignore` });
-              continue;
-            }
-            filesToStage.push(filepath);
-          }
-          const staged = [];
-          this.updateStatus(filesToStage.length > 0 ? `Adding ${filesToStage.length} change${filesToStage.length === 1 ? "" : "s"}...` : "No changes to add");
-          const stagedPaths = /* @__PURE__ */ new Set();
-          const stageIndividually = async (file) => {
-            try {
-              this.assertOperationActive();
-              await this.stagePath(file, statusByPath);
-              stagedPaths.add(file);
-            } catch (error) {
-              const message = error instanceof Error ? error.message : String(error);
-              failed.push({ filepath: file, message });
-              log2.error("GitManager", `Failed to stage ${file}`, error);
-            }
-          };
-          const presentFiles = filesToStage.filter((file) => {
-            const row = statusByPath.get(file);
-            return !(row && row[1] === 1 && row[2] === 0);
-          });
-          const deletedFiles = filesToStage.filter((file) => {
-            const row = statusByPath.get(file);
-            return Boolean(row && row[1] === 1 && row[2] === 0);
-          });
-          for (let start = 0; start < presentFiles.length; start += BULK_STAGE_BATCH_SIZE) {
-            this.assertOperationActive();
-            const batch = presentFiles.slice(start, start + BULK_STAGE_BATCH_SIZE);
-            try {
-              await add({
-                fs: this.fs,
-                dir: this.dir,
-                filepath: batch,
-                parallel: true
-              });
-              for (const file of batch)
-                stagedPaths.add(file);
-            } catch (error) {
-              log2.debug("GitManager", `Bulk staging batch failed; retrying ${batch.length} files individually`, error);
-              for (const file of batch)
-                await stageIndividually(file);
-            }
-          }
-          for (const file of deletedFiles) {
-            await stageIndividually(file);
-          }
-          if (stagedPaths.size > 0) {
-            const finalMatrix = await statusMatrix({
-              fs: this.fs,
-              dir: this.dir
-            });
-            const finalByPath = new Map(finalMatrix.map((row) => [row[0], row]));
-            for (const file of [...stagedPaths]) {
-              const before = statusByPath.get(file);
-              const after = finalByPath.get(file);
-              const deletion = (before == null ? void 0 : before[1]) === 1 && (before == null ? void 0 : before[2]) === 0;
-              const stagedInIndex = deletion ? (after == null ? void 0 : after[3]) === 0 : (after == null ? void 0 : after[3]) === 2;
-              if (!stagedInIndex) {
-                stagedPaths.delete(file);
-                failed.push({ filepath: file, message: `Path "${file}" was not written to the Git index` });
-              }
-            }
-          }
-          for (const file of filesToStage) {
-            if (stagedPaths.has(file))
-              staged.push(file);
-          }
-          const result = { requested: requestedFiles.length, staged, failed };
-          this.updateStatus(failed.length > 0 ? `Staged ${staged.length}; ${failed.length} failed` : `Staged ${staged.length} change${staged.length === 1 ? "" : "s"}`);
-          return result;
-        } catch (error) {
-          log2.error("GitManager", "Failed to add changes", error);
-          this.updateStatus("Failed to add changes");
-          throw error;
-        }
-      }
-      /**
-       * Get a list of all changed files
-       */
-      async getChangedFiles() {
-        try {
-          const statusMatrix2 = await statusMatrix({
-            fs: this.fs,
-            dir: this.dir
-          });
-          const changedFiles = statusMatrix2.filter((row) => row[1] !== row[2] || row[1] !== row[3]).map((row) => row[0]);
-          return filterAutomaticallyStagedPaths(changedFiles);
-        } catch (error) {
-          log2.error("GitManager", "Failed to get changed files", error);
-          throw error;
-        }
-      }
-      /**
-       * Commit changes with a message
-       */
-      async commit(message) {
-        try {
-          this.assertOperationActive();
-          this.updateStatus("Committing changes...");
-          log2.debug("GitManager", `Committing changes with message: ${message}`);
-          const sha = await commit({
-            fs: this.fs,
-            dir: this.dir,
-            message,
-            author: {
-              name: this.credentials.author.name || "Obsidian Git Sync",
-              email: this.credentials.author.email || "obsidian@example.com"
-            }
-          });
-          this.updateStatus("Changes committed");
-          log2.info("GitManager", `Changes committed successfully with SHA: ${sha.slice(0, 7)}`);
-          return sha;
-        } catch (error) {
-          log2.error("GitManager", "Failed to commit changes", error);
-          this.updateStatus("Commit failed");
-          throw error;
-        }
-      }
-      /**
-       * Push changes to the remote repository
-       */
-      async push(branchName, force = false) {
-        var _a, _b, _c, _d, _e;
-        let progress = null;
-        try {
-          this.assertOperationActive();
-          this.updateStatus("Pushing changes...");
-          log2.debug("GitManager", `Pushing changes to remote branch: ${branchName}`);
-          if (this.credentials.repoUrl) {
-            await this.ensureRemote(this.credentials.repoUrl);
-          }
-          progress = this.createProgress("Pushing to remote");
-          const { onProgress, onMessage } = progress;
-          onMessage("Connecting to remote...");
-          await push({
-            fs: this.fs,
-            http: this.createHttpClient(progress),
-            dir: this.dir,
-            remote: "origin",
-            ref: branchName,
-            force,
-            onAuth: () => {
-              log2.debug("GitManager", "Authentication requested for push operation");
-              return {
-                username: this.credentials.username,
-                password: this.credentials.password
-              };
-            },
-            onProgress,
-            onMessage
-          });
-          onMessage("Confirming branch...");
-          try {
-            const localOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: `refs/heads/${branchName}` });
-            await writeRef({
-              fs: this.fs,
-              dir: this.dir,
-              ref: `refs/remotes/origin/${branchName}`,
-              value: localOid,
-              force: true
-            });
-          } catch (error) {
-            log2.warn("GitManager", "Push succeeded but tracking metadata could not be updated", error);
-          }
-          progress.complete();
-          this.updateStatus("Push completed");
-          log2.info("GitManager", `Successfully pushed changes to remote branch: ${branchName}`);
-        } catch (error) {
-          if (progress)
-            progress.fail(error);
-          log2.error("GitManager", `Failed to push changes to branch ${branchName}`, error);
-          this.updateStatus("Push failed");
-          if (((_a = error.message) == null ? void 0 : _a.includes("not a fast-forward")) || ((_b = error.message) == null ? void 0 : _b.includes("rejected"))) {
-            throw new Error(
-              `Push rejected: The remote has commits that you don't have locally. Pull first to get the latest changes, then push again. If this is a first-time push to an empty repo, use Force Push.`
-            );
-          }
-          if (((_c = error.message) == null ? void 0 : _c.includes("auth")) || ((_d = error.message) == null ? void 0 : _d.includes("401")) || ((_e = error.message) == null ? void 0 : _e.includes("403"))) {
-            throw new Error(
-              `Authentication failed. Check your token/username in the plugin settings. Make sure your PAT has 'Contents: Read and Write' permission.`
-            );
-          }
-          throw error;
-        }
-      }
-      /**
-       * Get the current status of the repository
-       */
-      async getStatus() {
-        var _a, _b;
-        try {
-          log2.debug("GitManager", "Getting repository status");
-          const currentBranch2 = await currentBranch({
-            fs: this.fs,
-            dir: this.dir,
-            fullname: false
-          });
-          if (!currentBranch2) {
-            log2.warn("GitManager", "Not currently on any branch");
-            throw new Error("Not on a branch");
-          }
-          log2.debug("GitManager", `Current branch: ${currentBranch2}`);
-          const localRef = `refs/heads/${currentBranch2}`;
-          const remoteRef = `refs/remotes/origin/${currentBranch2}`;
-          let localOid = null;
-          try {
-            localOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: localRef });
-          } catch (error) {
-            return {
-              branch: currentBranch2,
-              ahead: 0,
-              behind: 0,
-              comparison: "unavailable",
-              comparisonError: error instanceof Error ? error.message : String(error)
-            };
-          }
-          let remoteOid;
-          try {
-            remoteOid = await resolveRef({ fs: this.fs, dir: this.dir, ref: remoteRef });
-          } catch (error) {
-            log2.info("GitManager", `No tracking ref for ${currentBranch2}`);
-            if (((_a = this.comparisonCache) == null ? void 0 : _a.branch) === currentBranch2 && this.comparisonCache.localOid === localOid && this.comparisonCache.remoteOid === null) {
-              return this.comparisonCache.result;
-            }
-            const localCommits2 = localOid ? await log({ fs: this.fs, dir: this.dir, ref: localRef }).catch(() => []) : [];
-            const result2 = {
-              branch: currentBranch2,
-              ahead: localCommits2.length,
-              behind: 0,
-              comparison: localOid ? "local-only" : "unavailable",
-              comparisonError: error instanceof Error ? error.message : String(error)
-            };
-            this.comparisonCache = { branch: currentBranch2, localOid, remoteOid: null, result: result2 };
-            return result2;
-          }
-          if (((_b = this.comparisonCache) == null ? void 0 : _b.branch) === currentBranch2 && this.comparisonCache.localOid === localOid && this.comparisonCache.remoteOid === remoteOid) {
-            return this.comparisonCache.result;
-          }
-          const [localCommits, remoteCommits] = await Promise.all([
-            log({ fs: this.fs, dir: this.dir, ref: localRef }),
-            log({ fs: this.fs, dir: this.dir, ref: remoteRef })
-          ]);
-          const remoteOids = new Set(remoteCommits.map((commit2) => commit2.oid));
-          const localOids = new Set(localCommits.map((commit2) => commit2.oid));
-          const ahead = localCommits.filter((commit2) => !remoteOids.has(commit2.oid)).length;
-          const behind = remoteCommits.filter((commit2) => !localOids.has(commit2.oid)).length;
-          const comparison = ahead > 0 && behind > 0 ? "diverged" : ahead > 0 ? "ahead" : behind > 0 ? "behind" : "up-to-date";
-          log2.info("GitManager", `Repository status: branch=${currentBranch2}, ahead=${ahead}, behind=${behind}`);
-          const result = { branch: currentBranch2, ahead, behind, comparison };
-          this.comparisonCache = { branch: currentBranch2, localOid, remoteOid, result };
-          return result;
-        } catch (error) {
-          log2.error("GitManager", "Failed to get repository status", error);
-          throw error;
-        }
-      }
-      /**
-       * Get detailed status of all files (staged, modified, untracked, etc.)
-       */
-      async getDetailedStatus() {
-        var _a, _b, _c;
-        try {
-          return (await this.readStatusSnapshot()).detailedStatus;
-        } catch (error) {
-          log2.error("GitManager", "Failed to get detailed status", error);
-          if (((_a = error.message) == null ? void 0 : _a.includes("Cannot read properties of null")) || ((_b = error.stack) == null ? void 0 : _b.includes("BufferCursor.slice")) || ((_c = error.stack) == null ? void 0 : _c.includes("GitPackIndex"))) {
-            const packErr = new Error(
-              "Pack index reading failed. This is a known issue with isomorphic-git reading certain pack files. Check the Obsidian console for [ObsidianFsAdapter] warnings to see which file failed."
-            );
-            packErr.isPackIndexError = true;
-            throw packErr;
-          }
-          throw error;
-        }
-      }
-      /**
-       * Get status groups: staged and unstaged file lists
-       * A file that is both staged AND modified appears only in staged.
-       */
-      async getStatusGroups() {
-        try {
-          const snapshot = await this.readStatusSnapshot();
-          return { staged: snapshot.staged, unstaged: snapshot.unstaged };
-        } catch (error) {
-          log2.error("GitManager", "Failed to get status groups", error);
-          throw error;
-        }
-      }
-      /**
-       * Read the complete working-tree status once and derive every sidebar
-       * representation from the same status matrix.
-       */
-      async getSidebarStatusSnapshot() {
-        const repositoryStatusPromise = this.getStatus().then((status2) => ({
-          ...status2,
-          repositoryStatusAvailable: true
-        })).catch((error) => {
-          log2.warn("GitManager", "Repository comparison unavailable; continuing with file status", error);
-          return {
-            branch: "local",
-            ahead: 0,
-            behind: 0,
-            comparison: "unavailable",
-            comparisonError: error instanceof Error ? error.message : String(error),
-            repositoryStatusAvailable: false
-          };
-        });
-        const [repositoryStatus, fileStatus] = await Promise.all([
-          repositoryStatusPromise,
-          this.readStatusSnapshot()
-        ]);
-        return { ...repositoryStatus, ...fileStatus };
-      }
-      async readStatusSnapshot() {
-        let matrix = null;
-        let lastError;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
-            break;
-          } catch (error) {
-            lastError = error;
-            if (!isTransientMissingPath(error) || attempt === 2)
-              throw error;
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-        }
-        if (!matrix)
-          throw lastError instanceof Error ? lastError : new Error("Unable to read repository status");
-        const detailedStatus = [];
-        const staged = [];
-        const unstaged = [];
-        for (const row of matrix) {
-          const [filepath, head, workdir, stage] = row;
-          if (head === 1 && workdir === 1 && stage === 1)
-            continue;
-          let status2;
-          if (head === 0 && workdir === 2 && stage === 0)
-            status2 = "untracked";
-          else if (head === 0 && (stage === 2 || stage === 3))
-            status2 = "added";
-          else if (workdir === 0)
-            status2 = "deleted";
-          else if (head === 1 && workdir === 2 && stage === 1)
-            status2 = "modified";
-          else if (head === 1 && workdir === 1 && stage === 2)
-            status2 = "staged";
-          else if (head === 1 && workdir === 2 && stage === 2)
-            status2 = "staged";
-          else
-            status2 = "modified";
-          detailedStatus.push({ filepath, status: status2 });
-          const hasStagedChanges = head === 1 && stage === 0 || stage !== 1 && stage !== 0;
-          const hasWorkdirChanges = workdir !== 1;
-          if (hasStagedChanges)
-            staged.push(filepath);
-          if (hasWorkdirChanges && !hasStagedChanges)
-            unstaged.push(filepath);
-        }
-        return { detailedStatus, staged, unstaged };
-      }
-      /**
-       * Stage a single file
-       */
-      async stageFile(filepath) {
-        try {
-          this.assertOperationActive();
-          await this.stagePath(filepath);
-          log2.debug("GitManager", `Staged file: ${filepath}`);
-        } catch (error) {
-          log2.error("GitManager", `Failed to stage file: ${filepath}`, error);
-          throw error;
-        }
-      }
-      /**
-       * Stage a path, including tracked paths that have been deleted locally.
-       * isomorphic-git.add() reads the working-tree file and therefore throws
-       * NotFoundError for a tracked deletion. remove() updates only the index,
-       * which is exactly what staging that deletion requires.
-       */
-      async stagePath(filepath, statusByPath) {
-        let row = statusByPath == null ? void 0 : statusByPath.get(filepath);
-        if (!row) {
-          const trackedPaths = await listFiles({
-            fs: this.fs,
-            dir: this.dir
-          });
-          const tracked = trackedPaths.includes(filepath);
-          if (tracked) {
-            try {
-              await this.fs.stat(this.dir === "." ? filepath : `${this.dir}/${filepath}`);
-            } catch (error) {
-              if (isTransientMissingPath(error)) {
-                await remove({ fs: this.fs, dir: this.dir, filepath });
-                return;
-              }
-              throw error;
-            }
-            await add({ fs: this.fs, dir: this.dir, filepath });
-            return;
-          }
-          if (await this.isIgnoredPath(filepath)) {
-            throw new Error(`Path "${filepath}" is ignored by .gitignore`);
-          }
-          await add({ fs: this.fs, dir: this.dir, filepath });
-          return;
-        }
-        if (row && row[1] === 1 && row[2] === 0) {
-          await remove({ fs: this.fs, dir: this.dir, filepath });
-          return;
-        }
-        if ((!row || row[1] !== 1) && await this.isIgnoredPath(filepath)) {
-          throw new Error(`Path "${filepath}" is ignored by .gitignore`);
-        }
-        await add({ fs: this.fs, dir: this.dir, filepath });
-      }
-      /**
-       * Ask isomorphic-git for ignore semantics at the staging boundary. A
-       * missing .gitignore is a normal non-ignored result; other read failures
-       * are logged and left to git.add() to report with its original error.
-       */
-      async isIgnoredPath(filepath) {
-        try {
-          return await isIgnored({ fs: this.fs, dir: this.dir, filepath });
-        } catch (error) {
-          log2.debug("GitManager", `Unable to evaluate .gitignore for ${filepath}`, error);
-          return false;
-        }
-      }
-      /**
-       * Unstage a single file (reset to HEAD, or remove from index for new files)
-       */
-      async unstageFile(filepath) {
-        try {
-          this.assertOperationActive();
-          if (resetIndex) {
-            await resetIndex({ fs: this.fs, dir: this.dir, filepath });
-            log2.debug("GitManager", `Unstaged file: ${filepath}`);
-            return;
-          }
-          try {
-            const { blob } = await readBlob({
-              fs: this.fs,
-              dir: this.dir,
-              oid: "HEAD",
-              filepath
-            });
-            await this.fs.promises.writeFile(this.dir + "/" + filepath, blob);
-            log2.debug("GitManager", `Unstaged file (HEAD fallback): ${filepath}`);
-          } catch (headErr) {
-            log2.warn("GitManager", `Cannot unstage new file ${filepath}: resetIndex not available and file not in HEAD`);
-            throw new Error(`Cannot unstage new file "${filepath}". Please upgrade isomorphic-git or use git CLI.`);
-          }
-        } catch (error) {
-          log2.error("GitManager", `Failed to unstage file: ${filepath}`, error);
-          throw error;
-        }
-      }
-      /**
-       * Unstage all staged files
-       */
-      async unstageAll() {
-        try {
-          this.assertOperationActive();
-          const matrix = await statusMatrix({ fs: this.fs, dir: this.dir });
-          const requested = [];
-          const unstaged = [];
-          const failed = [];
-          for (const row of matrix) {
-            this.assertOperationActive();
-            const [filepath, head, workdir, stage] = row;
-            if (head === 1 && workdir === 1 && stage === 1)
-              continue;
-            const hasStagedChanges = stage !== 1 && stage !== 0;
-            if (hasStagedChanges) {
-              requested.push(filepath);
-              try {
-                await this.unstageFile(filepath);
-                unstaged.push(filepath);
-              } catch (err) {
-                const message = err instanceof Error ? err.message : String(err);
-                failed.push({ filepath, message });
-                log2.warn("GitManager", `Failed to unstage ${filepath}: ${err.message}`);
-              }
-            }
-          }
-          log2.debug("GitManager", `Unstaged ${unstaged.length} files, ${failed.length} failed`);
-          if (failed.length > 0 && unstaged.length === 0) {
-            throw new Error(`Could not unstage ${failed.length} file(s). resetIndex may not be available.`);
-          }
-          return { requested: requested.length, unstaged, failed };
-        } catch (error) {
-          log2.error("GitManager", "Failed to unstage all files", error);
-          throw error;
-        }
-      }
-      /**
-       * Get list of files changed in a specific commit (compared to its parent).
-       * 
-       * For shallow clones, the commit may not exist locally. This method gracefully
-       * handles that by returning an empty array and logging a warning (not error).
-       */
-      async getCommitFiles(oid) {
-        var _a, _b;
-        try {
-          const commit2 = await readCommit({ fs: this.fs, dir: this.dir, oid });
-          const treeOid = commit2.commit.tree;
-          const parentOid = (_b = (_a = commit2.commit) == null ? void 0 : _a.parent) == null ? void 0 : _b[0];
-          let parentFiles = /* @__PURE__ */ new Map();
-          if (parentOid) {
-            const parentCommit = await readCommit({ fs: this.fs, dir: this.dir, oid: parentOid });
-            parentFiles = await this.readTreeRecursive(parentCommit.commit.tree);
-          }
-          const currentFiles = await this.readTreeRecursive(treeOid);
-          const result = [];
-          for (const [path, oid2] of currentFiles.entries()) {
-            if (!parentFiles.has(path)) {
-              result.push({ filepath: path, status: "added" });
-            } else if (parentFiles.get(path) !== oid2) {
-              result.push({ filepath: path, status: "modified" });
-            }
-          }
-          for (const [path] of parentFiles.entries()) {
-            if (!currentFiles.has(path)) {
-              result.push({ filepath: path, status: "deleted" });
-            }
-          }
-          return result.sort((a, b) => a.filepath.localeCompare(b.filepath));
-        } catch (error) {
-          const msg = (error == null ? void 0 : error.message) || String(error);
-          if (msg.includes("Could not find") || msg.includes("not found")) {
-            log2.debug("GitManager", `Commit ${oid.slice(0, 7)} not found locally; shallow-history fallback may be needed`, msg);
-          } else {
-            log2.error("GitManager", `Failed to get commit files for ${oid.slice(0, 7)}`, error);
-          }
-          return [];
-        }
-      }
-      /**
-       * Fetch commit file changes from GitHub API.
-       * Useful for remote commits that don't exist in a shallow local clone.
-       * Returns same format as getCommitFiles() for consistency.
-       */
-      static async fetchCommitFilesFromGitHub(repoUrl, token, ref) {
-        try {
-          const repository = parseGitHubRepositoryUrl(repoUrl);
-          if (!repository) {
-            log2.warn("GitManager", "Cannot fetch commit files: not a GitHub URL", repoUrl);
-            return null;
-          }
-          const { owner, repo } = repository;
-          const apiUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(ref)}`;
-          log2.debug("GitManager", `Fetching commit files from GitHub API: ${apiUrl}`);
-          const headers = {
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28"
-          };
-          if (token) {
-            headers["Authorization"] = `Bearer ${token}`;
-          }
-          const response = await (0, import_obsidian3.requestUrl)({ url: apiUrl, method: "GET", headers, throw: false });
-          if (response.status !== 200) {
-            log2.warn("GitManager", `GitHub API commit fetch returned ${response.status}`, response.text);
-            return null;
-          }
-          const data = JSON.parse(response.text);
-          if (!data.files || !Array.isArray(data.files)) {
-            log2.warn("GitManager", "GitHub API commit response missing files", data);
-            return null;
-          }
-          const statusMap = {
-            "added": "added",
-            "modified": "modified",
-            "removed": "deleted",
-            "renamed": "modified"
-          };
-          const files = data.files.map((f) => ({
-            filepath: f.filename || f.previous_filename || "unknown",
-            status: statusMap[f.status] || "modified"
-          })).sort((a, b) => a.filepath.localeCompare(b.filepath));
-          log2.info("GitManager", `Fetched ${files.length} files for commit ${ref.slice(0, 7)} from GitHub API`);
-          return files;
-        } catch (error) {
-          log2.warn("GitManager", `GitHub API commit file fetch failed for ${ref.slice(0, 7)}`, error);
-          return null;
-        }
-      }
-      /**
-       * Recursively read a git tree and return a flat map of path -> oid
-       */
-      async readTreeRecursive(treeOid, prefix = "") {
-        return this.readTreeRecursiveAt(this.fs, this.dir, treeOid, prefix);
-      }
-      async readTreeRecursiveAt(fs, dir, treeOid, prefix = "", strict = false) {
-        const result = /* @__PURE__ */ new Map();
-        try {
-          const tree = await readTree({ fs, dir, oid: treeOid });
-          for (const entry of tree.tree) {
-            const fullPath = prefix + entry.path;
-            if (entry.type === "tree") {
-              const subMap = await this.readTreeRecursiveAt(fs, dir, entry.oid, fullPath + "/", strict);
-              for (const [subPath, subOid] of subMap.entries()) {
-                result.set(subPath, subOid);
-              }
-            } else {
-              result.set(fullPath, entry.oid);
-            }
-          }
-        } catch (e) {
-          log2.warn("GitManager", `Failed to read tree ${treeOid.slice(0, 7)}`, e);
-          if (strict)
-            throw e;
-        }
-        return result;
-      }
-      /**
-       * Get commit log (history)
-       */
-      async getLog(maxCount = 20) {
-        try {
-          const commits = await log({ fs: this.fs, dir: this.dir, ref: "HEAD", depth: maxCount });
-          return commits.map((c) => {
-            var _a, _b, _c, _d, _e;
-            return {
-              oid: c.oid,
-              message: ((_a = c.commit) == null ? void 0 : _a.message) || "",
-              author: ((_c = (_b = c.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
-              date: new Date((((_e = (_d = c.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
-              commit: c.commit
-            };
-          });
-        } catch (error) {
-          const msg = error.message || String(error);
-          if (msg.includes("Could not find") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
-            log2.info("GitManager", "No commits in repository yet");
-            return [];
-          }
-          log2.error("GitManager", "Failed to get commit log", error);
-          throw error;
-        }
-      }
-      /**
-       * Get the current branch name
-       */
-      async getCurrentBranch() {
-        try {
-          const branch2 = await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
-          return branch2 || "HEAD";
-        } catch (error) {
-          log2.error("GitManager", "Failed to get current branch", error);
-          throw error;
-        }
-      }
-      /**
-       * Detect if a directory contains a git repository (.git exists)
-       */
-      static async hasGitRepo(fs, dir) {
-        try {
-          const gitDir = dir + "/.git";
-          const stat = await fs.promises.stat(gitDir);
-          return stat.isDirectory();
-        } catch (e) {
-          return false;
-        }
-      }
-      /**
-       * Initialize from an existing local repo (no remote URL needed)
-       * Creates an empty repo in LightningFS if one doesn't exist
-       */
-      async initLocal() {
-        try {
-          this.assertOperationActive();
-          const hasVirtualRepo = await _GitManager.hasGitRepo(this.fs, this.dir);
-          if (!hasVirtualRepo) {
-            await init({ fs: this.fs, dir: this.dir, defaultBranch: "main" });
-            log2.info("GitManager", `Initialized empty local repo at ${this.dir}`);
-          } else {
-            await currentBranch({ fs: this.fs, dir: this.dir, fullname: false });
-            log2.info("GitManager", `Initialized local repo at ${this.dir}`);
-          }
-        } catch (error) {
-          log2.error("GitManager", "Failed to initialize local repo", error);
-          throw error;
-        }
-      }
-      /**
-       * Perform a full sync operation: pull, add, commit, push
-       * If repoUrl is empty, only does local commit (no push)
-       */
-      async sync(repoUrl, branchName, commitMessage) {
-        try {
-          this.assertOperationActive();
-          log2.info("GitManager", `Starting sync operation with repo: ${repoUrl || "(local only)"}, branch: ${branchName}`);
-          if (!await this.isRepository()) {
-            throw new Error("No local git repository found. Initialize or clone the vault first.");
-          }
-          if (repoUrl) {
-            log2.debug("GitManager", "Pulling latest changes before committing");
-            await this.pull(branchName);
-          }
-          log2.debug("GitManager", "Checking for local changes");
-          const changedFiles = await this.getChangedFiles();
-          log2.info("GitManager", `Found ${changedFiles.length} changed files`);
-          if (changedFiles.length > 0) {
-            log2.debug("GitManager", `Changed files: ${changedFiles.join(", ")}`);
-            const stageResult = await this.addAll(changedFiles);
-            if (stageResult.failed.length > 0) {
-              throw new Error(
-                `Could not stage ${stageResult.failed.length} of ${stageResult.requested} changed file(s).`
-              );
-            }
-            await this.commit(commitMessage);
-            if (repoUrl) {
-              await this.push(branchName);
-              log2.info("GitManager", `Sync completed with ${changedFiles.length} files updated`);
-              new import_obsidian3.Notice(`Git sync completed: ${changedFiles.length} files updated`);
-            } else {
-              log2.info("GitManager", `Local commit completed: ${changedFiles.length} files`);
-              new import_obsidian3.Notice(`Local commit: ${changedFiles.length} files`);
-            }
-          } else {
-            log2.info("GitManager", "Sync completed: No changes to commit");
-            new import_obsidian3.Notice("Git sync: No changes to commit");
-          }
-          this.updateStatus("Ready");
-        } catch (error) {
-          log2.error("GitManager", "Sync operation failed", error);
-          this.updateStatus("Sync failed");
-          throw error;
-        }
-      }
-    };
-  }
-});
-
 // src/main.ts
 var main_exports = {};
 __export(main_exports, {
@@ -23984,6 +20812,11 @@ var import_obsidian9 = require("obsidian");
 // src/adapters/ObsidianFsAdapter.ts
 var ObsidianFsAdapter = class {
   constructor(adapter, dir) {
+    // readdir() validates entries on mobile because the vault index can be
+    // briefly stale. Keep those validated stats for the immediately
+    // following lstat() made by isomorphic-git's worktree walker so the
+    // adapter bridge is not called twice for every entry.
+    this.validatedStats = /* @__PURE__ */ new Map();
     // Direct fs methods — isomorphic-git may call these directly (not just via promises)
     this.readFile = this.readFileImpl.bind(this);
     this.writeFile = this.writeFileImpl.bind(this);
@@ -23992,7 +20825,7 @@ var ObsidianFsAdapter = class {
     this.readdir = this.readdirImpl.bind(this);
     this.unlink = this.unlinkImpl.bind(this);
     this.stat = this.statImpl.bind(this);
-    this.lstat = this.statImpl.bind(this);
+    this.lstat = this.lstatImpl.bind(this);
     this.readlink = this.readlinkImpl.bind(this);
     this.symlink = this.symlinkImpl.bind(this);
     this.adapter = adapter;
@@ -24012,8 +20845,7 @@ var ObsidianFsAdapter = class {
       readdir: this.readdirImpl.bind(this),
       unlink: this.unlinkImpl.bind(this),
       stat: this.statImpl.bind(this),
-      lstat: this.statImpl.bind(this),
-      // Obsidian doesn't expose symlinks; treat as stat
+      lstat: this.lstatImpl.bind(this),
       readlink: this.readlinkImpl.bind(this),
       symlink: this.symlinkImpl.bind(this),
       setWriteProgress: this.setWriteProgress.bind(this)
@@ -24029,19 +20861,23 @@ var ObsidianFsAdapter = class {
     }
     return filepath;
   }
-  /**
-   * Check if we're running in Electron desktop (has Node.js fs via window.require)
-   */
-  isNodeAvailable() {
-    return typeof window !== "undefined" && !!window.require && !!window.process;
+  /** Resolve Electron's CommonJS loader in both legacy and context-isolated desktop windows. */
+  nodeRequire() {
+    if (typeof require === "function")
+      return require;
+    const windowRequire = typeof window !== "undefined" ? window.require : null;
+    if (typeof windowRequire === "function")
+      return windowRequire;
+    const globalRequire = globalThis.require;
+    return typeof globalRequire === "function" ? globalRequire : null;
   }
   /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
   nodePathFor(path) {
     var _a, _b;
-    if (!this.isNodeAvailable())
+    const nodeRequire = this.nodeRequire();
+    if (!nodeRequire)
       return null;
     try {
-      const nodeRequire = window.require;
       const nodeFs = nodeRequire("fs");
       const nodePath = nodeRequire("path");
       const basePath = (_b = (_a = this.adapter).getBasePath) == null ? void 0 : _b.call(_a);
@@ -24055,7 +20891,7 @@ var ObsidianFsAdapter = class {
   /**
    * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
    * Node-compatible 'utf8' string for text; no encoding means binary.
-   * 
+   *
    * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
    * We use Node.js fs via window.require (Electron desktop) as a fallback.
    */
@@ -24063,6 +20899,13 @@ var ObsidianFsAdapter = class {
     const path = this.resolve(filepath);
     const encoding = typeof options === "string" ? options : options == null ? void 0 : options.encoding;
     if (encoding === "utf8") {
+      const nodeFile2 = this.nodePathFor(path);
+      if (nodeFile2) {
+        try {
+          return await nodeFile2.fs.promises.readFile(nodeFile2.fullPath, { encoding: "utf8" });
+        } catch (e) {
+        }
+      }
       return this.adapter.read(path);
     }
     const nodeFile = this.nodePathFor(path);
@@ -24088,21 +20931,36 @@ var ObsidianFsAdapter = class {
    * writeFile — data may be string, Uint8Array, or ArrayBuffer
    */
   async writeFileImpl(filepath, data) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        if (typeof data === "string") {
+          await nodeFile.fs.promises.writeFile(nodeFile.fullPath, data, "utf8");
+          (_a = this.writeProgress) == null ? void 0 : _a.call(this, path, new TextEncoder().encode(data).byteLength);
+          return;
+        }
+        const bytes = data instanceof Uint8Array ? data : data instanceof ArrayBuffer ? new Uint8Array(data) : new TextEncoder().encode(String(data));
+        await nodeFile.fs.promises.writeFile(nodeFile.fullPath, bytes);
+        (_b = this.writeProgress) == null ? void 0 : _b.call(this, path, bytes.byteLength);
+        return;
+      } catch (e) {
+      }
+    }
     if (typeof data === "string") {
       await this.adapter.write(path, data);
-      (_a = this.writeProgress) == null ? void 0 : _a.call(this, path, new TextEncoder().encode(data).byteLength);
+      (_c = this.writeProgress) == null ? void 0 : _c.call(this, path, new TextEncoder().encode(data).byteLength);
     } else if (data instanceof Uint8Array) {
       await this.adapter.writeBinary(path, data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
-      (_b = this.writeProgress) == null ? void 0 : _b.call(this, path, data.byteLength);
+      (_d = this.writeProgress) == null ? void 0 : _d.call(this, path, data.byteLength);
     } else if (data instanceof ArrayBuffer) {
       await this.adapter.writeBinary(path, data);
-      (_c = this.writeProgress) == null ? void 0 : _c.call(this, path, data.byteLength);
+      (_e = this.writeProgress) == null ? void 0 : _e.call(this, path, data.byteLength);
     } else {
       const text = String(data);
       await this.adapter.write(path, text);
-      (_d = this.writeProgress) == null ? void 0 : _d.call(this, path, new TextEncoder().encode(text).byteLength);
+      (_f = this.writeProgress) == null ? void 0 : _f.call(this, path, new TextEncoder().encode(text).byteLength);
     }
   }
   async mkdirImpl(filepath, _options) {
@@ -24150,7 +21008,7 @@ var ObsidianFsAdapter = class {
       const candidatePath = path === "." ? relativePath : `${path}/${relativePath}`;
       try {
         const stat = await this.adapter.stat(candidatePath);
-        return stat ? relativePath : null;
+        return stat ? { relativePath, candidatePath, stat } : null;
       } catch (error) {
         if ((error == null ? void 0 : error.code) === "ENOENT" || /no such file|not found/i.test((error == null ? void 0 : error.message) || "")) {
           return null;
@@ -24158,7 +21016,11 @@ var ObsidianFsAdapter = class {
         throw error;
       }
     }));
-    return existingEntries.filter((entry) => entry !== null);
+    for (const entry of existingEntries) {
+      if (entry)
+        this.validatedStats.set(entry.candidatePath, entry.stat);
+    }
+    return existingEntries.filter((entry) => entry !== null).map((entry) => entry.relativePath);
   }
   async unlinkImpl(filepath) {
     var _a, _b;
@@ -24180,12 +21042,48 @@ var ObsidianFsAdapter = class {
       } catch (e) {
       }
     }
+    const validated = this.validatedStats.get(path);
+    if (validated) {
+      this.validatedStats.delete(path);
+      return this.toNodeStat(validated);
+    }
     const stat = await this.adapter.stat(path);
     if (!stat) {
       const err = new Error(`ENOENT: no such file or directory, stat '${path}'`);
       err.code = "ENOENT";
       throw err;
     }
+    return this.toNodeStat(stat);
+  }
+  /**
+   * Keep lstat distinct from stat on desktop. A regular stat follows a
+   * symlink and therefore throws for a broken link. Git's worktree walker
+   * deliberately uses lstat so it can identify the link without following
+   * it (and subsequently apply ignore rules normally).
+   */
+  async lstatImpl(filepath) {
+    const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      try {
+        return await nodeFile.fs.promises.lstat(nodeFile.fullPath);
+      } catch (e) {
+      }
+    }
+    const validated = this.validatedStats.get(path);
+    if (validated) {
+      this.validatedStats.delete(path);
+      return this.toNodeStat(validated);
+    }
+    const stat = await this.adapter.stat(path);
+    if (!stat) {
+      const err = new Error(`ENOENT: no such file or directory, lstat '${path}'`);
+      err.code = "ENOENT";
+      throw err;
+    }
+    return this.toNodeStat(stat);
+  }
+  toNodeStat(stat) {
     return {
       isFile: () => stat.type === "file",
       isDirectory: () => stat.type === "folder",
@@ -24200,6 +21098,11 @@ var ObsidianFsAdapter = class {
     };
   }
   async readlinkImpl(filepath) {
+    const path = this.resolve(filepath);
+    const nodeFile = this.nodePathFor(path);
+    if (nodeFile) {
+      return nodeFile.fs.promises.readlink(nodeFile.fullPath, { encoding: "utf8" });
+    }
     const err = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
     err.code = "EINVAL";
     throw err;
@@ -24211,13 +21114,1930 @@ var ObsidianFsAdapter = class {
   }
 };
 
-// src/main.ts
-init_gitManager();
-init_logger();
+// src/backend/obsidianAdapter.ts
+var import_obsidian2 = require("obsidian");
+
+// src/logger.ts
+var import_obsidian = require("obsidian");
+
+// src/security.ts
+var REDACTED = "[REDACTED]";
+var SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+  "authorization",
+  "password",
+  "passwd",
+  "pat",
+  "secret",
+  "token",
+  "credential",
+  "credentials",
+  "cookie",
+  "set-cookie"
+]);
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+function redactSensitiveText(value, secrets = []) {
+  let result = String(value);
+  for (const secret of secrets) {
+    if (secret && secret.length >= 3) {
+      result = result.replace(new RegExp(escapeRegExp(secret), "g"), REDACTED);
+    }
+  }
+  result = result.replace(/(https?:\/\/)[^\s/@:]+(?::[^\s/@]*)?@/gi, `$1${REDACTED}@`);
+  result = result.replace(/(authorization\s*[:=]\s*)(?:basic|bearer)\s+[^\s,;]+/gi, `$1${REDACTED}`);
+  result = result.replace(/\bBasic\s+[A-Za-z0-9+/=]+/g, `Basic ${REDACTED}`);
+  result = result.replace(/\b(?:ghp|github_pat|glpat)-[A-Za-z0-9_-]+/g, REDACTED);
+  return result;
+}
+function redactSensitiveData(value, secrets = []) {
+  if (value === null || value === void 0)
+    return value;
+  if (typeof value === "string")
+    return redactSensitiveText(value, secrets);
+  if (typeof value !== "object")
+    return value;
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: redactSensitiveText(value.message, secrets),
+      stack: value.stack ? redactSensitiveText(value.stack, secrets) : void 0
+    };
+  }
+  if (Array.isArray(value))
+    return value.map((item) => redactSensitiveData(item, secrets));
+  const output = {};
+  for (const [key, item] of Object.entries(value)) {
+    output[key] = SENSITIVE_KEYS.has(key.toLowerCase()) ? REDACTED : redactSensitiveData(item, secrets);
+  }
+  return output;
+}
+function isProtectedSyncPath(filepath, pluginId = "obsidian-git-sync") {
+  const path = filepath.replace(/\\/g, "/").replace(/^\.\//, "");
+  const pluginPath = `.obsidian/plugins/${pluginId}`;
+  return path === pluginPath || path.startsWith(`${pluginPath}/`);
+}
+function filterAutomaticallyStagedPaths(paths) {
+  return paths.filter((filepath) => !isProtectedSyncPath(filepath));
+}
+
+// src/logger.ts
+var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
+  LogLevel2[LogLevel2["DEBUG"] = 0] = "DEBUG";
+  LogLevel2[LogLevel2["INFO"] = 1] = "INFO";
+  LogLevel2[LogLevel2["WARN"] = 2] = "WARN";
+  LogLevel2[LogLevel2["ERROR"] = 3] = "ERROR";
+  return LogLevel2;
+})(LogLevel || {});
+var Logger = class _Logger {
+  constructor() {
+    this.logLevel = 1 /* INFO */;
+    this.showNotices = true;
+    this.entries = [];
+    this.persistedEntries = [];
+    this.maxEntries = 500;
+    this.sensitiveValues = [];
+    this.recentNoticeTimes = /* @__PURE__ */ new Map();
+    this.noticeCooldownMs = 5 * 60 * 1e3;
+    this.fileLogSink = null;
+    this.listeners = /* @__PURE__ */ new Set();
+  }
+  /**
+   * Get the singleton instance of the logger
+   */
+  static getInstance() {
+    if (!_Logger.instance) {
+      _Logger.instance = new _Logger();
+    }
+    return _Logger.instance;
+  }
+  /**
+   * Get recent log entries for display
+   */
+  getEntries() {
+    const merged = /* @__PURE__ */ new Map();
+    const persisted = this.persistedEntries;
+    for (const entry of [...this.persistedEntries, ...this.entries]) {
+      const exactKey = `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}`;
+      if (merged.has(exactKey))
+        continue;
+      const isLiveEntry = !persisted.includes(entry);
+      if (isLiveEntry && persisted.some(
+        (persistedEntry) => persistedEntry.level === entry.level && persistedEntry.namespace === entry.namespace && persistedEntry.message === entry.message && Math.abs(persistedEntry.timestamp - entry.timestamp) <= 250 && JSON.stringify(persistedEntry.data) === JSON.stringify(entry.data)
+      ))
+        continue;
+      merged.set(exactKey, entry);
+    }
+    return [...merged.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-this.maxEntries);
+  }
+  mergePersistedEntries(entries) {
+    this.persistedEntries = [...entries].slice(-this.maxEntries);
+  }
+  /** Subscribe to new entries so long-lived views can update without polling. */
+  subscribe(listener) {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+  /** Clear the in-memory activity log shown in the sidebar. */
+  clear() {
+    this.entries = [];
+    this.persistedEntries = [];
+  }
+  /**
+   * Export logs to a markdown file in the vault
+   */
+  async exportToFile(vault, filename) {
+    var _a;
+    const timestamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+    const path = filename || `.obsidian/plugins/obsidian-git-sync/debug-log-${timestamp}.md`;
+    const normalizedPath = (0, import_obsidian.normalizePath)(path);
+    const folder = normalizedPath.split("/").slice(0, -1).join("/");
+    if (folder) {
+      try {
+        await vault.adapter.mkdir(folder);
+      } catch (e) {
+        if (!((_a = e.message) == null ? void 0 : _a.includes("already exists"))) {
+          throw e;
+        }
+      }
+    }
+    const lines = [
+      "# Obsidian Git Sync \u2014 Debug Log",
+      "",
+      `**Generated:** ${(/* @__PURE__ */ new Date()).toLocaleString()}`,
+      `**Entries:** ${this.getEntries().length}`,
+      `**Log Level:** ${LogLevel[this.logLevel]}`,
+      "",
+      "---",
+      ""
+    ];
+    for (const entry of this.getEntries()) {
+      const time = new Date(entry.timestamp).toLocaleTimeString();
+      const emoji = entry.level === "error" ? "\u{1F534}" : entry.level === "warn" ? "\u26A0\uFE0F" : entry.level === "debug" ? "\u{1F50D}" : "\u2139\uFE0F";
+      lines.push(`### ${emoji} [${entry.level.toUpperCase()}] ${entry.namespace} \u2014 ${time}`);
+      lines.push("");
+      lines.push(entry.message);
+      if (entry.data) {
+        lines.push("");
+        lines.push("```json");
+        try {
+          lines.push(JSON.stringify(entry.data, null, 2).slice(0, 2e3));
+        } catch (e) {
+          lines.push(String(entry.data).slice(0, 2e3));
+        }
+        lines.push("```");
+      }
+      lines.push("");
+      lines.push("---");
+      lines.push("");
+    }
+    const content = lines.join("\n");
+    await vault.adapter.write(path, content);
+    return path;
+  }
+  /**
+   * Set the maximum number of entries to keep in memory
+   */
+  setMaxEntries(max) {
+    this.maxEntries = max;
+  }
+  /**
+   * Set the minimum log level to display
+   */
+  setLogLevel(level) {
+    this.logLevel = level;
+  }
+  /**
+   * Set whether to show notices for warnings and errors
+   */
+  setShowNotices(show) {
+    this.showNotices = show;
+  }
+  /** Show a background warning/error once per message during the cooldown. */
+  showNotice(level, message) {
+    const key = `${level}:${message}`;
+    const now = Date.now();
+    const previous = this.recentNoticeTimes.get(key);
+    if (previous !== void 0 && now - previous < this.noticeCooldownMs)
+      return;
+    this.recentNoticeTimes.set(key, now);
+    if (this.recentNoticeTimes.size > 100) {
+      for (const [noticeKey, timestamp] of this.recentNoticeTimes) {
+        if (now - timestamp >= this.noticeCooldownMs)
+          this.recentNoticeTimes.delete(noticeKey);
+      }
+    }
+    new import_obsidian.Notice(`[${level}] ${message}`);
+  }
+  setSensitiveValues(values) {
+    this.sensitiveValues = values.filter((value) => typeof value === "string" && value.length >= 3);
+  }
+  /** Attach the plugin-owned persistent log sink without touching global console state. */
+  setFileLogSink(sink) {
+    this.fileLogSink = sink;
+  }
+  /**
+   * Log a debug message
+   */
+  debug(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("debug", context, safeMessage, safeData);
+    if (this.logLevel <= 0 /* DEBUG */) {
+      console.debug(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+    }
+  }
+  /**
+   * Log an info message
+   */
+  info(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("info", context, safeMessage, safeData);
+    if (this.logLevel <= 1 /* INFO */) {
+      console.info(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+    }
+  }
+  /**
+   * Log a warning message
+   */
+  warn(context, message, data) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.pushEntry("warn", context, safeMessage, safeData);
+    if (this.logLevel <= 2 /* WARN */) {
+      console.warn(`[Git Sync][${context}] ${safeMessage}`, safeData || "");
+      if (this.showNotices) {
+        this.showNotice("Warning", safeMessage);
+      }
+    }
+  }
+  /**
+   * Log an error message
+   */
+  error(context, message, error) {
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeError = redactSensitiveData(error, this.sensitiveValues);
+    const errorText = error ? redactSensitiveText(error.message, this.sensitiveValues) : "";
+    this.pushEntry("error", context, safeMessage, safeError || errorText);
+    if (this.logLevel <= 3 /* ERROR */) {
+      console.error(`[Git Sync][${context}] ${safeMessage}`, safeError || "");
+      if (error && typeof safeError === "object" && safeError && "stack" in safeError) {
+        console.error(`[Git Sync][${context}] Stack trace:`, safeError.stack || "");
+      }
+      if (this.showNotices) {
+        this.showNotice("Error", `${safeMessage}${errorText ? `: ${errorText}` : ""}`);
+      }
+    }
+  }
+  pushEntry(level, namespace, message, data) {
+    var _a, _b;
+    const safeMessage = redactSensitiveText(message, this.sensitiveValues);
+    const safeData = redactSensitiveData(data, this.sensitiveValues);
+    this.entries.push({
+      timestamp: Date.now(),
+      level,
+      namespace,
+      message: safeMessage,
+      data: safeData
+    });
+    if (this.entries.length > this.maxEntries) {
+      this.entries = this.entries.slice(-this.maxEntries);
+    }
+    for (const listener of this.listeners) {
+      try {
+        listener();
+      } catch (e) {
+      }
+    }
+    const levelRank = {
+      debug: 0 /* DEBUG */,
+      info: 1 /* INFO */,
+      warn: 2 /* WARN */,
+      error: 3 /* ERROR */,
+      fatal: 3 /* ERROR */
+    };
+    if (((_a = levelRank[level]) != null ? _a : 1 /* INFO */) >= this.logLevel) {
+      (_b = this.fileLogSink) == null ? void 0 : _b.call(
+        this,
+        level,
+        `[Git Sync][${namespace}] ${safeMessage}`,
+        safeData || ""
+      );
+    }
+  }
+};
+var log = Logger.getInstance();
+
+// src/backend/gitBackend.ts
+init_isomorphic_git();
+
+// src/backend/http.ts
+function statusMessage(status2) {
+  const messages = {
+    200: "OK",
+    201: "Created",
+    202: "Accepted",
+    204: "No Content",
+    400: "Bad Request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not Found",
+    409: "Conflict",
+    429: "Too Many Requests",
+    500: "Internal Server Error"
+  };
+  return messages[status2] || "Unknown";
+}
+async function collectBody(body) {
+  if (body === void 0)
+    return void 0;
+  if (typeof body === "string")
+    return new TextEncoder().encode(body);
+  if (body instanceof Uint8Array)
+    return body;
+  if (body instanceof ArrayBuffer)
+    return new Uint8Array(body);
+  const chunks = [];
+  for await (const chunk of body)
+    chunks.push(chunk);
+  const size = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  const result = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+function asBodyIterable(body) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield body;
+    }
+  };
+}
+var GitProtocolHttp = class {
+  constructor(transport, credentials, progress) {
+    this.transport = transport;
+    this.credentials = credentials;
+    this.operationSignal = null;
+    this.progress = progress;
+  }
+  setProgressSink(progress) {
+    this.progress = progress;
+  }
+  setOperationSignal(signal) {
+    this.operationSignal = signal;
+  }
+  async request(config) {
+    var _a, _b;
+    this.throwIfAborted();
+    const credential = this.credentials ? await this.credentials() : null;
+    const body = await collectBody(config.body);
+    const headers = { ...config.headers || {} };
+    if ((credential == null ? void 0 : credential.username) && credential.password) {
+      const encoded = this.encodeBasic(`${credential.username}:${credential.password}`);
+      headers.Authorization = `Basic ${encoded}`;
+    }
+    const response = await this.transport.request({
+      url: config.url,
+      method: config.method || "GET",
+      headers,
+      body,
+      signal: this.operationSignal || void 0
+    });
+    this.throwIfAborted();
+    (_b = (_a = this.progress) == null ? void 0 : _a.progress) == null ? void 0 : _b.call(_a, response.body.byteLength, response.body.byteLength);
+    return {
+      url: config.url,
+      method: config.method || "GET",
+      statusCode: response.status,
+      statusMessage: statusMessage(response.status),
+      headers: response.headers,
+      body: asBodyIterable(response.body)
+    };
+  }
+  throwIfAborted() {
+    var _a;
+    if ((_a = this.operationSignal) == null ? void 0 : _a.aborted) {
+      const error = new Error("Git operation cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+  }
+  encodeBasic(value) {
+    if (typeof btoa === "function")
+      return btoa(value);
+    const nodeBuffer = globalThis.Buffer;
+    if (nodeBuffer)
+      return nodeBuffer.from(value, "utf8").toString("base64");
+    throw new Error("No base64 encoder is available for Git authentication");
+  }
+};
+function jsonRequest(transport, request) {
+  return transport.request({
+    ...request,
+    headers: {
+      Accept: "application/json",
+      ...request.body ? { "Content-Type": "application/json" } : {},
+      ...request.headers || {}
+    }
+  });
+}
+
+// src/backend/gitBackend.ts
+var PullBlockedError = class extends Error {
+  constructor(paths) {
+    const displayed = paths.slice(0, 30);
+    super(
+      `Pull blocked: local changes would be overwritten by remote updates:
+${displayed.map((path) => `\u2022 ${path}`).join("\n")}` + (paths.length > displayed.length ? `
+\u2022 \u2026and ${paths.length - displayed.length} more file(s)` : "") + "\n\nCommit, stash, or discard these local changes before pulling."
+    );
+    this.paths = paths;
+    this.name = "PullBlockedError";
+  }
+};
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function isMissing(error) {
+  const value = error;
+  return (value == null ? void 0 : value.code) === "ENOENT" || /not found|unknown revision|no such file|could not find/i.test(String((value == null ? void 0 : value.message) || error));
+}
+function uniquePaths(paths) {
+  return [...new Set(paths.map((path) => path.replace(/^\.\//, "").replace(/^\/+/, "")).filter(Boolean))];
+}
+function isMissingPath(error) {
+  const value = error;
+  return (value == null ? void 0 : value.code) === "ENOENT" || /ENOENT|no such file or directory|not found/i.test(String((value == null ? void 0 : value.message) || error));
+}
+function asBytes(value) {
+  if (typeof value === "string")
+    return new TextEncoder().encode(value);
+  if (value instanceof Uint8Array)
+    return value;
+  return new Uint8Array(value);
+}
+function asText(value) {
+  return typeof value === "string" ? value : new TextDecoder().decode(asBytes(value));
+}
+function protectedMaintenancePath(path) {
+  const normalized = path.replace(/^\.\//, "").replace(/^\/+/, "");
+  return normalized === ".git" || normalized.startsWith(".git/") || normalized === ".git-sync-repair" || normalized.startsWith(".git-sync-repair-") || normalized.startsWith(".obsidian/plugins/obsidian-git-sync/");
+}
+function compareRepositoryPaths(localFiles, remoteFiles) {
+  const localOnly = [];
+  const remoteOnly = [];
+  const conflicts = [];
+  const unchanged = [];
+  const paths = /* @__PURE__ */ new Set([...localFiles.keys(), ...remoteFiles.keys()]);
+  for (const path of [...paths].sort()) {
+    const local = localFiles.get(path);
+    const remote = remoteFiles.get(path);
+    if (local === void 0)
+      remoteOnly.push(path);
+    else if (remote === void 0)
+      localOnly.push(path);
+    else if (local === remote)
+      unchanged.push(path);
+    else
+      conflicts.push(path);
+  }
+  return { localOnly, remoteOnly, conflicts, unchanged };
+}
+var GitBackend = class {
+  constructor(ports, dir, config, progress) {
+    this.ports = ports;
+    this.dir = dir;
+    this.config = config;
+    this.progress = progress;
+    this.operationSignal = null;
+    this.http = new GitProtocolHttp(
+      ports.transport,
+      async () => {
+        var _a;
+        return ((_a = ports.credentials) == null ? void 0 : _a.getCredential()) || null;
+      },
+      progress
+    );
+  }
+  configure(config) {
+    Object.assign(this.config, config);
+  }
+  setProgressSink(progress) {
+    this.http.setProgressSink(progress);
+  }
+  setOperationSignal(signal) {
+    this.operationSignal = signal;
+    this.http.setOperationSignal(signal);
+  }
+  async hasRepository() {
+    var _a;
+    try {
+      const stat = await this.fs.stat(`${this.dir}/.git`);
+      return Boolean((_a = stat == null ? void 0 : stat.isDirectory) == null ? void 0 : _a.call(stat));
+    } catch (e) {
+      return false;
+    }
+  }
+  async initialize() {
+    if (!await this.hasRepository()) {
+      await init({ fs: this.ports.fs, dir: this.dir, defaultBranch: this.config.branch });
+    }
+    if (this.config.remoteUrl)
+      await this.setRemote(this.config.remoteUrl);
+  }
+  async health() {
+    if (!await this.hasRepository()) {
+      return { state: "missing", branch: null, head: null, index: "missing", reason: "No .git directory" };
+    }
+    let branch2;
+    try {
+      branch2 = await currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false }) || null;
+    } catch (error) {
+      return { state: "damaged", branch: null, head: null, index: "invalid", reason: errorMessage(error) };
+    }
+    if (!branch2)
+      return { state: "damaged", branch: null, head: null, index: "invalid", reason: "HEAD is not attached to a branch" };
+    let head = null;
+    try {
+      head = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+      await readCommit({ fs: this.ports.fs, dir: this.dir, oid: head });
+    } catch (error) {
+      if (isMissing(error))
+        return { state: "empty", branch: branch2, head: null, index: "readable" };
+      return { state: "damaged", branch: branch2, head: null, index: "invalid", reason: errorMessage(error) };
+    }
+    try {
+      await listFiles({ fs: this.ports.fs, dir: this.dir });
+      return { state: "healthy", branch: branch2, head, index: "readable" };
+    } catch (error) {
+      return { state: "damaged", branch: branch2, head, index: "invalid", reason: errorMessage(error) };
+    }
+  }
+  async checkIndex() {
+    const fs = this.fileSystem;
+    const indexPath = this.repositoryGitPath("index");
+    let stat;
+    try {
+      stat = await fs.stat(indexPath);
+    } catch (error) {
+      if (isMissingPath(error))
+        return { state: "missing", exists: false, size: null };
+      throw error;
+    }
+    const size = Number.isFinite(stat == null ? void 0 : stat.size) ? stat.size : null;
+    if (size === 0)
+      return { state: "empty", exists: true, size, reason: "Git index is empty (.git/index)" };
+    try {
+      await listFiles({ fs: this.ports.fs, dir: this.dir });
+      return { state: "healthy", exists: true, size };
+    } catch (error) {
+      return { state: "invalid", exists: true, size, reason: errorMessage(error) };
+    }
+  }
+  async previewIndexRepair() {
+    const index2 = await this.checkIndex();
+    const head = await this.readHeadTree();
+    const worktree = await this.readWorktreeFiles(false, new Set(head.keys()));
+    let modifiedFiles = 0;
+    let deletedFiles = 0;
+    let unchangedFiles = 0;
+    for (const [path, oid] of head) {
+      const localOid = worktree.get(path);
+      if (localOid === void 0)
+        deletedFiles += 1;
+      else if (localOid === oid)
+        unchangedFiles += 1;
+      else
+        modifiedFiles += 1;
+    }
+    const tracked = new Set(head.keys());
+    const untrackedFiles = [...worktree.keys()].filter((path) => !tracked.has(path)).length;
+    return {
+      index: index2,
+      trackedFiles: head.size,
+      modifiedFiles,
+      deletedFiles,
+      untrackedFiles,
+      unchangedFiles
+    };
+  }
+  async previewLatestIndexBackup() {
+    const fs = this.fileSystem;
+    let entries;
+    try {
+      entries = await fs.readdir(this.repositoryGitPath(""), { encoding: "utf8" });
+    } catch (error) {
+      if (isMissingPath(error))
+        return null;
+      throw error;
+    }
+    const backups = entries.filter((entry) => /^index\.obsidian-git-backup-\d+$/.test(entry)).sort().reverse();
+    if (backups.length === 0)
+      return null;
+    const filename = backups[0];
+    const bytes = asBytes(await fs.readFile(this.repositoryGitPath(filename)));
+    return {
+      filename,
+      size: bytes.byteLength,
+      validFormat: bytes.byteLength >= 4 && String.fromCharCode(...bytes.slice(0, 4)) === "DIRC"
+    };
+  }
+  async rebuildIndexFromHead() {
+    const health = await this.checkIndex();
+    if (health.state === "healthy")
+      throw new Error("The Git index is already healthy; no repair is needed.");
+    const fs = this.fileSystem;
+    const lockPath = this.repositoryGitPath("index.lock");
+    try {
+      await fs.stat(lockPath);
+      throw new Error("Git index.lock exists. Another Git operation may be running; try again after it finishes.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Another Git operation"))
+        throw error;
+      if (!isMissingPath(error))
+        throw error;
+    }
+    const head = await this.readHeadTree();
+    const worktree = await this.readWorktreeFiles(false, new Set(head.keys()));
+    const indexPath = this.repositoryGitPath("index");
+    const original = health.exists ? asBytes(await fs.readFile(indexPath)) : null;
+    const backupPath = original ? await this.backupIndex(original) : null;
+    try {
+      await this.removeIndex();
+      const existingTracked = [...head.keys()].filter((path) => worktree.has(path));
+      if (existingTracked.length > 0) {
+        await add({ fs: this.ports.fs, dir: this.dir, filepath: existingTracked, parallel: true, force: true });
+      }
+      for (const path of head.keys()) {
+        if (worktree.has(path) && worktree.get(path) === head.get(path))
+          continue;
+        await resetIndex({ fs: this.ports.fs, dir: this.dir, filepath: path, ref: "HEAD" });
+      }
+      await listFiles({ fs: this.ports.fs, dir: this.dir });
+      return { backupPath, trackedFiles: head.size, worktreeFiles: worktree.size, stagedStateRecovered: false };
+    } catch (error) {
+      await this.removeIndex();
+      if (original)
+        await fs.writeFile(indexPath, original);
+      throw error;
+    }
+  }
+  async restoreLatestIndexBackup() {
+    const preview = await this.previewLatestIndexBackup();
+    if (!preview)
+      throw new Error("No Git index repair backup was found.");
+    if (!preview.validFormat || preview.size === 0)
+      throw new Error(`The newest Git index backup is invalid: ${preview.filename}`);
+    const fs = this.fileSystem;
+    const backup = asBytes(await fs.readFile(this.repositoryGitPath(preview.filename)));
+    const currentPath = this.repositoryGitPath("index");
+    const current = await this.indexBytesOrNull();
+    if (current)
+      await fs.writeFile(this.repositoryGitPath(`index.obsidian-git-pre-restore-${Date.now()}`), current);
+    try {
+      await fs.writeFile(currentPath, backup);
+      await listFiles({ fs: this.ports.fs, dir: this.dir });
+      return preview.filename;
+    } catch (error) {
+      await this.removeIndex();
+      if (current)
+        await fs.writeFile(currentPath, current);
+      throw error;
+    }
+  }
+  async previewRepositoryRebuild(remoteUrl = this.config.remoteUrl, branch2 = this.config.branch) {
+    if (!remoteUrl)
+      throw new Error("A remote repository URL is required before comparing a rebuild.");
+    const fs = this.fileSystem;
+    const temporaryDir = `${this.dir === "." ? "." : this.dir}/.git-sync-repair-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    try {
+      await clone({ fs: this.ports.fs, http: this.http, dir: temporaryDir, url: remoteUrl, ref: branch2, singleBranch: true, depth: 1, onAuth: () => this.auth() });
+      const remoteOid = await this.resolveRefOrNullAt(temporaryDir, `refs/heads/${branch2}`);
+      const remoteFiles = remoteOid ? await this.readCommitTreeAt(temporaryDir, remoteOid) : /* @__PURE__ */ new Map();
+      const localFiles = await this.readWorktreeFiles(true);
+      return { branch: branch2, remoteOid, ...compareRepositoryPaths(localFiles, remoteFiles) };
+    } finally {
+      try {
+        await fs.rmdir(temporaryDir, { recursive: true });
+      } catch (error) {
+        if (!isMissingPath(error))
+          throw error;
+      }
+    }
+  }
+  async readGitignore() {
+    try {
+      return asText(await this.fileSystem.readFile(this.repositoryPath(".gitignore")));
+    } catch (error) {
+      if (isMissingPath(error))
+        return "";
+      throw error;
+    }
+  }
+  async writeGitignore(content) {
+    await this.fileSystem.writeFile(this.repositoryPath(".gitignore"), content);
+    return { content, changed: true };
+  }
+  async addIgnorePattern(pattern) {
+    const normalized = pattern.trim();
+    if (!normalized || normalized.startsWith("#"))
+      throw new Error("Enter a non-empty ignore pattern");
+    const current = await this.readGitignore();
+    const lines = current.split(/\r?\n/);
+    if (lines.some((line) => line.trim() === normalized))
+      return { content: current, changed: false, pattern: normalized };
+    const prefix = current && !current.endsWith("\n") ? `${current}
+` : current;
+    const content = `${prefix}${normalized}
+`;
+    await this.fileSystem.writeFile(this.repositoryPath(".gitignore"), content);
+    return { content, changed: true, pattern: normalized };
+  }
+  async setRemote(url) {
+    this.throwIfAborted();
+    const remotes = await listRemotes({ fs: this.ports.fs, dir: this.dir });
+    const origin = remotes.find((remote) => remote.remote === "origin");
+    if (!origin) {
+      await addRemote({ fs: this.ports.fs, dir: this.dir, remote: "origin", url });
+    } else if (origin.url !== url) {
+      await deleteRemote({ fs: this.ports.fs, dir: this.dir, remote: "origin" });
+      await addRemote({ fs: this.ports.fs, dir: this.dir, remote: "origin", url });
+    }
+  }
+  async clone() {
+    if (!this.config.remoteUrl)
+      throw new Error("A remote repository URL is required to clone");
+    if (await this.hasRepository())
+      throw new Error("A local Git repository already exists");
+    await init({ fs: this.ports.fs, dir: this.dir, defaultBranch: this.config.branch });
+    await this.setRemote(this.config.remoteUrl);
+    try {
+      await fetch({
+        fs: this.ports.fs,
+        http: this.http,
+        dir: this.dir,
+        remote: "origin",
+        ref: this.config.branch,
+        singleBranch: true,
+        depth: 1,
+        onAuth: () => this.auth()
+      });
+    } catch (error) {
+      if (/empty|no commit|unborn|could not find.*ref/i.test(errorMessage(error)))
+        return;
+      throw error;
+    }
+    const remoteOid = await resolveRef({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ref: `refs/remotes/origin/${this.config.branch}`
+    });
+    await this.assertCheckoutSafe(remoteOid);
+    await writeRef({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ref: `refs/heads/${this.config.branch}`,
+      value: remoteOid,
+      force: true
+    });
+    await checkout({ fs: this.ports.fs, dir: this.dir, ref: this.config.branch });
+  }
+  async testRemote() {
+    this.requireRemote();
+    const remoteUrl = this.config.remoteUrl;
+    await listServerRefs({
+      http: this.http,
+      url: remoteUrl,
+      prefix: `refs/heads/${this.config.branch}`,
+      onAuth: () => this.auth()
+    });
+  }
+  /**
+   * One local status read. Remote comparison is deliberately opt-in so the
+   * first useful file state does not wait for history traversal or network IO.
+   */
+  async status(options = {}) {
+    var _a, _b;
+    if (!await this.hasRepository())
+      return this.emptyStatus("missing");
+    let branch2 = null;
+    try {
+      branch2 = await currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false }) || null;
+    } catch (error) {
+      return this.emptyStatus("damaged", errorMessage(error));
+    }
+    if (!branch2)
+      return this.emptyStatus("damaged", "HEAD is not attached to a branch");
+    let head = null;
+    try {
+      head = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+    } catch (error) {
+      if (!isMissing(error))
+        return this.emptyStatus("damaged", errorMessage(error), branch2);
+    }
+    let files = [];
+    try {
+      const matrix = await statusMatrix({ fs: this.ports.fs, dir: this.dir });
+      files = [];
+      const matrixStates = {};
+      for (const [path, headState, worktreeState, stageState] of matrix) {
+        const state = `${headState}/${worktreeState}/${stageState}`;
+        matrixStates[state] = (matrixStates[state] || 0) + 1;
+        const staged = stageState !== headState;
+        const worktree = worktreeState !== stageState;
+        if (!staged && !worktree)
+          continue;
+        const change = worktreeState === 0 && headState !== 0 ? "deleted" : headState === 0 && staged ? "added" : headState === 0 ? "untracked" : staged && !worktree ? "staged" : worktreeState === 2 ? "modified" : "conflict";
+        files.push({ path, change, staged, worktree });
+      }
+      (_a = this.ports.diagnostics) == null ? void 0 : _a.info("Working-tree status matrix read", {
+        branch: branch2,
+        matrixEntries: matrix.length,
+        changedFiles: files.length,
+        stagedFiles: files.filter((file) => file.staged).length,
+        worktreeFiles: files.filter((file) => file.worktree).length,
+        untrackedFiles: files.filter((file) => file.change === "untracked").length,
+        matrixStates
+      });
+    } catch (error) {
+      (_b = this.ports.diagnostics) == null ? void 0 : _b.error(
+        "Working-tree status matrix failed",
+        error instanceof Error ? error : new Error(errorMessage(error))
+      );
+      return this.emptyStatus("damaged", errorMessage(error), branch2, head);
+    }
+    const result = {
+      state: head ? "healthy" : "empty",
+      branch: branch2,
+      head,
+      files,
+      staged: files.filter((file) => file.staged).map((file) => file.path),
+      changed: files.filter((file) => file.worktree || file.staged).map((file) => file.path),
+      comparison: head ? "unavailable" : "local-only",
+      ahead: 0,
+      behind: 0
+    };
+    if (options.compareRemote)
+      return this.withRemoteComparison(result);
+    return result;
+  }
+  async compareRemote() {
+    if (!await this.hasRepository())
+      return this.emptyStatus("missing");
+    let branch2 = null;
+    try {
+      branch2 = await currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false }) || null;
+    } catch (error) {
+      return this.emptyStatus("damaged", errorMessage(error));
+    }
+    if (!branch2)
+      return this.emptyStatus("damaged", "HEAD is not attached to a branch");
+    let head = null;
+    try {
+      head = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+    } catch (error) {
+      if (!isMissing(error))
+        return this.emptyStatus("damaged", errorMessage(error), branch2);
+    }
+    const result = {
+      state: head ? "healthy" : "empty",
+      branch: branch2,
+      head,
+      files: [],
+      staged: [],
+      changed: [],
+      comparison: head ? "unavailable" : "local-only",
+      ahead: 0,
+      behind: 0
+    };
+    return this.withRemoteComparison(result);
+  }
+  async stage(path) {
+    this.assertPath(path);
+    this.throwIfAborted();
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
+    const worktreePath = this.repositoryPath(path);
+    let present = true;
+    try {
+      await this.fileSystem.lstat(worktreePath);
+    } catch (error) {
+      if (!isMissingPath(error))
+        throw error;
+      present = false;
+    }
+    if (!present && tracked.has(path)) {
+      await remove({ fs: this.ports.fs, dir: this.dir, filepath: path });
+    } else if (!present) {
+      throw new Error(`Path "${path}" is not present in the worktree`);
+    } else {
+      if (!tracked.has(path) && await this.isIgnored(path)) {
+        throw new Error(`Path "${path}" is ignored by .gitignore`);
+      }
+      await add({ fs: this.ports.fs, dir: this.dir, filepath: path });
+    }
+    return { path, staged: true };
+  }
+  async stageAll(paths) {
+    const requested = uniquePaths(paths);
+    const succeeded = [];
+    const failed = [];
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
+    const states = await Promise.all(requested.map(async (path) => {
+      try {
+        this.assertPath(path);
+        let present2 = true;
+        try {
+          await this.fileSystem.lstat(this.repositoryPath(path));
+        } catch (error) {
+          if (!isMissingPath(error))
+            throw error;
+          present2 = false;
+        }
+        if (!present2)
+          return { path, state: tracked.has(path) ? "deleted" : "absent", error: null };
+        if (!tracked.has(path) && await this.isIgnored(path))
+          return { path, state: "ignored", error: null };
+        return { path, state: "present", error: null };
+      } catch (error) {
+        return { path, state: null, error };
+      }
+    }));
+    const present = states.filter(({ state }) => state === "present").map(({ path }) => path);
+    const deleted = states.filter(({ state }) => state === "deleted").map(({ path }) => path);
+    for (const { path, state, error } of states.filter(({ state: state2, error: error2 }) => error2 || state2 === "ignored" || state2 === "absent" || state2 === "*absent")) {
+      failed.push({ path, message: error ? errorMessage(error) : state === "ignored" ? `Path "${path}" is ignored by .gitignore` : `Path "${path}" is not present in the worktree` });
+    }
+    const batchSize = 32;
+    for (let index2 = 0; index2 < present.length; index2 += batchSize) {
+      this.throwIfAborted();
+      const batch = present.slice(index2, index2 + batchSize);
+      try {
+        await add({ fs: this.ports.fs, dir: this.dir, filepath: batch, parallel: true });
+        succeeded.push(...batch);
+      } catch (e) {
+        for (const path of batch) {
+          try {
+            this.throwIfAborted();
+            await this.stage(path);
+            succeeded.push(path);
+          } catch (error) {
+            failed.push({ path, message: errorMessage(error) });
+          }
+        }
+      }
+    }
+    for (const path of deleted) {
+      try {
+        await this.stage(path);
+        succeeded.push(path);
+      } catch (error) {
+        failed.push({ path, message: errorMessage(error) });
+      }
+    }
+    return { requested, succeeded: uniquePaths(succeeded), failed };
+  }
+  async unstage(path) {
+    this.assertPath(path);
+    this.throwIfAborted();
+    const head = await this.resolveRefOrNull("HEAD");
+    await resetIndex({
+      fs: this.ports.fs,
+      dir: this.dir,
+      filepath: path,
+      ...head ? { ref: "HEAD" } : {}
+    });
+    return { path, staged: false };
+  }
+  async unstageAll(paths) {
+    const requested = uniquePaths(paths);
+    const succeeded = [];
+    const failed = [];
+    for (const path of requested) {
+      try {
+        await this.unstage(path);
+        succeeded.push(path);
+      } catch (error) {
+        failed.push({ path, message: errorMessage(error) });
+      }
+    }
+    return { requested, succeeded, failed };
+  }
+  /** Restore one tracked worktree path to its committed HEAD version. */
+  async discard(path) {
+    this.assertPath(path);
+    const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
+    if (!tracked.has(path))
+      throw new Error(`Cannot restore untracked file "${path}" from HEAD`);
+    await checkout({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ref: "HEAD",
+      filepaths: [path],
+      force: true,
+      noUpdateHead: true
+    });
+  }
+  /** Read the current and committed text for a read-only review UI. */
+  async review(path) {
+    this.assertPath(path);
+    let head = null;
+    try {
+      const oid = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+      const result = await readBlob({ fs: this.ports.fs, dir: this.dir, oid, filepath: path });
+      head = this.reviewText(result.blob);
+    } catch (error) {
+      if (!isMissing(error))
+        throw error;
+    }
+    let worktree = null;
+    try {
+      worktree = this.reviewText(await this.fileSystem.readFile(this.repositoryPath(path)));
+    } catch (error) {
+      if (!isMissingPath(error))
+        throw error;
+    }
+    return { path, head, worktree };
+  }
+  async commit(message) {
+    const trimmed = message.trim();
+    if (!trimmed)
+      throw new Error("A commit message is required");
+    const author = this.config.author;
+    const oid = await commit({
+      fs: this.ports.fs,
+      dir: this.dir,
+      message: trimmed,
+      author,
+      committer: author
+    });
+    return { oid, message: trimmed };
+  }
+  async pull() {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    this.requireRemote();
+    await this.setRemote(this.config.remoteUrl);
+    this.throwIfAborted();
+    const branch2 = this.config.branch;
+    (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Fetching remote changes\u2026");
+    await fetch({
+      fs: this.ports.fs,
+      http: this.http,
+      dir: this.dir,
+      remote: "origin",
+      ref: branch2,
+      singleBranch: true,
+      onAuth: () => this.auth()
+    });
+    const fetched = await this.resolveRefOrNull(`refs/remotes/origin/${branch2}`) || await this.resolveRefOrNull("FETCH_HEAD");
+    if (!fetched)
+      throw new Error(`Pull failed: fetched remote ${branch2}, but no remote-tracking ref was written`);
+    const local = await this.resolveRefOrNull(`refs/heads/${branch2}`);
+    if (!local) {
+      (_d = (_c = this.progress) == null ? void 0 : _c.message) == null ? void 0 : _d.call(_c, "Checking whether the remote files are safe to apply\u2026");
+      await this.assertCheckoutSafe(fetched);
+      (_f = (_e = this.progress) == null ? void 0 : _e.message) == null ? void 0 : _f.call(_e, "Updating local branch\u2026");
+      await writeRef({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${branch2}`, value: fetched, force: true });
+      (_h = (_g = this.progress) == null ? void 0 : _g.message) == null ? void 0 : _h.call(_g, "Checking out remote files\u2026");
+      await checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 });
+      return { branch: branch2, oid: fetched };
+    }
+    if (local === fetched)
+      return { branch: branch2, oid: local, alreadyCurrent: true };
+    (_j = (_i = this.progress) == null ? void 0 : _i.message) == null ? void 0 : _j.call(_i, "Checking local changes before merge\u2026");
+    const blockedPaths = await this.findPullOverwritePaths(local, fetched);
+    if (blockedPaths.length > 0)
+      throw new PullBlockedError(blockedPaths);
+    (_l = (_k = this.progress) == null ? void 0 : _k.message) == null ? void 0 : _l.call(_k, "Applying remote changes\u2026");
+    await merge({
+      fs: this.ports.fs,
+      dir: this.dir,
+      ours: branch2,
+      theirs: fetched,
+      fastForward: true,
+      fastForwardOnly: true,
+      author: this.config.author,
+      committer: this.config.author
+    });
+    (_n = (_m = this.progress) == null ? void 0 : _m.message) == null ? void 0 : _n.call(_m, "Checking out updated files\u2026");
+    await checkout({ fs: this.ports.fs, dir: this.dir, ref: branch2 });
+    return { branch: branch2, oid: fetched };
+  }
+  async push(force = false) {
+    var _a, _b, _c, _d;
+    this.requireRemote();
+    await this.setRemote(this.config.remoteUrl);
+    this.throwIfAborted();
+    (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Uploading local changes\u2026");
+    await push({
+      fs: this.ports.fs,
+      http: this.http,
+      dir: this.dir,
+      remote: "origin",
+      ref: this.config.branch,
+      force,
+      onAuth: () => this.auth()
+    });
+    (_d = (_c = this.progress) == null ? void 0 : _c.message) == null ? void 0 : _d.call(_c, "Confirming remote branch\u2026");
+    const oid = await this.resolveRefOrNull(`refs/heads/${this.config.branch}`);
+    if (oid) {
+      await writeRef({
+        fs: this.ports.fs,
+        dir: this.dir,
+        ref: `refs/remotes/origin/${this.config.branch}`,
+        value: oid,
+        force: true
+      });
+    }
+    return { branch: this.config.branch, oid };
+  }
+  async sync(message) {
+    const pulled = this.config.remoteUrl ? await this.pull() : null;
+    this.throwIfAborted();
+    const status2 = await this.status();
+    const stageResult = await this.stageAll(filterAutomaticallyStagedPaths(status2.changed));
+    if (stageResult.failed.length > 0)
+      throw new Error(`Could not stage ${stageResult.failed.length} file(s)`);
+    const committed = stageResult.succeeded.length > 0 ? await this.commit(message) : null;
+    const pushed = committed && this.config.remoteUrl ? await this.push() : null;
+    return { committed, pulled, pushed };
+  }
+  async history(limit = 25) {
+    let commits;
+    try {
+      commits = await log2({ fs: this.ports.fs, dir: this.dir, ref: "HEAD", depth: limit });
+    } catch (error) {
+      if (isMissing(error))
+        return [];
+      throw error;
+    }
+    return commits.map((entry) => {
+      var _a, _b, _c, _d, _e;
+      return {
+        oid: entry.oid,
+        message: ((_a = entry.commit) == null ? void 0 : _a.message) || "",
+        author: ((_c = (_b = entry.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
+        date: new Date((((_e = (_d = entry.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
+        raw: entry.commit
+      };
+    });
+  }
+  /** Read the attached branch ref without scanning the worktree. */
+  async currentBranch() {
+    try {
+      return await currentBranch({ fs: this.ports.fs, dir: this.dir, fullname: false }) || null;
+    } catch (error) {
+      if (isMissing(error))
+        return null;
+      throw error;
+    }
+  }
+  async remoteHistory(branch2 = this.config.branch, limit = 25) {
+    let commits;
+    try {
+      commits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${branch2}`, depth: limit });
+    } catch (error) {
+      if (isMissing(error))
+        return [];
+      throw error;
+    }
+    return commits.map((entry) => {
+      var _a, _b, _c, _d, _e;
+      return {
+        oid: entry.oid,
+        message: ((_a = entry.commit) == null ? void 0 : _a.message) || "",
+        author: ((_c = (_b = entry.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || "Unknown",
+        date: new Date((((_e = (_d = entry.commit) == null ? void 0 : _d.author) == null ? void 0 : _e.timestamp) || 0) * 1e3),
+        raw: entry.commit
+      };
+    });
+  }
+  async commitFiles(oid) {
+    var _a;
+    const entry = await readCommit({ fs: this.ports.fs, dir: this.dir, oid });
+    const current = await this.readTree(entry.commit.tree);
+    const parent = ((_a = entry.commit.parent) == null ? void 0 : _a[0]) ? await this.readCommitTree(entry.commit.parent[0]) : /* @__PURE__ */ new Map();
+    const paths = /* @__PURE__ */ new Set([...current.keys(), ...parent.keys()]);
+    const files = [];
+    for (const path of [...paths].sort()) {
+      const before = parent.get(path);
+      const after = current.get(path);
+      if (before === void 0 && after !== void 0)
+        files.push({ path, change: "added" });
+      else if (before !== void 0 && after === void 0)
+        files.push({ path, change: "deleted" });
+      else if (before !== after)
+        files.push({ path, change: "modified" });
+    }
+    return files;
+  }
+  get fs() {
+    return this.ports.fs.promises || this.ports.fs;
+  }
+  get fileSystem() {
+    return this.ports.fs.promises || this.ports.fs;
+  }
+  repositoryPath(filepath) {
+    return this.dir === "." ? filepath : `${this.dir}/${filepath}`;
+  }
+  repositoryGitPath(filepath) {
+    return this.repositoryPath(`.git/${filepath}`);
+  }
+  async indexBytesOrNull() {
+    try {
+      return asBytes(await this.fileSystem.readFile(this.repositoryGitPath("index")));
+    } catch (error) {
+      if (isMissingPath(error))
+        return null;
+      throw error;
+    }
+  }
+  async backupIndex(value) {
+    const filename = `index.obsidian-git-backup-${Date.now()}`;
+    await this.fileSystem.writeFile(this.repositoryGitPath(filename), value);
+    return filename;
+  }
+  async removeIndex() {
+    try {
+      await this.fileSystem.unlink(this.repositoryGitPath("index"));
+    } catch (error) {
+      if (!isMissingPath(error))
+        throw error;
+    }
+  }
+  async readHeadTree() {
+    const oid = await resolveRef({ fs: this.ports.fs, dir: this.dir, ref: "HEAD" });
+    const commit2 = await readCommit({ fs: this.ports.fs, dir: this.dir, oid });
+    return this.readTree(commit2.commit.tree);
+  }
+  async assertCheckoutSafe(remoteOid) {
+    var _a;
+    const commit2 = await readCommit({ fs: this.ports.fs, dir: this.dir, oid: remoteOid });
+    const remoteFiles = await this.readTree(commit2.commit.tree);
+    const localFiles = await this.readWorktreeFiles(true);
+    const comparison = compareRepositoryPaths(localFiles, remoteFiles);
+    if (comparison.conflicts.length > 0) {
+      const paths = comparison.conflicts.slice(0, 3).join(", ");
+      throw new Error(`Clone stopped because existing vault files would be overwritten (${paths}${comparison.conflicts.length > 3 ? ", ..." : ""})`);
+    }
+    for (const path of remoteFiles.keys()) {
+      try {
+        const stat = await this.fileSystem.stat(this.repositoryPath(path));
+        if ((_a = stat.isDirectory) == null ? void 0 : _a.call(stat))
+          throw new Error(`Clone stopped because the existing vault folder "${path}" would be replaced by a file`);
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("Clone stopped"))
+          throw error;
+        if (!isMissingPath(error))
+          throw error;
+      }
+    }
+  }
+  async readWorktreeFiles(includeIgnored = false, trackedPaths = /* @__PURE__ */ new Set()) {
+    const result = /* @__PURE__ */ new Map();
+    const walk2 = async (relativeDir) => {
+      var _a, _b;
+      const lookupPath = relativeDir ? this.repositoryPath(relativeDir) : this.dir;
+      const entries = await this.fileSystem.readdir(lookupPath, { encoding: "utf8" });
+      for (const entry of entries) {
+        const path = relativeDir ? `${relativeDir}/${entry}` : entry;
+        if (protectedMaintenancePath(path))
+          continue;
+        const fullPath = this.repositoryPath(path);
+        let stat;
+        try {
+          stat = await this.fileSystem.stat(fullPath);
+        } catch (error) {
+          if (isMissingPath(error))
+            continue;
+          throw error;
+        }
+        if ((_a = stat.isDirectory) == null ? void 0 : _a.call(stat)) {
+          if (!includeIgnored && !await this.hasTrackedDescendant(path, trackedPaths) && await this.isIgnored(path))
+            continue;
+          await walk2(path);
+        } else if (((_b = stat.isFile) == null ? void 0 : _b.call(stat)) && (includeIgnored || trackedPaths.has(path) || !await this.isIgnored(path))) {
+          const value = await this.fileSystem.readFile(fullPath);
+          result.set(path, (await hashBlob({ object: value })).oid);
+        }
+      }
+    };
+    await walk2("");
+    return result;
+  }
+  hasTrackedDescendant(path, trackedPaths) {
+    const prefix = `${path}/`;
+    for (const trackedPath of trackedPaths)
+      if (trackedPath.startsWith(prefix))
+        return true;
+    return false;
+  }
+  async isIgnored(path) {
+    try {
+      return await isIgnored({ fs: this.ports.fs, dir: this.dir, filepath: path });
+    } catch (e) {
+      return false;
+    }
+  }
+  async resolveRefOrNullAt(dir, ref) {
+    try {
+      return await resolveRef({ fs: this.ports.fs, dir, ref });
+    } catch (e) {
+      return null;
+    }
+  }
+  async readCommitTreeAt(dir, oid) {
+    const commit2 = await readCommit({ fs: this.ports.fs, dir, oid });
+    return this.readTreeAt(dir, commit2.commit.tree);
+  }
+  async readTreeAt(dir, treeOid, prefix = "") {
+    const result = /* @__PURE__ */ new Map();
+    const tree = await readTree({ fs: this.ports.fs, dir, oid: treeOid });
+    for (const entry of tree.tree) {
+      const path = `${prefix}${entry.path}`;
+      if (entry.type === "tree") {
+        for (const [nested, nestedOid] of await this.readTreeAt(dir, entry.oid, `${path}/`))
+          result.set(nested, nestedOid);
+      } else
+        result.set(path, entry.oid);
+    }
+    return result;
+  }
+  async auth() {
+    var _a;
+    const credential = await ((_a = this.ports.credentials) == null ? void 0 : _a.getCredential());
+    if (!(credential == null ? void 0 : credential.password))
+      throw new Error("Authentication is required for this remote operation");
+    return credential;
+  }
+  async pathStatus(path) {
+    return status({ fs: this.ports.fs, dir: this.dir, filepath: path });
+  }
+  async resolveRefOrNull(ref) {
+    try {
+      return await resolveRef({ fs: this.ports.fs, dir: this.dir, ref });
+    } catch (e) {
+      return null;
+    }
+  }
+  async withRemoteComparison(status2) {
+    if (!status2.head || !this.config.remoteUrl)
+      return { ...status2, comparison: "local-only" };
+    const remote = await this.resolveRefOrNull(`refs/remotes/origin/${status2.branch}`);
+    if (!remote)
+      return { ...status2, comparison: "unavailable", comparisonError: "No local remote-tracking ref" };
+    if (remote === status2.head)
+      return { ...status2, comparison: "up-to-date" };
+    const localCommits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/heads/${status2.branch}` });
+    const remoteCommits = await log2({ fs: this.ports.fs, dir: this.dir, ref: `refs/remotes/origin/${status2.branch}` });
+    const localOids = new Set(localCommits.map((entry) => entry.oid));
+    const remoteOids = new Set(remoteCommits.map((entry) => entry.oid));
+    const ahead = localCommits.filter((entry) => !remoteOids.has(entry.oid)).length;
+    const behind = remoteCommits.filter((entry) => !localOids.has(entry.oid)).length;
+    const comparison = ahead && behind ? "diverged" : ahead ? "ahead" : "behind";
+    return { ...status2, comparison, ahead, behind };
+  }
+  async readCommitTree(oid) {
+    const commit2 = await readCommit({ fs: this.ports.fs, dir: this.dir, oid });
+    return this.readTree(commit2.commit.tree);
+  }
+  async findPullOverwritePaths(localOid, remoteOid) {
+    const [status2, localTree, remoteTree] = await Promise.all([
+      this.status(),
+      this.readCommitTree(localOid),
+      this.readCommitTree(remoteOid)
+    ]);
+    return status2.files.filter((file) => file.worktree || file.staged).map((file) => file.path).filter((path) => localTree.get(path) !== remoteTree.get(path));
+  }
+  async readTree(treeOid, prefix = "") {
+    const result = /* @__PURE__ */ new Map();
+    const tree = await readTree({ fs: this.ports.fs, dir: this.dir, oid: treeOid });
+    for (const entry of tree.tree) {
+      const path = `${prefix}${entry.path}`;
+      if (entry.type === "tree") {
+        for (const [nested, oid] of await this.readTree(entry.oid, `${path}/`))
+          result.set(nested, oid);
+      } else {
+        result.set(path, entry.oid);
+      }
+    }
+    return result;
+  }
+  emptyStatus(state, comparisonError, branch2 = null, head = null) {
+    return {
+      state,
+      branch: branch2,
+      head,
+      files: [],
+      staged: [],
+      changed: [],
+      comparison: state === "missing" || state === "empty" ? "local-only" : "unavailable",
+      ahead: 0,
+      behind: 0,
+      ...comparisonError ? { comparisonError } : {}
+    };
+  }
+  requireRemote() {
+    if (!this.config.remoteUrl)
+      throw new Error("A remote repository URL is not configured");
+  }
+  throwIfAborted() {
+    var _a;
+    if ((_a = this.operationSignal) == null ? void 0 : _a.aborted) {
+      const error = new Error("Git operation cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+  }
+  assertPath(path) {
+    if (!path || path.startsWith("/") || path.split("/").includes(".."))
+      throw new Error(`Invalid repository path: ${path}`);
+  }
+  reviewText(value) {
+    const bytes = asBytes(value);
+    if (bytes.byteLength > 512 * 1024)
+      return `[File is ${bytes.byteLength.toLocaleString()} bytes; review is limited to the first 512 KiB.]
+${new TextDecoder().decode(bytes.slice(0, 512 * 1024))}`;
+    if (bytes.includes(0))
+      return `[Binary file: ${bytes.byteLength.toLocaleString()} bytes]`;
+    return new TextDecoder().decode(bytes);
+  }
+};
+
+// src/backend/githubApi.ts
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error("GitHub returned invalid JSON");
+  }
+}
+function authHeaders(token) {
+  return {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    ...token ? { Authorization: `Bearer ${token}` } : {}
+  };
+}
+function parseGitHubRepositoryUrl(value) {
+  const normalized = value.trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
+  const https = normalized.match(/^https?:\/\/(?:www\.)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (https)
+    return { owner: https[1], repo: https[2] };
+  const ssh = normalized.match(/^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?$/i);
+  if (ssh)
+    return { owner: ssh[1], repo: ssh[2] };
+  return null;
+}
+var GitHubApi = class {
+  constructor(transport, token) {
+    this.transport = transport;
+    this.token = token;
+  }
+  async getAuthenticatedUser() {
+    const response = await jsonRequest(this.transport, {
+      url: "https://api.github.com/user",
+      headers: authHeaders(this.token)
+    });
+    const data = parseJson(response.text);
+    if (response.status !== 200)
+      throw new Error(data.message || `GitHub authentication check failed (${response.status})`);
+    return { login: String(data.login), id: Number(data.id) };
+  }
+  async getRepository(repoUrl) {
+    const parsed = parseGitHubRepositoryUrl(repoUrl);
+    if (!parsed)
+      throw new Error("The configured repository URL is not a GitHub repository");
+    const response = await jsonRequest(this.transport, {
+      url: `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`,
+      headers: authHeaders(this.token)
+    });
+    const data = parseJson(response.text);
+    if (response.status !== 200)
+      throw new Error(data.message || `GitHub repository check failed (${response.status})`);
+    return {
+      fullName: String(data.full_name),
+      private: Boolean(data.private),
+      defaultBranch: String(data.default_branch || "main")
+    };
+  }
+  async listCommits(repoUrl, branch2, limit = 25) {
+    const parsed = parseGitHubRepositoryUrl(repoUrl);
+    if (!parsed)
+      return [];
+    const response = await jsonRequest(this.transport, {
+      url: `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}/commits?sha=${encodeURIComponent(branch2)}&per_page=${Math.min(100, Math.max(1, limit))}`,
+      headers: authHeaders(this.token)
+    });
+    const data = parseJson(response.text);
+    if (response.status !== 200)
+      throw new Error(data.message || `GitHub commit history failed (${response.status})`);
+    return (Array.isArray(data) ? data : []).map((commit2) => {
+      var _a, _b, _c, _d, _e, _f;
+      return {
+        oid: String(commit2.sha),
+        message: String(((_a = commit2.commit) == null ? void 0 : _a.message) || ""),
+        author: String(((_c = (_b = commit2.commit) == null ? void 0 : _b.author) == null ? void 0 : _c.name) || ((_d = commit2.author) == null ? void 0 : _d.login) || "Unknown"),
+        date: String(((_f = (_e = commit2.commit) == null ? void 0 : _e.author) == null ? void 0 : _f.date) || "")
+      };
+    });
+  }
+  async getCommitFiles(repoUrl, oid) {
+    const parsed = parseGitHubRepositoryUrl(repoUrl);
+    if (!parsed)
+      return [];
+    const response = await jsonRequest(this.transport, {
+      url: `https://api.github.com/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}/commits/${encodeURIComponent(oid)}`,
+      headers: authHeaders(this.token)
+    });
+    const data = parseJson(response.text);
+    if (response.status !== 200)
+      throw new Error(data.message || `GitHub commit details failed (${response.status})`);
+    const statusMap = { added: "added", modified: "modified", removed: "deleted", renamed: "modified" };
+    return (Array.isArray(data.files) ? data.files : []).map((file) => ({
+      path: String(file.filename || file.previous_filename || ""),
+      change: statusMap[file.status] || "modified"
+    })).filter((file) => file.path);
+  }
+};
+
+// src/backend/githubAuth.ts
+var DEVICE_CODE_URL = "https://github.com/login/device/code";
+var ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token";
+function parseJson2(response) {
+  try {
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    throw new Error("GitHub returned invalid authentication data");
+  }
+}
+function requiredString(value, name) {
+  if (typeof value !== "string" || value.length === 0)
+    throw new Error(`GitHub authentication response omitted ${name}`);
+  return value;
+}
+var GitHubDeviceAuth = class {
+  constructor(options) {
+    this.options = options;
+    if (!options.clientId.trim())
+      throw new Error("A GitHub OAuth client ID is required");
+    this.wait = options.wait || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.now = options.now || (() => Date.now());
+  }
+  async requestDeviceCode() {
+    var _a, _b;
+    const response = await jsonRequest(this.options.transport, {
+      url: DEVICE_CODE_URL,
+      method: "POST",
+      body: JSON.stringify({
+        client_id: this.options.clientId,
+        scope: this.options.scope || "repo"
+      })
+    });
+    const data = parseJson2(response);
+    if (response.status < 200 || response.status >= 300 || data.error) {
+      throw new Error(data.error_description || data.error || `GitHub device authorization failed (${response.status})`);
+    }
+    const code = {
+      deviceCode: requiredString(data.device_code, "device code"),
+      userCode: requiredString(data.user_code, "user code"),
+      verificationUri: requiredString(data.verification_uri || data.verification_uri_complete, "verification URI"),
+      expiresIn: Number(data.expires_in) || 900,
+      interval: Math.max(1, Number(data.interval) || 5)
+    };
+    (_b = (_a = this.options).onUserCode) == null ? void 0 : _b.call(_a, code);
+    return code;
+  }
+  async authenticate() {
+    const code = await this.requestDeviceCode();
+    const deadline = this.now() + code.expiresIn * 1e3;
+    let interval = code.interval;
+    while (this.now() < deadline) {
+      await this.wait(interval * 1e3);
+      const response = await jsonRequest(this.options.transport, {
+        url: ACCESS_TOKEN_URL,
+        method: "POST",
+        body: JSON.stringify({
+          client_id: this.options.clientId,
+          device_code: code.deviceCode,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        })
+      });
+      const data = parseJson2(response);
+      if (data.access_token) {
+        return {
+          credential: {
+            username: "x-access-token",
+            password: requiredString(data.access_token, "access token"),
+            source: "github"
+          },
+          userCode: code.userCode,
+          verificationUri: code.verificationUri
+        };
+      }
+      if (data.error === "authorization_pending")
+        continue;
+      if (data.error === "slow_down") {
+        interval += 5;
+        continue;
+      }
+      throw new Error(data.error_description || data.error || `GitHub authentication failed (${response.status})`);
+    }
+    throw new Error("GitHub authentication timed out before approval");
+  }
+};
+var StaticCredentialProvider = class {
+  constructor(credential) {
+    this.credential = credential;
+  }
+  async getCredential() {
+    return this.credential;
+  }
+  setCredential(credential) {
+    this.credential = credential;
+  }
+};
+
+// src/backend/obsidianAdapter.ts
+function toCredential(credentials) {
+  return {
+    username: credentials.username || "x-access-token",
+    password: credentials.password,
+    source: credentials.source || (credentials.password ? "pat" : "none")
+  };
+}
+function toLegacyCommit(commit2) {
+  return {
+    oid: commit2.oid,
+    message: commit2.message,
+    author: commit2.author,
+    date: commit2.date,
+    commit: commit2.raw
+  };
+}
+function toFileStatus(status2) {
+  return status2.files.map((file) => ({
+    filepath: file.path,
+    status: file.change === "untracked" ? "untracked" : file.change
+  }));
+}
+var ObsidianGitBackend = class {
+  constructor(adapter, dir, credentials, branch2 = "main") {
+    const fs = new ObsidianFsAdapter(adapter, dir);
+    this.credentials = new StaticCredentialProvider(toCredential(credentials));
+    this.config = {
+      branch: branch2 || "main",
+      remoteUrl: credentials.repoUrl,
+      author: credentials.author
+    };
+    this.transport = {
+      async request(request) {
+        const body = request.body instanceof Uint8Array ? request.body.buffer.slice(request.body.byteOffset, request.body.byteOffset + request.body.byteLength) : request.body;
+        const requestPromise = (0, import_obsidian2.requestUrl)({
+          url: request.url,
+          method: request.method || "GET",
+          headers: request.headers,
+          body,
+          throw: false
+        });
+        const response = request.signal ? await Promise.race([
+          requestPromise,
+          new Promise((_, reject) => {
+            var _a, _b;
+            const abort = () => {
+              const error = new Error("Git operation cancelled");
+              error.name = "AbortError";
+              reject(error);
+            };
+            if ((_a = request.signal) == null ? void 0 : _a.aborted)
+              abort();
+            else
+              (_b = request.signal) == null ? void 0 : _b.addEventListener("abort", abort, { once: true });
+            requestPromise.finally(() => {
+              var _a2;
+              return (_a2 = request.signal) == null ? void 0 : _a2.removeEventListener("abort", abort);
+            }).catch(() => {
+            });
+          })
+        ]) : await requestPromise;
+        const bytes = new Uint8Array(response.arrayBuffer || new ArrayBuffer(0));
+        return {
+          status: response.status,
+          headers: response.headers || {},
+          body: bytes,
+          text: response.text || new TextDecoder().decode(bytes)
+        };
+      }
+    };
+    this.backend = new GitBackend({
+      fs,
+      transport: this.transport,
+      credentials: this.credentials,
+      diagnostics: {
+        info: (message, data) => log.info("GitStatus", message, data),
+        error: (message, error) => log.error("GitStatus", message, error)
+      }
+    }, dir, this.config);
+  }
+  updateCredentials(credentials) {
+    this.credentials.setCredential(toCredential(credentials));
+    this.configure({ remoteUrl: credentials.repoUrl, author: credentials.author });
+  }
+  hasRepository() {
+    return this.backend.hasRepository();
+  }
+  setOperationSignal(signal) {
+    this.backend.setOperationSignal(signal);
+  }
+  setProgressHandle(progress) {
+    this.backend.setProgressSink(progress ? {
+      message: (text) => progress.onMessage(text),
+      progress: (loaded, total) => progress.onTransfer({
+        bytesLoaded: loaded,
+        bytesTotal: total || loaded,
+        lengthComputable: total !== void 0
+      })
+    } : void 0);
+  }
+  async initializeRepo(repoUrl, branch2) {
+    this.configure({ remoteUrl: repoUrl || void 0, branch: branch2 });
+    if (await this.backend.hasRepository()) {
+      await this.backend.initialize();
+      return;
+    }
+    if (repoUrl) {
+      try {
+        await this.backend.clone();
+        return;
+      } catch (error) {
+        if (!/empty|no commit|unborn|could not find.*ref/i.test(String((error == null ? void 0 : error.message) || error)))
+          throw error;
+      }
+    }
+    await this.backend.initialize();
+  }
+  async sync(_repoUrl, branch2, message) {
+    this.configure({ branch: branch2, remoteUrl: _repoUrl || void 0 });
+    return this.backend.sync(message);
+  }
+  async pull(branch2 = this.config.branch) {
+    this.configure({ branch: branch2 });
+    await this.backend.pull();
+  }
+  async push(branch2 = this.config.branch, force = false) {
+    this.configure({ branch: branch2 });
+    await this.backend.push(force);
+  }
+  async getStatus() {
+    const status2 = await this.backend.compareRemote();
+    return {
+      branch: status2.branch || this.config.branch,
+      ahead: status2.ahead,
+      behind: status2.behind,
+      comparison: status2.comparison,
+      comparisonError: status2.comparisonError
+    };
+  }
+  async getSidebarStatusSnapshot() {
+    const status2 = await this.backend.status();
+    const staged = status2.staged;
+    const unstaged = status2.files.filter((file) => file.worktree && !file.staged).map((file) => file.path);
+    log.info("GitStatus", "Sidebar status snapshot built", {
+      repositoryState: status2.state,
+      branch: status2.branch || this.config.branch,
+      statusFiles: status2.files.length,
+      detailedFiles: status2.files.length,
+      stagedFiles: staged.length,
+      unstagedFiles: unstaged.length,
+      untrackedFiles: status2.files.filter((file) => file.change === "untracked").length,
+      comparison: status2.comparison,
+      ...status2.comparisonError ? { comparisonError: status2.comparisonError } : {}
+    });
+    return {
+      branch: status2.branch || this.config.branch,
+      ahead: status2.ahead,
+      behind: status2.behind,
+      comparison: status2.comparison,
+      comparisonError: status2.comparisonError,
+      repositoryStatusAvailable: status2.state !== "damaged",
+      detailedStatus: toFileStatus(status2),
+      staged,
+      unstaged
+    };
+  }
+  async getCurrentBranch() {
+    return await this.backend.currentBranch() || this.config.branch;
+  }
+  async getLog(limit = 25) {
+    return (await this.backend.history(limit)).map(toLegacyCommit);
+  }
+  async getRemoteLog(branch2 = this.config.branch, limit = 25) {
+    return (await this.backend.remoteHistory(branch2, limit)).map(toLegacyCommit);
+  }
+  async stageFile(path) {
+    await this.backend.stage(path);
+  }
+  async addAll(paths) {
+    const status2 = paths ? null : await this.backend.status();
+    const requested = paths ? [...paths] : (status2 == null ? void 0 : status2.changed) || [];
+    const result = await this.backend.stageAll(requested);
+    return { requested: result.requested.length, staged: result.succeeded, failed: result.failed.map((failure) => ({ filepath: failure.path, message: failure.message })) };
+  }
+  async unstageFile(path) {
+    await this.backend.unstage(path);
+  }
+  async unstageAll() {
+    const status2 = await this.backend.status();
+    const result = await this.backend.unstageAll(status2.staged);
+    return { requested: result.requested.length, unstaged: result.succeeded, failed: result.failed.map((failure) => ({ filepath: failure.path, message: failure.message })) };
+  }
+  discardFile(path) {
+    return this.backend.discard(path);
+  }
+  reviewFile(path) {
+    return this.backend.review(path);
+  }
+  async commit(message) {
+    return (await this.backend.commit(message)).oid;
+  }
+  async getCommitFiles(oid) {
+    return (await this.backend.commitFiles(oid)).map((file) => ({ filepath: file.path, status: file.change }));
+  }
+  async checkRepositoryHealth() {
+    const health = await this.backend.health();
+    return {
+      state: health.state === "missing" ? "missing" : health.state === "damaged" ? "damaged" : "healthy",
+      exists: health.state !== "missing",
+      healthy: health.state === "healthy" || health.state === "empty",
+      branch: health.branch,
+      hasCommits: Boolean(health.head),
+      reason: health.reason
+    };
+  }
+  previewIndexRepair() {
+    return this.backend.previewIndexRepair();
+  }
+  previewLatestIndexBackup() {
+    return this.backend.previewLatestIndexBackup();
+  }
+  previewRepositoryRebuild(repoUrl, branch2) {
+    return this.backend.previewRepositoryRebuild(repoUrl, branch2);
+  }
+  rebuildIndexFromHead() {
+    return this.backend.rebuildIndexFromHead();
+  }
+  restoreLatestIndexBackup() {
+    return this.backend.restoreLatestIndexBackup();
+  }
+  readGitignore() {
+    return this.backend.readGitignore();
+  }
+  writeGitignore(content) {
+    return this.backend.writeGitignore(content);
+  }
+  addIgnorePattern(pattern) {
+    return this.backend.addIgnorePattern(pattern);
+  }
+  async testRemote() {
+    await this.backend.testRemote();
+  }
+  authenticateWithGitHub(clientId, onUserCode) {
+    return new GitHubDeviceAuth({
+      clientId,
+      transport: this.transport,
+      onUserCode: (code) => onUserCode == null ? void 0 : onUserCode({ userCode: code.userCode, verificationUri: code.verificationUri })
+    }).authenticate();
+  }
+  async fetchRemoteCommits(repoUrl, branch2, limit = 25) {
+    const credential = await this.credentials.getCredential();
+    const api = new GitHubApi(this.backendTransport(), credential == null ? void 0 : credential.password);
+    return (await api.listCommits(repoUrl, branch2, limit)).map((commit2) => ({
+      oid: commit2.oid,
+      message: commit2.message,
+      author: commit2.author,
+      date: new Date(commit2.date),
+      commit: commit2
+    }));
+  }
+  async fetchRemoteCommitFiles(repoUrl, oid) {
+    const credential = await this.credentials.getCredential();
+    const api = new GitHubApi(this.backendTransport(), credential == null ? void 0 : credential.password);
+    return (await api.getCommitFiles(repoUrl, oid)).map((file) => ({ filepath: file.path, status: file.change }));
+  }
+  configure(config) {
+    Object.assign(this.config, config);
+    this.backend.configure(config);
+  }
+  backendTransport() {
+    return this.transport;
+  }
+};
 
 // src/fileLogger.ts
-var import_obsidian4 = require("obsidian");
-init_security();
+var import_obsidian3 = require("obsidian");
 var _FileLogger = class _FileLogger {
   constructor(app, pluginId, maxSizeBytes = 5 * 1024 * 1024) {
     this.buffer = [];
@@ -24230,6 +23050,7 @@ var _FileLogger = class _FileLogger {
     this.stopped = false;
     this.bytesWrittenSinceCheck = 0;
     this.sensitiveValues = [];
+    this.lastMemorySnapshot = null;
     this.app = app;
     this.pluginDir = `${app.vault.configDir}/plugins/${pluginId}`;
     this.logPath = `${this.pluginDir}/debug.log`;
@@ -24246,7 +23067,7 @@ var _FileLogger = class _FileLogger {
     } catch (e) {
     }
     this.writeDirect("info", "=== Obsidian Git Sync debug log started ===");
-    this.writeDirect("info", `Platform: ${import_obsidian4.Platform.isMobile ? "mobile" : "desktop"}`);
+    this.writeDirect("info", `Platform: ${import_obsidian3.Platform.isMobile ? "mobile" : "desktop"}`);
     this.writeDirect("info", `Obsidian version: ${((_a = window.app) == null ? void 0 : _a.version) || "unknown"}`);
     window.setTimeout(() => {
       this.truncateIfNeeded().catch(() => void 0);
@@ -24264,8 +23085,11 @@ var _FileLogger = class _FileLogger {
       window.clearInterval(this.memoryTimer);
       this.memoryTimer = null;
     }
-    if (!enabled || this.stopped || !this.initialized)
+    if (!enabled || this.stopped || !this.initialized) {
+      this.lastMemorySnapshot = null;
       return;
+    }
+    this.lastMemorySnapshot = null;
     this.logMemorySnapshot();
     this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 6e4);
   }
@@ -24364,14 +23188,16 @@ var _FileLogger = class _FileLogger {
   logMemorySnapshot() {
     const mem = performance.memory;
     const domNodes = typeof document === "undefined" ? 0 : document.getElementsByTagName("*").length;
+    let message;
     if (mem) {
-      this.log(
-        "metric",
-        `Memory \u2014 used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`
-      );
+      message = `Memory \u2014 used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`;
     } else {
-      this.log("metric", `Memory \u2014 N/A, DOM nodes: ${domNodes}`);
+      message = `Memory \u2014 N/A, DOM nodes: ${domNodes}`;
     }
+    if (message === this.lastMemorySnapshot)
+      return;
+    this.lastMemorySnapshot = message;
+    this.log("metric", message);
   }
   formatLine(level, ...args) {
     const message = args.map((value) => {
@@ -24469,16 +23295,24 @@ var FileLogger = _FileLogger;
 
 // src/views/GitSidebarView.ts
 var import_obsidian5 = require("obsidian");
-init_gitManager();
-init_logger();
 
 // src/sidebarReadModel.ts
 var SidebarReadModel = class {
   constructor() {
+    this.statusSnapshot = null;
     this.remoteCommits = null;
     this.localCommits = null;
     this.commitDetails = /* @__PURE__ */ new Map();
     this.logEntries = null;
+  }
+  getStatusSnapshot() {
+    return this.statusSnapshot;
+  }
+  setStatusSnapshot(snapshot) {
+    this.statusSnapshot = snapshot;
+  }
+  invalidateStatus() {
+    this.statusSnapshot = null;
   }
   getRemoteCommits(repoUrl, branch2) {
     var _a;
@@ -24522,8 +23356,421 @@ var SidebarReadModel = class {
   }
 };
 
+// src/ui/GitProgressModal.ts
+var import_obsidian4 = require("obsidian");
+var CLONE_PHASE_ORDER = [
+  "Remote communication",
+  "Fetching",
+  "Receiving objects",
+  "Resolving deltas",
+  "Checking out"
+];
+var PUSH_PHASE_ORDER = [
+  "Connecting to remote",
+  "Preparing upload",
+  "Uploading objects",
+  "Waiting for remote confirmation",
+  "Confirming branch"
+];
+var GitProgressModal = class extends import_obsidian4.Modal {
+  constructor(app, operationName) {
+    super(app);
+    this.phases = /* @__PURE__ */ new Map();
+    this.isComplete = false;
+    this.abortController = new AbortController();
+    this.bytesLoaded = 0;
+    this.bytesTotal = 0;
+    this.bytesPerSecond = 0;
+    this.lastTransferLoaded = 0;
+    this.lastTransferTime = 0;
+    this.objectsLoaded = 0;
+    this.objectsTotal = 0;
+    this.filesWritten = 0;
+    this.filesTotal = 0;
+    this.bytesWritten = 0;
+    this.elapsedTimer = null;
+    this.completedElapsedMs = null;
+    this.operationName = operationName;
+    this.phaseOrder = /push/i.test(operationName) ? PUSH_PHASE_ORDER : CLONE_PHASE_ORDER;
+    this.startTime = Date.now();
+    this.lastTransferTime = this.startTime;
+    for (const name of this.phaseOrder) {
+      this.phases.set(name, {
+        name,
+        status: "pending",
+        percent: 0,
+        loaded: 0,
+        total: 0
+      });
+    }
+  }
+  get signal() {
+    return this.abortController.signal;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("git-progress-modal");
+    this.container = contentEl.createDiv("git-progress-container");
+    this.headerEl = this.container.createDiv("git-progress-header");
+    const titleEl = this.headerEl.createDiv("git-progress-title");
+    titleEl.setText(this.operationName);
+    const statusEl = this.headerEl.createDiv("git-progress-status");
+    statusEl.setText("Initializing...");
+    this.statsEl = this.container.createDiv("git-progress-statistics");
+    this.phasesEl = this.container.createDiv("git-progress-phases");
+    this.footerEl = this.container.createDiv("git-progress-footer");
+    this.elapsedTimer = window.setInterval(() => this.render(), 1e3);
+    this.render();
+  }
+  onClose() {
+    if (!this.isComplete) {
+      this.abortController.abort();
+    }
+    if (this.elapsedTimer !== null) {
+      window.clearInterval(this.elapsedTimer);
+      this.elapsedTimer = null;
+    }
+    this.contentEl.empty();
+  }
+  updateProgress(event) {
+    const payload = (event == null ? void 0 : event.payload) || event || {};
+    const phase = String(payload.phase || "");
+    if (!phase)
+      return;
+    const phaseName = this.formatPhaseName(phase);
+    const loaded = Number(payload.loaded || 0);
+    const total = Number(payload.total || 0);
+    if (phaseName === "Checking out") {
+      this.updateCheckout({ loaded, total, bytesWritten: Number(payload.bytesWritten || 0) });
+    } else if (phaseName === "Receiving objects" || phaseName === "Resolving deltas") {
+      this.objectsLoaded = loaded;
+      this.objectsTotal = total;
+    }
+    this.activatePhase(phaseName, loaded, total);
+    this.render();
+  }
+  updateTransfer(event) {
+    if (this.isComplete)
+      return;
+    const loaded = Math.max(0, Number(event.bytesLoaded || 0));
+    const total = Math.max(0, Number(event.bytesTotal || 0));
+    const now = Date.now();
+    const elapsedSeconds = (now - this.lastTransferTime) / 1e3;
+    const deltaBytes = loaded - this.lastTransferLoaded;
+    if (event.bytesPerSecond && event.bytesPerSecond > 0) {
+      this.bytesPerSecond = event.bytesPerSecond;
+    } else if (elapsedSeconds >= 0.05 && deltaBytes >= 0) {
+      this.bytesPerSecond = deltaBytes / elapsedSeconds;
+    }
+    this.bytesLoaded = Math.max(this.bytesLoaded, loaded);
+    this.bytesTotal = Math.max(this.bytesTotal, total);
+    this.lastTransferLoaded = loaded;
+    this.lastTransferTime = now;
+    this.activatePhase(this.isPush() ? "Waiting for remote confirmation" : "Fetching", loaded, total);
+    this.render();
+  }
+  updateCheckout(event) {
+    this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
+    this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
+    this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
+    this.activatePhase(this.isPush() ? "Confirming branch" : "Checking out", this.filesWritten, this.filesTotal);
+    this.render();
+  }
+  updateMessage(text) {
+    var _a;
+    if (!text || this.isComplete)
+      return;
+    const message = text.trim();
+    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+    statusEl == null ? void 0 : statusEl.setText(message);
+    const phaseName = this.inferPhaseFromMessage(message);
+    if (phaseName) {
+      this.activatePhase(phaseName);
+      this.render();
+    }
+  }
+  complete(message = "Completed") {
+    var _a;
+    if (this.isComplete)
+      return;
+    this.isComplete = true;
+    this.completedElapsedMs = Date.now() - this.startTime;
+    this.stopElapsedTimer();
+    for (const phase of this.phases.values()) {
+      if (phase.status !== "error") {
+        phase.status = "completed";
+        phase.percent = 100;
+        phase.detail = this.statusLabel("completed");
+      }
+    }
+    this.render();
+    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+    if (statusEl) {
+      statusEl.setText(message);
+      statusEl.addClass("git-progress-status-success");
+    }
+  }
+  fail(error) {
+    var _a;
+    if (this.isComplete)
+      return;
+    this.isComplete = true;
+    this.completedElapsedMs = Date.now() - this.startTime;
+    this.stopElapsedTimer();
+    for (const phase of this.phases.values()) {
+      if (phase.status === "active") {
+        phase.status = "error";
+        phase.detail = this.statusLabel("error");
+      }
+    }
+    this.render();
+    const message = error instanceof Error ? error.message : String(error);
+    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
+    if (statusEl) {
+      statusEl.setText(`Failed: ${message}`);
+      statusEl.addClass("git-progress-status-error");
+    }
+  }
+  activatePhase(name, loaded = 0, total = 0) {
+    const phase = this.phases.get(name);
+    if (!phase)
+      return;
+    const index2 = this.phaseOrder.indexOf(name);
+    for (let i = 0; i < index2; i++) {
+      const previous = this.phases.get(this.phaseOrder[i]);
+      if (previous && previous.status !== "error") {
+        previous.status = "completed";
+        previous.percent = 100;
+      }
+    }
+    phase.status = "active";
+    phase.loaded = loaded;
+    phase.total = total;
+    phase.percent = total > 0 ? Math.min(100, Math.round(loaded / total * 100)) : 0;
+    phase.detail = this.phaseDetail(name, loaded, total);
+  }
+  render() {
+    if (!this.statsEl || !this.phasesEl)
+      return;
+    this.renderStatistics();
+    this.renderPhases();
+    this.updateFooter();
+  }
+  stopElapsedTimer() {
+    if (this.elapsedTimer !== null) {
+      window.clearInterval(this.elapsedTimer);
+      this.elapsedTimer = null;
+    }
+  }
+  renderStatistics() {
+    this.statsEl.empty();
+    const transferTitle = this.statsEl.createDiv("git-progress-section-title");
+    transferTitle.setText("Transfer statistics");
+    const transfer = this.statsEl.createDiv("git-progress-stat-card");
+    this.addStatRow(transfer, "Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
+    this.addStatRow(transfer, this.isPush() ? "Response data" : "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
+    this.addStatRow(transfer, "Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
+    this.addStatRow(transfer, "ETA", this.estimateRemaining());
+    const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
+    checkoutTitle.setText(this.isPush() ? "Remote confirmation" : "Checkout progress");
+    const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
+    this.addStatRow(checkout2, "Files", this.countPair(this.filesWritten, this.filesTotal));
+    this.addStatRow(
+      checkout2,
+      "Written",
+      this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : "\u2014"
+    );
+  }
+  renderPhases() {
+    this.phasesEl.empty();
+    const title = this.phasesEl.createDiv("git-progress-section-title");
+    title.setText(this.isPush() ? "Push phases" : "Clone phases");
+    const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
+    for (const phase of this.phases.values()) {
+      const phaseEl = phaseCard.createDiv("git-progress-phase");
+      phaseEl.addClass(`git-progress-phase-${phase.status}`);
+      const iconEl = phaseEl.createDiv("git-progress-phase-icon");
+      iconEl.setText(this.getStatusIcon(phase.status));
+      const infoEl = phaseEl.createDiv("git-progress-phase-info");
+      const nameEl = infoEl.createDiv("git-progress-phase-name");
+      nameEl.setText(phase.name);
+      const detailEl = infoEl.createDiv("git-progress-phase-detail");
+      detailEl.setText(phase.detail || this.statusLabel(phase.status));
+      if (phase.status === "active" && phase.total > 0) {
+        const barContainer = infoEl.createDiv("git-progress-bar-container");
+        const bar = barContainer.createDiv("git-progress-bar");
+        const fill = bar.createDiv("git-progress-bar-fill");
+        fill.style.width = `${phase.percent}%`;
+        const label = barContainer.createDiv("git-progress-bar-label");
+        label.setText(`${phase.percent}%`);
+      }
+    }
+  }
+  addStatRow(parent, label, value) {
+    const row = parent.createDiv("git-progress-stat-row");
+    const labelEl = row.createSpan("git-progress-stat-label");
+    labelEl.setText(label);
+    const valueEl = row.createSpan("git-progress-stat-value");
+    valueEl.setText(value);
+  }
+  updateFooter() {
+    var _a;
+    if (!this.footerEl)
+      return;
+    const elapsed = (((_a = this.completedElapsedMs) != null ? _a : Date.now() - this.startTime) / 1e3).toFixed(1);
+    const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
+    const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
+    this.footerEl.empty();
+    this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
+  }
+  countPair(loaded, total) {
+    if (loaded === 0 && total === 0)
+      return "\u2014";
+    return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"}`;
+  }
+  bytePair(loaded, total) {
+    if (loaded === 0 && total === 0)
+      return "\u2014";
+    return `${this.formatBytes(loaded)} / ${total > 0 ? this.formatBytes(total) : "?"}`;
+  }
+  estimateRemaining() {
+    if (this.bytesPerSecond <= 0 || this.bytesTotal <= 0 || this.bytesLoaded >= this.bytesTotal)
+      return "\u2014";
+    const seconds = Math.ceil((this.bytesTotal - this.bytesLoaded) / this.bytesPerSecond);
+    return `${seconds}s`;
+  }
+  phaseDetail(name, loaded, total) {
+    if (name === "Receiving objects" || name === "Resolving deltas") {
+      return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} objects`;
+    }
+    if (name === "Checking out") {
+      return `${loaded.toLocaleString()} / ${total > 0 ? total.toLocaleString() : "?"} files`;
+    }
+    if ((name === "Fetching" || name === "Uploading objects") && total > 0)
+      return `${this.formatBytes(loaded)} / ${this.formatBytes(total)}`;
+    if (name === "Waiting for remote confirmation" && total > 0)
+      return `${this.formatBytes(loaded)} / ${this.formatBytes(total)} response`;
+    return this.statusLabel("active");
+  }
+  statusLabel(status2) {
+    switch (status2) {
+      case "completed":
+        return "Completed";
+      case "active":
+        return "In progress";
+      case "error":
+        return "Failed";
+      default:
+        return "Pending";
+    }
+  }
+  inferPhaseFromMessage(message) {
+    const lower2 = message.toLowerCase();
+    if (this.isPush()) {
+      if (lower2.includes("confirm") || lower2.includes("remote result"))
+        return "Confirming branch";
+      if (lower2.includes("upload") || lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
+        return "Preparing upload";
+      if (lower2.includes("connect") || lower2.includes("remote"))
+        return "Connecting to remote";
+      return "Uploading objects";
+    }
+    if (lower2.includes("enumerating") || lower2.includes("counting") || lower2.includes("compressing"))
+      return "Fetching";
+    if (lower2.includes("receiving"))
+      return "Receiving objects";
+    if (lower2.includes("resolving deltas"))
+      return "Resolving deltas";
+    if (lower2.includes("checking out") || lower2.includes("writing files") || lower2.includes("updating workdir"))
+      return "Checking out";
+    if (lower2.includes("fetching") || lower2.includes("download") || lower2.includes("connecting"))
+      return "Fetching";
+    if (lower2.includes("remote") || lower2.includes("origin") || lower2.includes("preparing"))
+      return "Remote communication";
+    return null;
+  }
+  formatPhaseName(phase) {
+    if (this.isPush()) {
+      const pushMap = {
+        connecting: "Connecting to remote",
+        preparing: "Preparing upload",
+        enumeratingObjects: "Preparing upload",
+        countingObjects: "Preparing upload",
+        compressingObjects: "Preparing upload",
+        uploading: "Uploading objects",
+        receivingObjects: "Waiting for remote confirmation",
+        confirming: "Confirming branch"
+      };
+      return pushMap[phase] || (this.phaseOrder.includes(phase) ? phase : "Uploading objects");
+    }
+    const phaseMap = {
+      enumeratingObjects: "Fetching",
+      countingObjects: "Fetching",
+      compressingObjects: "Fetching",
+      receivingObjects: "Receiving objects",
+      "Receiving objects": "Receiving objects",
+      resolvingDeltas: "Resolving deltas",
+      "Resolving deltas": "Resolving deltas",
+      "Updating workdir": "Checking out",
+      checkingOut: "Checking out",
+      fetching: "Fetching"
+    };
+    return phaseMap[phase] || phase;
+  }
+  formatBytes(bytes) {
+    if (!bytes)
+      return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const index2 = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
+    return `${parseFloat((bytes / Math.pow(1024, index2)).toFixed(2))} ${units[index2]}`;
+  }
+  formatRate(bytesPerSecond) {
+    return `${this.formatBytes(bytesPerSecond)}/s`;
+  }
+  getStatusIcon(status2) {
+    switch (status2) {
+      case "completed":
+        return "\u2713";
+      case "active":
+        return "\u25D0";
+      case "error":
+        return "\u2717";
+      default:
+        return "\u25CB";
+    }
+  }
+  isPush() {
+    return this.phaseOrder === PUSH_PHASE_ORDER;
+  }
+};
+function createProgressModal(app, operationName) {
+  const modal = new GitProgressModal(app, operationName);
+  modal.open();
+  return {
+    onProgress: (event) => modal.updateProgress(event),
+    onMessage: (text) => modal.updateMessage(text),
+    onTransfer: (event) => modal.updateTransfer(event),
+    complete: (message) => modal.complete(message),
+    fail: (error) => modal.fail(error),
+    signal: modal.signal
+  };
+}
+
 // src/views/GitSidebarView.ts
 var VIEW_TYPE_GIT_SIDEBAR = "git-sidebar-view";
+var changeFilterStatuses = [
+  { status: "untracked", marker: "?", label: "Untracked" },
+  { status: "added", marker: "A", label: "Added" },
+  { status: "modified", marker: "M", label: "Modified" },
+  { status: "deleted", marker: "D", label: "Deleted" }
+];
+var uncommittedSortOptions = [
+  { value: "path-asc", label: "Path (A\u2013Z)" },
+  { value: "path-desc", label: "Path (Z\u2013A)" },
+  { value: "status", label: "Status, then path" },
+  { value: "folder", label: "Folder, then name" }
+];
 var sidebarReadModels = /* @__PURE__ */ new WeakMap();
 function getSidebarReadModel(plugin) {
   let model = sidebarReadModels.get(plugin);
@@ -24537,6 +23784,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   constructor(leaf, plugin) {
     super(leaf);
     this.refreshInterval = null;
+    this.remoteFetchInterval = null;
     this.stagedCount = 0;
     this.activeTab = "status";
     this.commitsViewMode = "local";
@@ -24545,12 +23793,28 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.isLocalOnly = false;
     this.hasRealRepo = false;
     this.sidebarSnapshot = null;
+    this.tabContainers = /* @__PURE__ */ new Map();
+    this.renderedTabs = /* @__PURE__ */ new Set();
     this.renderGeneration = 0;
     this.logUnsubscribe = null;
     this.logRenderScheduled = false;
     this.mutationInFlight = false;
+    this.repositoryStateKnown = false;
+    this.repositoryReadInFlight = null;
+    this.statusRevision = 0;
+    this.renderedStatusRevision = -1;
+    this.renderedHeaderKey = null;
+    this.renderedFooterKey = null;
+    this.uncommittedFilters = new Set(changeFilterStatuses.map(({ status: status2 }) => status2));
+    this.uncommittedSort = "path-asc";
+    this.selectedFilePaths = /* @__PURE__ */ new Set();
+    this.selectionAnchorBySection = /* @__PURE__ */ new Map();
+    this.commitInFlight = false;
+    this.ignorePatternInFlight = false;
     this.plugin = plugin;
     this.readModel = getSidebarReadModel(plugin);
+    this.sidebarSnapshot = this.readModel.getStatusSnapshot();
+    this.repositoryStateKnown = this.sidebarSnapshot !== null;
   }
   getViewType() {
     return VIEW_TYPE_GIT_SIDEBAR;
@@ -24564,6 +23828,11 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   async onOpen() {
     const container = this.containerEl.children[1];
     container.empty();
+    this.tabContainers.clear();
+    this.renderedTabs.clear();
+    this.renderedStatusRevision = -1;
+    this.renderedHeaderKey = null;
+    this.renderedFooterKey = null;
     container.addClass("git-sidebar-container");
     container.addClass("git-sidebar-density-compact");
     container.setAttr("role", "region");
@@ -24589,7 +23858,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("tabindex", "0");
     this.contentContainer.setAttr("aria-label", "Git Sync content");
     this.renderLoadingState();
-    this.logUnsubscribe = log2.subscribe(() => {
+    this.logUnsubscribe = log.subscribe(() => {
       this.readModel.invalidateLogs();
       if (this.activeTab !== "log" || this.logRenderScheduled)
         return;
@@ -24597,22 +23866,35 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       window.setTimeout(() => {
         this.logRenderScheduled = false;
         if (this.activeTab === "log" && this.containerEl.isConnected) {
-          void this.refresh({ readRepository: false });
+          void this.refresh({ readRepository: false }).catch((error) => {
+            log.debug("GitSidebar", "Log refresh failed", error);
+          });
         }
       }, 0);
     });
-    this.registerEvent(this.app.vault.on("delete", () => {
-      if (this.containerEl.isConnected)
-        void this.refresh({ force: true });
-    }));
+    const refreshAfterVaultChange = () => {
+      if (this.containerEl.isConnected) {
+        void this.refresh({ force: true }).catch((error) => {
+          log.debug("GitSidebar", "Vault-change refresh failed", error);
+        });
+      }
+    };
+    this.registerEvent(this.app.vault.on("create", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("modify", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("delete", refreshAfterVaultChange));
+    this.registerEvent(this.app.vault.on("rename", refreshAfterVaultChange));
     const footer = container.createDiv("git-sidebar-footer");
     this.renderFooter(footer);
-    await this.refresh();
+    void this.refresh().catch((error) => {
+      log.warn("GitSidebar", "Initial sidebar refresh failed", error);
+    });
     this.startAutoRefresh();
+    this.startRemoteFetchSchedule();
   }
   async onClose() {
     var _a;
     this.stopAutoRefresh();
+    this.stopRemoteFetchSchedule();
     (_a = this.logUnsubscribe) == null ? void 0 : _a.call(this);
     this.logUnsubscribe = null;
     this.renderGeneration += 1;
@@ -24623,8 +23905,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const ms = this.plugin.settings.refreshInterval * 1e3;
     if (ms > 0) {
       this.refreshInterval = window.setInterval(() => {
-        if (this.containerEl.isShown()) {
-          this.refresh();
+        if (this.containerEl.isShown() && !this.repositoryReadInFlight) {
+          void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+            log.debug("GitSidebar", "Automatic sidebar refresh failed", error);
+          });
         }
       }, ms);
     }
@@ -24639,8 +23923,50 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.plugin.settings.refreshInterval = seconds;
     this.startAutoRefresh();
   }
+  startRemoteFetchSchedule() {
+    this.stopRemoteFetchSchedule();
+    const ms = this.plugin.settings.remoteFetchInterval * 60 * 1e3;
+    if (ms > 0) {
+      this.remoteFetchInterval = window.setInterval(() => {
+        if (!this.containerEl.isShown() || !this.hasRemote || this.activeTab !== "commits" || this.commitsViewMode !== "remote")
+          return;
+        this.invalidateRemoteCommitsCache();
+        void this.refresh({ readRepository: false, force: true }).catch((error) => {
+          log.debug("GitSidebar", "Scheduled remote commit fetch failed", error);
+        });
+      }, ms);
+    }
+  }
+  stopRemoteFetchSchedule() {
+    if (this.remoteFetchInterval !== null) {
+      window.clearInterval(this.remoteFetchInterval);
+      this.remoteFetchInterval = null;
+    }
+  }
+  updateRemoteFetchInterval(minutes) {
+    this.plugin.settings.remoteFetchInterval = minutes;
+    this.startRemoteFetchSchedule();
+  }
   invalidateRemoteCommitsCache() {
     this.readModel.invalidateHistory();
+    this.invalidateTab("commits");
+  }
+  tabContainer(tab) {
+    let pane = this.tabContainers.get(tab);
+    if (!pane) {
+      pane = this.contentContainer.createDiv("git-sidebar-tab-pane");
+      pane.setAttr("data-tab", tab);
+      this.tabContainers.set(tab, pane);
+    }
+    for (const [otherTab, otherPane] of this.tabContainers) {
+      otherPane.toggleAttribute("hidden", otherTab !== tab);
+    }
+    return pane;
+  }
+  invalidateTab(tab) {
+    var _a;
+    this.renderedTabs.delete(tab);
+    (_a = this.tabContainers.get(tab)) == null ? void 0 : _a.empty();
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
@@ -24658,7 +23984,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const unstaged = this.sidebarSnapshot.unstaged.filter((path) => path !== filepath);
     if (destination === "staged")
       staged.push(filepath);
-    else
+    else if (destination === "unstaged")
       unstaged.push(filepath);
     this.sidebarSnapshot = {
       ...this.sidebarSnapshot,
@@ -24669,8 +23995,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   repaintStatusSnapshot() {
     if (this.activeTab !== "status")
       return;
-    this.contentContainer.empty();
-    this.renderStatusTab(this.sidebarSnapshot);
+    const pane = this.tabContainer("status");
+    pane.empty();
+    this.renderStatusTab(this.sidebarSnapshot, pane);
+    this.renderedTabs.add("status");
+    this.renderedStatusRevision = this.statusRevision;
+    this.renderedFooterKey = null;
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
     if (footerEl)
       this.renderFooter(footerEl);
@@ -24683,6 +24013,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     button.setAttr("aria-busy", "true");
     try {
       await this.refresh({ force: true });
+    } catch (error) {
+      new import_obsidian5.Notice("Refresh failed: " + ((error == null ? void 0 : error.message) || String(error)));
     } finally {
       if (button.isConnected) {
         button.disabled = false;
@@ -24699,7 +24031,6 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     (0, import_obsidian5.setIcon)(icon, "git-branch");
     row.createSpan({ text: "Loading repository\u2026", cls: "git-branch-name git-branch-uninit" });
     this.contentContainer.empty();
-    this.contentContainer.createEl("p", { text: "Loading Git status\u2026", cls: "git-empty-state" });
   }
   // ─── Tabs ───
   renderTabs() {
@@ -24720,10 +24051,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           "data-tab": tab.id
         }
       });
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         this.activeTab = tab.id;
         this.renderTabs();
-        await this.refresh({ readRepository: false });
+        void this.refresh({ readRepository: false }).catch((error) => {
+          log.debug("GitSidebar", "Tab refresh failed", error);
+        });
       });
     }
   }
@@ -24760,7 +24093,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         await this.refreshFromButton(headerAction);
       });
     }
-    const statusRow = this.headerContainer.createDiv("git-header-status");
+    const statusRow = branchRow.createDiv("git-header-status");
     const statusIcon = statusRow.createSpan({ cls: "git-header-status-icon", attr: { "aria-hidden": "true" } });
     if (!initialized) {
       (0, import_obsidian5.setIcon)(statusIcon, "circle-alert");
@@ -24801,6 +24134,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const commitBtn = new import_obsidian5.ButtonComponent(btnRow).setButtonText(`Commit (${this.stagedCount})`).setIcon("git-commit").setTooltip(this.stagedCount > 0 ? "Commit staged changes" : "No staged files to commit").setClass("git-btn-primary").setDisabled(this.stagedCount === 0);
     commitBtn.onClick(() => this.openCommitModal());
     new import_obsidian5.ButtonComponent(btnRow).setButtonText("Pull").setIcon("download").setTooltip(this.hasRemote ? "Pull from remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+      let progress = null;
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian5.Notice("Git not initialized");
@@ -24810,18 +24144,27 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           new import_obsidian5.Notice("No remote configured");
           return;
         }
+        progress = createProgressModal(this.app, "Pulling from remote");
         await this.plugin.runGitMutation("Pull from remote", async (manager) => {
           await this.plugin.refreshGitCredentials();
-          await manager.pull(this.plugin.settings.branchName);
+          manager.setProgressHandle(progress);
+          try {
+            await manager.pull(this.plugin.settings.branchName);
+            progress.complete("Pull complete");
+          } finally {
+            manager.setProgressHandle(void 0);
+          }
         });
         new import_obsidian5.Notice("Pulled from remote");
         this.invalidateRemoteCommitsCache();
         await this.refresh();
       } catch (e) {
+        progress == null ? void 0 : progress.fail(e);
         new import_obsidian5.Notice("Pull failed: " + e.message);
       }
     });
     new import_obsidian5.ButtonComponent(btnRow).setButtonText("Push").setIcon("upload").setTooltip(this.hasRemote ? "Push to remote" : "No remote configured \u2014 set repo URL in settings").setClass("git-btn-secondary").setDisabled(!this.hasRemote).onClick(async () => {
+      let progress = null;
       try {
         if (!this.plugin.gitManager) {
           new import_obsidian5.Notice("Git not initialized");
@@ -24831,14 +24174,22 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           new import_obsidian5.Notice("No remote configured");
           return;
         }
+        progress = createProgressModal(this.app, "Pushing to remote");
         await this.plugin.runGitMutation("Push to remote", async (manager) => {
           await this.plugin.refreshGitCredentials();
-          await manager.push(this.plugin.settings.branchName);
+          manager.setProgressHandle(progress);
+          try {
+            await manager.push(this.plugin.settings.branchName);
+            progress.complete("Push complete");
+          } finally {
+            manager.setProgressHandle(void 0);
+          }
         });
         new import_obsidian5.Notice("Pushed to remote");
         this.invalidateRemoteCommitsCache();
         await this.refresh();
       } catch (e) {
+        progress == null ? void 0 : progress.fail(e);
         new import_obsidian5.Notice("Push failed: " + e.message);
       }
     });
@@ -24862,8 +24213,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     new import_obsidian5.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => modal.close());
     const commitButton = new import_obsidian5.ButtonComponent(actions).setButtonText("Commit").setClass("git-btn-primary");
     const commit2 = async () => {
-      if (!this.plugin.gitManager)
+      if (!this.plugin.gitManager || this.commitInFlight)
         return;
+      this.commitInFlight = true;
       commitButton.setDisabled(true).setButtonText("Committing\u2026");
       try {
         await this.plugin.runGitMutation("Commit changes", async (manager) => {
@@ -24876,12 +24228,16 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       } catch (e) {
         commitButton.setDisabled(false).setButtonText("Commit");
         new import_obsidian5.Notice("Commit failed: " + e.message);
+      } finally {
+        this.commitInFlight = false;
       }
     };
     commitButton.onClick(commit2);
     input.inputEl.addEventListener("keydown", (event) => {
-      if (event.key === "Enter")
+      if (event.key === "Enter") {
+        event.preventDefault();
         void commit2();
+      }
     });
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
@@ -24929,35 +24285,96 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   async refresh(options = {}) {
     const generation = ++this.renderGeneration;
     const readRepository = options.readRepository !== false;
-    if (readRepository && options.force)
-      this.sidebarSnapshot = null;
-    if (!this.plugin.gitManager) {
-      await this.plugin.ensureGitManager();
+    if (options.force && this.activeTab === "commits" && this.commitsViewMode === "remote") {
+      this.invalidateRemoteCommitsCache();
     }
-    if (!this.isCurrentRender(generation))
-      return;
-    let hasReal = this.hasRealRepo;
     if (readRepository) {
-      try {
-        hasReal = await this.plugin.detectRealGitRepo();
-      } catch (e) {
-        log2.warn("GitSidebar", "detectRealGitRepo failed", e);
-      }
-      this.hasRealRepo = hasReal;
-      if (!hasReal)
-        this.sidebarSnapshot = null;
-      if (hasReal && this.plugin.gitManager) {
-        try {
-          this.sidebarSnapshot = await this.plugin.gitManager.getSidebarStatusSnapshot();
-        } catch (e) {
-          log2.warn("GitSidebar", "Failed to read repository snapshot", e);
-          if (options.force)
-            this.sidebarSnapshot = null;
-        }
-      }
+      await this.renderCurrentState(generation, false);
+      await this.refreshRepositoryStatus(options.skipIfRepositoryReadInFlight === true);
+      if (!this.isCurrentRender(generation))
+        return;
+    } else {
+      if (!this.plugin.gitManager)
+        await this.plugin.ensureGitManager();
+      if (!this.isCurrentRender(generation))
+        return;
     }
+    await this.renderCurrentState(generation, readRepository);
+  }
+  async refreshRepositoryStatus(skipIfInFlight) {
+    if (this.repositoryReadInFlight) {
+      if (skipIfInFlight)
+        return;
+      await this.repositoryReadInFlight;
+      return;
+    }
+    const read = this.readRepositoryStatus();
+    this.repositoryReadInFlight = read;
+    try {
+      await read;
+    } finally {
+      if (this.repositoryReadInFlight === read)
+        this.repositoryReadInFlight = null;
+    }
+  }
+  async readRepositoryStatus() {
+    const manager = await this.plugin.ensureGitManager();
+    if (!manager) {
+      const changed = !this.repositoryStateKnown || this.hasRealRepo || this.sidebarSnapshot !== null;
+      this.repositoryStateKnown = true;
+      this.hasRealRepo = false;
+      this.sidebarSnapshot = null;
+      this.readModel.invalidateStatus();
+      if (changed)
+        this.statusRevision += 1;
+      return;
+    }
+    let hasReal = this.hasRealRepo;
+    try {
+      hasReal = await manager.hasRepository();
+      this.repositoryStateKnown = true;
+    } catch (error) {
+      log.warn("GitSidebar", "repository check failed", error);
+      return;
+    }
+    this.hasRealRepo = hasReal;
+    if (!hasReal) {
+      const changed = this.sidebarSnapshot !== null;
+      this.sidebarSnapshot = null;
+      this.readModel.invalidateStatus();
+      if (changed)
+        this.statusRevision += 1;
+      return;
+    }
+    try {
+      const snapshot = await manager.getSidebarStatusSnapshot();
+      const changed = !this.statusSnapshotsEqual(this.sidebarSnapshot, snapshot);
+      this.sidebarSnapshot = snapshot;
+      this.readModel.setStatusSnapshot(snapshot);
+      if (changed)
+        this.statusRevision += 1;
+      log.info("GitStatus", "Sidebar status snapshot applied", {
+        activeTab: this.activeTab,
+        changed,
+        repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+        detailedFiles: snapshot.detailedStatus.length,
+        stagedFiles: snapshot.staged.length,
+        unstagedFiles: snapshot.unstaged.length,
+        untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === "untracked").length
+      });
+    } catch (error) {
+      log.warn("GitSidebar", "Failed to read repository snapshot", error);
+    }
+  }
+  async renderCurrentState(generation, readRepository) {
     if (!this.isCurrentRender(generation))
       return;
+    if (!this.repositoryStateKnown && !this.sidebarSnapshot) {
+      this.renderLoadingState();
+      return;
+    }
+    const activeTab = this.activeTab;
+    const hasReal = this.hasRealRepo || this.sidebarSnapshot !== null;
     const initialized = hasReal;
     this.hasRemote = !!this.plugin.settings.repoUrl;
     this.isLocalOnly = !this.hasRemote;
@@ -24970,33 +24387,102 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const behind = (snapshot == null ? void 0 : snapshot.behind) || 0;
     const repositoryStatusAvailable = (snapshot == null ? void 0 : snapshot.repositoryStatusAvailable) !== false;
     const comparison = (snapshot == null ? void 0 : snapshot.comparison) || (repositoryStatusAvailable ? "up-to-date" : "unavailable");
-    this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+    const headerKey = JSON.stringify({
+      tab: activeTab,
+      branch: branch2,
+      ahead,
+      behind,
+      initialized,
+      hasReal,
+      repositoryStatusAvailable,
+      comparison,
+      localOnly: this.isLocalOnly
+    });
+    if (this.renderedHeaderKey !== headerKey) {
+      this.renderHeader(branch2, ahead, behind, initialized, hasReal, repositoryStatusAvailable, comparison);
+      this.renderedHeaderKey = headerKey;
+    }
+    if (readRepository && initialized && this.hasRemote && this.plugin.gitManager && snapshot) {
+      void this.updateRemoteComparison(generation);
+    }
     this.stagedCount = (snapshot == null ? void 0 : snapshot.staged.length) || 0;
-    this.contentContainer.empty();
-    const remoteHistoryOnly = this.activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
+    const remoteHistoryOnly = activeTab === "commits" && this.commitsViewMode === "remote" && this.hasRemote;
     if (!initialized && !remoteHistoryOnly) {
-      await this.renderUninitializedContent(hasReal);
+      const pane = this.tabContainer(activeTab);
+      pane.empty();
+      await this.renderUninitializedContent(hasReal, pane);
+      if (!this.isCurrentRender(generation))
+        return;
+      this.renderedTabs.add(activeTab);
     } else {
-      switch (this.activeTab) {
-        case "status":
-          this.renderStatusTab(snapshot);
-          break;
-        case "commits":
-          await this.renderCommitsTab(generation);
-          break;
-        case "log":
-          await this.renderLogTab(generation);
-          break;
+      const shouldRender = !this.renderedTabs.has(activeTab) || activeTab === "status" && this.renderedStatusRevision !== this.statusRevision || activeTab === "log" && !this.readModel.getLogEntries();
+      const pane = this.tabContainer(activeTab);
+      if (shouldRender) {
+        pane.empty();
+        switch (activeTab) {
+          case "status":
+            this.renderStatusTab(snapshot, pane);
+            this.renderedStatusRevision = this.statusRevision;
+            break;
+          case "commits":
+            await this.renderCommitsTab(generation, pane);
+            break;
+          case "log":
+            await this.renderLogTabInto(generation, pane);
+            break;
+        }
+        if (!this.isCurrentRender(generation))
+          return;
+        this.renderedTabs.add(activeTab);
       }
     }
     if (!this.isCurrentRender(generation))
       return;
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
-    if (footerEl)
+    const footerKey = `${activeTab}|${this.stagedCount}|${this.hasRemote}|${!!this.plugin.gitManager}`;
+    if (footerEl && this.renderedFooterKey !== footerKey) {
       this.renderFooter(footerEl);
+      this.renderedFooterKey = footerKey;
+    }
   }
-  async renderUninitializedContent(hasReal) {
-    const wrapper = this.contentContainer.createDiv("git-uninit-container");
+  statusSnapshotsEqual(left, right) {
+    if (!left)
+      return false;
+    if (left.branch !== right.branch || left.ahead !== right.ahead || left.behind !== right.behind || left.comparison !== right.comparison || left.repositoryStatusAvailable !== right.repositoryStatusAvailable || left.staged.length !== right.staged.length || left.unstaged.length !== right.unstaged.length || left.detailedStatus.length !== right.detailedStatus.length)
+      return false;
+    return left.staged.every((path, index2) => path === right.staged[index2]) && left.unstaged.every((path, index2) => path === right.unstaged[index2]) && left.detailedStatus.every((file, index2) => {
+      const next = right.detailedStatus[index2];
+      return file.filepath === next.filepath && file.status === next.status;
+    });
+  }
+  async updateRemoteComparison(generation) {
+    const manager = this.plugin.gitManager;
+    if (!manager)
+      return;
+    try {
+      const comparison = await manager.getStatus();
+      if (!this.isCurrentRender(generation) || !this.sidebarSnapshot)
+        return;
+      this.sidebarSnapshot = {
+        ...this.sidebarSnapshot,
+        ...comparison,
+        repositoryStatusAvailable: true
+      };
+      this.renderHeader(
+        this.sidebarSnapshot.branch,
+        this.sidebarSnapshot.ahead,
+        this.sidebarSnapshot.behind,
+        true,
+        true,
+        true,
+        this.sidebarSnapshot.comparison
+      );
+    } catch (error) {
+      log.debug("GitSidebar", "Remote comparison unavailable after local refresh", error);
+    }
+  }
+  async renderUninitializedContent(hasReal, target = this.contentContainer) {
+    const wrapper = target.createDiv("git-uninit-container");
     if (!hasReal) {
       wrapper.createEl("p", {
         text: "No git repository found in this vault.",
@@ -25060,9 +24546,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     }
   }
   // ─── Tab renders ───
-  renderStatusTab(snapshot) {
+  renderStatusTab(snapshot, target = this.contentContainer) {
     var _a;
-    const container = this.contentContainer.createDiv("git-status-container");
+    const container = target.createDiv("git-status-container");
     try {
       if (!snapshot) {
         container.createEl("p", { text: "Unable to read repository status", cls: "git-empty-state" });
@@ -25072,6 +24558,15 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       const statusByPath = new Map(
         detailedStatus.map((file) => [file.filepath, file.status])
       );
+      const visiblePaths = /* @__PURE__ */ new Set([...staged, ...unstaged]);
+      for (const filepath of this.selectedFilePaths) {
+        if (!visiblePaths.has(filepath))
+          this.selectedFilePaths.delete(filepath);
+      }
+      for (const [sectionClass, filepath] of this.selectionAnchorBySection) {
+        if (!visiblePaths.has(filepath))
+          this.selectionAnchorBySection.delete(sectionClass);
+      }
       this.stagedCount = staged.length;
       this.renderCollapsibleSection(
         container,
@@ -25094,14 +24589,36 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             this.applyFileMutationToSnapshot(filepath, "unstaged");
           }
           new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} files.` : "All files unstaged");
+        },
+        async (paths) => {
+          const result = await this.plugin.runGitMutation("Unstage selected files", async (manager) => {
+            const unstaged2 = [];
+            const failed = [];
+            for (const filepath of paths) {
+              try {
+                await manager.unstageFile(filepath);
+                unstaged2.push(filepath);
+              } catch (error) {
+                failed.push({ filepath, message: (error == null ? void 0 : error.message) || String(error) });
+              }
+            }
+            return { requested: paths.length, unstaged: unstaged2, failed };
+          });
+          for (const filepath of result.unstaged) {
+            this.selectedFilePaths.delete(filepath);
+            this.applyFileMutationToSnapshot(filepath, "unstaged");
+          }
+          new import_obsidian5.Notice(result.failed.length > 0 ? `Unstaged ${result.unstaged.length} of ${result.requested} selected files.` : `Unstaged ${result.unstaged.length} selected file${result.unstaged.length === 1 ? "" : "s"}.`);
         }
       );
+      const visibleUnstaged = this.filteredAndSortedUnstagedFiles(unstaged, statusByPath);
+      const bulkLabel = visibleUnstaged.length === unstaged.length ? "Stage all" : "Stage visible";
       this.renderCollapsibleSection(
         container,
         "Uncommitted Changes",
-        unstaged,
+        visibleUnstaged,
         "unstaged",
-        "Stage all",
+        bulkLabel,
         statusByPath,
         async (fp) => {
           await this.plugin.runGitMutation("Stage file", async (manager) => {
@@ -25111,7 +24628,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         },
         async () => {
           const result = await this.plugin.runGitMutation("Stage all files", async (manager) => {
-            return manager.addAll(unstaged);
+            return manager.addAll(visibleUnstaged);
           });
           if (result.failed.length > 0) {
             const firstFailure = result.failed[0];
@@ -25124,10 +24641,19 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           for (const filepath of result.staged) {
             this.applyFileMutationToSnapshot(filepath, "staged");
           }
-        }
+        },
+        async (paths) => {
+          const result = await this.plugin.runGitMutation("Stage selected files", async (manager) => manager.addAll(paths));
+          for (const filepath of result.staged) {
+            this.selectedFilePaths.delete(filepath);
+            this.applyFileMutationToSnapshot(filepath, "staged");
+          }
+          new import_obsidian5.Notice(result.failed.length > 0 ? `Staged ${result.staged.length} of ${result.requested} selected files.` : `Staged ${result.staged.length} selected file${result.staged.length === 1 ? "" : "s"}.`);
+        },
+        { totalFiles: unstaged.length, showChangeControls: true }
       );
     } catch (e) {
-      log2.warn("GitSidebar", "Failed to get file status", e);
+      log.warn("GitSidebar", "Failed to get file status", e);
       container.empty();
       if (e.isPackIndexError || ((_a = e.message) == null ? void 0 : _a.includes("Pack index"))) {
         const errContainer = container.createDiv("git-uninit-container");
@@ -25147,7 +24673,39 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     }
   }
-  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk) {
+  filteredAndSortedUnstagedFiles(files, statusByPath) {
+    const statusFor = (path) => {
+      const status2 = statusByPath.get(path);
+      return status2 === "untracked" || status2 === "added" || status2 === "deleted" ? status2 : "modified";
+    };
+    const splitPath = (path) => {
+      const slash = path.lastIndexOf("/");
+      return slash === -1 ? ["", path] : [path.slice(0, slash), path.slice(slash + 1)];
+    };
+    const statusOrder = {
+      untracked: 0,
+      added: 1,
+      modified: 2,
+      deleted: 3
+    };
+    return files.filter((path) => this.uncommittedFilters.has(statusFor(path))).sort((left, right) => {
+      if (this.uncommittedSort === "path-desc")
+        return right.localeCompare(left);
+      if (this.uncommittedSort === "status") {
+        const difference = statusOrder[statusFor(left)] - statusOrder[statusFor(right)];
+        return difference || left.localeCompare(right);
+      }
+      if (this.uncommittedSort === "folder") {
+        const [leftFolder, leftName] = splitPath(left);
+        const [rightFolder, rightName] = splitPath(right);
+        return leftFolder.localeCompare(rightFolder) || leftName.localeCompare(rightName);
+      }
+      return left.localeCompare(right);
+    });
+  }
+  renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk, onSelected, options = {}) {
+    var _a, _b;
+    const totalFiles = (_a = options.totalFiles) != null ? _a : files.length;
     const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
     const isCollapsed = files.length === 0;
     section.setAttr("data-collapsed", String(isCollapsed));
@@ -25160,14 +24718,65 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     toggle.setAttr("aria-expanded", String(!isCollapsed));
     header.createSpan({ text: title, cls: "git-status-section-label" });
     const countBadge = header.createSpan({
-      text: String(files.length),
+      text: files.length === totalFiles ? String(totalFiles) : `${files.length}/${totalFiles}`,
       cls: "git-status-section-count"
     });
+    const headerControls = [];
+    if (options.showChangeControls) {
+      const filterBtn = header.createEl("button", {
+        cls: "git-status-section-control",
+        attr: { type: "button", "aria-label": "Filter uncommitted changes" }
+      });
+      (0, import_obsidian5.setIcon)(filterBtn, "filter");
+      filterBtn.setAttr("title", `Filter statuses (${this.uncommittedFilters.size} of ${changeFilterStatuses.length} shown)`);
+      filterBtn.classList.toggle("is-active", this.uncommittedFilters.size !== changeFilterStatuses.length);
+      filterBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = new import_obsidian5.Menu();
+        menu.addItem((item) => item.setTitle("All status types").setChecked(this.uncommittedFilters.size === changeFilterStatuses.length).onClick(() => {
+          this.uncommittedFilters.clear();
+          for (const { status: status2 } of changeFilterStatuses)
+            this.uncommittedFilters.add(status2);
+          this.repaintStatusSnapshot();
+        }));
+        menu.addSeparator();
+        for (const { status: status2, marker, label } of changeFilterStatuses) {
+          menu.addItem((item) => item.setTitle(`${marker} ${label}`).setChecked(this.uncommittedFilters.has(status2)).onClick(() => {
+            if (this.uncommittedFilters.has(status2))
+              this.uncommittedFilters.delete(status2);
+            else
+              this.uncommittedFilters.add(status2);
+            this.repaintStatusSnapshot();
+          }));
+        }
+        menu.showAtMouseEvent(event);
+      });
+      headerControls.push(filterBtn);
+      const sortBtn = header.createEl("button", {
+        cls: "git-status-section-control",
+        attr: { type: "button", "aria-label": "Sort uncommitted changes" }
+      });
+      (0, import_obsidian5.setIcon)(sortBtn, "arrow-down-up");
+      sortBtn.setAttr("title", `Sort: ${(_b = uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)) == null ? void 0 : _b.label}`);
+      sortBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = new import_obsidian5.Menu();
+        for (const option of uncommittedSortOptions) {
+          menu.addItem((item) => item.setTitle(option.label).setChecked(option.value === this.uncommittedSort).onClick(() => {
+            this.uncommittedSort = option.value;
+            this.repaintStatusSnapshot();
+          }));
+        }
+        menu.showAtMouseEvent(event);
+      });
+      headerControls.push(sortBtn);
+    }
     const bulkBtn = header.createEl("button", { cls: "git-status-section-action" });
     (0, import_obsidian5.setIcon)(bulkBtn, sectionClass === "staged" ? "minus" : "plus");
     bulkBtn.disabled = files.length === 0;
     bulkBtn.setAttr("title", bulkLabel);
     bulkBtn.setAttr("aria-label", bulkLabel);
+    headerControls.push(bulkBtn);
     bulkBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (bulkBtn.disabled || this.mutationInFlight)
@@ -25188,7 +24797,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     });
     header.addEventListener("click", (e) => {
-      if (e.target === bulkBtn || bulkBtn.contains(e.target))
+      if (headerControls.some((control) => e.target === control || control.contains(e.target)))
         return;
       const currentlyCollapsed = section.getAttr("data-collapsed") === "true";
       section.setAttr("data-collapsed", String(!currentlyCollapsed));
@@ -25196,12 +24805,114 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       toggle.setAttr("aria-expanded", String(currentlyCollapsed));
     });
     const list = section.createDiv("git-status-section-list");
+    if (files.length > 0) {
+      const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+      const selectionToolbar = list.createDiv("git-selection-toolbar");
+      selectionToolbar.createSpan({
+        text: selected.length > 0 ? `${selected.length} selected` : "Select files",
+        cls: "git-selection-count"
+      });
+      const selectAll = selectionToolbar.createEl("button", {
+        text: selected.length === files.length ? "Clear selection" : "Select all",
+        cls: "git-selection-btn",
+        attr: { type: "button" }
+      });
+      selectAll.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (selected.length === files.length) {
+          for (const filepath of files)
+            this.selectedFilePaths.delete(filepath);
+        } else {
+          for (const filepath of files)
+            this.selectedFilePaths.add(filepath);
+        }
+        this.repaintStatusSnapshot();
+      });
+      if (selected.length > 0) {
+        const selectedAction = selectionToolbar.createEl("button", {
+          text: sectionClass === "staged" ? "Unstage selected" : "Stage selected",
+          cls: "git-selection-btn git-selection-primary",
+          attr: { type: "button" }
+        });
+        selectedAction.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (this.mutationInFlight)
+            return;
+          this.setMutationBusy(true);
+          try {
+            await onSelected(selected);
+            this.repaintStatusSnapshot();
+          } catch (error) {
+            new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} selected failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+          } finally {
+            this.setMutationBusy(false);
+          }
+        });
+        if (sectionClass === "unstaged") {
+          const selectedUntracked = selected.filter((filepath) => statusByPath.get(filepath) === "untracked");
+          const selectedTracked = selected.filter((filepath) => statusByPath.get(filepath) !== "untracked");
+          if (selectedTracked.length > 0) {
+            const revertAction = selectionToolbar.createEl("button", {
+              text: "Revert selected",
+              cls: "git-selection-btn git-selection-warning",
+              attr: { type: "button" }
+            });
+            revertAction.addEventListener("click", (event) => {
+              event.stopPropagation();
+              this.confirmDiscardSelected(selectedTracked, statusByPath);
+            });
+          }
+          if (selectedUntracked.length > 0) {
+            const deleteAction = selectionToolbar.createEl("button", {
+              text: "Delete selected",
+              cls: "git-selection-btn git-selection-warning",
+              attr: { type: "button" }
+            });
+            deleteAction.addEventListener("click", (event) => {
+              event.stopPropagation();
+              this.confirmDiscardSelected(selectedUntracked, statusByPath);
+            });
+          }
+        }
+      }
+    }
     if (files.length === 0) {
-      const emptyMsg = sectionClass === "staged" ? "No staged files" : "No uncommitted changes";
+      const emptyMsg = sectionClass === "staged" ? "No staged files" : totalFiles > 0 ? "No files match the selected filters" : "No uncommitted changes";
       list.createEl("p", { text: emptyMsg, cls: "git-empty-state" });
     } else {
       for (const filepath of files) {
         const row = list.createDiv("git-file-row");
+        row.setAttr("role", "option");
+        row.setAttr("aria-selected", String(this.selectedFilePaths.has(filepath)));
+        if (this.selectedFilePaths.has(filepath))
+          row.addClass("git-file-row-selected");
+        row.addEventListener("click", (event) => {
+          const mouseEvent = event;
+          if (this.mutationInFlight)
+            return;
+          const anchor = this.selectionAnchorBySection.get(sectionClass);
+          const currentIndex = files.indexOf(filepath);
+          if (mouseEvent.shiftKey && anchor && files.includes(anchor)) {
+            const anchorIndex = files.indexOf(anchor);
+            const start = Math.min(anchorIndex, currentIndex);
+            const end = Math.max(anchorIndex, currentIndex);
+            for (const selectedPath of files.slice(start, end + 1)) {
+              this.selectedFilePaths.add(selectedPath);
+            }
+          } else if (mouseEvent.metaKey || mouseEvent.ctrlKey) {
+            if (this.selectedFilePaths.has(filepath))
+              this.selectedFilePaths.delete(filepath);
+            else
+              this.selectedFilePaths.add(filepath);
+            this.selectionAnchorBySection.set(sectionClass, filepath);
+          } else {
+            for (const selectedPath of files)
+              this.selectedFilePaths.delete(selectedPath);
+            this.selectedFilePaths.add(filepath);
+            this.selectionAnchorBySection.set(sectionClass, filepath);
+          }
+          this.repaintStatusSnapshot();
+        });
         const stageBtn = row.createEl("button", {
           cls: "git-file-stage-toggle",
           attr: {
@@ -25213,8 +24924,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         (0, import_obsidian5.setIcon)(stageBtn, sectionClass === "staged" ? "square-check" : "square");
         stageBtn.addClass(sectionClass === "staged" ? "git-file-stage-checked" : "git-file-stage-empty");
         const status2 = statusByPath.get(filepath);
-        const statusLabel = status2 === "deleted" ? "D" : status2 === "added" || status2 === "untracked" ? "A" : "M";
-        const statusClass = status2 === "deleted" ? "git-status-deleted" : status2 === "modified" || status2 === "staged" ? "git-status-modified" : "git-status-added";
+        const statusLabel = status2 === "deleted" ? "D" : status2 === "untracked" ? "?" : status2 === "added" ? "A" : "M";
+        const statusClass = status2 === "deleted" ? "git-status-deleted" : status2 === "untracked" ? "git-status-untracked" : status2 === "modified" || status2 === "staged" ? "git-status-modified" : "git-status-added";
         row.createSpan({ text: statusLabel, cls: `git-status-icon ${statusClass}` });
         const pathEl = row.createSpan({ text: filepath, cls: "git-file-path" });
         pathEl.setAttr("title", filepath);
@@ -25228,7 +24939,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           const menu = new import_obsidian5.Menu();
           if (filepath !== ".gitignore") {
             menu.addItem((item) => item.setTitle("Ignore this file").setIcon("file-minus").onClick(async () => {
-              var _a;
+              var _a2;
               try {
                 const pattern = `/${filepath.replace(/^\/+/, "")}`;
                 const currentStatus = statusByPath.get(filepath);
@@ -25241,7 +24952,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
                     `Added ${pattern} to .gitignore. ${filepath} remains in Changes because it is tracked or staged.`
                   );
                 } else {
-                  const stillListed = (_a = this.sidebarSnapshot) == null ? void 0 : _a.detailedStatus.some(
+                  const stillListed = (_a2 = this.sidebarSnapshot) == null ? void 0 : _a2.detailedStatus.some(
                     (file) => file.filepath === filepath
                   );
                   new import_obsidian5.Notice(stillListed ? `Added ${pattern} to .gitignore, but ${filepath} is still listed after refresh.` : `Ignored ${filepath}; removed from local changes.`);
@@ -25258,6 +24969,13 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
               new import_obsidian5.Notice("Could not open .gitignore: " + err.message);
             }
           }));
+          if (sectionClass === "unstaged" && this.plugin.settings.reviewActionsEnabled) {
+            menu.addItem((item) => item.setTitle("Review changes").setIcon("columns-2").onClick(() => this.openReviewModal(filepath)));
+          }
+          if (sectionClass === "unstaged") {
+            menu.addSeparator();
+            menu.addItem((item) => item.setTitle(status2 === "untracked" ? "Discard untracked file\u2026" : "Discard changes\u2026").setIcon("undo-2").setWarning(true).onClick(() => this.confirmDiscard(filepath, status2 || "modified")));
+          }
           menu.showAtMouseEvent(e);
         });
         stageBtn.addEventListener("click", async (e) => {
@@ -25285,7 +25003,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     var _a;
     this.mutationInFlight = busy;
     const controls = ((_a = this.contentContainer) == null ? void 0 : _a.querySelectorAll(
-      ".git-file-stage-toggle, .git-status-section-action"
+      ".git-file-stage-toggle, .git-status-section-action, .git-selection-btn"
     )) || [];
     controls.forEach((control) => {
       control.disabled = busy;
@@ -25295,6 +25013,106 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       else
         control.removeClass("git-operation-busy");
     });
+  }
+  confirmDiscard(filepath, status2) {
+    const untracked = status2 === "untracked";
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText(untracked ? "Discard untracked file?" : "Discard changes?");
+    modal.contentEl.createEl("p", {
+      text: untracked ? `\u201C${filepath}\u201D is not in Git. It will be moved to Obsidian\u2019s trash.` : `Restore \u201C${filepath}\u201D to its committed HEAD version. Its current changes will be lost.`
+    });
+    const actions = modal.contentEl.createDiv("git-confirm-actions");
+    new import_obsidian5.ButtonComponent(actions).setButtonText("Cancel").onClick(() => modal.close());
+    new import_obsidian5.ButtonComponent(actions).setButtonText(untracked ? "Move to trash" : "Discard changes").setWarning().onClick(async () => {
+      try {
+        if (untracked) {
+          const file = this.app.vault.getAbstractFileByPath(filepath);
+          if (!file)
+            throw new Error("File no longer exists in the vault");
+          await this.app.vault.trash(file, false);
+        } else {
+          await this.plugin.runGitMutation("Discard file changes", async (manager) => manager.discardFile(filepath));
+        }
+        this.applyFileMutationToSnapshot(filepath, "removed");
+        this.repaintStatusSnapshot();
+        new import_obsidian5.Notice(untracked ? `Moved ${filepath} to trash` : `Restored ${filepath} from HEAD`);
+        modal.close();
+      } catch (error) {
+        new import_obsidian5.Notice(`Discard failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+      }
+    });
+    modal.open();
+  }
+  confirmDiscardSelected(filepaths, statusByPath) {
+    const untracked = filepaths.every((filepath) => statusByPath.get(filepath) === "untracked");
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText(untracked ? "Delete selected untracked files?" : "Revert selected changes?");
+    modal.contentEl.createEl("p", {
+      text: untracked ? `${filepaths.length} untracked file${filepaths.length === 1 ? "" : "s"} will be moved to Obsidian\u2019s trash.` : `${filepaths.length} file change${filepaths.length === 1 ? "" : "s"} will be restored to their committed HEAD versions.`
+    });
+    const actions = modal.contentEl.createDiv("git-confirm-actions");
+    new import_obsidian5.ButtonComponent(actions).setButtonText("Cancel").onClick(() => modal.close());
+    new import_obsidian5.ButtonComponent(actions).setButtonText(untracked ? "Move to trash" : "Revert changes").setWarning().onClick(async () => {
+      const succeeded = [];
+      const failed = [];
+      this.setMutationBusy(true);
+      try {
+        if (untracked) {
+          for (const filepath of filepaths) {
+            const file = this.app.vault.getAbstractFileByPath(filepath);
+            if (!file) {
+              failed.push(filepath);
+              continue;
+            }
+            await this.app.vault.trash(file, false);
+            succeeded.push(filepath);
+          }
+        } else {
+          const result = await this.plugin.runGitMutation("Revert selected changes", async (manager) => {
+            for (const filepath of filepaths)
+              await manager.discardFile(filepath);
+            return filepaths;
+          });
+          succeeded.push(...result);
+        }
+        for (const filepath of succeeded) {
+          this.selectedFilePaths.delete(filepath);
+          this.applyFileMutationToSnapshot(filepath, "removed");
+        }
+        this.repaintStatusSnapshot();
+        new import_obsidian5.Notice(failed.length > 0 ? `${untracked ? "Deleted" : "Reverted"} ${succeeded.length} of ${filepaths.length} selected files.` : `${untracked ? "Moved" : "Reverted"} ${succeeded.length} selected file${succeeded.length === 1 ? "" : "s"}.`);
+        modal.close();
+      } catch (error) {
+        new import_obsidian5.Notice(`Could not ${untracked ? "delete" : "revert"} selected files: ${(error == null ? void 0 : error.message) || String(error)}`);
+      } finally {
+        this.setMutationBusy(false);
+      }
+    });
+    modal.open();
+  }
+  async openReviewModal(filepath) {
+    var _a, _b, _c;
+    const modal = new import_obsidian5.Modal(this.app);
+    modal.titleEl.setText(`Review changes: ${filepath}`);
+    modal.contentEl.createEl("p", { text: "Read-only comparison of the committed HEAD version and the current vault file.", cls: "git-review-description" });
+    const panes = modal.contentEl.createDiv("git-review-panes");
+    const headPane = panes.createDiv("git-review-pane");
+    const worktreePane = panes.createDiv("git-review-pane");
+    headPane.createEl("h4", { text: "HEAD" });
+    worktreePane.createEl("h4", { text: "Working copy" });
+    const headContent = headPane.createEl("pre", { text: "Loading\u2026", cls: "git-review-content" });
+    const worktreeContent = worktreePane.createEl("pre", { text: "Loading\u2026", cls: "git-review-content" });
+    modal.open();
+    try {
+      const review = await ((_a = this.plugin.gitManager) == null ? void 0 : _a.reviewFile(filepath));
+      if (!review)
+        throw new Error("Git backend unavailable");
+      headContent.setText((_b = review.head) != null ? _b : "(Not tracked in HEAD)");
+      worktreeContent.setText((_c = review.worktree) != null ? _c : "(Deleted from working copy)");
+    } catch (error) {
+      headContent.setText(`Could not load review: ${(error == null ? void 0 : error.message) || String(error)}`);
+      worktreeContent.setText("");
+    }
   }
   openIgnorePatternModal() {
     const modal = new import_obsidian5.Modal(this.app);
@@ -25310,44 +25128,65 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     new import_obsidian5.ButtonComponent(actions).setButtonText("Cancel").setClass("git-btn-ghost").onClick(() => modal.close());
     const addButton = new import_obsidian5.ButtonComponent(actions).setButtonText("Add pattern").setClass("git-btn-primary");
     const submit = async () => {
+      if (this.ignorePatternInFlight)
+        return;
       try {
         const pattern = input.getValue().trim();
+        if (!pattern) {
+          new import_obsidian5.Notice("Enter a Git ignore pattern");
+          return;
+        }
+        this.ignorePatternInFlight = true;
+        addButton.setDisabled(true).setButtonText("Adding\u2026");
         const added = await this.plugin.addGitIgnorePattern(pattern);
         modal.close();
         new import_obsidian5.Notice(added ? `Added ${pattern} to .gitignore` : `${pattern} is already in .gitignore`);
         await this.refresh();
       } catch (e) {
         new import_obsidian5.Notice(`Could not update .gitignore: ${e.message}`);
+      } finally {
+        this.ignorePatternInFlight = false;
+        if (addButton.buttonEl.isConnected) {
+          addButton.setDisabled(false).setButtonText("Add pattern");
+        }
       }
     };
     addButton.onClick(submit);
     input.inputEl.addEventListener("keydown", (event) => {
-      if (event.key === "Enter")
+      if (event.key === "Enter") {
+        event.preventDefault();
         void submit();
+      }
     });
     modal.open();
     window.setTimeout(() => input.inputEl.focus(), 0);
   }
-  async renderCommitsTab(generation) {
-    const listContainer = this.contentContainer.createDiv("git-log-list");
+  async renderCommitsTab(generation, target = this.contentContainer) {
+    const listContainer = target.createDiv("git-log-list");
     const toggleBar = listContainer.createDiv("git-commits-toggle-bar");
     const localBtn = toggleBar.createEl("button", {
       text: "Local",
       cls: "git-commits-toggle-btn" + (this.commitsViewMode === "local" ? " git-commits-toggle-active" : ""),
       attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "local") }
     });
-    localBtn.addEventListener("click", async () => {
+    localBtn.addEventListener("click", () => {
       this.commitsViewMode = "local";
-      await this.refresh({ readRepository: false });
+      this.invalidateTab("commits");
+      void this.refresh({ readRepository: false }).catch((error) => {
+        log.debug("GitSidebar", "Local commit view refresh failed", error);
+      });
     });
     const remoteBtn = toggleBar.createEl("button", {
       text: "Remote",
       cls: "git-commits-toggle-btn" + (this.commitsViewMode === "remote" ? " git-commits-toggle-active" : ""),
       attr: { role: "tab", "aria-selected": String(this.commitsViewMode === "remote") }
     });
-    remoteBtn.addEventListener("click", async () => {
+    remoteBtn.addEventListener("click", () => {
       this.commitsViewMode = "remote";
-      await this.refresh({ readRepository: false });
+      this.invalidateTab("commits");
+      void this.refresh({ readRepository: false }).catch((error) => {
+        log.debug("GitSidebar", "Remote commit view refresh failed", error);
+      });
     });
     const loading = this.commitsViewMode === "remote" ? listContainer.createEl("p", { text: "Loading remote commits\u2026", cls: "git-empty-state" }) : null;
     try {
@@ -25375,10 +25214,31 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         if (cached !== null) {
           commits = cached;
         } else {
-          const password = await this.plugin.resolveGitPassword();
-          commits = await GitManager.fetchRemoteCommitsFromGitHub(remoteUrl, password, branch2, 25);
-          if (commits.length === 0 && this.plugin.gitManager) {
-            commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
+          const isGitHub = parseGitHubRepositoryUrl(remoteUrl) !== null;
+          if (!this.plugin.gitManager) {
+            log.error(
+              "GitSidebar",
+              `Remote commit fetch skipped (source=${isGitHub ? "github-api" : "local-remote-ref"}, branch=${branch2}): Git backend unavailable`,
+              new Error("Git backend unavailable")
+            );
+          } else {
+            await this.plugin.refreshGitCredentials();
+            log.info("GitSidebar", "Fetching remote commit history", {
+              branch: branch2,
+              source: isGitHub ? "github-api" : "local-remote-ref"
+            });
+            commits = await this.plugin.gitManager.fetchRemoteCommits(remoteUrl, branch2, 25);
+            log.info("GitSidebar", "Remote commit history fetched", {
+              branch: branch2,
+              source: isGitHub ? "github-api" : "local-remote-ref",
+              count: commits.length
+            });
+            if (commits.length === 0 && !isGitHub) {
+              log.warn("GitSidebar", "Remote API returned no commits; using local remote-tracking ref", { branch: branch2 });
+              commits = await this.plugin.gitManager.getRemoteLog(branch2, 25);
+            } else if (commits.length === 0) {
+              log.warn("GitSidebar", "GitHub returned no remote commits", { branch: branch2 });
+            }
           }
         }
         this.readModel.setRemoteCommits(remoteUrl, branch2, commits);
@@ -25425,8 +25285,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         const toggle = meta.createSpan({ cls: "git-commit-toggle", attr: { "aria-hidden": "true" } });
         toggle.setText(isExpanded ? "\u2304" : "\u203A");
         row.addEventListener("click", async (e) => {
-          const target = e.target;
-          if (target.closest("a") || target.closest("button"))
+          const target2 = e.target;
+          if (target2.closest("a") || target2.closest("button"))
             return;
           const currentlyExpanded = this.expandedCommitOids.has(commit2.oid);
           if (currentlyExpanded) {
@@ -25453,7 +25313,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       }
     } catch (e) {
       loading == null ? void 0 : loading.remove();
-      log2.debug("GitSidebar", "Failed to get commit log", e);
+      const error = e instanceof Error ? e : new Error(String(e));
+      log.error(
+        "GitSidebar",
+        `Failed to get commit log (mode=${this.commitsViewMode}, branch=${this.plugin.settings.branchName || "main"})`,
+        error
+      );
       const msg = e.message || String(e);
       if (msg.includes("Could not find") || msg.includes("refs/head") || msg.includes("unknown revision") || msg.includes("Not a valid")) {
         listContainer.empty();
@@ -25480,11 +25345,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       if (cachedFiles) {
       } else if (this.commitsViewMode === "remote" && this.plugin.settings.repoUrl && !this.hasRealRepo) {
         (_a = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _a.setText("Fetching from GitHub...");
-        const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-          this.plugin.settings.repoUrl,
-          await this.plugin.resolveGitPassword(),
-          oid
-        );
+        const remoteFiles = this.plugin.gitManager ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid) : [];
         if (remoteFiles) {
           files = remoteFiles;
         }
@@ -25492,16 +25353,12 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         try {
           files = await this.plugin.gitManager.getCommitFiles(oid);
         } catch (error) {
-          log2.debug("GitSidebar", "Local commit details unavailable; trying remote fallback", error);
+          log.debug("GitSidebar", "Local commit details unavailable; trying remote fallback", error);
         }
       }
       if (files.length === 0 && this.commitsViewMode === "remote" && this.plugin.settings.repoUrl) {
         (_b = detail.querySelector(".git-commit-detail-loading")) == null ? void 0 : _b.setText("Fetching from GitHub...");
-        const remoteFiles = await GitManager.fetchCommitFilesFromGitHub(
-          this.plugin.settings.repoUrl,
-          await this.plugin.resolveGitPassword(),
-          oid
-        );
+        const remoteFiles = this.plugin.gitManager ? await this.plugin.gitManager.fetchRemoteCommitFiles(this.plugin.settings.repoUrl, oid) : [];
         if (remoteFiles) {
           files = remoteFiles;
         }
@@ -25541,19 +25398,22 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     await this.renderCommitsTab(this.renderGeneration);
   }
   async renderLogTab(generation) {
+    await this.renderLogTabInto(generation, this.contentContainer);
+  }
+  async renderLogTabInto(generation, target) {
     var _a;
-    const listContainer = this.contentContainer.createDiv("git-log-list");
+    const listContainer = target.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
-    const currentLogEntries = log2.getEntries();
+    const currentLogEntries = log.getEntries();
     const cachedEntries = this.readModel.getLogEntries();
     const cacheStale = cachedEntries && currentLogEntries.length !== cachedEntries.length;
     if (!cachedEntries || cacheStale) {
       const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
       if (!this.isCurrentRender(generation))
         return;
-      log2.mergePersistedEntries(persisted);
-      this.readModel.setLogEntries(log2.getEntries());
+      log.mergePersistedEntries(persisted);
+      this.readModel.setLogEntries(log.getEntries());
     }
     const entries = this.readModel.getLogEntries() || [];
     if (entries.length === 0) {
@@ -25589,10 +25449,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       try {
         if (!this.readModel.getLogEntries()) {
           const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
-          log2.mergePersistedEntries(persisted);
-          this.readModel.setLogEntries(log2.getEntries());
+          log.mergePersistedEntries(persisted);
+          this.readModel.setLogEntries(log.getEntries());
         }
-        const path = await log2.exportToFile(this.app.vault);
+        const path = await log.exportToFile(this.app.vault);
         new import_obsidian5.Notice(`Log exported to ${path}`);
       } catch (e) {
         new import_obsidian5.Notice("Could not export log: " + e.message);
@@ -25600,28 +25460,32 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     }));
     menu.addItem((item) => item.setTitle("Clear log").setIcon("trash-2").onClick(async () => {
       var _a;
-      log2.clear();
-      await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
-      this.readModel.setLogEntries([]);
-      new import_obsidian5.Notice("Activity log cleared");
-      this.contentContainer.empty();
-      await this.renderLogTab(this.renderGeneration);
+      try {
+        log.clear();
+        await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.clear());
+        this.readModel.setLogEntries([]);
+        new import_obsidian5.Notice("Activity log cleared");
+        this.invalidateTab("log");
+        await this.refresh({ readRepository: false });
+      } catch (e) {
+        new import_obsidian5.Notice("Could not clear log: " + e.message);
+      }
     }));
     menu.addItem((item) => item.setTitle("Copy details").setIcon("copy").onClick(async () => {
       var _a;
-      if (!this.readModel.getLogEntries()) {
-        const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
-        log2.mergePersistedEntries(persisted);
-        this.readModel.setLogEntries(log2.getEntries());
-      }
-      const entries = [...this.readModel.getLogEntries() || []].reverse();
-      const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
-        const time = new Date(entry.timestamp).toISOString();
-        const data = entry.data ? `
-${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "";
-        return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
-      }).join("\n");
       try {
+        if (!this.readModel.getLogEntries()) {
+          const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
+          log.mergePersistedEntries(persisted);
+          this.readModel.setLogEntries(log.getEntries());
+        }
+        const entries = [...this.readModel.getLogEntries() || []].reverse();
+        const details = entries.length === 0 ? "No activity yet" : entries.map((entry) => {
+          const time = new Date(entry.timestamp).toISOString();
+          const data = entry.data ? `
+${typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data)}` : "";
+          return `${time} ${entry.level.toUpperCase()} [${entry.namespace}] ${entry.message}${data}`;
+        }).join("\n");
         await navigator.clipboard.writeText(details);
         new import_obsidian5.Notice("Log details copied");
       } catch (e) {
@@ -26429,8 +26293,8 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "a13d4f0880013d3dcf20107840d5e3a945d57d2f" : "unknown";
-var GIT_BRANCH = true ? "main" : "unknown";
+var GIT_COMMIT_HASH = true ? "34c37a564c92ab1f571575e451948f7f17ce1052" : "unknown";
+var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";
@@ -26885,6 +26749,8 @@ var DEFAULT_SETTINGS = {
   branchName: "main",
   username: "",
   passwordSecretId: "",
+  authMethod: "pat",
+  githubClientId: "",
   author: {
     name: "",
     email: ""
@@ -26893,6 +26759,8 @@ var DEFAULT_SETTINGS = {
   autoCommitMessage: "Vault backup: {{date}}",
   refreshInterval: 60,
   // default 60 seconds
+  remoteFetchInterval: 0,
+  reviewActionsEnabled: true,
   checkForUpdates: true,
   updateChannel: "stable",
   lastUpdateCheck: 0,
@@ -26913,6 +26781,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.fileLogger = null;
     this.credentialStore = null;
     this.credentialStorageError = null;
+    this.gitManagerPromise = null;
     this.operationCoordinator = new OperationCoordinator();
     this.operationLifecycleUnsubscribe = null;
   }
@@ -26920,7 +26789,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     var _a;
     this.fileLogger = new FileLogger(this.app, this.manifest.id);
     await this.fileLogger.init();
-    log2.setFileLogSink((level, ...args) => {
+    log.setFileLogSink((level, ...args) => {
       var _a2;
       return (_a2 = this.fileLogger) == null ? void 0 : _a2.log(level, ...args);
     });
@@ -26932,19 +26801,19 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       };
       switch (event.lifecycle) {
         case "started":
-          log2.info("GitOperation", "Operation started", details);
+          log.info("GitOperation", "Operation started", details);
           break;
         case "completed":
-          log2.info("GitOperation", "Operation completed", details);
+          log.info("GitOperation", "Operation completed", details);
           break;
         case "cancelled":
-          log2.warn("GitOperation", "Operation cancelled", {
+          log.warn("GitOperation", "Operation cancelled", {
             ...details,
             reason: event.error instanceof Error ? event.error.message : String(event.error || "cancelled")
           });
           break;
         case "failed":
-          log2.error(
+          log.error(
             "GitOperation",
             `Operation failed: ${event.name} after ${event.elapsedMs || 0}ms`,
             event.error instanceof Error ? event.error : new Error(String(event.error))
@@ -26960,22 +26829,22 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       new import_obsidian9.Notice(this.credentialStorageError.message);
     }
     this.isDesktop = typeof window !== "undefined" && !!window.require && !!window.process;
-    log2.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
+    log.info("GitSyncPlugin", `Platform: ${this.isDesktop ? "desktop (Electron)" : "mobile (WebView)"}`);
     if (!this.isDesktop && typeof Buffer === "undefined") {
       const { Buffer: Buffer2 } = await Promise.resolve().then(() => __toESM(require_buffer()));
       window.Buffer = Buffer2;
-      log2.info("GitSyncPlugin", "Buffer polyfill loaded for mobile");
+      log.info("GitSyncPlugin", "Buffer polyfill loaded for mobile");
     }
-    log2.info("GitSyncPlugin", "Initializing Git Sync plugin");
+    log.info("GitSyncPlugin", "Initializing Git Sync plugin");
     this.fs = new ObsidianFsAdapter(this.app.vault.adapter, ".").promises;
-    log2.debug("GitSyncPlugin", "File system adapter initialized");
+    log.debug("GitSyncPlugin", "File system adapter initialized");
     const ribbonIconEl = this.addRibbonIcon("refresh-cw", "Git Sync", async () => {
-      log2.info("GitSyncPlugin", "Manual sync triggered from ribbon");
+      log.info("GitSyncPlugin", "Manual sync triggered from ribbon");
       try {
         await this.syncVault();
         new import_obsidian9.Notice("Git sync completed successfully");
       } catch (error) {
-        log2.error("GitSyncPlugin", "Manual sync failed", error);
+        log.error("GitSyncPlugin", "Manual sync failed", error);
         new import_obsidian9.Notice(`Git sync failed: ${error.message}`);
       }
     });
@@ -26986,7 +26855,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.statusBarItem = this.addStatusBarItem();
     this.statusBarItem.setText("Git: Ready");
     this.addSettingTab(new GitSyncSettingTab(this.app, this));
-    this.updater = new PluginUpdater(this.app, this.manifest.id, log2);
+    this.updater = new PluginUpdater(this.app, this.manifest.id, log);
     this.addCommand({
       id: "git-sync-check-for-updates",
       name: "Check for plugin updates",
@@ -27002,12 +26871,12 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-now",
       name: "Sync now",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Manual sync triggered from command palette");
+        log.info("GitSyncPlugin", "Manual sync triggered from command palette");
         try {
           await this.syncVault();
           new import_obsidian9.Notice("Git sync completed successfully");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Manual sync failed", error);
+          log.error("GitSyncPlugin", "Manual sync failed", error);
           new import_obsidian9.Notice(`Git sync failed: ${error.message}`);
         }
       }
@@ -27016,15 +26885,23 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-pull",
       name: "Pull from remote",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Pull triggered from command palette");
+        log.info("GitSyncPlugin", "Pull triggered from command palette");
+        const progress = createProgressModal(this.app, "Pulling from remote");
         try {
           await this.runGitMutation("Pull from remote", async (manager) => {
             await this.refreshGitCredentials();
-            await manager.pull(this.settings.branchName);
+            manager.setProgressHandle(progress);
+            try {
+              await manager.pull(this.settings.branchName);
+              progress.complete("Pull complete");
+            } finally {
+              manager.setProgressHandle(void 0);
+            }
           });
           new import_obsidian9.Notice("Git pull completed successfully");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Pull failed", error);
+          progress.fail(error);
+          log.error("GitSyncPlugin", "Pull failed", error);
           new import_obsidian9.Notice(`Git pull failed: ${error.message}`);
         }
       }
@@ -27033,15 +26910,23 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-push",
       name: "Push to remote",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Push triggered from command palette");
+        log.info("GitSyncPlugin", "Push triggered from command palette");
+        const progress = createProgressModal(this.app, "Pushing to remote");
         try {
           await this.runGitMutation("Push to remote", async (manager) => {
             await this.refreshGitCredentials();
-            await manager.push(this.settings.branchName);
+            manager.setProgressHandle(progress);
+            try {
+              await manager.push(this.settings.branchName);
+              progress.complete("Push complete");
+            } finally {
+              manager.setProgressHandle(void 0);
+            }
           });
           new import_obsidian9.Notice("Git push completed successfully");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Push failed", error);
+          progress.fail(error);
+          log.error("GitSyncPlugin", "Push failed", error);
           new import_obsidian9.Notice(`Git push failed: ${error.message}`);
         }
       }
@@ -27050,7 +26935,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       id: "git-sync-status",
       name: "Show repository status",
       callback: async () => {
-        log2.info("GitSyncPlugin", "Status check triggered from command palette");
+        log.info("GitSyncPlugin", "Status check triggered from command palette");
         try {
           const health = await this.checkRepositoryHealth();
           if (health.state === "missing") {
@@ -27068,7 +26953,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           const status2 = await this.gitManager.getStatus();
           new import_obsidian9.Notice(`Git status: ${status2.branch} \u2014 ${status2.ahead} ahead, ${status2.behind} behind`);
         } catch (error) {
-          log2.error("GitSyncPlugin", "Status check failed", error);
+          log.error("GitSyncPlugin", "Status check failed", error);
           new import_obsidian9.Notice(`Git status failed: ${error.message}`);
         }
       }
@@ -27083,7 +26968,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
             `Rebuild preview: ${preview.conflicts.length} conflicts, ${preview.remoteOnly.length} remote-only, ${preview.localOnly.length} local-only, ${preview.unchanged.length} unchanged.`
           );
         } catch (error) {
-          log2.error("GitSyncPlugin", "Repository rebuild preview failed", error);
+          log.error("GitSyncPlugin", "Repository rebuild preview failed", error);
           new import_obsidian9.Notice(`Rebuild preview failed: ${error.message}`);
         }
       }
@@ -27103,7 +26988,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
             `Git index repaired. ${result.trackedFiles} tracked files restored; ${result.worktreeFiles} vault files preserved.${backup}`
           );
         } catch (error) {
-          log2.error("GitSyncPlugin", "Git index repair failed", error);
+          log.error("GitSyncPlugin", "Git index repair failed", error);
           new import_obsidian9.Notice(`Git index repair failed: ${error.message}`);
         }
       }
@@ -27120,7 +27005,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           const backup = await this.restoreLatestRepositoryIndexBackup();
           new import_obsidian9.Notice(`Git index restored from ${backup}`);
         } catch (error) {
-          log2.error("GitSyncPlugin", "Git index backup restore failed", error);
+          log.error("GitSyncPlugin", "Git index backup restore failed", error);
           new import_obsidian9.Notice(`Git index restore failed: ${error.message}`);
         }
       }
@@ -27151,7 +27036,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       name: "Export debug logs",
       callback: async () => {
         try {
-          const path = await log2.exportToFile(this.app.vault);
+          const path = await log.exportToFile(this.app.vault);
           new import_obsidian9.Notice(`Debug log exported to ${path}`);
         } catch (error) {
           new import_obsidian9.Notice(`Export failed: ${error.message}`);
@@ -27175,7 +27060,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     this.operationCoordinator.dispose();
     (_a = this.operationLifecycleUnsubscribe) == null ? void 0 : _a.call(this);
     this.operationLifecycleUnsubscribe = null;
-    log2.setFileLogSink(null);
+    log.setFileLogSink(null);
     (_b = this.fileLogger) == null ? void 0 : _b.stop();
     this.fileLogger = null;
   }
@@ -27197,6 +27082,9 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     if (!this.settings.settingsSectionStates || typeof this.settings.settingsSectionStates !== "object") {
       this.settings.settingsSectionStates = {};
     }
+    if (this.settings.authMethod !== "pat" && this.settings.authMethod !== "github") {
+      this.settings.authMethod = "pat";
+    }
     delete this.settings.sidebarDensity;
     if (!this.settings.passwordSecretId) {
       this.settings.passwordSecretId = createSecretId(((_b = (_a = this.app.vault).getName) == null ? void 0 : _b.call(_a)) || "default");
@@ -27206,11 +27094,11 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       if (await migrateLegacySecret(this.credentialStore, legacyPassword, async () => {
         await this.saveData(this.settings);
       })) {
-        log2.info("GitSyncPlugin", "Migrated the legacy Git credential to secure storage");
+        log.info("GitSyncPlugin", "Migrated the legacy Git credential to secure storage");
       }
     } catch (error) {
       this.credentialStorageError = error instanceof Error ? error : new Error(String(error));
-      log2.warn("GitSyncPlugin", "Secure credential storage is unavailable; remote operations are disabled");
+      log.warn("GitSyncPlugin", "Secure credential storage is unavailable; remote operations are disabled");
     }
   }
   async saveSettings() {
@@ -27228,7 +27116,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       info: 1 /* INFO */,
       debug: 0 /* DEBUG */
     };
-    log2.setLogLevel(levels[level]);
+    log.setLogLevel(levels[level]);
     (_a = this.fileLogger) == null ? void 0 : _a.setMemorySamplingEnabled(level === "debug");
   }
   setDiagnosticLogMaxSize(maxSizeMB) {
@@ -27253,32 +27141,62 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   }
   async getGitCredentials(resolveSecret = true) {
     var _a;
+    const usingGitHub = this.settings.authMethod === "github";
     const credentials = {
-      username: this.settings.username,
+      username: usingGitHub ? "x-access-token" : this.settings.username,
       password: resolveSecret ? await this.resolveGitPassword() : "",
       repoUrl: this.settings.repoUrl,
+      source: usingGitHub ? "github" : resolveSecret && this.settings.passwordSecretId ? "pat" : "none",
       author: {
         name: this.settings.author.name || "Obsidian Git User",
         email: this.settings.author.email || "user@example.com"
       }
     };
-    log2.setSensitiveValues([credentials.password]);
+    log.setSensitiveValues([credentials.password]);
     (_a = this.fileLogger) == null ? void 0 : _a.setSensitiveValues([credentials.password]);
     return credentials;
   }
   async refreshGitCredentials() {
-    if (this.gitManager)
+    if (this.gitManager) {
       this.gitManager.updateCredentials(await this.getGitCredentials());
+      this.gitManager.configure({ branch: this.settings.branchName });
+    }
+  }
+  async testRemoteConnection() {
+    if (!this.settings.repoUrl)
+      throw new Error("Please enter a repository URL first");
+    const manager = await this.ensureGitManager(true);
+    if (!manager)
+      throw new Error("No Git backend is available");
+    await this.refreshGitCredentials();
+    await manager.testRemote();
   }
   async setGitCredential(value) {
     this.requireCredentialStore().set(value);
+    this.settings.authMethod = "pat";
     await this.saveSettings();
+  }
+  async authenticateWithGitHub() {
+    if (!this.settings.githubClientId.trim()) {
+      throw new Error("Set a GitHub OAuth client ID before signing in with GitHub.");
+    }
+    const manager = await this.ensureGitManager();
+    if (!manager)
+      throw new Error("Unable to prepare the Git backend.");
+    const session = await manager.authenticateWithGitHub(this.settings.githubClientId, (code) => {
+      window.open(code.verificationUri, "_blank");
+      new import_obsidian9.Notice(`GitHub sign-in: enter ${code.userCode} at ${code.verificationUri}`, 15e3);
+    });
+    this.requireCredentialStore().set(session.credential.password);
+    this.settings.authMethod = "github";
+    await this.saveSettings();
+    await this.refreshGitCredentials();
   }
   async checkForUpdates(manual) {
     if (!this.updater)
       return;
     const startedAt = performance.now();
-    log2.info("Updater", "Update check started", {
+    log.info("Updater", "Update check started", {
       manual,
       channel: this.settings.updateChannel,
       currentVersion: this.manifest.version
@@ -27292,12 +27210,12 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       );
       this.settings.lastUpdateCheck = Date.now();
       const saveStartedAt = performance.now();
-      log2.debug("Updater", "Saving update-check timestamp");
+      log.debug("Updater", "Saving update-check timestamp");
       await this.saveSettings();
-      log2.info("Updater", "Update-check timestamp saved", {
+      log.info("Updater", "Update-check timestamp saved", {
         elapsedMs: Math.round(performance.now() - saveStartedAt)
       });
-      log2.info("Updater", "Update check completed", {
+      log.info("Updater", "Update check completed", {
         manual,
         hasUpdate: result.hasUpdate,
         latestVersion: result.latestVersion,
@@ -27328,8 +27246,8 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       });
       modal.open();
     } catch (error) {
-      log2.error("Updater", "Update check failed", error);
-      log2.error("GitSyncPlugin", "Update check failed", error);
+      log.error("Updater", "Update check failed", error);
+      log.error("GitSyncPlugin", "Update check failed", error);
       if (manual) {
         new import_obsidian9.Notice(`\u274C Update check failed: ${(error == null ? void 0 : error.message) || String(error)}`);
       }
@@ -27356,9 +27274,9 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
           if (!await this.detectRealGitRepo())
             return;
           await this.syncVault();
-          log2.info("GitSyncPlugin", "Auto sync completed");
+          log.info("GitSyncPlugin", "Auto sync completed");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Auto sync failed", error);
+          log.error("GitSyncPlugin", "Auto sync failed", error);
         }
       }, intervalMs);
     }
@@ -27390,7 +27308,10 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
    */
   async openGitIgnore() {
     new GitIgnoreEditorModal(this.app, () => this.readGitIgnore(), async (updatedContent) => {
-      await this.app.vault.adapter.write(".gitignore", updatedContent);
+      const manager = await this.ensureGitManager();
+      if (!manager)
+        throw new Error("Unable to prepare the Git backend");
+      await manager.writeGitignore(updatedContent);
       new import_obsidian9.Notice("Saved .gitignore");
     }).open();
   }
@@ -27399,47 +27320,37 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
    * hidden .gitignore file manually.
    */
   async addGitIgnorePattern(pattern) {
-    const normalizedPattern = pattern.trim();
-    if (!normalizedPattern || normalizedPattern.startsWith("#")) {
-      throw new Error("Enter a non-empty ignore pattern");
-    }
-    const current = await this.readGitIgnore();
-    const lines = current.split(/\r?\n/);
-    if (lines.includes(normalizedPattern))
-      return false;
-    const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-    await this.app.vault.adapter.write(".gitignore", `${current}${separator}${normalizedPattern}
-`);
-    return true;
+    const manager = await this.ensureGitManager();
+    if (!manager)
+      throw new Error("Unable to prepare the Git backend");
+    return (await manager.addIgnorePattern(pattern)).changed;
   }
   async readGitIgnore() {
-    const adapter = this.app.vault.adapter;
-    try {
-      return await adapter.read(".gitignore");
-    } catch (error) {
-      if (await adapter.exists(".gitignore"))
-        throw error;
-      await adapter.write(".gitignore", "");
-      new import_obsidian9.Notice("Created .gitignore");
+    const manager = await this.ensureGitManager();
+    if (!manager)
       return "";
-    }
+    return manager.readGitignore();
   }
   async ensureGitManager(requireRemote = false) {
     if (this.gitManager)
       return this.gitManager;
-    const vaultPath = ".";
-    const hasRepo = await this.detectRealGitRepo();
-    if (!hasRepo && requireRemote && !this.settings.repoUrl) {
-      log2.warn("GitSyncPlugin", "No .git repo found in vault");
-      return null;
+    if (this.gitManagerPromise)
+      return this.gitManagerPromise;
+    this.gitManagerPromise = (async () => {
+      const vaultPath = ".";
+      if (!this.settings.repoUrl && requireRemote) {
+        log.warn("GitSyncPlugin", "No remote URL configured");
+        return null;
+      }
+      const credentials = await this.getGitCredentials(false);
+      this.gitManager = new ObsidianGitBackend(this.app.vault.adapter, vaultPath, credentials, this.settings.branchName);
+      return this.gitManager;
+    })();
+    try {
+      return await this.gitManagerPromise;
+    } finally {
+      this.gitManagerPromise = null;
     }
-    if (!this.settings.repoUrl && requireRemote) {
-      return null;
-    }
-    const credentials = await this.getGitCredentials(false);
-    const statusEl = this.statusBarItem || void 0;
-    this.gitManager = new GitManager(this.fs, vaultPath, credentials, this.app, statusEl);
-    return this.gitManager;
   }
   /** Run one repository mutation through the shared lifecycle boundary. */
   async runGitMutation(name, operation) {
@@ -27461,7 +27372,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
   }
   async checkRepositoryHealth() {
     const startedAt = Date.now();
-    log2.info("Maintenance", "Repository health check started");
+    log.info("Maintenance", "Repository health check started");
     try {
       const manager = await this.ensureGitManager();
       const health = manager ? await manager.checkRepositoryHealth() : {
@@ -27472,13 +27383,13 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         hasCommits: false,
         reason: "missing .git directory"
       };
-      log2.info("Maintenance", "Repository health check completed", {
+      log.info("Maintenance", "Repository health check completed", {
         ...health,
         elapsedMs: Date.now() - startedAt
       });
       return health;
     } catch (error) {
-      log2.error("Maintenance", `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
+      log.error("Maintenance", `Repository health check failed after ${Date.now() - startedAt}ms`, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
   }
@@ -27509,10 +27420,10 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
     await this.runGitMutation("Initialize repository", async (manager) => {
       try {
         await manager.initializeRepo("", this.settings.branchName || "main");
-        log2.info("GitSyncPlugin", "New git repository initialized in vault");
+        log.info("GitSyncPlugin", "New git repository initialized in vault");
         new import_obsidian9.Notice("New git repository initialized");
       } catch (e) {
-        log2.error("GitSyncPlugin", "Failed to initialize repo", e);
+        log.error("GitSyncPlugin", "Failed to initialize repo", e);
         if ((e == null ? void 0 : e.name) === "AbortError")
           throw e;
         throw new Error("Failed to initialize repo: " + e.message);
@@ -27536,23 +27447,23 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
         if (basePath) {
           const gitPath = nodePath.join(basePath, ".git");
           await nodeFs.promises.access(gitPath);
-          log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs found .git");
+          log.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs found .git");
           return true;
         }
       } catch (e) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs failed, trying adapter");
+        log.debug("GitSyncPlugin", "detectRealGitRepo: desktop Node fs failed, trying adapter");
       }
     }
     try {
       await adapter.read(".git/HEAD");
-      log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.read .git/HEAD succeeded");
+      log.debug("GitSyncPlugin", "detectRealGitRepo: adapter.read .git/HEAD succeeded");
       return true;
     } catch (e) {
     }
     try {
       const stat = await adapter.stat(".git");
       if (stat && stat.type === "folder") {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: adapter.stat .git succeeded");
+        log.debug("GitSyncPlugin", "detectRealGitRepo: adapter.stat .git succeeded");
         return true;
       }
     } catch (e) {
@@ -27561,11 +27472,11 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       const git = await Promise.resolve().then(() => (init_isomorphic_git(), isomorphic_git_exports));
       const root = await git.findRoot({ fs: this.fs, filepath: "dummy.txt" });
       if (root !== void 0) {
-        log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
+        log.debug("GitSyncPlugin", "detectRealGitRepo: findRoot found repo at", root);
         return true;
       }
     } catch (e) {
-      log2.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed");
+      log.debug("GitSyncPlugin", "detectRealGitRepo: findRoot failed");
     }
     return false;
   }
@@ -27659,7 +27570,7 @@ var GitSyncPlugin = class extends import_obsidian9.Plugin {
       results.push(`Git init test: FAIL \u2014 ${e.message}`);
     }
     const message = results.join("\n");
-    log2.info("GitSyncPlugin", "Diagnostics:\n" + message);
+    log.info("GitSyncPlugin", "Diagnostics:\n" + message);
     const modal = new import_obsidian9.Modal(this.app);
     modal.titleEl.setText("Git Sync Diagnostics");
     modal.contentEl.createEl("pre", { text: message, cls: "git-diagnostics" });
@@ -27823,6 +27734,25 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
       await this.plugin.saveSettings();
     }));
     const authentication = this.createSettingsSection(containerEl, sections[1]);
+    new import_obsidian9.Setting(authentication).setName("Authentication method").setDesc("Use a stored PAT, or sign in to GitHub without pasting a token.").addDropdown((dropdown) => dropdown.addOption("pat", "Personal Access Token").addOption("github", "Sign in with GitHub").setValue(this.plugin.settings.authMethod).onChange(async (value) => {
+      this.plugin.settings.authMethod = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian9.Setting(authentication).setName("GitHub OAuth client ID").setDesc("Required for GitHub sign-in. This is the public client ID of the plugin OAuth App.").addText((text) => text.setPlaceholder("Your registered GitHub OAuth App client ID").setValue(this.plugin.settings.githubClientId).onChange(async (value) => {
+      this.plugin.settings.githubClientId = value.trim();
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian9.Setting(authentication).setName("GitHub sign-in").setDesc("Authorize this plugin in GitHub, then store the resulting credential securely.").addButton((button) => button.setButtonText("Sign in with GitHub").onClick(async () => {
+      button.setDisabled(true);
+      try {
+        await this.plugin.authenticateWithGitHub();
+        new import_obsidian9.Notice("GitHub credential stored securely");
+      } catch (error) {
+        new import_obsidian9.Notice(`GitHub sign-in failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+      } finally {
+        button.setDisabled(false);
+      }
+    }));
     new import_obsidian9.Setting(authentication).setName("Username").setDesc("Git username (optional when using a Personal Access Token)").addText((text) => text.setPlaceholder("username").setValue(this.plugin.settings.username).onChange(async (value) => {
       this.plugin.settings.username = value;
       await this.plugin.saveSettings();
@@ -27833,7 +27763,7 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
           await this.plugin.setGitCredential(value);
           new import_obsidian9.Notice(value ? "Credential stored securely" : "Stored credential cleared");
         } catch (error) {
-          log2.error("GitSyncPlugin", "Failed to store Git credential", error);
+          log.error("GitSyncPlugin", "Failed to store Git credential", error);
           new import_obsidian9.Notice((error == null ? void 0 : error.message) || "Secure credential storage is unavailable");
         }
       });
@@ -27874,6 +27804,23 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
         }
       }
     }));
+    new import_obsidian9.Setting(sync).setName("Show change review actions").setDesc("Show the read-only \u201CReview changes\u201D action for files in Uncommitted Changes.").addToggle((toggle) => toggle.setValue(this.plugin.settings.reviewActionsEnabled).onChange(async (value) => {
+      this.plugin.settings.reviewActionsEnabled = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian9.Setting(sync).setName("Remote Commit Fetch Interval").setDesc("How often to fetch remote commit history while the Remote commits view is open (in minutes, 0 to disable)").addText((text) => text.setPlaceholder("0").setValue(String(this.plugin.settings.remoteFetchInterval)).onChange(async (value) => {
+      const numValue = Number(value);
+      if (!isNaN(numValue) && numValue >= 0) {
+        this.plugin.settings.remoteFetchInterval = numValue;
+        await this.plugin.saveSettings();
+        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SIDEBAR);
+        for (const leaf of leaves) {
+          if (leaf.view instanceof GitSidebarView) {
+            leaf.view.updateRemoteFetchInterval(numValue);
+          }
+        }
+      }
+    }));
     new import_obsidian9.Setting(sync).setName("Test Connection").setDesc("Checks the remote URL and credentials without cloning, initializing, or changing this vault.").addButton((button) => button.setButtonText("Test").onClick(async () => {
       button.setDisabled(true);
       button.setButtonText("Testing\u2026");
@@ -27883,23 +27830,13 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
           return;
         }
         new import_obsidian9.Notice("Testing remote connection\u2026");
-        const { testRemoteConnection: testRemoteConnection2 } = await Promise.resolve().then(() => (init_gitManager(), gitManager_exports));
-        const credentials = await this.plugin.getGitCredentials();
-        await testRemoteConnection2({ ...credentials });
+        await this.plugin.testRemoteConnection();
         new import_obsidian9.Notice("Remote connection successful. You can now clone it or initialize a local repository.");
       } catch (error) {
         new import_obsidian9.Notice(`Remote connection test failed: ${(error == null ? void 0 : error.message) || String(error)}`);
       } finally {
         button.setDisabled(false);
         button.setButtonText("Test");
-      }
-    }));
-    new import_obsidian9.Setting(sync).setName("Manual Sync").setDesc("Manually sync your vault with the Git repository").addButton((button) => button.setButtonText("Sync Now").onClick(async () => {
-      try {
-        await this.plugin.syncVault();
-        new import_obsidian9.Notice("Git sync completed successfully");
-      } catch (error) {
-        new import_obsidian9.Notice(`Git sync failed: ${(error == null ? void 0 : error.message) || String(error)}`);
       }
     }));
     const updates = this.createSettingsSection(containerEl, sections[3]);
@@ -27944,7 +27881,7 @@ var GitSyncSettingTab = class extends import_obsidian9.PluginSettingTab {
     const diagnostics = this.createSettingsSection(containerEl, sections[4]);
     new import_obsidian9.Setting(diagnostics).setName("Export Debug Logs").setDesc("Export captured debug logs to a markdown file in your vault").addButton((button) => button.setButtonText("Export Logs").onClick(async () => {
       try {
-        const path = await log2.exportToFile(this.app.vault);
+        const path = await log.exportToFile(this.app.vault);
         new import_obsidian9.Notice(`Debug log exported to ${path}`);
       } catch (error) {
         new import_obsidian9.Notice(`Export failed: ${error.message}`);

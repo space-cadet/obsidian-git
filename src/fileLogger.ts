@@ -22,6 +22,7 @@ export class FileLogger {
 	private stopped = false;
 	private bytesWrittenSinceCheck = 0;
 	private sensitiveValues: string[] = [];
+	private lastMemorySnapshot: string | null = null;
 	private static readonly CHECK_INTERVAL = 100 * 1024;
 
 	constructor(app: App, pluginId: string, maxSizeBytes = 5 * 1024 * 1024) {
@@ -67,7 +68,11 @@ export class FileLogger {
 			window.clearInterval(this.memoryTimer);
 			this.memoryTimer = null;
 		}
-		if (!enabled || this.stopped || !this.initialized) return;
+		if (!enabled || this.stopped || !this.initialized) {
+			this.lastMemorySnapshot = null;
+			return;
+		}
+		this.lastMemorySnapshot = null;
 		this.logMemorySnapshot();
 		this.memoryTimer = window.setInterval(() => this.logMemorySnapshot(), 60000);
 	}
@@ -174,14 +179,15 @@ export class FileLogger {
 	private logMemorySnapshot(): void {
 		const mem = (performance as any).memory;
 		const domNodes = typeof document === 'undefined' ? 0 : document.getElementsByTagName('*').length;
+		let message: string;
 		if (mem) {
-			this.log(
-				'metric',
-				`Memory — used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`,
-			);
+			message = `Memory — used: ${(mem.usedJSHeapSize / 1024 / 1024).toFixed(1)} MB, total: ${(mem.totalJSHeapSize / 1024 / 1024).toFixed(1)} MB, limit: ${(mem.jsHeapSizeLimit / 1024 / 1024).toFixed(1)} MB, DOM nodes: ${domNodes}`;
 		} else {
-			this.log('metric', `Memory — N/A, DOM nodes: ${domNodes}`);
+			message = `Memory — N/A, DOM nodes: ${domNodes}`;
 		}
+		if (message === this.lastMemorySnapshot) return;
+		this.lastMemorySnapshot = message;
+		this.log('metric', message);
 	}
 
 	private formatLine(level: string, ...args: unknown[]): string {

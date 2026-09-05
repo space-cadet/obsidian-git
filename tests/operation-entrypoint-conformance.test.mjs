@@ -90,10 +90,10 @@ test('staging controls stay stationary while a mutation is in flight', () => {
 });
 
 test('successful pushes force-update the existing local tracking ref', () => {
-  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
+  const gitBackendSource = readFileSync(join(repositoryRoot, 'src/backend/gitBackend.ts'), 'utf8');
   assert.match(
-    gitManagerSource,
-    /ref: `refs\/remotes\/origin\/\$\{branchName\}`,[\s\S]*value: localOid,[\s\S]*force: true,/,
+    gitBackendSource,
+    /ref: `refs\/remotes\/origin\/\$\{this\.config\.branch\}`,[\s\S]*value: oid,[\s\S]*force: true,/,
   );
 });
 
@@ -104,6 +104,62 @@ test('async sidebar reads guard log and commit-detail responses against stale re
   assert.match(sidebarSource, /await this\.plugin\.fileLogger\?\.readEntries\(500\)[\s\S]*if \(!this\.isCurrentRender\(generation\)\) return;/);
   assert.match(sidebarSource, /private async renderCommitDetail\(row: HTMLElement, oid: string, generation: number\)/);
   assert.match(sidebarSource, /if \(!this\.isCurrentRender\(generation\) \|\| !row\.isConnected\) return;/);
+});
+
+test('sidebar initial load does not await the repository-wide read', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const onOpenSource = sidebarSource.slice(
+    sidebarSource.indexOf('async onOpen()'),
+    sidebarSource.indexOf('\n    async onClose()', sidebarSource.indexOf('async onOpen()')),
+  );
+
+  assert.match(onOpenSource, /void this\.refresh\(\)\.catch/);
+  assert.doesNotMatch(onOpenSource, /await this\.refresh\(\)/);
+  assert.match(sidebarSource, /private repositoryReadInFlight: Promise<void> \| null = null/);
+  assert.match(sidebarSource, /if \(this\.repositoryReadInFlight\)/);
+});
+
+test('sidebar avoids rebuilding an unchanged Changes snapshot', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /private statusSnapshotsEqual\(/);
+  assert.match(sidebarSource, /const changed = !this\.statusSnapshotsEqual\(this\.sidebarSnapshot, snapshot\)/);
+  assert.match(sidebarSource, /this\.renderedStatusRevision !== this\.statusRevision/);
+});
+
+test('sidebar distinguishes untracked files from staged additions', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /status === 'untracked'\s*\? '\?'/);
+  assert.match(sidebarSource, /status === 'added'\s*\? 'A'/);
+  assert.match(sidebarSource, /status === 'untracked'\s*\? 'git-status-untracked'/);
+});
+
+test('uncommitted changes offer status filters and file-list sorting', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+
+  assert.match(sidebarSource, /marker: '\?', label: 'Untracked'/);
+  assert.match(sidebarSource, /marker: 'A', label: 'Added'/);
+  assert.match(sidebarSource, /marker: 'M', label: 'Modified'/);
+  assert.match(sidebarSource, /marker: 'D', label: 'Deleted'/);
+  assert.match(sidebarSource, /label: 'Path \(A–Z\)'/);
+  assert.match(sidebarSource, /label: 'Path \(Z–A\)'/);
+  assert.match(sidebarSource, /label: 'Status, then path'/);
+  assert.match(sidebarSource, /label: 'Folder, then name'/);
+  assert.match(sidebarSource, /return manager\.addAll\(visibleUnstaged\)/);
+});
+
+test('Changes section headers stay visible while the sidebar content scrolls', () => {
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
+
+  const headerStyles = styles.slice(
+    styles.indexOf('.git-status-section-header {'),
+    styles.indexOf('\n}', styles.indexOf('.git-status-section-header {')) + 2,
+  );
+  assert.match(headerStyles, /position:\s*sticky/);
+  assert.match(headerStyles, /top:\s*0/);
+  assert.match(headerStyles, /z-index:\s*5/);
+  assert.match(styles, /\.git-sidebar-content\s*\{[\s\S]*overflow-y:\s*auto/);
 });
 
 test('sidebar keeps retained activity history and commit source controls visible', () => {
@@ -119,13 +175,13 @@ test('sidebar keeps retained activity history and commit source controls visible
 });
 
 test('single-file staging avoids a repository-wide status scan', () => {
-  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
-  const stagePathSource = gitManagerSource.match(
-    /private async stagePath\([\s\S]*?\n    \}\n\n    \/\*\*\n     \* Ask isomorphic-git for ignore semantics/,
+  const gitBackendSource = readFileSync(join(repositoryRoot, 'src/backend/gitBackend.ts'), 'utf8');
+  const stagePathSource = gitBackendSource.match(
+    /async stage\(path: string\)[\s\S]*?\n  \}\n\n  async stageAll\(/,
   )?.[0] || '';
 
   assert.match(stagePathSource, /git\.listFiles\(/);
-  assert.match(stagePathSource, /this\.fs\.stat\(/);
+  assert.match(stagePathSource, /this\.fileSystem\.lstat\(/);
   assert.doesNotMatch(stagePathSource, /git\.statusMatrix\(/);
 });
 
@@ -139,7 +195,7 @@ test('single-file sidebar mutations repaint from the completed operation', () =>
   assert.match(actionSource, /this\.applyFileMutationToSnapshot\(/);
   assert.match(actionSource, /this\.repaintStatusSnapshot\(\);/);
   assert.doesNotMatch(actionSource, /await this\.refresh\(/);
-  assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged'\)/);
+  assert.match(sidebarSource, /private applyFileMutationToSnapshot\(filepath: string, destination: 'staged' \| 'unstaged' \| 'removed'\)/);
 });
 
 test('bulk sidebar mutations repaint without a second repository read', () => {
@@ -153,4 +209,23 @@ test('bulk sidebar mutations repaint without a second repository read', () => {
   assert.doesNotMatch(bulkSource, /await this\.refresh\(/);
   assert.match(sidebarSource, /for \(const filepath of result\.unstaged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'unstaged'\)/);
   assert.match(sidebarSource, /for \(const filepath of result\.staged\)[\s\S]*applyFileMutationToSnapshot\(filepath, 'staged'\)/);
+});
+
+test('staged and uncommitted lists support range and modifier-key selection', () => {
+  const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
+
+  assert.match(sidebarSource, /private readonly selectedFilePaths = new Set<string>\(\)/);
+  assert.match(sidebarSource, /private readonly selectionAnchorBySection/);
+  assert.match(sidebarSource, /mouseEvent\.shiftKey/);
+  assert.match(sidebarSource, /mouseEvent\.metaKey \|\| mouseEvent\.ctrlKey/);
+  assert.match(sidebarSource, /Stage selected/);
+  assert.match(sidebarSource, /Unstage selected/);
+  assert.match(sidebarSource, /Revert selected/);
+  assert.match(sidebarSource, /Delete selected/);
+  assert.match(sidebarSource, /confirmDiscardSelected/);
+  assert.match(sidebarSource, /manager\.addAll\(paths\)/);
+  assert.match(sidebarSource, /manager\.unstageFile\(filepath\)/);
+  assert.match(sidebarSource, /this\.app\.vault\.trash\(file, false\)/);
+  assert.match(styles, /\.git-selection-toolbar\s*\{[\s\S]*position: sticky;[\s\S]*top: 60px;/);
 });

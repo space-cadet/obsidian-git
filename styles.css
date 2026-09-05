@@ -506,6 +506,9 @@
 .git-status-section-header {
     display: flex;
     align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 5;
     gap: 10px;
     padding: 10px 14px;
     background: var(--background-secondary-alt);
@@ -550,7 +553,8 @@
 }
 
 /* Bulk action button — mobile-style */
-.git-status-section-action {
+.git-status-section-action,
+.git-status-section-control {
     padding: 3px 10px;
     border: none;
     border-radius: 6px;
@@ -564,7 +568,8 @@
     transition: all 0.1s;
 }
 
-.git-status-section-action:hover {
+.git-status-section-action:hover,
+.git-status-section-control:hover {
     background: var(--interactive-accent);
     color: var(--text-on-accent);
 }
@@ -583,6 +588,48 @@
     padding: 4px 0;
 }
 
+.git-selection-toolbar {
+    display: flex;
+    align-items: center;
+    position: sticky;
+    top: 60px;
+    z-index: 4;
+    gap: 8px;
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--background-modifier-border);
+    background: var(--background-primary-alt);
+}
+
+.git-selection-count {
+    flex: 1;
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.git-selection-btn {
+    padding: 3px 10px;
+    border: none;
+    border-radius: 6px;
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.git-selection-btn:hover {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+}
+
+.git-selection-primary {
+    color: var(--text-accent);
+}
+
+.git-selection-warning {
+    color: var(--text-error);
+}
+
 /* File row — mobile-style clean layout */
 .git-file-row {
     display: flex;
@@ -596,6 +643,12 @@
 
 .git-file-row:hover {
     background: var(--background-modifier-hover);
+}
+
+.git-file-row-selected,
+.git-file-row-selected:hover {
+    background: var(--background-modifier-hover);
+    box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 /* Status icon — clean text marker like mobile (purple M, not boxed) */
@@ -1142,9 +1195,61 @@
 .git-section-toggle:focus-visible,
 .git-file-btn:focus-visible,
 .git-status-section-action:focus-visible,
+.git-status-section-control:focus-visible,
 .git-commits-toggle-btn:focus-visible {
     outline: 2px solid var(--interactive-accent);
     outline-offset: -2px;
+}
+
+.git-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.git-review-description {
+    color: var(--text-muted);
+    margin: 0 0 12px;
+}
+
+.git-review-panes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    min-width: min(760px, 80vw);
+}
+
+.git-review-pane {
+    min-width: 0;
+}
+
+.git-review-pane h4 {
+    margin: 0 0 6px;
+    color: var(--text-muted);
+}
+
+.git-review-content {
+    box-sizing: border-box;
+    width: 100%;
+    max-height: min(58vh, 620px);
+    overflow: auto;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    background: var(--background-primary-alt);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 620px) {
+    .git-review-panes {
+        grid-template-columns: 1fr;
+        min-width: 0;
+    }
 }
 
 .git-tab-active {
@@ -1221,7 +1326,7 @@
 
 .git-header-status {
     min-height: 20px;
-    margin: 2px 44px 0 20px;
+    margin: 0 0 0 14px;
     font-size: var(--font-ui-small);
     line-height: 1.4;
 }
@@ -1258,6 +1363,7 @@
     gap: 10px;
     padding: 10px 16px;
     background: var(--background-primary);
+    box-shadow: 0 1px 0 var(--git-sidebar-divider);
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     letter-spacing: 0.05em;
@@ -1297,7 +1403,8 @@
     line-height: 1;
 }
 
-.git-status-section-action {
+.git-status-section-action,
+.git-status-section-control {
     min-height: var(--git-sidebar-control-height);
     padding: 6px 12px;
     border: 1px solid transparent;
@@ -1309,7 +1416,8 @@
     transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
-.git-status-section-action:hover:not(:disabled) {
+.git-status-section-action:hover:not(:disabled),
+.git-status-section-control:hover {
     background: var(--background-modifier-hover);
     border-color: var(--git-sidebar-divider);
     color: var(--text-accent);
@@ -1318,6 +1426,28 @@
 .git-status-section-action:disabled {
     background: var(--background-modifier-border);
     color: var(--text-faint);
+}
+
+.git-status-section-control {
+    order: 2;
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    padding: 7px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: var(--background-primary);
+    color: var(--text-muted);
+}
+
+.git-status-section-control.is-active {
+    color: var(--text-accent);
+    border-color: var(--interactive-accent);
+}
+
+.git-status-section-control svg {
+    width: 18px;
+    height: 18px;
 }
 
 .git-status-section-list {
@@ -1756,12 +1886,18 @@
     padding: 8px 24px;
     border-top: 1px solid var(--git-sidebar-divider);
     border-left: 0;
-    cursor: default;
+    cursor: pointer;
 }
 
 .git-file-row:hover {
     background: var(--git-sidebar-muted-surface);
     border-left-color: transparent;
+}
+
+.git-file-row-selected,
+.git-file-row-selected:hover {
+    background: var(--background-modifier-hover);
+    box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 .git-file-stage-toggle {

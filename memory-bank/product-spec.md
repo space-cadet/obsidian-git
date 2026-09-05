@@ -290,7 +290,7 @@ of the value being entered.
 | Auto Commit Message | Text | `Vault backup: {{date}}` | Message for automatic commits |
 | Sidebar Refresh Interval | Text number | `60` seconds | Automatic sidebar refresh; zero disables it |
 | Test Connection | Button | — | Tests remote URL and credentials without changing the vault |
-| Manual Sync | Button | — | Runs `Sync Now` manually |
+| Manual Sync | Ribbon icon / command palette | — | Runs the retained manual sync entry point |
 
 The automatic commit message expands the first `{{date}}` placeholder to the
 current local date and time. Non-negative numeric intervals are accepted. A
@@ -402,7 +402,8 @@ remote failure. `Push` sends local commits to the configured remote. A force
 push is available through More and requires explicit confirmation because it
 overwrites remote history.
 
-`Sync now` and automatic sync perform the combined workflow of pulling first,
+The retained ribbon and command-palette `Sync now` actions and automatic sync
+perform the combined workflow of pulling first,
 staging local changes, committing them when present, and pushing when a remote
 is configured. With no remote, sync creates a local commit only. With no
 changes, it reports that there are no changes to commit.
@@ -595,8 +596,8 @@ This current document task is only the product baseline and PRD foundation.
   credentials, diagnostics, and `.gitignore` editor.
 - `src/views/GitSidebarView.ts` — sidebar layout, tabs, actions, states, and
   commit/log interactions.
-- `src/gitManager.ts` — user-visible repository, status, Git, history, and
-  recovery outcomes.
+- `src/backend/gitBackend.ts` — user-visible repository, status, Git, history,
+  and recovery outcomes.
 - `src/settings-sections/diagnostics.ts` — diagnostic controls and metrics.
 - `src/settings-sections/maintenance.ts` — health, dry-run, repair, and restore
   controls.

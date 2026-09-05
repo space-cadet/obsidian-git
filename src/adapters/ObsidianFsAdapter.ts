@@ -11,6 +11,11 @@ export class ObsidianFsAdapter {
     private adapter: DataAdapter;
     private dir: string;
     private writeProgress?: (path: string, bytes: number) => void;
+    // readdir() validates entries on mobile because the vault index can be
+    // briefly stale. Keep those validated stats for the immediately
+    // following lstat() made by isomorphic-git's worktree walker so the
+    // adapter bridge is not called twice for every entry.
+    private readonly validatedStats = new Map<string, Stat>();
 
     constructor(adapter: DataAdapter, dir: string) {
         this.adapter = adapter;
@@ -30,7 +35,7 @@ export class ObsidianFsAdapter {
     readdir = this.readdirImpl.bind(this);
     unlink = this.unlinkImpl.bind(this);
     stat = this.statImpl.bind(this);
-    lstat = this.statImpl.bind(this);
+    lstat = this.lstatImpl.bind(this);
     readlink = this.readlinkImpl.bind(this);
     symlink = this.symlinkImpl.bind(this);
 
@@ -44,7 +49,7 @@ export class ObsidianFsAdapter {
             readdir: this.readdirImpl.bind(this),
             unlink: this.unlinkImpl.bind(this),
             stat: this.statImpl.bind(this),
-            lstat: this.statImpl.bind(this), // Obsidian doesn't expose symlinks; treat as stat
+            lstat: this.lstatImpl.bind(this),
             readlink: this.readlinkImpl.bind(this),
             symlink: this.symlinkImpl.bind(this),
             setWriteProgress: this.setWriteProgress.bind(this),
@@ -65,20 +70,20 @@ export class ObsidianFsAdapter {
         return filepath;
     }
 
-    /**
-     * Check if we're running in Electron desktop (has Node.js fs via window.require)
-     */
-    private isNodeAvailable(): boolean {
-        return typeof window !== 'undefined' && 
-               !!(window as any).require &&
-               !!(window as any).process;
+    /** Resolve Electron's CommonJS loader in both legacy and context-isolated desktop windows. */
+    private nodeRequire(): ((moduleName: string) => any) | null {
+        if (typeof require === 'function') return require;
+        const windowRequire = typeof window !== 'undefined' ? (window as any).require : null;
+        if (typeof windowRequire === 'function') return windowRequire;
+        const globalRequire = (globalThis as any).require;
+        return typeof globalRequire === 'function' ? globalRequire : null;
     }
 
     /** Resolve the vault's native desktop filesystem, when Electron exposes it. */
     private nodePathFor(path: string): { fs: any; path: any; fullPath: string } | null {
-        if (!this.isNodeAvailable()) return null;
+        const nodeRequire = this.nodeRequire();
+        if (!nodeRequire) return null;
         try {
-            const nodeRequire = (window as any).require;
             const nodeFs = nodeRequire('fs');
             const nodePath = nodeRequire('path');
             const basePath = (this.adapter as any).getBasePath?.();
@@ -92,7 +97,7 @@ export class ObsidianFsAdapter {
     /**
      * readFile — isomorphic-git may pass either { encoding: 'utf8' } or the
      * Node-compatible 'utf8' string for text; no encoding means binary.
-     * 
+     *
      * CRITICAL: Obsidian's readBinary() returns null for .git/objects/pack/*.idx files.
      * We use Node.js fs via window.require (Electron desktop) as a fallback.
      */
@@ -101,6 +106,14 @@ export class ObsidianFsAdapter {
         const encoding = typeof options === 'string' ? options : options?.encoding;
 
         if (encoding === 'utf8') {
+            const nodeFile = this.nodePathFor(path);
+            if (nodeFile) {
+                try {
+                    return await nodeFile.fs.promises.readFile(nodeFile.fullPath, { encoding: 'utf8' });
+                } catch {
+                    // Fall back to the DataAdapter below.
+                }
+            }
             return this.adapter.read(path);
         }
 
@@ -138,6 +151,27 @@ export class ObsidianFsAdapter {
      */
     private async writeFileImpl(filepath: string, data: string | Uint8Array | ArrayBuffer): Promise<void> {
         const path = this.resolve(filepath);
+
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                if (typeof data === 'string') {
+                    await nodeFile.fs.promises.writeFile(nodeFile.fullPath, data, 'utf8');
+                    this.writeProgress?.(path, new TextEncoder().encode(data).byteLength);
+                    return;
+                }
+                const bytes = data instanceof Uint8Array
+                    ? data
+                    : data instanceof ArrayBuffer
+                        ? new Uint8Array(data)
+                        : new TextEncoder().encode(String(data));
+                await nodeFile.fs.promises.writeFile(nodeFile.fullPath, bytes);
+                this.writeProgress?.(path, bytes.byteLength);
+                return;
+            } catch {
+                // Fall back to the DataAdapter below.
+            }
+        }
 
         if (typeof data === 'string') {
             await this.adapter.write(path, data);
@@ -213,7 +247,7 @@ export class ObsidianFsAdapter {
             const candidatePath = path === '.' ? relativePath : `${path}/${relativePath}`;
             try {
                 const stat = await this.adapter.stat(candidatePath);
-                return stat ? relativePath : null;
+                return stat ? { relativePath, candidatePath, stat } : null;
             } catch (error: any) {
                 if (error?.code === 'ENOENT' || /no such file|not found/i.test(error?.message || '')) {
                     return null;
@@ -222,7 +256,12 @@ export class ObsidianFsAdapter {
             }
         }));
 
-        return existingEntries.filter((entry): entry is string => entry !== null);
+        for (const entry of existingEntries) {
+            if (entry) this.validatedStats.set(entry.candidatePath, entry.stat);
+        }
+        return existingEntries
+            .filter((entry): entry is { relativePath: string; candidatePath: string; stat: Stat } => entry !== null)
+            .map((entry) => entry.relativePath);
     }
 
     private async unlinkImpl(filepath: string): Promise<void> {
@@ -248,6 +287,12 @@ export class ObsidianFsAdapter {
             }
         }
 
+        const validated = this.validatedStats.get(path);
+        if (validated) {
+            this.validatedStats.delete(path);
+            return this.toNodeStat(validated);
+        }
+
         const stat: Stat | null = await this.adapter.stat(path);
 
         if (!stat) {
@@ -256,6 +301,44 @@ export class ObsidianFsAdapter {
             throw err;
         }
 
+        return this.toNodeStat(stat);
+    }
+
+    /**
+     * Keep lstat distinct from stat on desktop. A regular stat follows a
+     * symlink and therefore throws for a broken link. Git's worktree walker
+     * deliberately uses lstat so it can identify the link without following
+     * it (and subsequently apply ignore rules normally).
+     */
+    private async lstatImpl(filepath: string): Promise<any> {
+        const path = this.resolve(filepath);
+
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            try {
+                return await nodeFile.fs.promises.lstat(nodeFile.fullPath);
+            } catch {
+                // Mobile and virtual vault adapters do not expose symlink
+                // metadata, so retain the existing DataAdapter fallback.
+            }
+        }
+
+        const validated = this.validatedStats.get(path);
+        if (validated) {
+            this.validatedStats.delete(path);
+            return this.toNodeStat(validated);
+        }
+
+        const stat: Stat | null = await this.adapter.stat(path);
+        if (!stat) {
+            const err: any = new Error(`ENOENT: no such file or directory, lstat '${path}'`);
+            err.code = 'ENOENT';
+            throw err;
+        }
+        return this.toNodeStat(stat);
+    }
+
+    private toNodeStat(stat: Stat): any {
         // Map Obsidian Stat to Node-like stat object
         return {
             isFile: () => stat.type === 'file',
@@ -272,7 +355,16 @@ export class ObsidianFsAdapter {
     }
 
     private async readlinkImpl(filepath: string): Promise<string> {
-        // Obsidian doesn't expose symlinks; throw as if not a symlink
+        const path = this.resolve(filepath);
+        const nodeFile = this.nodePathFor(path);
+        if (nodeFile) {
+            // Desktop Git walkers read a link's target after lstat identifies
+            // it as a symbolic link. Do not route this through DataAdapter:
+            // it has no symlink API and rejects every readlink call.
+            return nodeFile.fs.promises.readlink(nodeFile.fullPath, { encoding: 'utf8' });
+        }
+
+        // Obsidian's mobile and virtual adapters do not expose symlinks.
         const err: any = new Error(`EINVAL: invalid argument, readlink '${filepath}'`);
         err.code = 'EINVAL';
         throw err;

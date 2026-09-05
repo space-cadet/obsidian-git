@@ -149,3 +149,23 @@ They are not copied into the repository by this planning record.
 - The `.gitignore` editor received visual-viewport sizing and focus scrolling,
   but Android testing still shows keyboard overlap. Real WebView inspection is
   required before this behavior can be accepted.
+
+## Changes Interaction Continuation — 2026-09-05
+
+- Changes section headers remain visible while file lists scroll.
+- Uncommitted files can be filtered by untracked, added, modified, and deleted
+  status and sorted by path, reverse path, status/path, or folder/name.
+- Selection is scoped to Staged or Uncommitted Changes. Plain click selects one
+  row, Shift-click selects a contiguous range, and Cmd/Ctrl-click toggles rows.
+- The selected-file toolbar remains sticky and offers stage, unstage, revert,
+  delete-to-trash, select-all, and clear-selection actions as applicable.
+- Destructive multi-file actions require confirmation. Runtime desktop/mobile
+and intermediate-width acceptance remains pending.
+
+## Branch Closeout Cross-Reference — 2026-09-05
+
+The complete backend-branch result, including the retained UI boundary and the
+automated evidence for these Changes-tab refinements, is recorded in
+`implementation-details/T39-kiss-branch-summary.md`. This document remains the
+visual and behavior-preservation record; it does not claim real Obsidian
+desktop/mobile or intermediate-width acceptance.
