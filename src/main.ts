@@ -7,6 +7,7 @@ import {
 	Setting,
 	WorkspaceLeaf,
 } from "obsidian";
+import { inspectLocalRepository, RepositoryState, validateRepositoryPath } from "./repository";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 
@@ -77,7 +78,7 @@ export default class GitSyncPlugin extends Plugin {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
 			const view = leaf.view;
 			if (view instanceof GitSyncView) {
-				view.render();
+				void view.refreshRepositoryState();
 			}
 		}
 	}
@@ -86,6 +87,8 @@ export default class GitSyncPlugin extends Plugin {
 class GitSyncView extends ItemView {
 	private readonly plugin: GitSyncPlugin;
 	private activeTab = "Changes";
+	private repositoryState: RepositoryState | null = null;
+	private refreshGeneration = 0;
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
 		super(leaf);
@@ -106,6 +109,7 @@ class GitSyncView extends ItemView {
 
 	onOpen(): Promise<void> {
 		this.render();
+		void this.refreshRepositoryState();
 		return Promise.resolve();
 	}
 
@@ -142,31 +146,102 @@ class GitSyncView extends ItemView {
 
 		const content = root.createDiv({ cls: "git-sync-content" });
 		if (!repository) {
-			content.createDiv({ cls: "git-sync-state-title", text: "Set up your repository" });
+			this.renderSettingsPrompt(content, "Set up your repository");
+			return;
+		}
+
+		if (!this.repositoryState || this.repositoryState.kind === "checking") {
+			content.createDiv({ cls: "git-sync-state-title", text: "Checking repository" });
 			content.createEl("p", {
-				text: "Choose a repository in Settings to start using Git Sync.",
+				text: "Reading local repository information…",
 				cls: "git-sync-state-description",
 			});
-			const settingsButton = content.createEl("button", {
-				text: "Open Settings",
-				cls: "mod-cta",
-				attr: { type: "button" },
+			return;
+		}
+
+		if (this.repositoryState.kind === "missing") {
+			content.createDiv({ cls: "git-sync-state-title", text: "No Git repository found" });
+			content.createEl("p", {
+				text: `No .git directory was found at ${this.repositoryState.repositoryPath}.`,
+				cls: "git-sync-state-description",
 			});
-			settingsButton.addEventListener("click", () => {
-				const settings = (this.app as App & {
-					setting: { open: () => void; openTabById: (id: string) => void };
-				}).setting;
-				settings.open();
-				settings.openTabById(this.plugin.manifest.id);
+			this.addRefreshButton(content);
+			return;
+		}
+
+		if (this.repositoryState.kind === "error") {
+			content.createDiv({ cls: "git-sync-state-title", text: "Could not read repository" });
+			content.createEl("p", {
+				text: this.repositoryState.message,
+				cls: "git-sync-state-description",
 			});
+			this.addRefreshButton(content);
 			return;
 		}
 
 		content.createDiv({ cls: "git-sync-state-title", text: this.activeTab });
 		content.createEl("p", {
-			text: "Git actions will appear here when the repository component is ready.",
+			text: `Local repository ready on ${this.repositoryState.branch}.`,
 			cls: "git-sync-state-description",
 		});
+		if (this.repositoryState.head) {
+			content.createEl("p", {
+				text: `HEAD ${this.repositoryState.head.slice(0, 7)}`,
+				cls: "git-sync-state-description",
+			});
+		}
+		content.createEl("p", {
+			text: "Changes and commit actions are next.",
+			cls: "git-sync-state-description",
+		});
+		this.addRefreshButton(content);
+	}
+
+	async refreshRepositoryState(): Promise<void> {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (!repositoryPath) {
+			this.repositoryState = null;
+			this.render();
+			return;
+		}
+
+		const generation = ++this.refreshGeneration;
+		this.repositoryState = { kind: "checking", repositoryPath };
+		this.render();
+		const state = await inspectLocalRepository(this.app.vault.adapter, repositoryPath);
+		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+		this.repositoryState = state;
+		this.render();
+	}
+
+	private renderSettingsPrompt(content: HTMLElement, title: string): void {
+		content.createDiv({ cls: "git-sync-state-title", text: title });
+		content.createEl("p", {
+			text: "Choose a vault-relative repository path in Settings to start using Git Sync.",
+			cls: "git-sync-state-description",
+		});
+		const settingsButton = content.createEl("button", {
+			text: "Open Settings",
+			cls: "mod-cta",
+			attr: { type: "button" },
+		});
+		settingsButton.addEventListener("click", () => this.openSettings());
+	}
+
+	private addRefreshButton(content: HTMLElement): void {
+		const refreshButton = content.createEl("button", {
+			text: "Refresh repository",
+			attr: { type: "button" },
+		});
+		refreshButton.addEventListener("click", () => void this.refreshRepositoryState());
+	}
+
+	private openSettings(): void {
+		const settings = (this.app as App & {
+			setting: { open: () => void; openTabById: (id: string) => void };
+		}).setting;
+		settings.open();
+		settings.openTabById(this.plugin.manifest.id);
 	}
 }
 
@@ -230,8 +305,9 @@ class GitSyncSettingTab extends PluginSettingTab {
 				button.setCta();
 				button.onClick(async () => {
 					const settings = this.plugin.settings;
-					if (!settings.repositoryPath || !settings.branchName) {
-						feedback.setText("Enter a repository path and branch before saving.");
+					const pathError = validateRepositoryPath(settings.repositoryPath);
+					if (pathError || !settings.branchName) {
+						feedback.setText(pathError || "Enter a branch before saving.");
 						feedback.addClass("is-error");
 						return;
 					}
