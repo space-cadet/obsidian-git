@@ -1,27 +1,16 @@
 # Product Context
 
-*Last Updated: 2026-09-04 20:18:35 IST*
+This is a clean rebuild of the Obsidian Git plugin. The first visible product
+work is the UI shell and Settings panel, which provide the anchor for the
+remaining components.
 
-Obsidian Git Sync is an Obsidian plugin for tracking a vault with Git on
-desktop and mobile. Its current product surface includes the Git sidebar,
-Git Sync Settings, manual and automatic synchronization, repository history,
-`.gitignore` controls, diagnostics, maintenance, and plugin updates.
+The common workflow is:
 
-The complete current product contract is recorded in
-[`product-spec.md`](product-spec.md). That specification is implementation-
-agnostic and is the source from which the rewrite PRD will be prepared.
+1. Open the sidebar.
+2. Configure a repository.
+3. See local file changes.
+4. Commit and synchronise with a remote.
+5. Understand what happened when an operation succeeds or fails.
 
-The first rewrite PRD draft is recorded in
-[`product-prd.md`](product-prd.md). It remains subject to user review before
-the rewrite task and branch are created.
-
-The rewrite direction is UI-preserving: retain the existing Settings panel,
-sidebar layout, styles, dialogs, and proven updater experience. Replace only
-the Git or state-update code that cannot support a demonstrated user workflow
-with a simpler direct implementation. No particular module structure is part
-of the product decision.
-
-The approved sidebar visual references remain in
-[`assets/ui-mockups/`](assets/ui-mockups/). The current product specification
-records the existing UI and evidenced behaviour; it does not record the
-current code's internal ownership or call structure.
+The previous implementation is reference material only. Its records are
+archived outside this fresh Memory Bank.

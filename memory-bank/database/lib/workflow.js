@@ -33,7 +33,7 @@ import { join, resolve } from 'path';
  * @param {Array<{action:string,path:string,description:string}>} [data.files_modified] - Files changed
  * @param {string} [data.task_status] - New status if changed: in_progress, completed, paused
  * @param {string} [data.session_notes] - Notes about the session
- * @param {string} [data.session_period] - morning, afternoon, evening, night
+ * @param {string} [data.period] - morning, afternoon, evening, night
  * @param {string} [data.output_dir] - Directory to write markdown files (default: memory-bank/)
  * @param {string} [data.tasks_dir] - Directory for individual task files (e.g., memory-bank/tasks/)
  * @param {string} [data.sessions_dir] - Directory for session files (e.g., memory-bank/sessions/)
@@ -47,7 +47,7 @@ export async function recordSessionWork({
   files_modified = [],
   task_status = null,
   session_notes = '',
-  session_period = 'morning',
+  period = 'morning',
   output_dir = null,
   tasks_dir = null,
   sessions_dir = null,
@@ -110,7 +110,7 @@ export async function recordSessionWork({
       `SELECT id FROM sessions
        WHERE date = ? AND period = ? AND status = 'active'
        ORDER BY id DESC LIMIT 1`,
-      [dateStr, session_period]
+      [dateStr, period]
     );
 
     let sessionId;
@@ -126,7 +126,7 @@ export async function recordSessionWork({
     } else {
       const sessionResult = await inserts.createSession({
         date: dateStr,
-        period: session_period,
+        period: period,
         focus: task_id,
         status: 'active',
         content: session_notes || `Working on ${task_id}: ${task_description}`
@@ -291,7 +291,7 @@ export async function completeSessionWork(sessionId, notes = null, {
     );
     await inserts.updateSessionCache({
       current_session_id: nextActiveSession?.id || null,
-      current_focus_task: nextActiveSession?.focus || null,
+      current_focus_task: nextActiveSession?.focus_task || null,
       active_tasks_count: counts.active || 0,
       paused_tasks_count: counts.paused || 0,
       completed_tasks_count: counts.completed || 0

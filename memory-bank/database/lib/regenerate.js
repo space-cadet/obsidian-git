@@ -76,7 +76,7 @@ export async function regenerateEditHistory(outputPath) {
  */
 export async function regenerateTasks(outputPath) {
   const allTasks = await sqlite.queryAll(
-    `SELECT id, title, status, priority, started, updated, details
+    `SELECT id, title, status, priority, started, last_updated, details
      FROM task_items
      ORDER BY id`
   );
@@ -92,11 +92,11 @@ export async function regenerateTasks(outputPath) {
   const completed = allTasks.filter(t => t.status === 'completed');
   const pending = allTasks.filter(t => t.status === 'pending');
 
-  let md = '# Memory Bank - Sage Workspace\n\n';
+  let md = '# Memory Bank - Obsidian Git\n\n';
   md += `*Created: ${now}*\n`;
   md += `*Last Updated: ${now}*\n\n`;
   md += '## Overview\n\n';
-  md += 'This is the Memory Bank for the Sage (灵剑) OpenClaw workspace.\n\n';
+  md += 'This is the Memory Bank for the clean Obsidian Git rebuild.\n\n';
 
   // Active Tasks
   if (active.length > 0) {
@@ -118,7 +118,7 @@ export async function regenerateTasks(outputPath) {
     md += '|----|-------|--------|----------|---------|-----------|--------------|---------|\n';
     for (const t of completed) {
       const depList = deps.filter(d => d.task_id === t.id).map(d => d.depends_on).join(', ') || '-';
-      const completedDate = t.updated ? t.updated.slice(0, 10) : '-';
+      const completedDate = t.last_updated ? t.last_updated.slice(0, 10) : '-';
       md += `| ${t.id} | ${t.title} | ✅ | ${t.priority.toUpperCase()} | ${t.started} | ${completedDate} | ${depList} | [Details](tasks/${t.id}.md) |\n`;
     }
     md += '\n';
@@ -264,7 +264,7 @@ export async function regenerateSessionCache(outputPath) {
       md += `### ${t.id}: ${t.title}\n`;
       md += `**Status:** ✅ **COMPLETED**\n`;
       md += `**Started:** ${t.started}\n`;
-      md += `**Completed:** ${t.updated?.slice(0, 10) || '-'}\n\n`;
+      md += `**Completed:** ${t.last_updated?.slice(0, 10) || '-'}\n\n`;
     }
   }
 
@@ -282,7 +282,7 @@ export async function regenerateSessionCache(outputPath) {
   // System Status
   md += '## System Status\n\n';
   md += `- **Memory Bank**: ${activeTasks.length > 0 ? '🔄 Active' : '✅ Idle'}\n`;
-  md += `- **OpenClaw**: ✅ Operational\n`;
+  md += `- **Memory Bank**: ✅ Operational\n`;
 
   if (outputPath) {
     ensureDir(outputPath);
@@ -423,7 +423,7 @@ function activeFocusTaskId(cacheFocusTask, currentSession) {
  */
 export async function regenerateTaskFiles(tasksDir) {
   const tasks = await sqlite.queryAll(
-    `SELECT id, title, status, priority, started, updated, details FROM task_items ORDER BY id`
+    `SELECT id, title, status, priority, started, last_updated, details FROM task_items ORDER BY id`
   );
 
   for (const task of tasks) {
@@ -431,7 +431,7 @@ export async function regenerateTaskFiles(tasksDir) {
 
     let md = `# ${task.id}: ${task.title}\n\n`;
     md += `*Created: ${task.started || '-'}*\n`;
-    md += `*Last Updated: ${task.updated || '-'}*\n\n`;
+    md += `*Last Updated: ${task.last_updated || '-'}*\n\n`;
     md += `**Status**: ${statusEmoji(task.status)} **${task.status.toUpperCase()}**\n`;
     md += `**Priority**: ${task.priority || 'MEDIUM'}\n\n`;
 

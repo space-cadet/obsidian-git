@@ -217,7 +217,7 @@ async function testRegenerateTasks() {
   const testPath = join(__dirname, 'test_output_tasks.md');
   const md = await regenerate.regenerateTasks(testPath);
 
-  assert(md.includes('# Memory Bank - Sage Workspace'), 'Has header');
+  assert(md.includes('# Memory Bank - Obsidian Git'), 'Has header');
   assert(md.includes('## Active Tasks'), 'Has active tasks section');
   assert(md.includes('| T3 |'), 'Has T3 in table');
   assert(md.includes('🔄'), 'Has in_progress emoji');
@@ -271,7 +271,7 @@ async function testWorkflow() {
       { action: 'Created', path: 'memory-bank/database/lib/workflow.js', description: 'Workflow wrapper' }
     ],
     task_status: 'in_progress',
-    session_period: 'morning',
+    period: 'morning',
     output_dir: join(__dirname, 'test_output')
   });
 

@@ -1,10 +1,13 @@
-# Memory Bank Project
+# Obsidian Git Rebuild Memory Bank
 
-*Initialized: 2026-08-11 02:13:09 IST*
+*Initialized: 2026-05-09 23:15:48 GMT+5:30*
 
 ## Overview
 
-This directory contains your Memory Bank - a system for maintaining project knowledge, tracking tasks, and preserving context across work sessions.
+This directory records the clean, component-based rebuild of Obsidian Git.
+The previous Memory Bank is archived at the repository root. The new plugin is
+being built from scratch; old implementation details are reference material,
+not constraints.
 
 ## Getting Started
 
@@ -70,10 +73,9 @@ When using with an AI assistant:
 3. Update files after completing work
 4. Maintain activeContext.md and session_cache.md
 
-### 5. Next Steps
+### 5. Current Starting Point
 
-1. Fill in **projectbrief.md** with your project details
-2. Add your first tasks to **tasks.md**
-3. Define development standards in **.cursorrules**
-4. If using database: `cd memory-bank/database && pnpm install && ./run-all.sh`
-5. Start working and update context files as you progress
+1. Build **T1: Plugin UI Shell**.
+2. Build **T2: Settings Panel**.
+3. Verify the visual anchor in Obsidian.
+4. Add the next component only after the first two are usable.

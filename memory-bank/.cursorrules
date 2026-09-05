@@ -1,43 +1,32 @@
 # Development Guidelines
 
-## Project Standards
+## Core rule
 
-### Code Style
-- [Add your coding standards]
-- [Formatting preferences]
-- [Naming conventions]
+Keep the plugin simple and functional. Add a component or abstraction only
+when the current user workflow cannot work without it.
 
-### Architecture Patterns
-- [Key patterns used in this project]
-- [Design principles]
-- [Architectural decisions]
+## Implementation
 
-### File Organization
-- [How files are organized]
-- [Module structure]
-- [Naming conventions for files/folders]
+- Build one app component at a time.
+- Keep state and operations owned by the component that uses them.
+- Prefer direct functions and small adapters over general frameworks.
+- Do not copy code from the archived implementation.
+- Do not build speculative edge-case handling.
 
-### Dependencies
-- [Key dependencies]
-- [Version constraints]
-- [Why each dependency is used]
+## UI
 
-### Testing Requirements
-- [Testing framework]
-- [Coverage requirements]
-- [Testing conventions]
+- Build the UI shell and Settings first.
+- Keep visible states clear: loading, empty, ready, and failed.
+- Avoid visual complexity that does not improve the common workflow.
 
-### Documentation Standards
-- [Comment style]
-- [README requirements]
-- [API documentation format]
+## Testing
 
-### Git Workflow
-- [Branch naming conventions]
-- [Commit message format]
-- [PR review process]
+- Test the component's common workflow first.
+- Use temporary repositories for Git behavior.
+- Keep source, build, desktop, mobile, remote, and release evidence separate.
 
-### Important Notes
-- [Project-specific considerations]
-- [Common gotchas]
-- [Best practices for this codebase]
+## Documentation
+
+- Keep one task per app component.
+- Keep implementation notes short and current.
+- Record decisions and failures without turning every edge case into a feature.

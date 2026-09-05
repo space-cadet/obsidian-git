@@ -1,49 +1,28 @@
 # Project Brief
+*Last Updated: 2026-09-05 23:35:25 IST*
 
-## Obsidian Git Sync Plugin
+## Project Overview
+**Project Name**: Obsidian Git
+**Description**: A simple Obsidian plugin for viewing and synchronising a vault with Git.
 
-A Git synchronization plugin for Obsidian that works on desktop and mobile platforms using isomorphic-git, a pure JavaScript implementation of Git.
-
-## Core Components
-
-- **Git Backend** (`src/backend/gitBackend.ts`): Core Git operations — clone, pull, add, commit, push, status
-- **Plugin Main** (`src/main.ts`): Obsidian plugin lifecycle, settings UI, auto-sync scheduler, ribbon icon
-- **Logger** (`src/logger.ts`): Winston-based structured logging with configurable levels
-- **Proxy Server** (`proxy/proxyServer.js`): CORS proxy for Git HTTP requests on mobile
+## Objectives
+1. Build a functional plugin from a clean implementation.
+2. Make the UI visible and useful before adding Git operations.
+3. Support the common local and remote workflows without speculative machinery.
 
 ## Key Features
+- UI shell and Settings panel
+- Local file status, staging, commit, and history
+- Remote pull, push, sync, and clone
+- Activity, progress, errors, and updater support
 
-- Synchronize Obsidian vault with a Git repository
-- Works on desktop (Windows, macOS, Linux) and mobile (iOS, Android)
-- Automatic and manual sync options
-- Configurable commit messages with `{{date}}` placeholder
-- Status bar indicator for sync status
-- Settings UI with connection test and manual sync buttons
+## Constraints
+- Keep the implementation simple and component-owned.
+- Do not copy the previous plugin implementation.
+- Add handling for an edge case only when a real workflow requires it.
+- Treat automated, desktop, mobile, remote, and release evidence separately.
 
-## Technical Stack
-
-- **Language**: TypeScript
-- **Build**: esbuild
-- **Git Engine**: isomorphic-git + @isomorphic-git/lightning-fs
-- **HTTP Client**: isomorphic-git/http/web via custom proxy
-- **Logging**: Winston
-- **Platform**: Obsidian Plugin API
-
-## File Organization
-
-```
-/src/
-  main.ts          — Plugin entry point, settings, auto-sync
-  gitManager.ts    — Git operations wrapper
-  logger.ts        — Structured logging
-/proxy/
-  proxyServer.js   — CORS proxy for Git HTTP
-```
-
-## Project Status
-
-- **Version**: 1.0.0
-- **Phase**: Initial development / stabilization
-- **License**: MIT
-
-Last Updated: 2026-05-30
+## Success Metrics
+- The plugin loads and presents a usable shell.
+- A user can configure a repository and complete the basic Git workflow.
+- The same workflows are verified in the supported Obsidian environments.

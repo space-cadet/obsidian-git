@@ -1,54 +1,90 @@
-# Memory Bank — Obsidian Git Sync Plugin
+# Memory Bank - Obsidian Git
 
-*Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-05 21:00:52 IST*
+*Created: 2026-09-05 23:35:25 IST*
+*Last Updated: 2026-09-05 23:41:09 IST*
 
 ## Overview
 
-Git sync plugin for Obsidian using isomorphic-git. Works on desktop and mobile without proxy servers. Uses Obsidian's `requestUrl` native API for HTTP operations.
+This is the Memory Bank for the clean Obsidian Git rebuild.
+
+## Component Build Order
+
+1. T1: Plugin UI Shell
+2. T2: Settings Panel
+3. T3: Vault and Local Repository
+4. T4: Changes Panel
+5. T5: Activity and Logging
+6. T6: Commits and History
+7. T7: Remote Sync and Authentication
+8. T8: Progress Errors and Dialogs
+9. T9: Updater and Release
+10. T10: Platform Integration and Verification
 
 ## Active Tasks
 
 | ID | Title | Status | Priority | Started | Dependencies | Details |
 |----|-------|--------|----------|---------|--------------|---------|
-| T29 | obsidian-git Plugin — sidebar UX published; release acceptance | 🔄 | HIGH | 2026-05-31 | T1-T6 | [Details](tasks/T29.md) |
-| T29a | Full Sidebar UI Redesign and Visual Acceptance | 🔄 | HIGH | 2026-09-02 | T29 | [Details](tasks/T29a.md) |
-| T30 | Remote Commits View | ✅ | MEDIUM | 2026-06-01 | T29 | [Details](tasks/T30.md) |
-| T31 | Branch Tree View | ⏳ BACKLOG | LOW | 2026-06-01 | T29 | [Details](tasks/T31.md) |
-| T32 | Mobile Crash Fix + Progress | ✅ | HIGH | 2026-06-01 | T29 | [Details](tasks/T32.md) |
-| T33 | Progress Modal + UI Fixes | ✅ | HIGH | 2026-06-02 | T29 | [Details](tasks/T33.md) |
-| T34 | Remote Authentication for Obsidian Git | 🔄 | HIGH | 2026-08-10 | - | [Details](tasks/T34.md) |
-| T34a | PAT Validation and Repository-Access Diagnostics | 🔄 | HIGH | 2026-08-10 | T34 | [Details](tasks/T34a.md) |
-| T34b | GitHub Device-Flow Authentication | ⏸️ | MEDIUM | 2026-08-10 | T34a | [Details](tasks/T34b.md) |
-| T34c | Android/Desktop Authentication Acceptance Tests | ⏸️ | HIGH | 2026-08-10 | T34a, T34b | [Details](tasks/T34c.md) |
-| T35 | Plugin Reliability, Security, Lifecycle, Transport, Updater, and Test Follow-up | 🔄 | HIGH | 2026-08-11 | T29, T34 | [Details](tasks/T35.md) |
-| T35a | Credential Safety and Git Staging Boundaries | 🔄 | HIGH | 2026-08-11 | T35, T34a | [Details](tasks/T35a.md) |
-| T35b | Git Mutation Concurrency and Cancellation | 🔄 | HIGH | 2026-08-11 | T35, T29 | [Details](tasks/T35b.md) |
-| T35c | Repository Initialization and Destructive-Operation Safety | 🔄 | HIGH | 2026-08-11 | T35, T29 | [Details](tasks/T35c.md) |
-| T35d | Mobile and Remote Transport Reliability | 🔄 | HIGH | 2026-08-11 | T35, T29, T34c | [Details](tasks/T35d.md) |
-| T35e | Updater Integrity and Release Artifact Consistency | 🔄 | HIGH | 2026-08-11 | T35, T29 | [Details](tasks/T35e.md) |
-| T35f | Test, CI, and Documentation Alignment | 🔄 | MEDIUM | 2026-08-11 | T35, T29 | [Details](tasks/T35f.md) |
-| T36 | Fork and Maintain isomorphic-git | 🔄 | HIGH | 2026-09-03 | T29, T35b, T35d, T35f | [Details](tasks/T36.md) |
-| T37 | Tentative Plugin Rewrite Feasibility and User-Workflow Assessment | ⏸️ | MEDIUM | 2026-09-03 | T35, T35b, T35c, T35d, T35f, T36 | [Details](tasks/T37.md) |
-| T38 | Current Product Specification and Rewrite PRD Foundation | 🔄 | HIGH | 2026-09-04 | T29, T29a, T34, T35, T36 | [Details](tasks/T38.md) |
-| T39 | KISS Git Backend Rewrite | 🔄 | HIGH | 2026-09-04 | T29, T29a, T34, T35, T36, T37, T38 | [Details](tasks/T39.md) |
-| T40 | UI Rendering Lifecycle Refactor | 🔄 | HIGH | 2026-09-05 | T29a, T35d, T35f, T39 | [Details](tasks/T40.md) |
+| T1 | Plugin UI Shell | 🔄 | HIGH | 2026-09-05 | - | [Details](tasks/T1.md) |
+| T2 | Settings Panel | 🔄 | HIGH | 2026-09-05 | T1 | [Details](tasks/T2.md) |
 
-## Completed Tasks
+## Pending Tasks
 
-| ID | Title | Status | Priority | Started | Completed | Dependencies | Details |
-|----|-------|--------|----------|---------|-----------|--------------|---------|
-| T1 | Core Git Integration | ✅ | HIGH | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T1.md) |
-| T2 | Plugin Commands & UI | ✅ | HIGH | 2026-05-28 | 2026-05-30 | T1 | [Details](tasks/T2.md) |
-| T3 | Mobile Compatibility | ✅ | HIGH | 2026-05-30 | 2026-05-30 | T1, T2 | [Details](tasks/T3.md) |
-| T4 | Auto-sync & Background | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | T1, T2 | [Details](tasks/T4.md) |
-| T5 | Error Handling & Logging | ✅ | MEDIUM | 2026-05-28 | 2026-05-30 | - | [Details](tasks/T5.md) |
-| T6 | Git Sidebar UI | ✅ | MEDIUM | 2026-05-28 | 2026-05-31 | T1, T2 | [Details](tasks/T6.md) |
+| ID | Title | Status | Priority | Started | Dependencies | Details |
+|----|-------|--------|----------|---------|--------------|---------|
+| T10 | Platform Integration and Verification | ⬜ | HIGH | 2026-09-05 | T1, T2, T3, T4, T5, T6, T7, T8, T9 | [Details](tasks/T10.md) |
+| T3 | Vault and Local Repository | ⬜ | HIGH | 2026-09-05 | T1, T2 | [Details](tasks/T3.md) |
+| T4 | Changes Panel | ⬜ | HIGH | 2026-09-05 | T1, T2, T3 | [Details](tasks/T4.md) |
+| T5 | Activity and Logging | ⬜ | MEDIUM | 2026-09-05 | T1, T2 | [Details](tasks/T5.md) |
+| T6 | Commits and History | ⬜ | MEDIUM | 2026-09-05 | T1, T2, T3 | [Details](tasks/T6.md) |
+| T7 | Remote Sync and Authentication | ⬜ | HIGH | 2026-09-05 | T2, T3 | [Details](tasks/T7.md) |
+| T8 | Progress Errors and Dialogs | ⬜ | MEDIUM | 2026-09-05 | T1, T3, T7 | [Details](tasks/T8.md) |
+| T9 | Updater and Release | ⬜ | MEDIUM | 2026-09-05 | T1, T2 | [Details](tasks/T9.md) |
+
+## Task Relationships
+
+```
+T1: Plugin UI Shell
+T10: Platform Integration and Verification
+  └── T1
+  └── T2
+  └── T3
+  └── T4
+  └── T5
+  └── T6
+  └── T7
+  └── T8
+  └── T9
+T2: Settings Panel
+  └── T1
+T3: Vault and Local Repository
+  └── T1
+  └── T2
+T4: Changes Panel
+  └── T1
+  └── T2
+  └── T3
+T5: Activity and Logging
+  └── T1
+  └── T2
+T6: Commits and History
+  └── T1
+  └── T2
+  └── T3
+T7: Remote Sync and Authentication
+  └── T2
+  └── T3
+T8: Progress Errors and Dialogs
+  └── T1
+  └── T3
+  └── T7
+T9: Updater and Release
+  └── T1
+  └── T2
+```
 
 ## Status Summary
 
-- **Active parent tasks**: 7 (T29, T34, T35, T36, T38, T39, T40); **active child tasks**: T29a, T34a, T35a, T35b, T35c, T35d, T35e, T35f
-- **Completed**: 6 (T1-T6) + 3 sub-tasks (T30, T32, T33)
-- **Paused**: 3 (T34b, T34c, T37); **planned follow-up children**: none
-- **Backlog**: 1 (T31)
-- **Total**: 28
+- **Active**: 2
+- **Completed**: 0
+- **Paused**: 0
+- **Total**: 10
