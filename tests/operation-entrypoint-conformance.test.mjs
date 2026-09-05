@@ -90,10 +90,10 @@ test('staging controls stay stationary while a mutation is in flight', () => {
 });
 
 test('successful pushes force-update the existing local tracking ref', () => {
-  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
+  const gitBackendSource = readFileSync(join(repositoryRoot, 'src/backend/gitBackend.ts'), 'utf8');
   assert.match(
-    gitManagerSource,
-    /ref: `refs\/remotes\/origin\/\$\{branchName\}`,[\s\S]*value: localOid,[\s\S]*force: true,/,
+    gitBackendSource,
+    /ref: `refs\/remotes\/origin\/\$\{this\.config\.branch\}`,[\s\S]*value: oid,[\s\S]*force: true,/,
   );
 });
 
@@ -175,13 +175,13 @@ test('sidebar keeps retained activity history and commit source controls visible
 });
 
 test('single-file staging avoids a repository-wide status scan', () => {
-  const gitManagerSource = readFileSync(join(repositoryRoot, 'src/gitManager.ts'), 'utf8');
-  const stagePathSource = gitManagerSource.match(
-    /private async stagePath\([\s\S]*?\n    \}\n\n    \/\*\*\n     \* Ask isomorphic-git for ignore semantics/,
+  const gitBackendSource = readFileSync(join(repositoryRoot, 'src/backend/gitBackend.ts'), 'utf8');
+  const stagePathSource = gitBackendSource.match(
+    /async stage\(path: string\)[\s\S]*?\n  \}\n\n  async stageAll\(/,
   )?.[0] || '';
 
   assert.match(stagePathSource, /git\.listFiles\(/);
-  assert.match(stagePathSource, /this\.fs\.stat\(/);
+  assert.match(stagePathSource, /this\.fileSystem\.lstat\(/);
   assert.doesNotMatch(stagePathSource, /git\.statusMatrix\(/);
 });
 

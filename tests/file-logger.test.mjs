@@ -36,7 +36,7 @@ test('readEntries restores structured data so live and persisted logs deduplicat
   const adapter = {
     read: async () => [
       '[2026-09-04T00:54:39.000Z] [INFO] [Git Sync][GitOperation] Operation started {"operation":"Stage all files","operationId":1}\n',
-      '[2026-09-04T00:54:40.000Z] [INFO] [Git Sync][GitManager] Repository status: branch=main, ahead=0, behind=0 {"comparison":"up-to-date"}\n',
+      '[2026-09-04T00:54:40.000Z] [INFO] [Git Sync][GitBackend] Repository status: branch=main, ahead=0, behind=0 {"comparison":"up-to-date"}\n',
     ].join(''),
   };
   const logger = new FileLogger({ vault: { configDir: '.obsidian', adapter } }, 'obsidian-git-sync');
@@ -52,7 +52,7 @@ test('readEntries restores structured data so live and persisted logs deduplicat
     {
       timestamp: Date.parse('2026-09-04T00:54:40.000Z'),
       level: 'info',
-      namespace: 'GitManager',
+      namespace: 'GitBackend',
       message: 'Repository status: branch=main, ahead=0, behind=0',
       data: { comparison: 'up-to-date' },
     },
