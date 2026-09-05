@@ -11,6 +11,7 @@ export interface ReleaseInfo {
 	body: string;
 	prerelease: boolean;
 	published_at: string;
+	updated_at: string;
 	html_url: string;
 	assets: Array<{
 		name: string;
@@ -23,7 +24,7 @@ export interface AvailableBuild {
 	release: ReleaseInfo;
 	branch: string;
 	commit: string | null;
-	publishedAt: string;
+	updatedAt: string;
 }
 
 export type UpdateCheckResult =
@@ -123,11 +124,12 @@ export class PluginUpdater {
 
 		return releases
 			.filter((release) => release.prerelease && release.tag_name.startsWith("latest-dev"))
+			.sort((left, right) => Date.parse(right.updated_at) - Date.parse(left.updated_at))
 			.map((release) => ({
 				release,
 				branch: branchFromRelease(release),
 				commit: commitFromRelease(release),
-				publishedAt: release.published_at,
+				updatedAt: release.updated_at,
 			}));
 	}
 
@@ -327,7 +329,7 @@ export class AvailableBuildsModal extends Modal {
 		this.contentEl.empty();
 		this.contentEl.createEl("h2", { text: "Available development builds" });
 		this.contentEl.createEl("p", {
-			text: "Choose a published branch build to download and install.",
+			text: "Choose a branch build to download and install. Newest updated build appears first.",
 		});
 		const status = this.contentEl.createEl("p", { text: "Loading builds…" });
 
@@ -340,11 +342,11 @@ export class AvailableBuildsModal extends Modal {
 			}
 
 			for (const build of builds) {
-				const timestamp = new Date(build.publishedAt).toLocaleString();
+				const timestamp = new Date(build.updatedAt).toLocaleString();
 				new Setting(this.contentEl)
 					.setName(build.branch)
 					.setDesc(
-						`${build.release.name || build.release.tag_name} · ${build.commit?.slice(0, 7) ?? "commit unavailable"} · ${timestamp}`,
+						`${build.release.name || build.release.tag_name} · ${build.commit?.slice(0, 7) ?? "commit unavailable"} · Updated ${timestamp}`,
 					)
 					.addButton((button) =>
 						button.setButtonText("Install").onClick(async () => {
