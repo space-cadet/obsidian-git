@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-git-sync",
+  "version": "0.1.0",
+  "description": "A simple Git synchronization plugin for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "test": "pnpm run build"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "git",
+    "sync"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "typescript": "^5.3.3"
+  }
+}

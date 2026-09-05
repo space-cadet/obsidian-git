@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-git-sync",
+  "name": "Git Sync",
+  "version": "0.1.0",
+  "minAppVersion": "1.11.4",
+  "description": "A simple Git synchronization plugin for Obsidian",
+  "author": "",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}

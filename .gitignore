@@ -1,0 +1,5 @@
+node_modules/
+.pnpm-store/
+main.js
+data.json
+*.js.map

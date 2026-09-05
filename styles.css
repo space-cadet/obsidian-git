@@ -1,0 +1,73 @@
+.git-sync-sidebar {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	overflow: hidden;
+}
+
+.git-sync-header {
+	padding: 14px 12px 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-title {
+	font-size: var(--font-ui-medium);
+	font-weight: 600;
+}
+
+.git-sync-repository {
+	margin-top: 4px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-sync-tabs {
+	display: flex;
+	gap: 2px;
+	padding: 6px 8px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-tab {
+	padding: 6px 8px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.git-sync-tab:hover,
+.git-sync-tab.is-active {
+	color: var(--text-normal);
+}
+
+.git-sync-tab.is-active {
+	border-bottom-color: var(--interactive-accent);
+}
+
+.git-sync-content {
+	padding: 24px 16px;
+	overflow: auto;
+	text-align: center;
+}
+
+.git-sync-state-title {
+	font-weight: 600;
+}
+
+.git-sync-state-description {
+	color: var(--text-muted);
+}
+
+.git-sync-settings-feedback {
+	margin-top: 8px;
+	color: var(--text-success);
+}
+
+.git-sync-settings-feedback.is-error {
+	color: var(--text-error);
+}
