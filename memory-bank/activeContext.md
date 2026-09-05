@@ -1,8 +1,13 @@
 # Active Context
 
-*Last Updated: 2026-09-05 21:00:52 IST*
+*Last Updated: 2026-09-05 22:57:49 IST*
 
 ## Current Tasks
+
+## KISS Restart — 2026-09-05
+
+- `codex/kiss-restart` is an orphan branch containing only `memory-bank/`.
+- The next session starts from no plugin code and follows `KISS-RESTART.md`.
 
 ### T40: UI Rendering Lifecycle Refactor — 🔄
 - **Scope**: Remove demonstrated full-rebuild update paths from Activity,

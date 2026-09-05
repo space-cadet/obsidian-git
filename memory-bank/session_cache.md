@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-05 21:24:00 IST*
+*Last Updated: 2026-09-05 22:57:49 IST*
 
 ## Current Session
 **Started**: 2026-09-05 21:00:52 IST
@@ -11,8 +11,7 @@
 
 **Session Title**: T29a, T35d, T35f, T40: Diagnose pull-display latency and plan the UI rendering refactor
 
-**Branch**: `rewrite/ui-complexity-refactor`, created from clean `main` at
-`bfe42cf` for the next implementation session.
+**Branch**: `codex/kiss-restart`, an orphan branch with only `memory-bank/`.
 
 **Current Handoff**: T40 source changes and automated checks are complete:
 retained Activity/Changes updates, coalesced vault refreshes, and persistent

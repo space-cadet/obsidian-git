@@ -1,7 +1,13 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-05 21:23:38 IST*
+*Last Updated: 2026-09-05 22:57:49 IST*
+
+#### 22:57:49 IST - T00: Record KISS restart baseline
+
+- Created `memory-bank/KISS-RESTART.md` - Defined restart constraints and implementation order.
+- Modified `memory-bank/activeContext.md` - Recorded the orphan branch and next-session focus.
+- Modified `memory-bank/session_cache.md` - Updated the restart handoff.
 
 #### 21:23:38 IST - T40: Implement retained rendering lifecycle updates
 
