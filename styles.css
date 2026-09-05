@@ -63,6 +63,25 @@
 	color: var(--text-muted);
 }
 
+.git-sync-activity-list {
+	margin: 16px 0 0;
+	padding: 0;
+	list-style: none;
+	text-align: left;
+}
+
+.git-sync-activity-list li {
+	margin: 0;
+	padding: 10px 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-activity-time {
+	margin-top: 3px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
 .git-sync-settings-feedback {
 	margin-top: 8px;
 	color: var(--text-success);

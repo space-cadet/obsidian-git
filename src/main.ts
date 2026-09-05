@@ -17,14 +17,20 @@ interface GitSyncSettings {
 	branchName: string;
 }
 
+interface ActivityEntry {
+	message: string;
+	timestamp: number;
+}
+
 const DEFAULT_SETTINGS: GitSyncSettings = {
-	repositoryPath: "",
+	repositoryPath: ".",
 	remoteUrl: "",
 	branchName: "main",
 };
 
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
+	private activity: ActivityEntry[] = [];
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -42,6 +48,7 @@ export default class GitSyncPlugin extends Plugin {
 			callback: () => void this.activateView(),
 		});
 		this.addSettingTab(new GitSyncSettingTab(this.app, this));
+		this.recordActivity("Git Sync started.");
 	}
 
 	onunload(): void {
@@ -66,12 +73,27 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const saved = (await this.loadData()) as Partial<GitSyncSettings> | null;
+		this.settings = {
+			...DEFAULT_SETTINGS,
+			...saved,
+			repositoryPath: saved?.repositoryPath?.trim() || DEFAULT_SETTINGS.repositoryPath,
+		};
 	}
 
 	async saveSettings(): Promise<void> {
 		await this.saveData(this.settings);
+		this.recordActivity("Saved repository settings.");
 		this.refreshViews();
+	}
+
+	recordActivity(message: string): void {
+		this.activity.unshift({ message, timestamp: Date.now() });
+		this.activity = this.activity.slice(0, 50);
+	}
+
+	getActivity(): readonly ActivityEntry[] {
+		return this.activity;
 	}
 
 	refreshViews(): void {
@@ -89,6 +111,7 @@ class GitSyncView extends ItemView {
 	private activeTab = "Changes";
 	private repositoryState: RepositoryState | null = null;
 	private refreshGeneration = 0;
+	private lastRepositoryActivity = "";
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
 		super(leaf);
@@ -145,6 +168,11 @@ class GitSyncView extends ItemView {
 		}
 
 		const content = root.createDiv({ cls: "git-sync-content" });
+		if (this.activeTab === "Activity") {
+			this.renderActivity(content);
+			return;
+		}
+
 		if (!repository) {
 			this.renderSettingsPrompt(content, "Set up your repository");
 			return;
@@ -211,7 +239,37 @@ class GitSyncView extends ItemView {
 		const state = await inspectLocalRepository(this.app.vault.adapter, repositoryPath);
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.repositoryState = state;
+		this.recordRepositoryActivity(state);
 		this.render();
+	}
+
+	private recordRepositoryActivity(state: RepositoryState): void {
+		const message = repositoryActivityMessage(state);
+		if (message === this.lastRepositoryActivity) return;
+		this.lastRepositoryActivity = message;
+		this.plugin.recordActivity(message);
+	}
+
+	private renderActivity(content: HTMLElement): void {
+		content.createDiv({ cls: "git-sync-state-title", text: "Activity" });
+		const entries = this.plugin.getActivity();
+		if (entries.length === 0) {
+			content.createEl("p", {
+				text: "No activity recorded yet.",
+				cls: "git-sync-state-description",
+			});
+			return;
+		}
+
+		const list = content.createEl("ul", { cls: "git-sync-activity-list" });
+		for (const entry of entries) {
+			const item = list.createEl("li");
+			item.createDiv({ text: entry.message });
+			item.createDiv({
+				text: new Date(entry.timestamp).toLocaleTimeString(),
+				cls: "git-sync-activity-time",
+			});
+		}
 	}
 
 	private renderSettingsPrompt(content: HTMLElement, title: string): void {
@@ -265,7 +323,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Repository path")
-			.setDesc("Path to the Git repository, relative to the vault when possible.")
+			.setDesc("Vault-relative path to the Git repository. Use . for the vault root.")
 			.addText((text) => {
 				text.setPlaceholder("path/to/repository");
 				text.setValue(this.plugin.settings.repositoryPath);
@@ -317,5 +375,18 @@ class GitSyncSettingTab extends PluginSettingTab {
 					feedback.setText("Settings saved.");
 				});
 			});
+	}
+}
+
+function repositoryActivityMessage(state: RepositoryState): string {
+	switch (state.kind) {
+		case "missing":
+			return `No Git repository found at ${state.repositoryPath}.`;
+		case "ready":
+			return `Read local repository on ${state.branch}.`;
+		case "error":
+			return `Could not read repository: ${state.message}`;
+		case "checking":
+			return `Checking repository at ${state.repositoryPath}.`;
 	}
 }
