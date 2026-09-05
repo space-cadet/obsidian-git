@@ -5,6 +5,24 @@
 
 ---
 
+#### 05:50:10 IST - T29/T29a/T35b/T35c/T35f/T38: Verify sidebar status and multi-select
+- Updated `memory-bank/tasks/T29.md` - Recorded status classification and Changes-tab actions.
+- Updated `memory-bank/tasks/T29a.md` - Recorded sticky headers, toolbar, filters, sorting, and selection behavior.
+- Updated `memory-bank/tasks/T35b.md` - Recorded the desktop adapter `readlink` failure and status-matrix recovery.
+- Updated `memory-bank/tasks/T35c.md` - Recorded revert and Obsidian-trash safety for selected files.
+- Updated `memory-bank/tasks/T35f.md` - Recorded 83 general tests, 16 rewrite tests, 10 smoke checks, and artifact verification.
+- Updated `memory-bank/tasks/T38.md` - Clarified the Settings-only Sync Now removal in the product contract.
+- Updated `memory-bank/implementation-details/sidebar-ui-redesign.md` - Documented Changes-tab interaction behavior.
+- Updated `memory-bank/implementation-details/reliability-and-lifecycle.md` - Documented the adapter failure and fix.
+- Updated `memory-bank/product-spec.md` - Corrected manual-sync entry-point wording.
+- Updated `memory-bank/product-prd.md` - Corrected retained manual-sync requirements.
+- Updated `memory-bank/session_cache.md` - Closed the current session and recorded verification.
+- Updated `memory-bank/activeContext.md` - Added the session closeout and acceptance boundary.
+- Updated `memory-bank/progress.md` - Recorded the verification milestone.
+- Created `memory-bank/sessions/2026-09-05-early-morning.md` - Recorded the session scope, evidence, and remaining acceptance.
+- Created `memory-bank/edits/2026-09-05/055010-T29-sidebar-status-multiselect-verification.md` - Recorded the update scope and evidence boundary.
+- Modified `main.js` - Regenerated the embedded source commit identity.
+
 #### 20:18:35 IST - T38: Revise rewrite plan using KISS
 - Updated the current product and rewrite planning records so KISS means
   “Keep It Simple, Stupid.”

@@ -95,7 +95,7 @@ particular collection of implementation modules.
 
 ### Daily remote work
 
-1. User chooses Pull, Push, or Sync now.
+1. User chooses Pull, Push, or the retained ribbon/command-palette Sync now.
 2. The product shows progress where the operation supports it.
 3. The product reports success, no changes, conflict, cancellation, or
    failure.
@@ -259,7 +259,7 @@ must require explicit confirmation before overwriting remote history.
 
 ### PRD-FN-06: Sync
 
-Sync now and automatic sync must pull first when a remote is configured, then
+The retained ribbon/command-palette Sync now and automatic sync must pull first when a remote is configured, then
 stage local changes, commit when changes exist, and push when a remote exists.
 Without a remote, sync must create a local commit only. With no changes, it
 must report that there are no changes to commit.

@@ -368,6 +368,19 @@
   T38. The agreed direction retains the existing UI and replaces the Git/
   repository mechanics and result-to-UI path.
 
+## Session Closeout — 2026-09-05
+
+- Verified the pushed sidebar status, filesystem, filtering, sorting, review,
+  discard, sticky-control, and multi-select implementation on the local branch.
+- Recorded the desktop adapter `readlink` failure that previously discarded the
+  full status matrix and documented the fix and diagnostics.
+- Corrected the product records: the Settings Sync Now action is removed, but
+  the ribbon and command-palette manual sync entry points remain.
+- Verification passed with 83 general tests, 16 rewrite tests, 10
+  isomorphic-git checks, artifact identity, and `git diff --check`.
+- Real Obsidian desktop/mobile acceptance remains open. The generated bundle
+  identity must be committed with the final Memory Bank update.
+
 ## Decisions Made
 
 - **isomorphic-git over native git**: Cross-platform compatibility ✅

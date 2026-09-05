@@ -297,3 +297,13 @@ partial bulk operation stays visible and honest without a second full scan.
 This session improved several sidebar and staging paths, but it did not resolve
 the broader UI backlog. Real Obsidian desktop/mobile behaviour, visual parity,
 and remaining UI issues must stay separate acceptance work.
+
+## Desktop Status Adapter Failure — 2026-09-05
+
+The Changes view could render no files even when Git reported tracked and
+untracked changes. The desktop adapter attempted `readlink` on an ordinary
+file path, producing `EINVAL`; the exception caused the working-tree status
+matrix to be discarded. The adapter now reads ordinary desktop files directly,
+handles actual symlinks through native metadata, and skips broken ignored
+symlinks without losing unrelated status rows. Status-pipeline diagnostics now
+retain repository, branch, count, comparison, and filesystem error context.

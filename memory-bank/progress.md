@@ -443,3 +443,13 @@ ownership; T35 records and tracks its shared follow-up work.
   Node tests, production build, artifact identity, smoke checks, and diff
   validation.
 - Real Obsidian desktop/mobile acceptance remains open.
+
+### 2026-09-05 — Sidebar Status and Multi-Select Verification
+
+- Verified the latest status-pipeline, filesystem adapter, filtering, sorting,
+  review/discard, sticky-header, and multi-select changes.
+- Recorded the adapter `readlink` failure and clarified the Settings-only
+  removal of Sync Now in the product records.
+- Automated verification passed with 83 general tests, 16 rewrite tests, 10
+  isomorphic-git checks, artifact identity, and `git diff --check`.
+- Real Obsidian desktop/mobile acceptance and live remote parity remain open.

@@ -220,6 +220,18 @@
   new origin task.
 - No source code or UI layout was changed.
 
+## 2026-09-05 — Sidebar Status and Multi-Select Verification
+
+- Documented the desktop status adapter fix for ordinary-file `readlink`
+  failures and broken ignored symlinks.
+- Recorded Changes-tab status filters, sorting, review/discard, sticky headers,
+  and section-scoped multi-select actions.
+- Clarified that only the Settings Sync Now action was removed; ribbon and
+  command-palette manual sync remain available.
+- Verified 83 general tests, 16 rewrite tests, 10 isomorphic-git checks,
+  artifact identity, and `git diff --check`; runtime Obsidian acceptance is
+  still pending.
+
 ## 2026-09-04 — T38 UI-preserving mechanics rewrite
 
 - Clarified the PRD so the existing Settings panel, sidebar layout, styles,

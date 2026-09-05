@@ -1,13 +1,21 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-04 20:18:35 IST*
+*Last Updated: 2026-09-05 05:50:10 IST*
 
 ## Current Session
-**Started**: 2026-09-03 18:26:33 IST
-**Focus Task**: T38 current product specification and rewrite PRD foundation
-**Session File**: `memory-bank/sessions/2026-09-03-afternoon.md`
-**Status**: 🔄 IN PROGRESS
+**Started**: 2026-09-05 05:50:10 IST
+**Focus Task**: T29, T29a, T35b, T35c, T35f, T38 sidebar verification and documentation
+**Session File**: `memory-bank/sessions/2026-09-05-early-morning.md`
+**Status**: ✅ CLOSED
+
+**Session Title**: T29, T29a, T35b, T35c, T35f, T38: Verify and document sidebar status, multi-select, and release evidence
+
+**Verification**: `CI=true pnpm test` passed with 83 general tests, 16 rewrite
+tests, 10 isomorphic-git checks, artifact identity, and `git diff --check`.
+
+**Remaining**: Real Obsidian desktop/mobile visual and interaction acceptance;
+fresh live remote parity could not be queried because DNS was unavailable.
 
 **Documentation Continuation**: Created the canonical implementation-agnostic
 `memory-bank/product-spec.md` and the first `memory-bank/product-prd.md` draft,
