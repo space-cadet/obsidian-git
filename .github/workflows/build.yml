@@ -14,6 +14,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PLUGIN_NAME: obsidian-git-sync
+
 concurrency:
   group: build-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -55,3 +58,49 @@ jobs:
             manifest.json
             styles.css
           if-no-files-found: error
+
+  release-dev-build:
+    needs: build
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download plugin artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: obsidian-git-sync
+          path: release
+
+      - name: Create plugin archive
+        working-directory: release
+        run: zip -r "../${{ env.PLUGIN_NAME }}.zip" main.js manifest.json styles.css
+
+      - name: Read commit subject
+        id: commit
+        run: echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update branch pre-release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: latest-dev-${{ github.ref_name }}
+          name: "Dev Build (${{ github.ref_name }})"
+          body: |
+            Automated development build from `${{ github.ref_name }}`.
+
+            **Commit:** `${{ github.sha }}`
+            **Subject:** `${{ steps.commit.outputs.subject }}`
+          prerelease: true
+          allowUpdates: true
+          removeArtifacts: true
+          artifacts: |
+            ${{ env.PLUGIN_NAME }}.zip
+            release/main.js
+            release/manifest.json
+            release/styles.css
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
