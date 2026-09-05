@@ -84,6 +84,14 @@ jobs:
         id: commit
         run: echo "subject=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
 
+      - name: Update branch development tag
+        run: |
+          tag="latest-dev-${{ github.ref_name }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "$tag" "${{ github.sha }}"
+          git push --force origin "refs/tags/$tag"
+
       - name: Create or update branch pre-release
         uses: ncipollo/release-action@v1
         with:
