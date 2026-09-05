@@ -28,11 +28,11 @@ function parseJson(text: string): any {
   try { return JSON.parse(text); } catch { throw new Error('GitHub returned invalid JSON'); }
 }
 
-function authHeaders(token: string): Record<string, string> {
+function authHeaders(token?: string): Record<string, string> {
   return {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    Authorization: `Bearer ${token}`,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
@@ -46,7 +46,7 @@ export function parseGitHubRepositoryUrl(value: string): { owner: string; repo: 
 }
 
 export class GitHubApi {
-  constructor(private readonly transport: HttpTransport, private readonly token: string) {}
+  constructor(private readonly transport: HttpTransport, private readonly token?: string) {}
 
   async getAuthenticatedUser(): Promise<GitHubUser> {
     const response = await jsonRequest(this.transport, {

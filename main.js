@@ -21172,6 +21172,14 @@ function redactSensitiveData(value, secrets = []) {
   }
   return output;
 }
+function isProtectedSyncPath(filepath, pluginId = "obsidian-git-sync") {
+  const path = filepath.replace(/\\/g, "/").replace(/^\.\//, "");
+  const pluginPath = `.obsidian/plugins/${pluginId}`;
+  return path === pluginPath || path.startsWith(`${pluginPath}/`);
+}
+function filterAutomaticallyStagedPaths(paths) {
+  return paths.filter((filepath) => !isProtectedSyncPath(filepath));
+}
 
 // src/logger.ts
 var LogLevel = /* @__PURE__ */ ((LogLevel2) => {
@@ -21473,13 +21481,18 @@ var GitProtocolHttp = class {
   constructor(transport, credentials, progress) {
     this.transport = transport;
     this.credentials = credentials;
+    this.operationSignal = null;
     this.progress = progress;
   }
   setProgressSink(progress) {
     this.progress = progress;
   }
+  setOperationSignal(signal) {
+    this.operationSignal = signal;
+  }
   async request(config) {
     var _a, _b;
+    this.throwIfAborted();
     const credential = this.credentials ? await this.credentials() : null;
     const body = await collectBody(config.body);
     const headers = { ...config.headers || {} };
@@ -21491,8 +21504,10 @@ var GitProtocolHttp = class {
       url: config.url,
       method: config.method || "GET",
       headers,
-      body
+      body,
+      signal: this.operationSignal || void 0
     });
+    this.throwIfAborted();
     (_b = (_a = this.progress) == null ? void 0 : _a.progress) == null ? void 0 : _b.call(_a, response.body.byteLength, response.body.byteLength);
     return {
       url: config.url,
@@ -21502,6 +21517,14 @@ var GitProtocolHttp = class {
       headers: response.headers,
       body: asBodyIterable(response.body)
     };
+  }
+  throwIfAborted() {
+    var _a;
+    if ((_a = this.operationSignal) == null ? void 0 : _a.aborted) {
+      const error = new Error("Git operation cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
   }
   encodeBasic(value) {
     if (typeof btoa === "function")
@@ -21590,6 +21613,7 @@ var GitBackend = class {
     this.dir = dir;
     this.config = config;
     this.progress = progress;
+    this.operationSignal = null;
     this.http = new GitProtocolHttp(
       ports.transport,
       async () => {
@@ -21604,6 +21628,10 @@ var GitBackend = class {
   }
   setProgressSink(progress) {
     this.http.setProgressSink(progress);
+  }
+  setOperationSignal(signal) {
+    this.operationSignal = signal;
+    this.http.setOperationSignal(signal);
   }
   async hasRepository() {
     var _a;
@@ -21830,6 +21858,7 @@ var GitBackend = class {
     return { content, changed: true, pattern: normalized };
   }
   async setRemote(url) {
+    this.throwIfAborted();
     const remotes = await listRemotes({ fs: this.ports.fs, dir: this.dir });
     const origin = remotes.find((remote) => remote.remote === "origin");
     if (!origin) {
@@ -21989,6 +22018,7 @@ var GitBackend = class {
   }
   async stage(path) {
     this.assertPath(path);
+    this.throwIfAborted();
     const tracked = new Set(await listFiles({ fs: this.ports.fs, dir: this.dir }));
     const worktreePath = this.repositoryPath(path);
     let present = true;
@@ -22041,13 +22071,17 @@ var GitBackend = class {
     for (const { path, state, error } of states.filter(({ state: state2, error: error2 }) => error2 || state2 === "ignored" || state2 === "absent" || state2 === "*absent")) {
       failed.push({ path, message: error ? errorMessage(error) : state === "ignored" ? `Path "${path}" is ignored by .gitignore` : `Path "${path}" is not present in the worktree` });
     }
-    if (present.length > 0) {
+    const batchSize = 32;
+    for (let index2 = 0; index2 < present.length; index2 += batchSize) {
+      this.throwIfAborted();
+      const batch = present.slice(index2, index2 + batchSize);
       try {
-        await add({ fs: this.ports.fs, dir: this.dir, filepath: present, parallel: true });
-        succeeded.push(...present);
+        await add({ fs: this.ports.fs, dir: this.dir, filepath: batch, parallel: true });
+        succeeded.push(...batch);
       } catch (e) {
-        for (const path of present) {
+        for (const path of batch) {
           try {
+            this.throwIfAborted();
             await this.stage(path);
             succeeded.push(path);
           } catch (error) {
@@ -22068,7 +22102,14 @@ var GitBackend = class {
   }
   async unstage(path) {
     this.assertPath(path);
-    await resetIndex({ fs: this.ports.fs, dir: this.dir, filepath: path, ref: "HEAD" });
+    this.throwIfAborted();
+    const head = await this.resolveRefOrNull("HEAD");
+    await resetIndex({
+      fs: this.ports.fs,
+      dir: this.dir,
+      filepath: path,
+      ...head ? { ref: "HEAD" } : {}
+    });
     return { path, staged: false };
   }
   async unstageAll(paths) {
@@ -22138,6 +22179,8 @@ var GitBackend = class {
   async pull() {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     this.requireRemote();
+    await this.setRemote(this.config.remoteUrl);
+    this.throwIfAborted();
     const branch2 = this.config.branch;
     (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Fetching remote changes\u2026");
     await fetch({
@@ -22186,6 +22229,8 @@ var GitBackend = class {
   async push(force = false) {
     var _a, _b, _c, _d;
     this.requireRemote();
+    await this.setRemote(this.config.remoteUrl);
+    this.throwIfAborted();
     (_b = (_a = this.progress) == null ? void 0 : _a.message) == null ? void 0 : _b.call(_a, "Uploading local changes\u2026");
     await push({
       fs: this.ports.fs,
@@ -22211,8 +22256,9 @@ var GitBackend = class {
   }
   async sync(message) {
     const pulled = this.config.remoteUrl ? await this.pull() : null;
+    this.throwIfAborted();
     const status2 = await this.status();
-    const stageResult = await this.stageAll(status2.changed);
+    const stageResult = await this.stageAll(filterAutomaticallyStagedPaths(status2.changed));
     if (stageResult.failed.length > 0)
       throw new Error(`Could not stage ${stageResult.failed.length} file(s)`);
     const committed = stageResult.succeeded.length > 0 ? await this.commit(message) : null;
@@ -22498,6 +22544,14 @@ var GitBackend = class {
     if (!this.config.remoteUrl)
       throw new Error("A remote repository URL is not configured");
   }
+  throwIfAborted() {
+    var _a;
+    if ((_a = this.operationSignal) == null ? void 0 : _a.aborted) {
+      const error = new Error("Git operation cancelled");
+      error.name = "AbortError";
+      throw error;
+    }
+  }
   assertPath(path) {
     if (!path || path.startsWith("/") || path.split("/").includes(".."))
       throw new Error(`Invalid repository path: ${path}`);
@@ -22525,7 +22579,7 @@ function authHeaders(token) {
   return {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    Authorization: `Bearer ${token}`
+    ...token ? { Authorization: `Bearer ${token}` } : {}
   };
 }
 function parseGitHubRepositoryUrl(value) {
@@ -22742,13 +22796,33 @@ var ObsidianGitBackend = class {
     this.transport = {
       async request(request) {
         const body = request.body instanceof Uint8Array ? request.body.buffer.slice(request.body.byteOffset, request.body.byteOffset + request.body.byteLength) : request.body;
-        const response = await (0, import_obsidian2.requestUrl)({
+        const requestPromise = (0, import_obsidian2.requestUrl)({
           url: request.url,
           method: request.method || "GET",
           headers: request.headers,
           body,
           throw: false
         });
+        const response = request.signal ? await Promise.race([
+          requestPromise,
+          new Promise((_, reject) => {
+            var _a, _b;
+            const abort = () => {
+              const error = new Error("Git operation cancelled");
+              error.name = "AbortError";
+              reject(error);
+            };
+            if ((_a = request.signal) == null ? void 0 : _a.aborted)
+              abort();
+            else
+              (_b = request.signal) == null ? void 0 : _b.addEventListener("abort", abort, { once: true });
+            requestPromise.finally(() => {
+              var _a2;
+              return (_a2 = request.signal) == null ? void 0 : _a2.removeEventListener("abort", abort);
+            }).catch(() => {
+            });
+          })
+        ]) : await requestPromise;
         const bytes = new Uint8Array(response.arrayBuffer || new ArrayBuffer(0));
         return {
           status: response.status,
@@ -22775,7 +22849,8 @@ var ObsidianGitBackend = class {
   hasRepository() {
     return this.backend.hasRepository();
   }
-  setOperationSignal(_signal) {
+  setOperationSignal(signal) {
+    this.backend.setOperationSignal(signal);
   }
   setProgressHandle(progress) {
     this.backend.setProgressSink(progress ? {
@@ -22938,9 +23013,7 @@ var ObsidianGitBackend = class {
   }
   async fetchRemoteCommits(repoUrl, branch2, limit = 25) {
     const credential = await this.credentials.getCredential();
-    if (!(credential == null ? void 0 : credential.password))
-      throw new Error("Remote credential unavailable for remote commit history");
-    const api = new GitHubApi(this.backendTransport(), credential.password);
+    const api = new GitHubApi(this.backendTransport(), credential == null ? void 0 : credential.password);
     return (await api.listCommits(repoUrl, branch2, limit)).map((commit2) => ({
       oid: commit2.oid,
       message: commit2.message,
@@ -22951,9 +23024,7 @@ var ObsidianGitBackend = class {
   }
   async fetchRemoteCommitFiles(repoUrl, oid) {
     const credential = await this.credentials.getCredential();
-    if (!(credential == null ? void 0 : credential.password))
-      return [];
-    const api = new GitHubApi(this.backendTransport(), credential.password);
+    const api = new GitHubApi(this.backendTransport(), credential == null ? void 0 : credential.password);
     return (await api.getCommitFiles(repoUrl, oid)).map((file) => ({ filepath: file.path, status: file.change }));
   }
   configure(config) {
@@ -26222,7 +26293,7 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "70f16726d20f04f62a0b821bb1b37eac1508055d" : "unknown";
+var GIT_COMMIT_HASH = true ? "34c37a564c92ab1f571575e451948f7f17ce1052" : "unknown";
 var GIT_BRANCH = true ? "rewrite/git-backend-kiss" : "unknown";
 
 // src/credentialStore.ts

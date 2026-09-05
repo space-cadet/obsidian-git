@@ -1,6 +1,7 @@
 import * as git from 'isomorphic-git';
 import { GitProtocolHttp } from './http';
 import { GitBackendPorts } from './ports';
+import { filterAutomaticallyStagedPaths } from '../security';
 import {
   BulkResult,
   CommitResult,
@@ -97,6 +98,7 @@ export function compareRepositoryPaths(
 
 export class GitBackend {
   private readonly http: GitProtocolHttp;
+  private operationSignal: AbortSignal | null = null;
 
   constructor(
     private readonly ports: GitBackendPorts,
@@ -117,6 +119,11 @@ export class GitBackend {
 
   setProgressSink(progress?: ProgressSink): void {
     this.http.setProgressSink(progress);
+  }
+
+  setOperationSignal(signal: AbortSignal | null): void {
+    this.operationSignal = signal;
+    this.http.setOperationSignal(signal);
   }
 
   async hasRepository(): Promise<boolean> {
@@ -333,6 +340,7 @@ export class GitBackend {
   }
 
   async setRemote(url: string): Promise<void> {
+    this.throwIfAborted();
     const remotes = await git.listRemotes({ fs: this.ports.fs, dir: this.dir });
     const origin = remotes.find((remote) => remote.remote === 'origin');
     if (!origin) {
@@ -493,6 +501,7 @@ export class GitBackend {
 
   async stage(path: string): Promise<StageResult> {
     this.assertPath(path);
+    this.throwIfAborted();
 
     // Do not call git.status({ filepath }) here. That looks targeted, but
     // isomorphic-git still resolves the HEAD tree, reads the index, and may
@@ -554,16 +563,20 @@ export class GitBackend {
       failed.push({ path, message: error ? errorMessage(error) : state === 'ignored' ? `Path "${path}" is ignored by .gitignore` : `Path "${path}" is not present in the worktree` });
     }
 
-    if (present.length > 0) {
+    const batchSize = 32;
+    for (let index = 0; index < present.length; index += batchSize) {
+      this.throwIfAborted();
+      const batch = present.slice(index, index + batchSize);
       try {
-        await git.add({ fs: this.ports.fs, dir: this.dir, filepath: present, parallel: true });
-        succeeded.push(...present);
+        await git.add({ fs: this.ports.fs, dir: this.dir, filepath: batch, parallel: true });
+        succeeded.push(...batch);
       } catch {
         // Keep partial-result semantics if one path disappears or the host
         // cannot complete the batch. The fallback is still direct per-path
         // work and does not perform another full status read.
-        for (const path of present) {
+        for (const path of batch) {
           try {
+            this.throwIfAborted();
             await this.stage(path);
             succeeded.push(path);
           } catch (error) {
@@ -586,7 +599,14 @@ export class GitBackend {
 
   async unstage(path: string): Promise<StageResult> {
     this.assertPath(path);
-    await git.resetIndex({ fs: this.ports.fs, dir: this.dir, filepath: path, ref: 'HEAD' });
+    this.throwIfAborted();
+    const head = await this.resolveRefOrNull('HEAD');
+    await git.resetIndex({
+      fs: this.ports.fs,
+      dir: this.dir,
+      filepath: path,
+      ...(head ? { ref: 'HEAD' } : {}),
+    });
     return { path, staged: false };
   }
 
@@ -653,6 +673,8 @@ export class GitBackend {
 
   async pull(): Promise<RemoteResult> {
     this.requireRemote();
+    await this.setRemote(this.config.remoteUrl as string);
+    this.throwIfAborted();
     const branch = this.config.branch;
     this.progress?.message?.('Fetching remote changes…');
     await git.fetch({
@@ -699,6 +721,8 @@ export class GitBackend {
 
   async push(force = false): Promise<RemoteResult> {
     this.requireRemote();
+    await this.setRemote(this.config.remoteUrl as string);
+    this.throwIfAborted();
     this.progress?.message?.('Uploading local changes…');
     await git.push({
       fs: this.ports.fs,
@@ -725,8 +749,9 @@ export class GitBackend {
 
   async sync(message: string): Promise<{ committed: CommitResult | null; pulled: RemoteResult | null; pushed: RemoteResult | null }> {
     const pulled = this.config.remoteUrl ? await this.pull() : null;
+    this.throwIfAborted();
     const status = await this.status();
-    const stageResult = await this.stageAll(status.changed);
+    const stageResult = await this.stageAll(filterAutomaticallyStagedPaths(status.changed));
     if (stageResult.failed.length > 0) throw new Error(`Could not stage ${stageResult.failed.length} file(s)`);
     const committed = stageResult.succeeded.length > 0 ? await this.commit(message) : null;
     const pushed = committed && this.config.remoteUrl ? await this.push() : null;
@@ -985,6 +1010,14 @@ export class GitBackend {
 
   private requireRemote(): void {
     if (!this.config.remoteUrl) throw new Error('A remote repository URL is not configured');
+  }
+
+  private throwIfAborted(): void {
+    if (this.operationSignal?.aborted) {
+      const error = new Error('Git operation cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
   }
 
   private assertPath(path: string): void {

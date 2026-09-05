@@ -143,6 +143,7 @@ export interface HttpRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string | Uint8Array | ArrayBuffer;
+  signal?: AbortSignal;
 }
 
 export interface HttpResponse {

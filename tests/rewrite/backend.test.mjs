@@ -162,6 +162,53 @@ test('bulk staging returns successful and failed paths without hiding partial wo
   rmSync(directory, { recursive: true, force: true });
 });
 
+test('unstage removes a staged file from an unborn repository without deleting it', async () => {
+  const { directory, backend } = await makeBackend();
+  await backend.initialize();
+  await fsPromises.writeFile(join(directory, 'first.md'), 'first');
+  await backend.stage('first.md');
+
+  await backend.unstage('first.md');
+
+  assert.equal(await fsPromises.readFile(join(directory, 'first.md'), 'utf8'), 'first');
+  assert.deepEqual((await backend.status()).staged, []);
+  assert.deepEqual((await backend.status()).changed, ['first.md']);
+
+  rmSync(directory, { recursive: true, force: true });
+});
+
+test('sync does not automatically stage plugin-owned files', async () => {
+  const { directory, backend } = await makeBackend();
+  await backend.initialize();
+  await fsPromises.mkdir(join(directory, '.obsidian/plugins/obsidian-git-sync'), { recursive: true });
+  await fsPromises.writeFile(join(directory, 'note.md'), 'note');
+  await fsPromises.writeFile(join(directory, '.obsidian/plugins/obsidian-git-sync/data.json'), '{}');
+
+  const result = await backend.sync('sync note');
+
+  assert.ok(result.committed);
+  assert.deepEqual((await backend.history(1))[0].message.trim(), 'sync note');
+  assert.deepEqual((await backend.status()).staged, []);
+  assert.deepEqual((await backend.status()).changed, [
+    '.obsidian/plugins/obsidian-git-sync/data.json',
+  ]);
+
+  rmSync(directory, { recursive: true, force: true });
+});
+
+test('operation cancellation reaches backend mutations', async () => {
+  const { directory, backend } = await makeBackend();
+  await backend.initialize();
+  await fsPromises.writeFile(join(directory, 'note.md'), 'note');
+  const controller = new AbortController();
+  controller.abort();
+  backend.setOperationSignal(controller.signal);
+
+  await assert.rejects(backend.stage('note.md'), (error) => error.name === 'AbortError');
+
+  rmSync(directory, { recursive: true, force: true });
+});
+
 test('commit returns a plain result and leaves UI concerns outside the backend', async () => {
   const { directory, backend } = await makeBackend();
   await backend.initialize();
@@ -360,4 +407,27 @@ test('GitHub API validates an authenticated session and repository access', asyn
     { path: 'removed.md', change: 'deleted' },
   ]);
   assert.equal(calls[2].headers.Authorization, 'Bearer github-oauth-token');
+});
+
+test('GitHub API omits authorization for public repository requests', async () => {
+  const calls = [];
+  const api = new GitHubApi({
+    async request(request) {
+      calls.push(request);
+      return {
+        status: 200,
+        headers: {},
+        body: new Uint8Array(),
+        text: JSON.stringify([{ sha: 'abc123', commit: { message: 'public commit', author: { name: 'Public Author', date: '2026-01-01T00:00:00Z' } } }]),
+      };
+    },
+  });
+
+  assert.deepEqual(await api.listCommits('https://github.com/space-cadet/git-test-small.git', 'main', 1), [{
+    oid: 'abc123',
+    message: 'public commit',
+    author: 'Public Author',
+    date: '2026-01-01T00:00:00Z',
+  }]);
+  assert.equal(calls[0].headers.Authorization, undefined);
 });

@@ -45,6 +45,7 @@ function asBodyIterable(body: Uint8Array): AsyncIterable<Uint8Array> {
 
 export class GitProtocolHttp {
   private progress?: ProgressSink;
+  private operationSignal: AbortSignal | null = null;
 
   constructor(
     private readonly transport: HttpTransport,
@@ -58,7 +59,12 @@ export class GitProtocolHttp {
     this.progress = progress;
   }
 
+  setOperationSignal(signal: AbortSignal | null): void {
+    this.operationSignal = signal;
+  }
+
   async request(config: any): Promise<any> {
+    this.throwIfAborted();
     const credential = this.credentials ? await this.credentials() : null;
     const body = await collectBody(config.body);
     const headers: Record<string, string> = { ...(config.headers || {}) };
@@ -73,7 +79,9 @@ export class GitProtocolHttp {
       method: config.method || 'GET',
       headers,
       body,
+      signal: this.operationSignal || undefined,
     });
+    this.throwIfAborted();
     this.progress?.progress?.(response.body.byteLength, response.body.byteLength);
 
     return {
@@ -84,6 +92,14 @@ export class GitProtocolHttp {
       headers: response.headers,
       body: asBodyIterable(response.body),
     };
+  }
+
+  private throwIfAborted(): void {
+    if (this.operationSignal?.aborted) {
+      const error = new Error('Git operation cancelled');
+      error.name = 'AbortError';
+      throw error;
+    }
   }
 
   private encodeBasic(value: string): string {

@@ -100,13 +100,28 @@ export class ObsidianGitBackend {
         const body = request.body instanceof Uint8Array
           ? request.body.buffer.slice(request.body.byteOffset, request.body.byteOffset + request.body.byteLength)
           : request.body;
-        const response = await requestUrl({
+        const requestPromise = requestUrl({
           url: request.url,
           method: request.method || 'GET',
           headers: request.headers,
           body,
           throw: false,
         });
+        const response = request.signal
+          ? await Promise.race([
+            requestPromise,
+            new Promise<never>((_, reject) => {
+              const abort = () => {
+                const error = new Error('Git operation cancelled');
+                error.name = 'AbortError';
+                reject(error);
+              };
+              if (request.signal?.aborted) abort();
+              else request.signal?.addEventListener('abort', abort, { once: true });
+              requestPromise.finally(() => request.signal?.removeEventListener('abort', abort)).catch(() => {});
+            }),
+          ])
+          : await requestPromise;
         const bytes = new Uint8Array(response.arrayBuffer || new ArrayBuffer(0));
         return {
           status: response.status,
@@ -136,9 +151,8 @@ export class ObsidianGitBackend {
     return this.backend.hasRepository();
   }
 
-  setOperationSignal(_signal: AbortSignal | null): void {
-    // Cancellation belongs to the host lifecycle. The backend remains a
-    // direct operation surface and does not depend on the coordinator.
+  setOperationSignal(signal: AbortSignal | null): void {
+    this.backend.setOperationSignal(signal);
   }
 
   setProgressHandle(progress?: GitOperationProgress): void {
@@ -300,8 +314,7 @@ export class ObsidianGitBackend {
 
   async fetchRemoteCommits(repoUrl: string, branch: string, limit = 25): Promise<GitCommit[]> {
     const credential = await this.credentials.getCredential();
-    if (!credential?.password) throw new Error('Remote credential unavailable for remote commit history');
-    const api = new GitHubApi(this.backendTransport(), credential.password);
+    const api = new GitHubApi(this.backendTransport(), credential?.password);
     return (await api.listCommits(repoUrl, branch, limit)).map((commit) => ({
       oid: commit.oid,
       message: commit.message,
@@ -313,8 +326,7 @@ export class ObsidianGitBackend {
 
   async fetchRemoteCommitFiles(repoUrl: string, oid: string): Promise<Array<{ filepath: string; status: 'added' | 'modified' | 'deleted' }>> {
     const credential = await this.credentials.getCredential();
-    if (!credential?.password) return [];
-    const api = new GitHubApi(this.backendTransport(), credential.password);
+    const api = new GitHubApi(this.backendTransport(), credential?.password);
     return (await api.getCommitFiles(repoUrl, oid)).map((file) => ({ filepath: file.path, status: file.change }));
   }
 
