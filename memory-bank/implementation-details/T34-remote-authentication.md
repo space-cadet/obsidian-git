@@ -63,3 +63,10 @@ content, must not be included in exported diagnostics, and must not be
 automatically staged through the plugin's broad sync path. These requirements
 are tracked in T34a and T35a, with the durable boundary recorded in
 `implementation-details/security-and-secrets.md`.
+
+## KISS Backend Cross-Reference — 2026-09-05
+
+The KISS branch implements PAT, GitHub API, smart-HTTP, and device-flow support
+behind the new backend transport and credential ports. The branch summary is
+the implementation-level record. The registered OAuth App device-flow run and
+real desktop/mobile authentication acceptance remain open under T34b/T34c.

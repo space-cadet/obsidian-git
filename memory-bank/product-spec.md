@@ -596,8 +596,8 @@ This current document task is only the product baseline and PRD foundation.
   credentials, diagnostics, and `.gitignore` editor.
 - `src/views/GitSidebarView.ts` — sidebar layout, tabs, actions, states, and
   commit/log interactions.
-- `src/gitManager.ts` — user-visible repository, status, Git, history, and
-  recovery outcomes.
+- `src/backend/gitBackend.ts` — user-visible repository, status, Git, history,
+  and recovery outcomes.
 - `src/settings-sections/diagnostics.ts` — diagnostic controls and metrics.
 - `src/settings-sections/maintenance.ts` — health, dry-run, repair, and restore
   controls.

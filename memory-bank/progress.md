@@ -2,6 +2,18 @@
 
 *Last Updated: 2026-09-04 20:18:35 IST*
 
+## 2026-09-05 KISS Backend Branch Closeout
+
+- Implemented the platform-neutral backend and connected it to the retained
+  Obsidian UI, Settings, progress, diagnostics, maintenance, and updater paths.
+- Completed the Changes-tab status, filtering, sorting, sticky-header,
+  multi-select, review/discard, and direct-repaint work.
+- Removed the retired backend and obsolete tests in commit `1823084`.
+- Verification passed: 59 general tests, 16 replacement-backend tests, 10
+  isomorphic-git checks, production build, artifact check, and `git diff --check`.
+- Real Obsidian desktop/mobile, live remote, registered device-flow, and release
+  installation acceptance remain open.
+
 ## 2026-09-04 KISS Rewrite Plan Revision
 
 - Revised the live rewrite planning direction to require only demonstrated

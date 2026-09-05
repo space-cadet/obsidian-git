@@ -6,7 +6,7 @@ A Git synchronization plugin for Obsidian that works on desktop and mobile platf
 
 ## Core Components
 
-- **Git Manager** (`src/gitManager.ts`): Core Git operations — clone, pull, add, commit, push, status
+- **Git Backend** (`src/backend/gitBackend.ts`): Core Git operations — clone, pull, add, commit, push, status
 - **Plugin Main** (`src/main.ts`): Obsidian plugin lifecycle, settings UI, auto-sync scheduler, ribbon icon
 - **Logger** (`src/logger.ts`): Winston-based structured logging with configurable levels
 - **Proxy Server** (`proxy/proxyServer.js`): CORS proxy for Git HTTP requests on mobile

@@ -160,4 +160,12 @@ They are not copied into the repository by this planning record.
 - The selected-file toolbar remains sticky and offers stage, unstage, revert,
   delete-to-trash, select-all, and clear-selection actions as applicable.
 - Destructive multi-file actions require confirmation. Runtime desktop/mobile
-  and intermediate-width acceptance remains pending.
+and intermediate-width acceptance remains pending.
+
+## Branch Closeout Cross-Reference — 2026-09-05
+
+The complete backend-branch result, including the retained UI boundary and the
+automated evidence for these Changes-tab refinements, is recorded in
+`implementation-details/T39-kiss-branch-summary.md`. This document remains the
+visual and behavior-preservation record; it does not claim real Obsidian
+desktop/mobile or intermediate-width acceptance.

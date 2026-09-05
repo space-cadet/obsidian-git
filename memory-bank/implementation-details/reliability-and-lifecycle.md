@@ -307,3 +307,14 @@ matrix to be discarded. The adapter now reads ordinary desktop files directly,
 handles actual symlinks through native metadata, and skips broken ignored
 symlinks without losing unrelated status rows. Status-pipeline diagnostics now
 retain repository, branch, count, comparison, and filesystem error context.
+
+## KISS Branch Closeout — 2026-09-05
+
+The replacement backend and retained sidebar now carry the lifecycle and
+reliability behavior described above without the retired GitManager boundary.
+The final branch summary records single-flight construction, cancellation and
+disposal boundaries, stale-result protection, direct mutation repainting,
+partial bulk results, filesystem refresh handling, and log deduplication.
+
+Automated verification passed on commit `1823084`; real Obsidian desktop/mobile
+and live repository acceptance remain separate evidence requirements.

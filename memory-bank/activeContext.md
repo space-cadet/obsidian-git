@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-04 20:18:35 IST*
+*Last Updated: 2026-09-05 15:04:04 IST*
 
 ## Current Tasks
 
@@ -443,3 +443,13 @@
 2. **Confirm the CI-generated dev ZIP** — Verify it contains styles.css
 3. **Create tagged v1.0.0 release** — `git tag v1.0.0 && git push origin v1.0.0`
 4. **Plugin store submission prep** — manifest, README, release notes
+
+## KISS Branch Closeout — 2026-09-05
+
+- T39 is now registered in `tasks.md` and its complete implementation is
+  summarized in `implementation-details/T39-kiss-branch-summary.md`.
+- The branch is at `1823084` on `rewrite/git-backend-kiss`, with the retired
+  backend and obsolete tests removed.
+- Automated verification is recorded as complete. Real Obsidian desktop/mobile,
+  intermediate-width, live-remote, device-flow, and release acceptance remain
+  the next evidence work.

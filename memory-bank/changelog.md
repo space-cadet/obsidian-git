@@ -240,3 +240,14 @@
   result-to-UI path behind a small product-facing interface.
 - Added the proven `obsidian-ai`-derived updater behaviour and safety rules to
   the rewrite requirements without copying its source structure.
+## 2026-09-05 — T39 KISS backend branch closeout
+
+- Recorded the platform-neutral backend, Obsidian adapter, direct Git operation
+  results, authentication boundaries, repository safety, and retained UI
+  integration.
+- Recorded the Changes-tab status, filtering, sorting, sticky headers,
+  multi-select, selected-file actions, and immediate mutation repainting.
+- Removed the retired GitManager implementation and obsolete tests in commit
+  `1823084`; rewired conformance checks to the active backend.
+- Automated verification passed; real Obsidian desktop/mobile, live remote,
+  device-flow, and release acceptance remain open.

@@ -58,3 +58,15 @@ read-only Git smart-HTTP clone before the backend is connected to the UI. The
 current live run uses the already-authenticated external `gh` OAuth session;
 the interactive device flow still requires the plugin's registered OAuth App
 client ID and remains a separate acceptance step.
+
+## Implemented Branch Record — 2026-09-05
+
+The `rewrite/git-backend-kiss` branch implemented this boundary under
+`src/backend/` and connected it to the retained Obsidian Settings, sidebar,
+progress, diagnostics, maintenance, and updater surfaces. The detailed result
+and verification are recorded in
+`implementation-details/T39-kiss-branch-summary.md`.
+
+The branch deliberately did not introduce a global event bus, generic cache, or
+multi-layer operation framework. The remaining device, live-remote, and real
+Obsidian acceptance items remain open.
