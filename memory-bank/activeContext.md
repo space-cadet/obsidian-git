@@ -8,11 +8,12 @@
 - **Scope**: Remove demonstrated full-rebuild update paths from Activity,
   Changes, vault refresh handling, and the progress modal while preserving the
   approved UI presentation.
-- **Status**: The source audit is complete. `rewrite/ui-complexity-refactor`
-  now holds the documented plan; no source implementation is claimed yet.
-- **Next**: Implement incremental Activity and Changes updates, coalesce vault
-  refreshes, reuse progress nodes, then record separate automated and real
-  Obsidian acceptance evidence.
+- **Status**: The targeted source implementation and automated verification are
+  complete on `rewrite/ui-complexity-refactor`: retained Activity/Changes
+  updates, coalesced vault refreshes, and persistent progress nodes preserve
+  the approved UI. This is not real Obsidian acceptance.
+- **Next**: Exercise and record desktop/mobile timing, scrolling, focus,
+  narrow-sidebar, modal-resize, and visual acceptance separately.
 
 ### T38: Current Product Specification and Rewrite PRD Foundation — 🔄
 - **Scope**: Record the current product's user-visible features, UI, Settings,

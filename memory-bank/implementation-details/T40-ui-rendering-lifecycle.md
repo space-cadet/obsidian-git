@@ -66,3 +66,20 @@ footer are rebuilt although their structure is fixed.
 - No backend replacement, Git transport change, credential change, updater
   rewrite, or visual redesign.
 - No claim that a source/build pass establishes device acceptance.
+
+## Implementation Record — 2026-09-05 21:24 IST
+
+- The view retains Activity row elements by entry key. The first render may
+  read and merge persisted history; live notifications update the retained
+  model and DOM without invoking `FileLogger.readEntries()`.
+- Changes retains row and section-list references. Ordinary selection and
+  mutation updates patch existing rows, control counts, selection controls,
+  collapse state, and the footer. Filter and sort choices remain explicit
+  order-changing rebuilds.
+- All four vault event types now enqueue one delayed refresh. The status
+  diagnostic is emitted only for a changed snapshot, avoiding routine Activity
+  work for identical scans.
+- `GitProgressModal` builds statistics, phase rows, bars, and footer once,
+  then changes their text, classes, width, and visibility in place.
+- Source/build evidence: focused T40 checks and full `CI=true pnpm test`
+  passed. Runtime Obsidian acceptance is still a separate required check.

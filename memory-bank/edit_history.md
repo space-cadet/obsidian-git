@@ -1,7 +1,24 @@
 # Edit History
 
 *Created: 2026-05-28 20:16:00 IST*
-*Last Updated: 2026-09-05 21:00:52 IST*
+*Last Updated: 2026-09-05 21:23:38 IST*
+
+#### 21:23:38 IST - T40: Implement retained rendering lifecycle updates
+
+- Modified `src/views/GitSidebarView.ts` - Retained Activity and Changes DOM state and coalesced vault refreshes.
+- Modified `src/ui/GitProgressModal.ts` - Reused progress statistic, phase, bar, and footer nodes.
+- Created `tests/t40-rendering-lifecycle.test.mjs` - Added focused rendering lifecycle coverage.
+- Modified `tests/operation-entrypoint-conformance.test.mjs` - Updated Activity conformance for retained-row rendering.
+- Modified `memory-bank/tasks/T40.md` - Recorded source/build evidence and remaining runtime acceptance.
+- Modified `memory-bank/implementation-details/T40-ui-rendering-lifecycle.md` - Recorded the implementation details.
+- Modified `memory-bank/tasks/T35d.md` - Kept transport/device evidence separate from UI source verification.
+- Modified `memory-bank/tasks/T35f.md` - Recorded focused and full automated checks.
+- Modified `memory-bank/activeContext.md` - Set real Obsidian acceptance as the next T40 work.
+- Modified `memory-bank/session_cache.md` - Updated the session handoff.
+- Modified `memory-bank/sessions/2026-09-05-evening.md` - Appended the implementation result.
+- Modified `memory-bank/progress.md` - Recorded the T40 source milestone.
+- Modified `memory-bank/changelog.md` - Added the retained rendering change.
+- Created `memory-bank/edits/2026-09-05/212338-T40-rendering-lifecycle-implementation.md` - Recorded the edit chunk.
 
 #### 21:00:52 IST - T40: Record UI rendering lifecycle refactor handoff
 

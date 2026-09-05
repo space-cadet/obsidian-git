@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-05-30 21:35:00 IST*
-*Last Updated: 2026-09-05 21:00:52 IST*
+*Last Updated: 2026-09-05 21:24:00 IST*
 
 ## Current Session
 **Started**: 2026-09-05 21:00:52 IST
@@ -14,9 +14,10 @@
 **Branch**: `rewrite/ui-complexity-refactor`, created from clean `main` at
 `bfe42cf` for the next implementation session.
 
-**Current Handoff**: The source audit confirms high-cost full rebuild paths in
-Activity, Changes, vault refresh fanout, and the progress modal. T40 owns a
-targeted update-mechanics refactor; no full UI rewrite is authorized.
+**Current Handoff**: T40 source changes and automated checks are complete:
+retained Activity/Changes updates, coalesced vault refreshes, and persistent
+progress nodes. No full UI rewrite is authorized. Real Obsidian desktop/mobile
+timing, scrolling, focus, resize, and visual acceptance remain open.
 
 **Branch Closeout**: T39 KISS backend implementation and dead-code cleanup
 are recorded through commit `681b108` (cleanup landed in `1823084`). The branch summary is

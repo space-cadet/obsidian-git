@@ -14,6 +14,21 @@
   the approved UI while replacing these update paths. Automated and real
   Obsidian acceptance remain separate.
 
+## 2026-09-05 T40 Rendering Lifecycle Source Implementation
+
+- Replaced Activity live rebuilds with retained keyed rows, kept persisted-log
+  loading to the initial model population, and preserved non-top reading
+  position when a live entry arrives.
+- Kept Changes rows and collapse state across selection and file-mutation
+  updates; only a filter or sort change intentionally replaces the ordered
+  list. Vault watcher bursts now share one delayed refresh.
+- Progress statistics, phase rows, bars, and footer are built once and updated
+  in place. Unchanged status scans no longer add Activity diagnostics.
+- Source verification passed: focused T40 checks and `CI=true pnpm test`
+  (production build, artifact check, 63 general tests, 20 rewrite tests, and
+  10 isomorphic-git checks). Desktop/mobile runtime and visual acceptance are
+  still open.
+
 ## 2026-09-05 KISS Backend Branch Closeout
 
 - Implemented the platform-neutral backend and connected it to the retained

@@ -146,7 +146,7 @@ test('uncommitted changes offer status filters and file-list sorting', () => {
   assert.match(sidebarSource, /label: 'Path \(Z–A\)'/);
   assert.match(sidebarSource, /label: 'Status, then path'/);
   assert.match(sidebarSource, /label: 'Folder, then name'/);
-  assert.match(sidebarSource, /return manager\.addAll\(visibleUnstaged\)/);
+  assert.match(sidebarSource, /return manager\.addAll\(this\.filesInStatusSection\('unstaged'\)\)/);
 });
 
 test('Changes section headers stay visible while the sidebar content scrolls', () => {
@@ -166,7 +166,8 @@ test('sidebar keeps retained activity history and commit source controls visible
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
   const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
 
-  assert.match(sidebarSource, /const recent = \[\.\.\.entries\]\.reverse\(\);/);
+  assert.match(sidebarSource, /private syncActivityRows\(entries:/);
+  assert.match(sidebarSource, /for \(const entry of entries\)/);
   assert.doesNotMatch(sidebarSource, /reverse\(\)\.slice\(0, 50\)/);
   assert.match(
     styles,

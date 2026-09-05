@@ -23427,6 +23427,8 @@ var GitProgressModal = class extends import_obsidian4.Modal {
   constructor(app, operationName) {
     super(app);
     this.phases = /* @__PURE__ */ new Map();
+    this.statValues = /* @__PURE__ */ new Map();
+    this.phaseNodes = /* @__PURE__ */ new Map();
     this.isComplete = false;
     this.abortController = new AbortController();
     this.bytesLoaded = 0;
@@ -23466,13 +23468,14 @@ var GitProgressModal = class extends import_obsidian4.Modal {
     this.headerEl = this.container.createDiv("git-progress-header");
     const titleEl = this.headerEl.createDiv("git-progress-title");
     titleEl.setText(this.operationName);
-    const statusEl = this.headerEl.createDiv("git-progress-status");
-    statusEl.setText("Initializing...");
+    this.statusEl = this.headerEl.createDiv("git-progress-status");
+    this.statusEl.setText("Initializing...");
     this.statsEl = this.container.createDiv("git-progress-statistics");
     this.phasesEl = this.container.createDiv("git-progress-phases");
     this.footerEl = this.container.createDiv("git-progress-footer");
-    this.elapsedTimer = window.setInterval(() => this.render(), 1e3);
-    this.render();
+    this.buildPersistentNodes();
+    this.elapsedTimer = window.setInterval(() => this.updatePersistentNodes(), 1e3);
+    this.updatePersistentNodes();
   }
   onClose() {
     if (!this.isComplete) {
@@ -23499,7 +23502,7 @@ var GitProgressModal = class extends import_obsidian4.Modal {
       this.objectsTotal = total;
     }
     this.activatePhase(phaseName, loaded, total);
-    this.render();
+    this.updatePersistentNodes();
   }
   updateTransfer(event) {
     if (this.isComplete)
@@ -23519,30 +23522,28 @@ var GitProgressModal = class extends import_obsidian4.Modal {
     this.lastTransferLoaded = loaded;
     this.lastTransferTime = now;
     this.activatePhase(this.isPush() ? "Waiting for remote confirmation" : "Fetching", loaded, total);
-    this.render();
+    this.updatePersistentNodes();
   }
   updateCheckout(event) {
     this.filesWritten = Math.max(this.filesWritten, Number(event.loaded || 0));
     this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
     this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
     this.activatePhase(this.isPush() ? "Confirming branch" : "Checking out", this.filesWritten, this.filesTotal);
-    this.render();
+    this.updatePersistentNodes();
   }
   updateMessage(text) {
     var _a;
     if (!text || this.isComplete)
       return;
     const message = text.trim();
-    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-    statusEl == null ? void 0 : statusEl.setText(message);
+    (_a = this.statusEl) == null ? void 0 : _a.setText(message);
     const phaseName = this.inferPhaseFromMessage(message);
     if (phaseName) {
       this.activatePhase(phaseName);
-      this.render();
+      this.updatePersistentNodes();
     }
   }
   complete(message = "Completed") {
-    var _a;
     if (this.isComplete)
       return;
     this.isComplete = true;
@@ -23555,15 +23556,13 @@ var GitProgressModal = class extends import_obsidian4.Modal {
         phase.detail = this.statusLabel("completed");
       }
     }
-    this.render();
-    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-    if (statusEl) {
-      statusEl.setText(message);
-      statusEl.addClass("git-progress-status-success");
+    this.updatePersistentNodes();
+    if (this.statusEl) {
+      this.statusEl.setText(message);
+      this.statusEl.addClass("git-progress-status-success");
     }
   }
   fail(error) {
-    var _a;
     if (this.isComplete)
       return;
     this.isComplete = true;
@@ -23575,12 +23574,11 @@ var GitProgressModal = class extends import_obsidian4.Modal {
         phase.detail = this.statusLabel("error");
       }
     }
-    this.render();
+    this.updatePersistentNodes();
     const message = error instanceof Error ? error.message : String(error);
-    const statusEl = (_a = this.headerEl) == null ? void 0 : _a.querySelector(".git-progress-status");
-    if (statusEl) {
-      statusEl.setText(`Failed: ${message}`);
-      statusEl.addClass("git-progress-status-error");
+    if (this.statusEl) {
+      this.statusEl.setText(`Failed: ${message}`);
+      this.statusEl.addClass("git-progress-status-error");
     }
   }
   activatePhase(name, loaded = 0, total = 0) {
@@ -23601,11 +23599,51 @@ var GitProgressModal = class extends import_obsidian4.Modal {
     phase.percent = total > 0 ? Math.min(100, Math.round(loaded / total * 100)) : 0;
     phase.detail = this.phaseDetail(name, loaded, total);
   }
-  render() {
+  buildPersistentNodes() {
+    this.statsEl.empty();
+    this.phasesEl.empty();
+    this.statValues.clear();
+    this.phaseNodes.clear();
+    const transferTitle = this.statsEl.createDiv("git-progress-section-title");
+    transferTitle.setText("Transfer statistics");
+    const transfer = this.statsEl.createDiv("git-progress-stat-card");
+    this.addPersistentStatRow(transfer, "Objects");
+    this.addPersistentStatRow(transfer, this.isPush() ? "Response data" : "Data");
+    this.addPersistentStatRow(transfer, "Rate");
+    this.addPersistentStatRow(transfer, "ETA");
+    const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
+    checkoutTitle.setText(this.isPush() ? "Remote confirmation" : "Checkout progress");
+    const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
+    this.addPersistentStatRow(checkout2, "Files");
+    this.addPersistentStatRow(checkout2, "Written");
+    const title = this.phasesEl.createDiv("git-progress-section-title");
+    title.setText(this.isPush() ? "Push phases" : "Clone phases");
+    const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
+    for (const phase of this.phases.values()) {
+      const root = phaseCard.createDiv("git-progress-phase");
+      const icon = root.createDiv("git-progress-phase-icon");
+      const info = root.createDiv("git-progress-phase-info");
+      info.createDiv("git-progress-phase-name").setText(phase.name);
+      const detail = info.createDiv("git-progress-phase-detail");
+      const barContainer = info.createDiv("git-progress-bar-container");
+      const bar = barContainer.createDiv("git-progress-bar");
+      const fill = bar.createDiv("git-progress-bar-fill");
+      const label = barContainer.createDiv("git-progress-bar-label");
+      this.phaseNodes.set(phase.name, { root, icon, detail, barContainer, fill, label });
+    }
+    this.footerTextEl = this.footerEl.createSpan();
+  }
+  updatePersistentNodes() {
     if (!this.statsEl || !this.phasesEl)
       return;
-    this.renderStatistics();
-    this.renderPhases();
+    this.setStatValue("Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
+    this.setStatValue(this.isPush() ? "Response data" : "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
+    this.setStatValue("Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
+    this.setStatValue("ETA", this.estimateRemaining());
+    this.setStatValue("Files", this.countPair(this.filesWritten, this.filesTotal));
+    this.setStatValue("Written", this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : "\u2014");
+    for (const phase of this.phases.values())
+      this.updatePhaseNodes(phase);
     this.updateFooter();
   }
   stopElapsedTimer() {
@@ -23614,66 +23652,38 @@ var GitProgressModal = class extends import_obsidian4.Modal {
       this.elapsedTimer = null;
     }
   }
-  renderStatistics() {
-    this.statsEl.empty();
-    const transferTitle = this.statsEl.createDiv("git-progress-section-title");
-    transferTitle.setText("Transfer statistics");
-    const transfer = this.statsEl.createDiv("git-progress-stat-card");
-    this.addStatRow(transfer, "Objects", this.countPair(this.objectsLoaded, this.objectsTotal));
-    this.addStatRow(transfer, this.isPush() ? "Response data" : "Data", this.bytePair(this.bytesLoaded, this.bytesTotal));
-    this.addStatRow(transfer, "Rate", this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "\u2014");
-    this.addStatRow(transfer, "ETA", this.estimateRemaining());
-    const checkoutTitle = this.statsEl.createDiv("git-progress-section-title");
-    checkoutTitle.setText(this.isPush() ? "Remote confirmation" : "Checkout progress");
-    const checkout2 = this.statsEl.createDiv("git-progress-stat-card");
-    this.addStatRow(checkout2, "Files", this.countPair(this.filesWritten, this.filesTotal));
-    this.addStatRow(
-      checkout2,
-      "Written",
-      this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : "\u2014"
-    );
-  }
-  renderPhases() {
-    this.phasesEl.empty();
-    const title = this.phasesEl.createDiv("git-progress-section-title");
-    title.setText(this.isPush() ? "Push phases" : "Clone phases");
-    const phaseCard = this.phasesEl.createDiv("git-progress-phase-card");
-    for (const phase of this.phases.values()) {
-      const phaseEl = phaseCard.createDiv("git-progress-phase");
-      phaseEl.addClass(`git-progress-phase-${phase.status}`);
-      const iconEl = phaseEl.createDiv("git-progress-phase-icon");
-      iconEl.setText(this.getStatusIcon(phase.status));
-      const infoEl = phaseEl.createDiv("git-progress-phase-info");
-      const nameEl = infoEl.createDiv("git-progress-phase-name");
-      nameEl.setText(phase.name);
-      const detailEl = infoEl.createDiv("git-progress-phase-detail");
-      detailEl.setText(phase.detail || this.statusLabel(phase.status));
-      if (phase.status === "active" && phase.total > 0) {
-        const barContainer = infoEl.createDiv("git-progress-bar-container");
-        const bar = barContainer.createDiv("git-progress-bar");
-        const fill = bar.createDiv("git-progress-bar-fill");
-        fill.style.width = `${phase.percent}%`;
-        const label = barContainer.createDiv("git-progress-bar-label");
-        label.setText(`${phase.percent}%`);
-      }
-    }
-  }
-  addStatRow(parent, label, value) {
+  addPersistentStatRow(parent, label) {
     const row = parent.createDiv("git-progress-stat-row");
     const labelEl = row.createSpan("git-progress-stat-label");
     labelEl.setText(label);
     const valueEl = row.createSpan("git-progress-stat-value");
-    valueEl.setText(value);
+    this.statValues.set(label, valueEl);
+  }
+  setStatValue(label, value) {
+    var _a;
+    (_a = this.statValues.get(label)) == null ? void 0 : _a.setText(value);
+  }
+  updatePhaseNodes(phase) {
+    const nodes = this.phaseNodes.get(phase.name);
+    if (!nodes)
+      return;
+    nodes.root.removeClass("git-progress-phase-pending", "git-progress-phase-active", "git-progress-phase-completed", "git-progress-phase-error");
+    nodes.root.addClass(`git-progress-phase-${phase.status}`);
+    nodes.icon.setText(this.getStatusIcon(phase.status));
+    nodes.detail.setText(phase.detail || this.statusLabel(phase.status));
+    const showBar = phase.status === "active" && phase.total > 0;
+    nodes.barContainer.toggleAttribute("hidden", !showBar);
+    nodes.fill.style.width = `${phase.percent}%`;
+    nodes.label.setText(`${phase.percent}%`);
   }
   updateFooter() {
-    var _a;
+    var _a, _b;
     if (!this.footerEl)
       return;
     const elapsed = (((_a = this.completedElapsedMs) != null ? _a : Date.now() - this.startTime) / 1e3).toFixed(1);
     const completed = Array.from(this.phases.values()).filter((p) => p.status === "completed").length;
     const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : "rate unavailable";
-    this.footerEl.empty();
-    this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
+    (_b = this.footerTextEl) == null ? void 0 : _b.setText(`Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases`);
   }
   countPair(loaded, total) {
     if (loaded === 0 && total === 0)
@@ -23849,6 +23859,11 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.renderGeneration = 0;
     this.logUnsubscribe = null;
     this.logRenderScheduled = false;
+    this.vaultRefreshTimer = null;
+    this.collapsedStatusSections = /* @__PURE__ */ new Map();
+    this.changeRows = /* @__PURE__ */ new Map();
+    this.changeLists = /* @__PURE__ */ new Map();
+    this.activityRows = /* @__PURE__ */ new Map();
     this.mutationInFlight = false;
     this.repositoryStateKnown = false;
     this.repositoryReadInFlight = null;
@@ -23910,26 +23925,18 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.contentContainer.setAttr("aria-label", "Git Sync content");
     this.renderLoadingState();
     this.logUnsubscribe = log.subscribe(() => {
-      this.readModel.invalidateLogs();
+      this.readModel.setLogEntries(log.getEntries());
       if (this.activeTab !== "log" || this.logRenderScheduled)
         return;
       this.logRenderScheduled = true;
       window.setTimeout(() => {
         this.logRenderScheduled = false;
         if (this.activeTab === "log" && this.containerEl.isConnected) {
-          void this.refresh({ readRepository: false }).catch((error) => {
-            log.debug("GitSidebar", "Log refresh failed", error);
-          });
+          this.applyLiveActivityEntries();
         }
       }, 0);
     });
-    const refreshAfterVaultChange = () => {
-      if (this.containerEl.isConnected) {
-        void this.refresh({ force: true }).catch((error) => {
-          log.debug("GitSidebar", "Vault-change refresh failed", error);
-        });
-      }
-    };
+    const refreshAfterVaultChange = () => this.scheduleVaultRefresh();
     this.registerEvent(this.app.vault.on("create", refreshAfterVaultChange));
     this.registerEvent(this.app.vault.on("modify", refreshAfterVaultChange));
     this.registerEvent(this.app.vault.on("delete", refreshAfterVaultChange));
@@ -23948,6 +23955,10 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     this.stopRemoteFetchSchedule();
     (_a = this.logUnsubscribe) == null ? void 0 : _a.call(this);
     this.logUnsubscribe = null;
+    if (this.vaultRefreshTimer !== null) {
+      window.clearTimeout(this.vaultRefreshTimer);
+      this.vaultRefreshTimer = null;
+    }
     this.renderGeneration += 1;
   }
   // ─── Auto Refresh ───
@@ -24018,6 +24029,23 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     var _a;
     this.renderedTabs.delete(tab);
     (_a = this.tabContainers.get(tab)) == null ? void 0 : _a.empty();
+    if (tab === "status") {
+      this.changeRows.clear();
+      this.changeLists.clear();
+    } else if (tab === "log") {
+      this.activityRows.clear();
+    }
+  }
+  /** Coalesce watcher bursts into one status read after Obsidian settles. */
+  scheduleVaultRefresh() {
+    if (!this.containerEl.isConnected || this.vaultRefreshTimer !== null)
+      return;
+    this.vaultRefreshTimer = window.setTimeout(() => {
+      this.vaultRefreshTimer = null;
+      void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+        log.debug("GitSidebar", "Vault-change refresh failed", error);
+      });
+    }, 100);
   }
   isCurrentRender(generation) {
     return generation === this.renderGeneration && this.containerEl.isConnected;
@@ -24042,12 +24070,22 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       staged,
       unstaged
     };
+    this.patchChangedFileRow(filepath, destination);
   }
-  repaintStatusSnapshot() {
+  /**
+   * Apply the state that can change without replacing the Changes list.
+   * Filters and sort order intentionally request a rebuild because they alter
+   * the list's ordering; ordinary selection and file mutations do not.
+   */
+  repaintStatusSnapshot(rebuild = false) {
     if (this.activeTab !== "status")
+      return;
+    if (!rebuild && this.patchStatusControls())
       return;
     const pane = this.tabContainer("status");
     pane.empty();
+    this.changeRows.clear();
+    this.changeLists.clear();
     this.renderStatusTab(this.sidebarSnapshot, pane);
     this.renderedTabs.add("status");
     this.renderedStatusRevision = this.statusRevision;
@@ -24055,6 +24093,109 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
     if (footerEl)
       this.renderFooter(footerEl);
+  }
+  patchChangedFileRow(filepath, destination) {
+    if (this.activeTab !== "status")
+      return;
+    const row = this.changeRows.get(filepath);
+    if (!row)
+      return;
+    if (destination === "removed") {
+      row.remove();
+      this.changeRows.delete(filepath);
+      return;
+    }
+    const section = destination;
+    const list = this.changeLists.get(section);
+    if (!list)
+      return;
+    row.setAttr("data-section", section);
+    const button = row.querySelector(".git-file-stage-toggle");
+    if (button) {
+      button.empty();
+      (0, import_obsidian5.setIcon)(button, section === "staged" ? "square-check" : "square");
+      button.removeClass(section === "staged" ? "git-file-stage-empty" : "git-file-stage-checked");
+      button.addClass(section === "staged" ? "git-file-stage-checked" : "git-file-stage-empty");
+      button.setAttr("title", section === "staged" ? "Unstage file" : "Stage file");
+      button.setAttr("aria-label", `${section === "staged" ? "Unstage" : "Stage"} ${filepath}`);
+    }
+    list.appendChild(row);
+  }
+  patchStatusControls() {
+    const snapshot = this.sidebarSnapshot;
+    if (!snapshot || this.changeLists.size === 0)
+      return false;
+    const statusByPath = new Map(snapshot.detailedStatus.map((file) => [file.filepath, file.status]));
+    const filesBySection = {
+      staged: [...snapshot.staged],
+      unstaged: this.filteredAndSortedUnstagedFiles(snapshot.unstaged, statusByPath)
+    };
+    for (const section of ["staged", "unstaged"]) {
+      const sectionEl = this.contentContainer.querySelector(`.git-status-section-${section}`);
+      const list = this.changeLists.get(section);
+      if (!sectionEl || !list)
+        return false;
+      const files = filesBySection[section];
+      const count = sectionEl.querySelector(".git-status-section-count");
+      if (count)
+        count.setText(section === "unstaged" && files.length !== snapshot.unstaged.length ? `${files.length}/${snapshot.unstaged.length}` : String(files.length));
+      const bulk = sectionEl.querySelector(".git-status-section-action");
+      const bulkLabel = section === "staged" ? "Unstage all" : files.length === snapshot.unstaged.length ? "Stage all" : "Stage visible";
+      if (bulk) {
+        bulk.disabled = files.length === 0;
+        bulk.setAttr("title", bulkLabel);
+        bulk.setAttr("aria-label", bulkLabel);
+      }
+      const empty = list.querySelector(".git-empty-state");
+      if (files.length === 0 && !empty) {
+        list.createEl("p", {
+          text: section === "staged" ? "No staged files" : snapshot.unstaged.length > 0 ? "No files match the selected filters" : "No uncommitted changes",
+          cls: "git-empty-state"
+        });
+      } else if (files.length > 0) {
+        empty == null ? void 0 : empty.remove();
+      }
+      this.patchSelectionToolbar(section, files, statusByPath);
+    }
+    this.stagedCount = snapshot.staged.length;
+    this.renderedFooterKey = null;
+    const footerEl = this.containerEl.querySelector(".git-sidebar-footer");
+    if (footerEl)
+      this.renderFooter(footerEl);
+    return true;
+  }
+  patchSelectionToolbar(section, files, statusByPath) {
+    const list = this.changeLists.get(section);
+    if (!list)
+      return;
+    const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+    const toolbar = list.querySelector(".git-selection-toolbar");
+    if (!toolbar)
+      return;
+    toolbar.toggleAttribute("hidden", files.length === 0);
+    const count = toolbar.querySelector(".git-selection-count");
+    if (count)
+      count.setText(selected.length > 0 ? `${selected.length} selected` : "Select files");
+    const selectAll = toolbar.querySelector('[data-selection-action="all"]');
+    if (selectAll)
+      selectAll.setText(selected.length === files.length && files.length > 0 ? "Clear selection" : "Select all");
+    const stage = toolbar.querySelector('[data-selection-action="stage"]');
+    if (stage)
+      stage.toggleAttribute("hidden", selected.length === 0);
+    const revert = toolbar.querySelector('[data-selection-action="revert"]');
+    if (revert)
+      revert.toggleAttribute("hidden", !selected.some((filepath) => statusByPath.get(filepath) !== "untracked"));
+    const remove2 = toolbar.querySelector('[data-selection-action="remove"]');
+    if (remove2)
+      remove2.toggleAttribute("hidden", !selected.some((filepath) => statusByPath.get(filepath) === "untracked"));
+    for (const filepath of files) {
+      const row = this.changeRows.get(filepath);
+      if (!row)
+        continue;
+      const selectedRow = this.selectedFilePaths.has(filepath);
+      row.setAttr("aria-selected", String(selectedRow));
+      row.toggleClass("git-file-row-selected", selectedRow);
+    }
   }
   async refreshFromButton(button) {
     if (button.disabled)
@@ -24404,15 +24545,16 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       this.readModel.setStatusSnapshot(snapshot);
       if (changed)
         this.statusRevision += 1;
-      log.info("GitStatus", "Sidebar status snapshot applied", {
-        activeTab: this.activeTab,
-        changed,
-        repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
-        detailedFiles: snapshot.detailedStatus.length,
-        stagedFiles: snapshot.staged.length,
-        unstagedFiles: snapshot.unstaged.length,
-        untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === "untracked").length
-      });
+      if (changed) {
+        log.info("GitStatus", "Sidebar status snapshot applied", {
+          activeTab: this.activeTab,
+          repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+          detailedFiles: snapshot.detailedStatus.length,
+          stagedFiles: snapshot.staged.length,
+          unstagedFiles: snapshot.unstaged.length,
+          untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === "untracked").length
+        });
+      }
     } catch (error) {
       log.warn("GitSidebar", "Failed to read repository snapshot", error);
     }
@@ -24599,6 +24741,8 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
   // ─── Tab renders ───
   renderStatusTab(snapshot, target = this.contentContainer) {
     var _a;
+    this.changeRows.clear();
+    this.changeLists.clear();
     const container = target.createDiv("git-status-container");
     try {
       if (!snapshot) {
@@ -24679,7 +24823,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         },
         async () => {
           const result = await this.plugin.runGitMutation("Stage all files", async (manager) => {
-            return manager.addAll(visibleUnstaged);
+            return manager.addAll(this.filesInStatusSection("unstaged"));
           });
           if (result.failed.length > 0) {
             const firstFailure = result.failed[0];
@@ -24754,11 +24898,26 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
       return left.localeCompare(right);
     });
   }
+  filesInStatusSection(section) {
+    if (!this.sidebarSnapshot)
+      return [];
+    if (section === "staged")
+      return [...this.sidebarSnapshot.staged];
+    return this.filteredAndSortedUnstagedFiles(this.sidebarSnapshot.unstaged, this.statusByPath());
+  }
+  statusByPath() {
+    var _a;
+    return new Map(((_a = this.sidebarSnapshot) == null ? void 0 : _a.detailedStatus.map((file) => [file.filepath, file.status])) || []);
+  }
+  statusForPath(filepath) {
+    return this.statusByPath().get(filepath);
+  }
   renderCollapsibleSection(container, title, files, sectionClass, bulkLabel, statusByPath, onAction, onBulk, onSelected, options = {}) {
-    var _a, _b;
+    var _a, _b, _c;
     const totalFiles = (_a = options.totalFiles) != null ? _a : files.length;
     const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
-    const isCollapsed = files.length === 0;
+    section.setAttr("data-section", sectionClass);
+    const isCollapsed = (_b = this.collapsedStatusSections.get(sectionClass)) != null ? _b : files.length === 0;
     section.setAttr("data-collapsed", String(isCollapsed));
     const header = section.createDiv("git-status-section-header");
     const toggle = header.createEl("button", {
@@ -24788,7 +24947,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
           this.uncommittedFilters.clear();
           for (const { status: status2 } of changeFilterStatuses)
             this.uncommittedFilters.add(status2);
-          this.repaintStatusSnapshot();
+          this.repaintStatusSnapshot(true);
         }));
         menu.addSeparator();
         for (const { status: status2, marker, label } of changeFilterStatuses) {
@@ -24797,7 +24956,7 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
               this.uncommittedFilters.delete(status2);
             else
               this.uncommittedFilters.add(status2);
-            this.repaintStatusSnapshot();
+            this.repaintStatusSnapshot(true);
           }));
         }
         menu.showAtMouseEvent(event);
@@ -24808,14 +24967,14 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         attr: { type: "button", "aria-label": "Sort uncommitted changes" }
       });
       (0, import_obsidian5.setIcon)(sortBtn, "arrow-down-up");
-      sortBtn.setAttr("title", `Sort: ${(_b = uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)) == null ? void 0 : _b.label}`);
+      sortBtn.setAttr("title", `Sort: ${(_c = uncommittedSortOptions.find((option) => option.value === this.uncommittedSort)) == null ? void 0 : _c.label}`);
       sortBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         const menu = new import_obsidian5.Menu();
         for (const option of uncommittedSortOptions) {
           menu.addItem((item) => item.setTitle(option.label).setChecked(option.value === this.uncommittedSort).onClick(() => {
             this.uncommittedSort = option.value;
-            this.repaintStatusSnapshot();
+            this.repaintStatusSnapshot(true);
           }));
         }
         menu.showAtMouseEvent(event);
@@ -24852,80 +25011,84 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
         return;
       const currentlyCollapsed = section.getAttr("data-collapsed") === "true";
       section.setAttr("data-collapsed", String(!currentlyCollapsed));
+      this.collapsedStatusSections.set(sectionClass, !currentlyCollapsed);
       toggle.setText(!currentlyCollapsed ? "\u25B8" : "\u25BE");
       toggle.setAttr("aria-expanded", String(currentlyCollapsed));
     });
     const list = section.createDiv("git-status-section-list");
-    if (files.length > 0) {
-      const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
-      const selectionToolbar = list.createDiv("git-selection-toolbar");
-      selectionToolbar.createSpan({
-        text: selected.length > 0 ? `${selected.length} selected` : "Select files",
-        cls: "git-selection-count"
-      });
-      const selectAll = selectionToolbar.createEl("button", {
-        text: selected.length === files.length ? "Clear selection" : "Select all",
-        cls: "git-selection-btn",
-        attr: { type: "button" }
-      });
-      selectAll.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (selected.length === files.length) {
-          for (const filepath of files)
-            this.selectedFilePaths.delete(filepath);
-        } else {
-          for (const filepath of files)
-            this.selectedFilePaths.add(filepath);
-        }
-        this.repaintStatusSnapshot();
-      });
-      if (selected.length > 0) {
-        const selectedAction = selectionToolbar.createEl("button", {
-          text: sectionClass === "staged" ? "Unstage selected" : "Stage selected",
-          cls: "git-selection-btn git-selection-primary",
-          attr: { type: "button" }
-        });
-        selectedAction.addEventListener("click", async (event) => {
-          event.stopPropagation();
-          if (this.mutationInFlight)
-            return;
-          this.setMutationBusy(true);
-          try {
-            await onSelected(selected);
-            this.repaintStatusSnapshot();
-          } catch (error) {
-            new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} selected failed: ${(error == null ? void 0 : error.message) || String(error)}`);
-          } finally {
-            this.setMutationBusy(false);
-          }
-        });
-        if (sectionClass === "unstaged") {
-          const selectedUntracked = selected.filter((filepath) => statusByPath.get(filepath) === "untracked");
-          const selectedTracked = selected.filter((filepath) => statusByPath.get(filepath) !== "untracked");
-          if (selectedTracked.length > 0) {
-            const revertAction = selectionToolbar.createEl("button", {
-              text: "Revert selected",
-              cls: "git-selection-btn git-selection-warning",
-              attr: { type: "button" }
-            });
-            revertAction.addEventListener("click", (event) => {
-              event.stopPropagation();
-              this.confirmDiscardSelected(selectedTracked, statusByPath);
-            });
-          }
-          if (selectedUntracked.length > 0) {
-            const deleteAction = selectionToolbar.createEl("button", {
-              text: "Delete selected",
-              cls: "git-selection-btn git-selection-warning",
-              attr: { type: "button" }
-            });
-            deleteAction.addEventListener("click", (event) => {
-              event.stopPropagation();
-              this.confirmDiscardSelected(selectedUntracked, statusByPath);
-            });
-          }
-        }
+    this.changeLists.set(sectionClass, list);
+    const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+    const selectionToolbar = list.createDiv("git-selection-toolbar");
+    selectionToolbar.toggleAttribute("hidden", files.length === 0);
+    selectionToolbar.createSpan({
+      text: selected.length > 0 ? `${selected.length} selected` : "Select files",
+      cls: "git-selection-count"
+    });
+    const selectAll = selectionToolbar.createEl("button", {
+      text: selected.length === files.length ? "Clear selection" : "Select all",
+      cls: "git-selection-btn",
+      attr: { type: "button", "data-selection-action": "all" }
+    });
+    selectAll.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (selected.length === files.length) {
+        for (const filepath of files)
+          this.selectedFilePaths.delete(filepath);
+      } else {
+        for (const filepath of files)
+          this.selectedFilePaths.add(filepath);
       }
+      this.repaintStatusSnapshot();
+    });
+    const selectedAction = selectionToolbar.createEl("button", {
+      text: sectionClass === "staged" ? "Unstage selected" : "Stage selected",
+      cls: "git-selection-btn git-selection-primary",
+      attr: { type: "button", "data-selection-action": "stage" }
+    });
+    selectedAction.toggleAttribute("hidden", selected.length === 0);
+    selectedAction.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      if (this.mutationInFlight)
+        return;
+      const currentFiles = this.filesInStatusSection(sectionClass);
+      const currentSelection = currentFiles.filter((filepath) => this.selectedFilePaths.has(filepath));
+      if (currentSelection.length === 0)
+        return;
+      this.setMutationBusy(true);
+      try {
+        await onSelected(currentSelection);
+        this.repaintStatusSnapshot();
+      } catch (error) {
+        new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} selected failed: ${(error == null ? void 0 : error.message) || String(error)}`);
+      } finally {
+        this.setMutationBusy(false);
+      }
+    });
+    if (sectionClass === "unstaged") {
+      const revertAction = selectionToolbar.createEl("button", {
+        text: "Revert selected",
+        cls: "git-selection-btn git-selection-warning",
+        attr: { type: "button", "data-selection-action": "revert" }
+      });
+      revertAction.toggleAttribute("hidden", !selected.some((filepath) => statusByPath.get(filepath) !== "untracked"));
+      revertAction.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const current = this.filesInStatusSection("unstaged").filter((filepath) => this.selectedFilePaths.has(filepath) && this.statusForPath(filepath) !== "untracked");
+        if (current.length > 0)
+          this.confirmDiscardSelected(current, this.statusByPath());
+      });
+      const deleteAction = selectionToolbar.createEl("button", {
+        text: "Delete selected",
+        cls: "git-selection-btn git-selection-warning",
+        attr: { type: "button", "data-selection-action": "remove" }
+      });
+      deleteAction.toggleAttribute("hidden", !selected.some((filepath) => statusByPath.get(filepath) === "untracked"));
+      deleteAction.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const current = this.filesInStatusSection("unstaged").filter((filepath) => this.selectedFilePaths.has(filepath) && this.statusForPath(filepath) === "untracked");
+        if (current.length > 0)
+          this.confirmDiscardSelected(current, this.statusByPath());
+      });
     }
     if (files.length === 0) {
       const emptyMsg = sectionClass === "staged" ? "No staged files" : totalFiles > 0 ? "No files match the selected filters" : "No uncommitted changes";
@@ -24933,6 +25096,9 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     } else {
       for (const filepath of files) {
         const row = list.createDiv("git-file-row");
+        row.setAttr("data-filepath", filepath);
+        row.setAttr("data-section", sectionClass);
+        this.changeRows.set(filepath, row);
         row.setAttr("role", "option");
         row.setAttr("aria-selected", String(this.selectedFilePaths.has(filepath)));
         if (this.selectedFilePaths.has(filepath))
@@ -25035,14 +25201,22 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
             return;
           this.setMutationBusy(true);
           try {
-            await onAction(filepath);
+            const currentSection = row.getAttr("data-section");
+            await this.plugin.runGitMutation(currentSection === "staged" ? "Unstage file" : "Stage file", async (manager) => {
+              if (currentSection === "staged")
+                await manager.unstageFile(filepath);
+              else
+                await manager.stageFile(filepath);
+            });
+            new import_obsidian5.Notice(`${currentSection === "staged" ? "Unstaged" : "Staged"} ${filepath}`);
             this.applyFileMutationToSnapshot(
               filepath,
-              sectionClass === "staged" ? "unstaged" : "staged"
+              currentSection === "staged" ? "unstaged" : "staged"
             );
             this.repaintStatusSnapshot();
           } catch (err) {
-            new import_obsidian5.Notice(`${sectionClass === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
+            const currentSection = row.getAttr("data-section");
+            new import_obsidian5.Notice(`${currentSection === "staged" ? "Unstage" : "Stage"} failed: ${err.message}`);
           } finally {
             this.setMutationBusy(false);
           }
@@ -25456,42 +25630,72 @@ var GitSidebarView = class extends import_obsidian5.ItemView {
     const listContainer = target.createDiv("git-log-list");
     const toolbar = listContainer.createDiv("git-log-toolbar");
     toolbar.createEl("h2", { text: "Activity", cls: "git-log-toolbar-title" });
-    const currentLogEntries = log.getEntries();
     const cachedEntries = this.readModel.getLogEntries();
-    const cacheStale = cachedEntries && currentLogEntries.length !== cachedEntries.length;
-    if (!cachedEntries || cacheStale) {
+    if (!cachedEntries) {
       const persisted = await ((_a = this.plugin.fileLogger) == null ? void 0 : _a.readEntries(500)) || [];
       if (!this.isCurrentRender(generation))
         return;
       log.mergePersistedEntries(persisted);
       this.readModel.setLogEntries(log.getEntries());
     }
-    const entries = this.readModel.getLogEntries() || [];
-    if (entries.length === 0) {
-      listContainer.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
-      return;
-    }
-    const recent = [...entries].reverse();
-    for (const entry of recent) {
-      const row = listContainer.createDiv("git-log-entry");
-      const time = row.createSpan({
-        text: this.formatLogTime(new Date(entry.timestamp)),
-        cls: "git-log-time"
-      });
-      const level = row.createSpan({
-        text: entry.level.toUpperCase(),
-        cls: "git-log-level git-log-" + entry.level
-      });
-      const message = row.createSpan({
-        text: entry.message,
-        cls: "git-log-message"
-      });
-      message.setAttr("title", `[${entry.namespace}] ${entry.message}`);
-      if (entry.data) {
-        const detail = row.createDiv("git-log-detail");
-        detail.setText(typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data).slice(0, 200));
+    this.activityRows.clear();
+    this.syncActivityRows(this.readModel.getLogEntries() || [], listContainer, false);
+  }
+  /** Update the visible Activity feed from live memory only; disk is read on initial open/reload. */
+  applyLiveActivityEntries() {
+    const entries = log.getEntries();
+    this.readModel.setLogEntries(entries);
+    const pane = this.tabContainers.get("log");
+    const list = pane == null ? void 0 : pane.querySelector(".git-log-list");
+    if (list)
+      this.syncActivityRows(entries, list, true);
+  }
+  activityKey(entry) {
+    return `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}:${JSON.stringify(entry.data)}`;
+  }
+  syncActivityRows(entries, list, preservePosition) {
+    var _a;
+    const scrollContainer = this.contentContainer;
+    const previousTop = scrollContainer.scrollTop;
+    const previousHeight = scrollContainer.scrollHeight;
+    const wasAtTop = previousTop <= 4;
+    const keys = new Set(entries.map((entry) => this.activityKey(entry)));
+    for (const [key, row] of this.activityRows) {
+      if (!keys.has(key)) {
+        row.remove();
+        this.activityRows.delete(key);
       }
     }
+    (_a = list.querySelector(".git-empty-state")) == null ? void 0 : _a.remove();
+    if (entries.length === 0) {
+      list.createEl("p", { text: "No activity yet", cls: "git-empty-state" });
+      return;
+    }
+    const firstRow = () => list.querySelector(".git-log-entry");
+    for (const entry of entries) {
+      const key = this.activityKey(entry);
+      if (this.activityRows.has(key))
+        continue;
+      const row = this.createActivityRow(entry);
+      list.insertBefore(row, firstRow());
+      this.activityRows.set(key, row);
+    }
+    if (preservePosition && !wasAtTop) {
+      scrollContainer.scrollTop = previousTop + (scrollContainer.scrollHeight - previousHeight);
+    }
+  }
+  createActivityRow(entry) {
+    const row = document.createElement("div");
+    row.addClass("git-log-entry");
+    const time = row.createSpan({ text: this.formatLogTime(new Date(entry.timestamp)), cls: "git-log-time" });
+    const level = row.createSpan({ text: entry.level.toUpperCase(), cls: "git-log-level git-log-" + entry.level });
+    const message = row.createSpan({ text: entry.message, cls: "git-log-message" });
+    message.setAttr("title", `[${entry.namespace}] ${entry.message}`);
+    if (entry.data) {
+      const detail = row.createDiv("git-log-detail");
+      detail.setText(typeof entry.data === "string" ? entry.data : JSON.stringify(entry.data).slice(0, 200));
+    }
+    return row;
   }
   openLogMenu(event) {
     const menu = new import_obsidian5.Menu();
@@ -26344,8 +26548,8 @@ var AvailableBuildsModal = class extends import_obsidian6.Modal {
 };
 
 // src/buildInfo.ts
-var GIT_COMMIT_HASH = true ? "263f3ac02142189afcdb94d0569a3f15a19543b8" : "unknown";
-var GIT_BRANCH = true ? "main" : "unknown";
+var GIT_COMMIT_HASH = true ? "7744ddb98587afbfc56d7ca8aded8c93f4da84a4" : "unknown";
+var GIT_BRANCH = true ? "rewrite/ui-complexity-refactor" : "unknown";
 
 // src/credentialStore.ts
 var MIN_SECRET_STORAGE_VERSION = "1.11.4";

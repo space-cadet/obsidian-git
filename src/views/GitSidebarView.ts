@@ -61,6 +61,11 @@ export class GitSidebarView extends ItemView {
     private renderGeneration = 0;
     private logUnsubscribe: (() => void) | null = null;
     private logRenderScheduled = false;
+    private vaultRefreshTimer: number | null = null;
+    private readonly collapsedStatusSections = new Map<'staged' | 'unstaged', boolean>();
+    private readonly changeRows = new Map<string, HTMLElement>();
+    private readonly changeLists = new Map<'staged' | 'unstaged', HTMLElement>();
+    private readonly activityRows = new Map<string, HTMLElement>();
     private mutationInFlight = false;
     private repositoryStateKnown = false;
     private repositoryReadInFlight: Promise<void> | null = null;
@@ -144,28 +149,20 @@ export class GitSidebarView extends ItemView {
         this.renderLoadingState();
 
         this.logUnsubscribe = log.subscribe(() => {
-            this.readModel.invalidateLogs();
+            this.readModel.setLogEntries(log.getEntries());
             if (this.activeTab !== 'log' || this.logRenderScheduled) return;
             this.logRenderScheduled = true;
             window.setTimeout(() => {
                 this.logRenderScheduled = false;
                 if (this.activeTab === 'log' && this.containerEl.isConnected) {
-                    void this.refresh({ readRepository: false }).catch((error) => {
-                        log.debug('GitSidebar', 'Log refresh failed', error);
-                    });
+                    this.applyLiveActivityEntries();
                 }
             }, 0);
         });
         // Reconcile every vault change once Obsidian's watcher notices it.
         // A Changes view that only reacts to deletes can retain an empty
         // snapshot while newly created or modified untracked files accumulate.
-        const refreshAfterVaultChange = () => {
-            if (this.containerEl.isConnected) {
-                void this.refresh({ force: true }).catch((error) => {
-                    log.debug('GitSidebar', 'Vault-change refresh failed', error);
-                });
-            }
-        };
+        const refreshAfterVaultChange = () => this.scheduleVaultRefresh();
         this.registerEvent(this.app.vault.on('create', refreshAfterVaultChange));
         this.registerEvent(this.app.vault.on('modify', refreshAfterVaultChange));
         this.registerEvent(this.app.vault.on('delete', refreshAfterVaultChange));
@@ -193,6 +190,10 @@ export class GitSidebarView extends ItemView {
         this.stopRemoteFetchSchedule();
         this.logUnsubscribe?.();
         this.logUnsubscribe = null;
+        if (this.vaultRefreshTimer !== null) {
+            window.clearTimeout(this.vaultRefreshTimer);
+            this.vaultRefreshTimer = null;
+        }
         // Invalidate any in-flight repository/history read before Obsidian
         // detaches the view so late responses cannot render into stale DOM.
         this.renderGeneration += 1;
@@ -274,6 +275,23 @@ export class GitSidebarView extends ItemView {
     private invalidateTab(tab: SidebarTab): void {
         this.renderedTabs.delete(tab);
         this.tabContainers.get(tab)?.empty();
+        if (tab === 'status') {
+            this.changeRows.clear();
+            this.changeLists.clear();
+        } else if (tab === 'log') {
+            this.activityRows.clear();
+        }
+    }
+
+    /** Coalesce watcher bursts into one status read after Obsidian settles. */
+    private scheduleVaultRefresh(): void {
+        if (!this.containerEl.isConnected || this.vaultRefreshTimer !== null) return;
+        this.vaultRefreshTimer = window.setTimeout(() => {
+            this.vaultRefreshTimer = null;
+            void this.refresh({ skipIfRepositoryReadInFlight: true }).catch((error) => {
+                log.debug('GitSidebar', 'Vault-change refresh failed', error);
+            });
+        }, 100);
     }
 
     private isCurrentRender(generation: number): boolean {
@@ -299,18 +317,128 @@ export class GitSidebarView extends ItemView {
             staged,
             unstaged,
         };
+        this.patchChangedFileRow(filepath, destination);
     }
 
-    private repaintStatusSnapshot(): void {
+    /**
+     * Apply the state that can change without replacing the Changes list.
+     * Filters and sort order intentionally request a rebuild because they alter
+     * the list's ordering; ordinary selection and file mutations do not.
+     */
+    private repaintStatusSnapshot(rebuild = false): void {
         if (this.activeTab !== 'status') return;
+        if (!rebuild && this.patchStatusControls()) return;
         const pane = this.tabContainer('status');
         pane.empty();
+        this.changeRows.clear();
+        this.changeLists.clear();
         this.renderStatusTab(this.sidebarSnapshot, pane);
         this.renderedTabs.add('status');
         this.renderedStatusRevision = this.statusRevision;
         this.renderedFooterKey = null;
         const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
         if (footerEl) this.renderFooter(footerEl);
+    }
+
+    private patchChangedFileRow(filepath: string, destination: 'staged' | 'unstaged' | 'removed'): void {
+        if (this.activeTab !== 'status') return;
+        const row = this.changeRows.get(filepath);
+        if (!row) return;
+        if (destination === 'removed') {
+            row.remove();
+            this.changeRows.delete(filepath);
+            return;
+        }
+        const section = destination;
+        const list = this.changeLists.get(section);
+        if (!list) return;
+        row.setAttr('data-section', section);
+        const button = row.querySelector('.git-file-stage-toggle') as HTMLButtonElement | null;
+        if (button) {
+            button.empty();
+            setIcon(button, section === 'staged' ? 'square-check' : 'square');
+            button.removeClass(section === 'staged' ? 'git-file-stage-empty' : 'git-file-stage-checked');
+            button.addClass(section === 'staged' ? 'git-file-stage-checked' : 'git-file-stage-empty');
+            button.setAttr('title', section === 'staged' ? 'Unstage file' : 'Stage file');
+            button.setAttr('aria-label', `${section === 'staged' ? 'Unstage' : 'Stage'} ${filepath}`);
+        }
+        list.appendChild(row);
+    }
+
+    private patchStatusControls(): boolean {
+        const snapshot = this.sidebarSnapshot;
+        if (!snapshot || this.changeLists.size === 0) return false;
+        const statusByPath = new Map(snapshot.detailedStatus.map((file) => [file.filepath, file.status] as const));
+        const filesBySection: Record<'staged' | 'unstaged', string[]> = {
+            staged: [...snapshot.staged],
+            unstaged: this.filteredAndSortedUnstagedFiles(snapshot.unstaged, statusByPath),
+        };
+        for (const section of ['staged', 'unstaged'] as const) {
+            const sectionEl = this.contentContainer.querySelector(`.git-status-section-${section}`) as HTMLElement | null;
+            const list = this.changeLists.get(section);
+            if (!sectionEl || !list) return false;
+            const files = filesBySection[section];
+            const count = sectionEl.querySelector('.git-status-section-count');
+            if (count) count.setText(section === 'unstaged' && files.length !== snapshot.unstaged.length
+                ? `${files.length}/${snapshot.unstaged.length}`
+                : String(files.length));
+            const bulk = sectionEl.querySelector('.git-status-section-action') as HTMLButtonElement | null;
+            const bulkLabel = section === 'staged'
+                ? 'Unstage all'
+                : files.length === snapshot.unstaged.length ? 'Stage all' : 'Stage visible';
+            if (bulk) {
+                bulk.disabled = files.length === 0;
+                bulk.setAttr('title', bulkLabel);
+                bulk.setAttr('aria-label', bulkLabel);
+            }
+            const empty = list.querySelector('.git-empty-state');
+            if (files.length === 0 && !empty) {
+                list.createEl('p', {
+                    text: section === 'staged'
+                        ? 'No staged files'
+                        : snapshot.unstaged.length > 0 ? 'No files match the selected filters' : 'No uncommitted changes',
+                    cls: 'git-empty-state',
+                });
+            } else if (files.length > 0) {
+                empty?.remove();
+            }
+            this.patchSelectionToolbar(section, files, statusByPath);
+        }
+        this.stagedCount = snapshot.staged.length;
+        this.renderedFooterKey = null;
+        const footerEl = this.containerEl.querySelector('.git-sidebar-footer') as HTMLElement;
+        if (footerEl) this.renderFooter(footerEl);
+        return true;
+    }
+
+    private patchSelectionToolbar(
+        section: 'staged' | 'unstaged',
+        files: string[],
+        statusByPath: ReadonlyMap<string, GitFileStatus['status']>,
+    ): void {
+        const list = this.changeLists.get(section);
+        if (!list) return;
+        const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+        const toolbar = list.querySelector('.git-selection-toolbar') as HTMLElement | null;
+        if (!toolbar) return;
+        toolbar.toggleAttribute('hidden', files.length === 0);
+        const count = toolbar.querySelector('.git-selection-count');
+        if (count) count.setText(selected.length > 0 ? `${selected.length} selected` : 'Select files');
+        const selectAll = toolbar.querySelector('[data-selection-action="all"]') as HTMLButtonElement | null;
+        if (selectAll) selectAll.setText(selected.length === files.length && files.length > 0 ? 'Clear selection' : 'Select all');
+        const stage = toolbar.querySelector('[data-selection-action="stage"]') as HTMLButtonElement | null;
+        if (stage) stage.toggleAttribute('hidden', selected.length === 0);
+        const revert = toolbar.querySelector('[data-selection-action="revert"]') as HTMLButtonElement | null;
+        if (revert) revert.toggleAttribute('hidden', !selected.some((filepath) => statusByPath.get(filepath) !== 'untracked'));
+        const remove = toolbar.querySelector('[data-selection-action="remove"]') as HTMLButtonElement | null;
+        if (remove) remove.toggleAttribute('hidden', !selected.some((filepath) => statusByPath.get(filepath) === 'untracked'));
+        for (const filepath of files) {
+            const row = this.changeRows.get(filepath);
+            if (!row) continue;
+            const selectedRow = this.selectedFilePaths.has(filepath);
+            row.setAttr('aria-selected', String(selectedRow));
+            row.toggleClass('git-file-row-selected', selectedRow);
+        }
     }
 
     private async refreshFromButton(button: HTMLButtonElement): Promise<void> {
@@ -746,15 +874,16 @@ export class GitSidebarView extends ItemView {
             this.sidebarSnapshot = snapshot;
             this.readModel.setStatusSnapshot(snapshot);
             if (changed) this.statusRevision += 1;
-            log.info('GitStatus', 'Sidebar status snapshot applied', {
-                activeTab: this.activeTab,
-                changed,
-                repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
-                detailedFiles: snapshot.detailedStatus.length,
-                stagedFiles: snapshot.staged.length,
-                unstagedFiles: snapshot.unstaged.length,
-                untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === 'untracked').length,
-            });
+            if (changed) {
+                log.info('GitStatus', 'Sidebar status snapshot applied', {
+                    activeTab: this.activeTab,
+                    repositoryStatusAvailable: snapshot.repositoryStatusAvailable !== false,
+                    detailedFiles: snapshot.detailedStatus.length,
+                    stagedFiles: snapshot.staged.length,
+                    unstagedFiles: snapshot.unstaged.length,
+                    untrackedFiles: snapshot.detailedStatus.filter((file) => file.status === 'untracked').length,
+                });
+            }
         } catch (error) {
             log.warn('GitSidebar', 'Failed to read repository snapshot', error);
         }
@@ -991,6 +1120,8 @@ export class GitSidebarView extends ItemView {
     // ─── Tab renders ───
 
     private renderStatusTab(snapshot: GitSidebarStatusSnapshot | null, target = this.contentContainer): void {
+        this.changeRows.clear();
+        this.changeLists.clear();
         const container = target.createDiv('git-status-container');
 
         try {
@@ -1067,7 +1198,7 @@ export class GitSidebarView extends ItemView {
                 },
                 async () => {
                     const result = await this.plugin.runGitMutation('Stage all files', async (manager) => {
-                        return manager.addAll(visibleUnstaged);
+                        return manager.addAll(this.filesInStatusSection('unstaged'));
                     });
                     if (result.failed.length > 0) {
                         const firstFailure = result.failed[0];
@@ -1159,6 +1290,20 @@ export class GitSidebarView extends ItemView {
             });
     }
 
+    private filesInStatusSection(section: 'staged' | 'unstaged'): string[] {
+        if (!this.sidebarSnapshot) return [];
+        if (section === 'staged') return [...this.sidebarSnapshot.staged];
+        return this.filteredAndSortedUnstagedFiles(this.sidebarSnapshot.unstaged, this.statusByPath());
+    }
+
+    private statusByPath(): Map<string, GitFileStatus['status']> {
+        return new Map(this.sidebarSnapshot?.detailedStatus.map((file) => [file.filepath, file.status] as const) || []);
+    }
+
+    private statusForPath(filepath: string): GitFileStatus['status'] | undefined {
+        return this.statusByPath().get(filepath);
+    }
+
     private renderCollapsibleSection(
         container: HTMLElement,
         title: string,
@@ -1173,9 +1318,11 @@ export class GitSidebarView extends ItemView {
     ): void {
         const totalFiles = options.totalFiles ?? files.length;
         const section = container.createDiv(`git-status-section git-status-section-${sectionClass}`);
+        section.setAttr('data-section', sectionClass);
         
-        // Default: expanded if files exist, collapsed if empty
-        const isCollapsed = files.length === 0;
+        // The initial default is collapsed when empty. After that, collapse is
+        // view state, not a side effect of replacing a list or moving a row.
+        const isCollapsed = this.collapsedStatusSections.get(sectionClass) ?? files.length === 0;
         section.setAttr('data-collapsed', String(isCollapsed));
 
         // Header with toggle arrow + title + count + bulk button
@@ -1214,7 +1361,7 @@ export class GitSidebarView extends ItemView {
                     .onClick(() => {
                         this.uncommittedFilters.clear();
                         for (const { status } of changeFilterStatuses) this.uncommittedFilters.add(status);
-                        this.repaintStatusSnapshot();
+                        this.repaintStatusSnapshot(true);
                     }));
                 menu.addSeparator();
                 for (const { status, marker, label } of changeFilterStatuses) {
@@ -1224,7 +1371,7 @@ export class GitSidebarView extends ItemView {
                         .onClick(() => {
                             if (this.uncommittedFilters.has(status)) this.uncommittedFilters.delete(status);
                             else this.uncommittedFilters.add(status);
-                            this.repaintStatusSnapshot();
+                            this.repaintStatusSnapshot(true);
                         }));
                 }
                 menu.showAtMouseEvent(event);
@@ -1246,7 +1393,7 @@ export class GitSidebarView extends ItemView {
                         .setChecked(option.value === this.uncommittedSort)
                         .onClick(() => {
                             this.uncommittedSort = option.value;
-                            this.repaintStatusSnapshot();
+                            this.repaintStatusSnapshot(true);
                         }));
                 }
                 menu.showAtMouseEvent(event);
@@ -1285,15 +1432,17 @@ export class GitSidebarView extends ItemView {
             if (headerControls.some((control) => e.target === control || control.contains(e.target as Node))) return;
             const currentlyCollapsed = section.getAttr('data-collapsed') === 'true';
             section.setAttr('data-collapsed', String(!currentlyCollapsed));
+            this.collapsedStatusSections.set(sectionClass, !currentlyCollapsed);
             toggle.setText(!currentlyCollapsed ? '▸' : '▾');
             toggle.setAttr('aria-expanded', String(currentlyCollapsed));
         });
 
         const list = section.createDiv('git-status-section-list');
+        this.changeLists.set(sectionClass, list);
 
-        if (files.length > 0) {
-            const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
-            const selectionToolbar = list.createDiv('git-selection-toolbar');
+        const selected = files.filter((filepath) => this.selectedFilePaths.has(filepath));
+        const selectionToolbar = list.createDiv('git-selection-toolbar');
+        selectionToolbar.toggleAttribute('hidden', files.length === 0);
             selectionToolbar.createSpan({
                 text: selected.length > 0 ? `${selected.length} selected` : 'Select files',
                 cls: 'git-selection-count',
@@ -1301,7 +1450,7 @@ export class GitSidebarView extends ItemView {
             const selectAll = selectionToolbar.createEl('button', {
                 text: selected.length === files.length ? 'Clear selection' : 'Select all',
                 cls: 'git-selection-btn',
-                attr: { type: 'button' },
+                attr: { type: 'button', 'data-selection-action': 'all' },
             });
             selectAll.addEventListener('click', (event) => {
                 event.stopPropagation();
@@ -1312,52 +1461,49 @@ export class GitSidebarView extends ItemView {
                 }
                 this.repaintStatusSnapshot();
             });
-            if (selected.length > 0) {
-                const selectedAction = selectionToolbar.createEl('button', {
-                    text: sectionClass === 'staged' ? 'Unstage selected' : 'Stage selected',
-                    cls: 'git-selection-btn git-selection-primary',
-                    attr: { type: 'button' },
-                });
-                selectedAction.addEventListener('click', async (event) => {
-                    event.stopPropagation();
-                    if (this.mutationInFlight) return;
-                    this.setMutationBusy(true);
-                    try {
-                        await onSelected(selected);
-                        this.repaintStatusSnapshot();
-                    } catch (error: any) {
-                        new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} selected failed: ${error?.message || String(error)}`);
-                    } finally {
-                        this.setMutationBusy(false);
-                    }
-                });
-                if (sectionClass === 'unstaged') {
-                    const selectedUntracked = selected.filter((filepath) => statusByPath.get(filepath) === 'untracked');
-                    const selectedTracked = selected.filter((filepath) => statusByPath.get(filepath) !== 'untracked');
-                    if (selectedTracked.length > 0) {
-                        const revertAction = selectionToolbar.createEl('button', {
-                            text: 'Revert selected',
-                            cls: 'git-selection-btn git-selection-warning',
-                            attr: { type: 'button' },
-                        });
-                        revertAction.addEventListener('click', (event) => {
-                            event.stopPropagation();
-                            this.confirmDiscardSelected(selectedTracked, statusByPath);
-                        });
-                    }
-                    if (selectedUntracked.length > 0) {
-                        const deleteAction = selectionToolbar.createEl('button', {
-                            text: 'Delete selected',
-                            cls: 'git-selection-btn git-selection-warning',
-                            attr: { type: 'button' },
-                        });
-                        deleteAction.addEventListener('click', (event) => {
-                            event.stopPropagation();
-                            this.confirmDiscardSelected(selectedUntracked, statusByPath);
-                        });
-                    }
-                }
+        const selectedAction = selectionToolbar.createEl('button', {
+            text: sectionClass === 'staged' ? 'Unstage selected' : 'Stage selected',
+            cls: 'git-selection-btn git-selection-primary',
+            attr: { type: 'button', 'data-selection-action': 'stage' },
+        });
+        selectedAction.toggleAttribute('hidden', selected.length === 0);
+        selectedAction.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            if (this.mutationInFlight) return;
+            const currentFiles = this.filesInStatusSection(sectionClass);
+            const currentSelection = currentFiles.filter((filepath) => this.selectedFilePaths.has(filepath));
+            if (currentSelection.length === 0) return;
+            this.setMutationBusy(true);
+            try {
+                await onSelected(currentSelection);
+                this.repaintStatusSnapshot();
+            } catch (error: any) {
+                new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} selected failed: ${error?.message || String(error)}`);
+            } finally {
+                this.setMutationBusy(false);
             }
+        });
+        if (sectionClass === 'unstaged') {
+            const revertAction = selectionToolbar.createEl('button', {
+                text: 'Revert selected', cls: 'git-selection-btn git-selection-warning',
+                attr: { type: 'button', 'data-selection-action': 'revert' },
+            });
+            revertAction.toggleAttribute('hidden', !selected.some((filepath) => statusByPath.get(filepath) !== 'untracked'));
+            revertAction.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const current = this.filesInStatusSection('unstaged').filter((filepath) => this.selectedFilePaths.has(filepath) && this.statusForPath(filepath) !== 'untracked');
+                if (current.length > 0) this.confirmDiscardSelected(current, this.statusByPath());
+            });
+            const deleteAction = selectionToolbar.createEl('button', {
+                text: 'Delete selected', cls: 'git-selection-btn git-selection-warning',
+                attr: { type: 'button', 'data-selection-action': 'remove' },
+            });
+            deleteAction.toggleAttribute('hidden', !selected.some((filepath) => statusByPath.get(filepath) === 'untracked'));
+            deleteAction.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const current = this.filesInStatusSection('unstaged').filter((filepath) => this.selectedFilePaths.has(filepath) && this.statusForPath(filepath) === 'untracked');
+                if (current.length > 0) this.confirmDiscardSelected(current, this.statusByPath());
+            });
         }
         
         if (files.length === 0) {
@@ -1368,6 +1514,9 @@ export class GitSidebarView extends ItemView {
         } else {
             for (const filepath of files) {
                 const row = list.createDiv('git-file-row');
+                row.setAttr('data-filepath', filepath);
+                row.setAttr('data-section', sectionClass);
+                this.changeRows.set(filepath, row);
 
                 row.setAttr('role', 'option');
                 row.setAttr('aria-selected', String(this.selectedFilePaths.has(filepath)));
@@ -1498,17 +1647,20 @@ export class GitSidebarView extends ItemView {
                     if (this.mutationInFlight) return;
                     this.setMutationBusy(true);
                     try {
-                        await onAction(filepath);
+                        const currentSection = row.getAttr('data-section') as 'staged' | 'unstaged';
+                        await this.plugin.runGitMutation(currentSection === 'staged' ? 'Unstage file' : 'Stage file', async (manager) => {
+                            if (currentSection === 'staged') await manager.unstageFile(filepath);
+                            else await manager.stageFile(filepath);
+                        });
+                        new Notice(`${currentSection === 'staged' ? 'Unstaged' : 'Staged'} ${filepath}`);
                         this.applyFileMutationToSnapshot(
                             filepath,
-                            sectionClass === 'staged' ? 'unstaged' : 'staged',
+                            currentSection === 'staged' ? 'unstaged' : 'staged',
                         );
-                        // The Git operation has completed. Repaint the current
-                        // Changes view directly instead of starting a second
-                        // repository-wide read just to reflect this result.
                         this.repaintStatusSnapshot();
                     } catch (err: any) {
-                        new Notice(`${sectionClass === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
+                        const currentSection = row.getAttr('data-section') as 'staged' | 'unstaged';
+                        new Notice(`${currentSection === 'staged' ? 'Unstage' : 'Stage'} failed: ${err.message}`);
                     } finally {
                         this.setMutationBusy(false);
                     }
@@ -2001,52 +2153,74 @@ export class GitSidebarView extends ItemView {
         const toolbar = listContainer.createDiv('git-log-toolbar');
         toolbar.createEl('h2', { text: 'Activity', cls: 'git-log-toolbar-title' });
         
-        const currentLogEntries = log.getEntries();
         const cachedEntries = this.readModel.getLogEntries();
-        const cacheStale = cachedEntries
-            && currentLogEntries.length !== cachedEntries.length;
-        if (!cachedEntries || cacheStale) {
+        if (!cachedEntries) {
             const persisted = await this.plugin.fileLogger?.readEntries(500) || [];
             if (!this.isCurrentRender(generation)) return;
             log.mergePersistedEntries(persisted);
             this.readModel.setLogEntries(log.getEntries());
         }
-        const entries = this.readModel.getLogEntries() || [];
-        
-        if (entries.length === 0) {
-            listContainer.createEl('p', { text: 'No activity yet', cls: 'git-empty-state' });
-            return;
-        }
+        this.activityRows.clear();
+        this.syncActivityRows(this.readModel.getLogEntries() || [], listContainer, false);
+    }
 
-        // FileLogger and Logger both apply the configured retention limit.
-        // Do not impose a smaller view-only limit here: that made a busy
-        // session hide every persisted entry from earlier sessions.
-        const recent = [...entries].reverse();
-        
-        for (const entry of recent) {
-            const row = listContainer.createDiv('git-log-entry');
-            
-            const time = row.createSpan({
-                text: this.formatLogTime(new Date(entry.timestamp)),
-                cls: 'git-log-time' 
-            });
-            
-            const level = row.createSpan({ 
-                text: entry.level.toUpperCase(), 
-                cls: 'git-log-level git-log-' + entry.level 
-            });
-            
-            const message = row.createSpan({
-                text: entry.message,
-                cls: 'git-log-message' 
-            });
-            message.setAttr('title', `[${entry.namespace}] ${entry.message}`);
-            
-            if (entry.data) {
-                const detail = row.createDiv('git-log-detail');
-                detail.setText(typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data).slice(0, 200));
+    /** Update the visible Activity feed from live memory only; disk is read on initial open/reload. */
+    private applyLiveActivityEntries(): void {
+        const entries = log.getEntries();
+        this.readModel.setLogEntries(entries);
+        const pane = this.tabContainers.get('log');
+        const list = pane?.querySelector('.git-log-list') as HTMLElement | null;
+        if (list) this.syncActivityRows(entries, list, true);
+    }
+
+    private activityKey(entry: { timestamp: number; level: string; namespace: string; message: string; data?: unknown }): string {
+        return `${entry.timestamp}:${entry.level}:${entry.namespace}:${entry.message}:${JSON.stringify(entry.data)}`;
+    }
+
+    private syncActivityRows(entries: readonly ReturnType<typeof log.getEntries>[number][], list: HTMLElement, preservePosition: boolean): void {
+        const scrollContainer = this.contentContainer;
+        const previousTop = scrollContainer.scrollTop;
+        const previousHeight = scrollContainer.scrollHeight;
+        const wasAtTop = previousTop <= 4;
+        const keys = new Set(entries.map((entry) => this.activityKey(entry)));
+        for (const [key, row] of this.activityRows) {
+            if (!keys.has(key)) {
+                row.remove();
+                this.activityRows.delete(key);
             }
         }
+        list.querySelector('.git-empty-state')?.remove();
+        if (entries.length === 0) {
+            list.createEl('p', { text: 'No activity yet', cls: 'git-empty-state' });
+            return;
+        }
+        const firstRow = () => list.querySelector('.git-log-entry');
+        // Insert oldest-to-newest before the current first row so final order
+        // remains newest-first without replacing rows the reader may be using.
+        for (const entry of entries) {
+            const key = this.activityKey(entry);
+            if (this.activityRows.has(key)) continue;
+            const row = this.createActivityRow(entry);
+            list.insertBefore(row, firstRow());
+            this.activityRows.set(key, row);
+        }
+        if (preservePosition && !wasAtTop) {
+            scrollContainer.scrollTop = previousTop + (scrollContainer.scrollHeight - previousHeight);
+        }
+    }
+
+    private createActivityRow(entry: ReturnType<typeof log.getEntries>[number]): HTMLElement {
+        const row = document.createElement('div');
+        row.addClass('git-log-entry');
+        const time = row.createSpan({ text: this.formatLogTime(new Date(entry.timestamp)), cls: 'git-log-time' });
+        const level = row.createSpan({ text: entry.level.toUpperCase(), cls: 'git-log-level git-log-' + entry.level });
+        const message = row.createSpan({ text: entry.message, cls: 'git-log-message' });
+        message.setAttr('title', `[${entry.namespace}] ${entry.message}`);
+        if (entry.data) {
+            const detail = row.createDiv('git-log-detail');
+            detail.setText(typeof entry.data === 'string' ? entry.data : JSON.stringify(entry.data).slice(0, 200));
+        }
+        return row;
     }
 
     private openLogMenu(event: MouseEvent): void {

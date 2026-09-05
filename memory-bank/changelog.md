@@ -5,6 +5,14 @@
 - The plan preserves the approved sidebar, Settings, dialogs, updater, and
   backend; it does not authorize a full UI rewrite.
 
+## 2026-09-05 — T40 retained rendering updates
+
+- Replaced Activity list rebuilds, repeated persisted-log reads, full Changes
+  pane repaints for ordinary selection/file mutations, vault watcher fanout,
+  and progress modal subtree rebuilds with retained update paths.
+- Source/build verification passed; real Obsidian desktop/mobile timing,
+  scrolling, focus, resize, and visual acceptance remain open.
+
 ## 2026-09-05 — T39 PR review fixes
 
 - Fixed all six automated review findings in pushed commit `681b108`:

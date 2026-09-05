@@ -25,6 +25,15 @@ interface ProgressPhase {
     detail?: string;
 }
 
+interface ProgressPhaseNodes {
+    root: HTMLElement;
+    icon: HTMLElement;
+    detail: HTMLElement;
+    barContainer: HTMLElement;
+    fill: HTMLElement;
+    label: HTMLElement;
+}
+
 const CLONE_PHASE_ORDER = [
     'Remote communication',
     'Fetching',
@@ -48,6 +57,10 @@ export class GitProgressModal extends Modal {
     private statsEl!: HTMLElement;
     private phasesEl!: HTMLElement;
     private footerEl!: HTMLElement;
+    private statusEl!: HTMLElement;
+    private footerTextEl!: HTMLElement;
+    private readonly statValues = new Map<string, HTMLElement>();
+    private readonly phaseNodes = new Map<string, ProgressPhaseNodes>();
     private operationName: string;
     private phaseOrder: string[];
     private startTime: number;
@@ -96,14 +109,15 @@ export class GitProgressModal extends Modal {
         this.headerEl = this.container.createDiv('git-progress-header');
         const titleEl = this.headerEl.createDiv('git-progress-title');
         titleEl.setText(this.operationName);
-        const statusEl = this.headerEl.createDiv('git-progress-status');
-        statusEl.setText('Initializing...');
+        this.statusEl = this.headerEl.createDiv('git-progress-status');
+        this.statusEl.setText('Initializing...');
 
         this.statsEl = this.container.createDiv('git-progress-statistics');
         this.phasesEl = this.container.createDiv('git-progress-phases');
         this.footerEl = this.container.createDiv('git-progress-footer');
-        this.elapsedTimer = window.setInterval(() => this.render(), 1000);
-        this.render();
+        this.buildPersistentNodes();
+        this.elapsedTimer = window.setInterval(() => this.updatePersistentNodes(), 1000);
+        this.updatePersistentNodes();
     }
 
     onClose() {
@@ -136,7 +150,7 @@ export class GitProgressModal extends Modal {
         }
 
         this.activatePhase(phaseName, loaded, total);
-        this.render();
+        this.updatePersistentNodes();
     }
 
     updateTransfer(event: TransferProgressEvent) {
@@ -159,7 +173,7 @@ export class GitProgressModal extends Modal {
         this.lastTransferLoaded = loaded;
         this.lastTransferTime = now;
         this.activatePhase(this.isPush() ? 'Waiting for remote confirmation' : 'Fetching', loaded, total);
-        this.render();
+        this.updatePersistentNodes();
     }
 
     updateCheckout(event: { loaded?: number; total?: number; bytesWritten?: number }) {
@@ -167,20 +181,19 @@ export class GitProgressModal extends Modal {
         this.filesTotal = Math.max(this.filesTotal, Number(event.total || 0));
         this.bytesWritten = Math.max(this.bytesWritten, Number(event.bytesWritten || 0));
         this.activatePhase(this.isPush() ? 'Confirming branch' : 'Checking out', this.filesWritten, this.filesTotal);
-        this.render();
+        this.updatePersistentNodes();
     }
 
     updateMessage(text: string) {
         if (!text || this.isComplete) return;
 
         const message = text.trim();
-        const statusEl = this.headerEl?.querySelector('.git-progress-status');
-        statusEl?.setText(message);
+        this.statusEl?.setText(message);
 
         const phaseName = this.inferPhaseFromMessage(message);
         if (phaseName) {
             this.activatePhase(phaseName);
-            this.render();
+            this.updatePersistentNodes();
         }
     }
 
@@ -197,12 +210,11 @@ export class GitProgressModal extends Modal {
                 phase.detail = this.statusLabel('completed');
             }
         }
-        this.render();
+        this.updatePersistentNodes();
 
-        const statusEl = this.headerEl?.querySelector('.git-progress-status');
-        if (statusEl) {
-            statusEl.setText(message);
-            statusEl.addClass('git-progress-status-success');
+        if (this.statusEl) {
+            this.statusEl.setText(message);
+            this.statusEl.addClass('git-progress-status-success');
         }
 
     }
@@ -219,13 +231,12 @@ export class GitProgressModal extends Modal {
                 phase.detail = this.statusLabel('error');
             }
         }
-        this.render();
+        this.updatePersistentNodes();
 
         const message = error instanceof Error ? error.message : String(error);
-        const statusEl = this.headerEl?.querySelector('.git-progress-status');
-        if (statusEl) {
-            statusEl.setText(`Failed: ${message}`);
-            statusEl.addClass('git-progress-status-error');
+        if (this.statusEl) {
+            this.statusEl.setText(`Failed: ${message}`);
+            this.statusEl.addClass('git-progress-status-error');
         }
     }
 
@@ -249,10 +260,51 @@ export class GitProgressModal extends Modal {
         phase.detail = this.phaseDetail(name, loaded, total);
     }
 
-    private render() {
+    private buildPersistentNodes(): void {
+        this.statsEl.empty();
+        this.phasesEl.empty();
+        this.statValues.clear();
+        this.phaseNodes.clear();
+        const transferTitle = this.statsEl.createDiv('git-progress-section-title');
+        transferTitle.setText('Transfer statistics');
+        const transfer = this.statsEl.createDiv('git-progress-stat-card');
+        this.addPersistentStatRow(transfer, 'Objects');
+        this.addPersistentStatRow(transfer, this.isPush() ? 'Response data' : 'Data');
+        this.addPersistentStatRow(transfer, 'Rate');
+        this.addPersistentStatRow(transfer, 'ETA');
+        const checkoutTitle = this.statsEl.createDiv('git-progress-section-title');
+        checkoutTitle.setText(this.isPush() ? 'Remote confirmation' : 'Checkout progress');
+        const checkout = this.statsEl.createDiv('git-progress-stat-card');
+        this.addPersistentStatRow(checkout, 'Files');
+        this.addPersistentStatRow(checkout, 'Written');
+
+        const title = this.phasesEl.createDiv('git-progress-section-title');
+        title.setText(this.isPush() ? 'Push phases' : 'Clone phases');
+        const phaseCard = this.phasesEl.createDiv('git-progress-phase-card');
+        for (const phase of this.phases.values()) {
+            const root = phaseCard.createDiv('git-progress-phase');
+            const icon = root.createDiv('git-progress-phase-icon');
+            const info = root.createDiv('git-progress-phase-info');
+            info.createDiv('git-progress-phase-name').setText(phase.name);
+            const detail = info.createDiv('git-progress-phase-detail');
+            const barContainer = info.createDiv('git-progress-bar-container');
+            const bar = barContainer.createDiv('git-progress-bar');
+            const fill = bar.createDiv('git-progress-bar-fill');
+            const label = barContainer.createDiv('git-progress-bar-label');
+            this.phaseNodes.set(phase.name, { root, icon, detail, barContainer, fill, label });
+        }
+        this.footerTextEl = this.footerEl.createSpan();
+    }
+
+    private updatePersistentNodes(): void {
         if (!this.statsEl || !this.phasesEl) return;
-        this.renderStatistics();
-        this.renderPhases();
+        this.setStatValue('Objects', this.countPair(this.objectsLoaded, this.objectsTotal));
+        this.setStatValue(this.isPush() ? 'Response data' : 'Data', this.bytePair(this.bytesLoaded, this.bytesTotal));
+        this.setStatValue('Rate', this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : '—');
+        this.setStatValue('ETA', this.estimateRemaining());
+        this.setStatValue('Files', this.countPair(this.filesWritten, this.filesTotal));
+        this.setStatValue('Written', this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : '—');
+        for (const phase of this.phases.values()) this.updatePhaseNodes(phase);
         this.updateFooter();
     }
 
@@ -263,64 +315,29 @@ export class GitProgressModal extends Modal {
         }
     }
 
-    private renderStatistics() {
-        this.statsEl.empty();
-
-        const transferTitle = this.statsEl.createDiv('git-progress-section-title');
-        transferTitle.setText('Transfer statistics');
-        const transfer = this.statsEl.createDiv('git-progress-stat-card');
-        this.addStatRow(transfer, 'Objects', this.countPair(this.objectsLoaded, this.objectsTotal));
-        this.addStatRow(transfer, this.isPush() ? 'Response data' : 'Data', this.bytePair(this.bytesLoaded, this.bytesTotal));
-        this.addStatRow(transfer, 'Rate', this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : '—');
-        this.addStatRow(transfer, 'ETA', this.estimateRemaining());
-
-        const checkoutTitle = this.statsEl.createDiv('git-progress-section-title');
-        checkoutTitle.setText(this.isPush() ? 'Remote confirmation' : 'Checkout progress');
-        const checkout = this.statsEl.createDiv('git-progress-stat-card');
-        this.addStatRow(checkout, 'Files', this.countPair(this.filesWritten, this.filesTotal));
-        this.addStatRow(
-            checkout,
-            'Written',
-            this.bytesWritten > 0 ? `${this.formatBytes(this.bytesWritten)} written` : '—',
-        );
-    }
-
-    private renderPhases() {
-        this.phasesEl.empty();
-        const title = this.phasesEl.createDiv('git-progress-section-title');
-        title.setText(this.isPush() ? 'Push phases' : 'Clone phases');
-
-        const phaseCard = this.phasesEl.createDiv('git-progress-phase-card');
-        for (const phase of this.phases.values()) {
-            const phaseEl = phaseCard.createDiv('git-progress-phase');
-            phaseEl.addClass(`git-progress-phase-${phase.status}`);
-
-            const iconEl = phaseEl.createDiv('git-progress-phase-icon');
-            iconEl.setText(this.getStatusIcon(phase.status));
-
-            const infoEl = phaseEl.createDiv('git-progress-phase-info');
-            const nameEl = infoEl.createDiv('git-progress-phase-name');
-            nameEl.setText(phase.name);
-            const detailEl = infoEl.createDiv('git-progress-phase-detail');
-            detailEl.setText(phase.detail || this.statusLabel(phase.status));
-
-            if (phase.status === 'active' && phase.total > 0) {
-                const barContainer = infoEl.createDiv('git-progress-bar-container');
-                const bar = barContainer.createDiv('git-progress-bar');
-                const fill = bar.createDiv('git-progress-bar-fill');
-                fill.style.width = `${phase.percent}%`;
-                const label = barContainer.createDiv('git-progress-bar-label');
-                label.setText(`${phase.percent}%`);
-            }
-        }
-    }
-
-    private addStatRow(parent: HTMLElement, label: string, value: string) {
+    private addPersistentStatRow(parent: HTMLElement, label: string): void {
         const row = parent.createDiv('git-progress-stat-row');
         const labelEl = row.createSpan('git-progress-stat-label');
         labelEl.setText(label);
         const valueEl = row.createSpan('git-progress-stat-value');
-        valueEl.setText(value);
+        this.statValues.set(label, valueEl);
+    }
+
+    private setStatValue(label: string, value: string): void {
+        this.statValues.get(label)?.setText(value);
+    }
+
+    private updatePhaseNodes(phase: ProgressPhase): void {
+        const nodes = this.phaseNodes.get(phase.name);
+        if (!nodes) return;
+        nodes.root.removeClass('git-progress-phase-pending', 'git-progress-phase-active', 'git-progress-phase-completed', 'git-progress-phase-error');
+        nodes.root.addClass(`git-progress-phase-${phase.status}`);
+        nodes.icon.setText(this.getStatusIcon(phase.status));
+        nodes.detail.setText(phase.detail || this.statusLabel(phase.status));
+        const showBar = phase.status === 'active' && phase.total > 0;
+        nodes.barContainer.toggleAttribute('hidden', !showBar);
+        nodes.fill.style.width = `${phase.percent}%`;
+        nodes.label.setText(`${phase.percent}%`);
     }
 
     private updateFooter() {
@@ -328,8 +345,7 @@ export class GitProgressModal extends Modal {
         const elapsed = ((this.completedElapsedMs ?? (Date.now() - this.startTime)) / 1000).toFixed(1);
         const completed = Array.from(this.phases.values()).filter((p) => p.status === 'completed').length;
         const rate = this.bytesPerSecond > 0 ? this.formatRate(this.bytesPerSecond) : 'rate unavailable';
-        this.footerEl.empty();
-        this.footerEl.createSpan({ text: `Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases` });
+        this.footerTextEl?.setText(`Elapsed: ${elapsed}s | ${rate} | ${completed}/${this.phaseOrder.length} phases`);
     }
 
     private countPair(loaded: number, total: number): string {
