@@ -213,6 +213,7 @@ test('bulk sidebar mutations repaint without a second repository read', () => {
 
 test('staged and uncommitted lists support range and modifier-key selection', () => {
   const sidebarSource = readFileSync(join(repositoryRoot, 'src/views/GitSidebarView.ts'), 'utf8');
+  const styles = readFileSync(join(repositoryRoot, 'styles.css'), 'utf8');
 
   assert.match(sidebarSource, /private readonly selectedFilePaths = new Set<string>\(\)/);
   assert.match(sidebarSource, /private readonly selectionAnchorBySection/);
@@ -220,6 +221,11 @@ test('staged and uncommitted lists support range and modifier-key selection', ()
   assert.match(sidebarSource, /mouseEvent\.metaKey \|\| mouseEvent\.ctrlKey/);
   assert.match(sidebarSource, /Stage selected/);
   assert.match(sidebarSource, /Unstage selected/);
+  assert.match(sidebarSource, /Revert selected/);
+  assert.match(sidebarSource, /Delete selected/);
+  assert.match(sidebarSource, /confirmDiscardSelected/);
   assert.match(sidebarSource, /manager\.addAll\(paths\)/);
   assert.match(sidebarSource, /manager\.unstageFile\(filepath\)/);
+  assert.match(sidebarSource, /this\.app\.vault\.trash\(file, false\)/);
+  assert.match(styles, /\.git-selection-toolbar\s*\{[\s\S]*position: sticky;[\s\S]*top: 60px;/);
 });

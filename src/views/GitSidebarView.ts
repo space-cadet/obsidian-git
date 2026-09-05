@@ -1331,6 +1331,32 @@ export class GitSidebarView extends ItemView {
                         this.setMutationBusy(false);
                     }
                 });
+                if (sectionClass === 'unstaged') {
+                    const selectedUntracked = selected.filter((filepath) => statusByPath.get(filepath) === 'untracked');
+                    const selectedTracked = selected.filter((filepath) => statusByPath.get(filepath) !== 'untracked');
+                    if (selectedTracked.length > 0) {
+                        const revertAction = selectionToolbar.createEl('button', {
+                            text: 'Revert selected',
+                            cls: 'git-selection-btn git-selection-warning',
+                            attr: { type: 'button' },
+                        });
+                        revertAction.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            this.confirmDiscardSelected(selectedTracked, statusByPath);
+                        });
+                    }
+                    if (selectedUntracked.length > 0) {
+                        const deleteAction = selectionToolbar.createEl('button', {
+                            text: 'Delete selected',
+                            cls: 'git-selection-btn git-selection-warning',
+                            attr: { type: 'button' },
+                        });
+                        deleteAction.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            this.confirmDiscardSelected(selectedUntracked, statusByPath);
+                        });
+                    }
+                }
             }
         }
         
@@ -1532,6 +1558,63 @@ export class GitSidebarView extends ItemView {
                 new Notice(`Discard failed: ${error?.message || String(error)}`);
             }
         });
+        modal.open();
+    }
+
+    private confirmDiscardSelected(
+        filepaths: string[],
+        statusByPath: Map<string, GitFileStatus['status']>,
+    ): void {
+        const untracked = filepaths.every((filepath) => statusByPath.get(filepath) === 'untracked');
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(untracked ? 'Delete selected untracked files?' : 'Revert selected changes?');
+        modal.contentEl.createEl('p', {
+            text: untracked
+                ? `${filepaths.length} untracked file${filepaths.length === 1 ? '' : 's'} will be moved to Obsidian’s trash.`
+                : `${filepaths.length} file change${filepaths.length === 1 ? '' : 's'} will be restored to their committed HEAD versions.`,
+        });
+        const actions = modal.contentEl.createDiv('git-confirm-actions');
+        new ButtonComponent(actions).setButtonText('Cancel').onClick(() => modal.close());
+        new ButtonComponent(actions)
+            .setButtonText(untracked ? 'Move to trash' : 'Revert changes')
+            .setWarning()
+            .onClick(async () => {
+                const succeeded: string[] = [];
+                const failed: string[] = [];
+                this.setMutationBusy(true);
+                try {
+                    if (untracked) {
+                        for (const filepath of filepaths) {
+                            const file = this.app.vault.getAbstractFileByPath(filepath);
+                            if (!file) {
+                                failed.push(filepath);
+                                continue;
+                            }
+                            await this.app.vault.trash(file, false);
+                            succeeded.push(filepath);
+                        }
+                    } else {
+                        const result = await this.plugin.runGitMutation('Revert selected changes', async (manager) => {
+                            for (const filepath of filepaths) await manager.discardFile(filepath);
+                            return filepaths;
+                        });
+                        succeeded.push(...result);
+                    }
+                    for (const filepath of succeeded) {
+                        this.selectedFilePaths.delete(filepath);
+                        this.applyFileMutationToSnapshot(filepath, 'removed');
+                    }
+                    this.repaintStatusSnapshot();
+                    new Notice(failed.length > 0
+                        ? `${untracked ? 'Deleted' : 'Reverted'} ${succeeded.length} of ${filepaths.length} selected files.`
+                        : `${untracked ? 'Moved' : 'Reverted'} ${succeeded.length} selected file${succeeded.length === 1 ? '' : 's'}.`);
+                    modal.close();
+                } catch (error: any) {
+                    new Notice(`Could not ${untracked ? 'delete' : 'revert'} selected files: ${error?.message || String(error)}`);
+                } finally {
+                    this.setMutationBusy(false);
+                }
+            });
         modal.open();
     }
 

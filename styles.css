@@ -591,6 +591,9 @@
 .git-selection-toolbar {
     display: flex;
     align-items: center;
+    position: sticky;
+    top: 60px;
+    z-index: 4;
     gap: 8px;
     padding: 6px 14px;
     border-bottom: 1px solid var(--background-modifier-border);
@@ -621,6 +624,10 @@
 
 .git-selection-primary {
     color: var(--text-accent);
+}
+
+.git-selection-warning {
+    color: var(--text-error);
 }
 
 /* File row — mobile-style clean layout */
