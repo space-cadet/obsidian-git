@@ -49,5 +49,6 @@ recorded.
 
 The source implementation supports authentication, clone or connect, pull,
 fetch, and push through the configured HTTP(S) remote. Production build and
-static diff checks pass. A real test-remote run and installed-host acceptance
-are still required before this task is complete.
+static diff checks pass. The user verified the pushed remote workflow, including
+Pull and Push from the Changes toolbar. Progress modals, richer Git-style
+messages, and additional edge-case acceptance remain planned.

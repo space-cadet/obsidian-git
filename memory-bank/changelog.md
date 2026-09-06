@@ -17,6 +17,13 @@
 - Added persistent structured Log entries with full timestamps and severity. - T5
 - Added the initial remote connection and credential foundation. - T7
 - Recorded user verification of the pushed Changes and Log behavior. - T10
+- Added versioned plugin-data export/import with optional Activity history. - T2
+- Added Local/Remote Commits history and repository comparison states. - T6
+- Added Fetch, Pull, Push, and Clone transport flows with queued diagnostics. - T7
+- Moved Pull, Push, and Fetch to the Changes toolbar and removed duplicate
+  Settings operation controls. - T4
+- Fixed Pull author identity and Push request-body handling after user Log
+  evidence; the user confirmed both toolbar actions now work. - T5, T7
 
 ## 2026-09-05
 

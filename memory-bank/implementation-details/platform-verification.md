@@ -36,5 +36,7 @@ verified the Log and Changes behavior.
   clean states.
 - Mobile initially exposed `Buffer is not defined`; the Buffer polyfill fix was
   pushed in `8a90e91`, after which the user observed the Changes panel rendering.
+- The user verified the pushed Remote commits view and confirmed that Pull and
+  Push work from the Changes toolbar.
 - Platform-specific desktop, Android, and iOS results are not identified in the
   current evidence and should be recorded separately when tested.

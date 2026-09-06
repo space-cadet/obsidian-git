@@ -26,6 +26,14 @@
 
 ## Next
 
-- Continue T7c/T7d for fetch, pull, push, and clone.
+- Add progress modals and richer Git-style result messages for remote actions.
 - Continue T4f/T4g and T5e for Changes refinements and Log clear/export.
 - Record platform-specific T10 acceptance when those hosts are tested.
+
+## 2026-09-06 Session Closeout
+
+- Completed versioned plugin-data export/import with optional Activity history.
+- Completed local and fetched Remote Commits display with comparison status.
+- Completed Changes-toolbar Pull, Push, and Fetch wiring with live diagnostics.
+- Fixed Pull author identity and Push HTTP-body transport failures.
+- The user verified the pushed Remote commits view and confirmed Pull and Push work.

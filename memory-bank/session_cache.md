@@ -1,12 +1,12 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 15:41:06 IST*
+*Last Updated: 2026-09-06 15:53:27 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
-**Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
+**Focus Task**: T2, T4, T5, T6, T7: data portability, Changes, Log, Commits, and remote Git
 **Session File**: `sessions/2026-09-06-changes-release-runtime.md`
-**Status**: 🔄 Active: 8, Paused: 0, Completed: 0
+**Status**: 🔄 Active: 9, Paused: 0, Completed: 0
 
 ## Overview
 
@@ -32,9 +32,9 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T7c/T7d and T6: Run the implemented remote operations and Remote Commits
-   view against a real test remote and installed host.
-2. T4f/T4g and T5e: Continue planned UI and Log refinements.
+1. T8: Add progress modals and operation-state presentation for Git actions.
+2. T4/T5/T7: Refine UI and replace generic notices with richer Git-style results.
+3. T10: Record platform-specific acceptance separately when those hosts are tested.
 
 ## 2026-09-06 Commits Update
 
@@ -98,6 +98,14 @@ Build the Settings panel immediately after the shell with only the configuration
   the configured author and committer identity.
 - User Log evidence showed Push failing with `body.next is not a function`; the
   HTTP bridge now handles Git's array-of-chunks request body.
+
+## 2026-09-06 Session Closeout
+
+- Session title: T2, T4, T5, T6, T7: data portability, Changes, Log, Commits, and remote Git
+- The user verified the Remote commits view and confirmed that Pull and Push
+  work from the Changes toolbar.
+- The branch is clean and pushed at `0bdbba0`; next work is UI refinement,
+  progress modals, richer operation messages, and edge-case verification.
 
 ## 2026-09-06 Update
 

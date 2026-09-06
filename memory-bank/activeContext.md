@@ -1,24 +1,25 @@
 # Active Context
 
-*Last Updated: 2026-09-06 15:41:06 IST*
+*Last Updated: 2026-09-06 15:53:27 IST*
 
 ## Current Focus
 
-- **T2, T6, T7, T4, T5, T10** — Settings data portability, Commits, core Git operations, Changes, Log, and pushed-build
-  verification are the current record
-- **Next** — verify T7 against a real test remote and installed host, then
-  continue T4/T5 refinements
+- **T2, T4, T5, T6, T7** — data portability, Changes, Log, local/remote
+  Commits, and core remote Git operations are the central session work
+- **Next** — refine operation UI and add progress modals and richer Git-style
+  messages
 
 ## Current State
 
-The source now contains the first complete T7 core Git operation path and a
+The source now contains the complete first T7 core Git operation path and a
 fetched Remote Commits view in addition to the verified Changes and Log
-updates, auto-saving Settings, and versioned plugin data portability.
+updates, auto-saving Settings, and versioned plugin data portability. The user
+verified Remote commits and confirmed that Pull and Push work from Changes.
 The repository header now reports comparison status, and remote operations
-write live diagnostic Activity entries. Remaining work is live remote and
-installed host verification, followed by the lettered UI refinements in T4 and
-T5. Pull, Push, and Fetch are exposed only in the Changes action bar; Settings
-now remains configuration-focused.
+write live diagnostic Activity entries. Pull, Push, and Fetch are exposed only
+in the Changes action bar; Settings now remains configuration-focused.
+Remaining work is progress-modal treatment, richer operation results, and
+edge-case verification.
 
 ## Current Decisions
 
@@ -28,8 +29,8 @@ now remains configuration-focused.
 
 ## Next Actions
 
-1. Run the Changes toolbar Pull/Push actions, T7c/T7d, the Remote Commits view,
-   and diagnostic Log flow against a real test remote and the installed
-   Obsidian host.
-2. Verify Settings import/export and the versioned data shape in the pushed host.
-3. Continue T4/T5 refinements after remote acceptance is recorded.
+1. Add progress modals for Fetch, Pull, Push, and other long-running Git work.
+2. Replace generic operation notices with informative Git-style results while
+   keeping token data out of diagnostics.
+3. Continue T4/T5 refinements and test divergence, authentication, and other
+   remote edge cases separately.

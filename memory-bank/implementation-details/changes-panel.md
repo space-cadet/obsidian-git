@@ -34,13 +34,14 @@ the resulting clean state.
 - Stage and unstage refresh the Changes content while preserving the panel,
   active control, commit-message focus, and scroll position.
 - Pull and Push are connected to the shared remote operation queue and emit
-  Activity diagnostics while they run.
+  Activity diagnostics while they run; Settings remains configuration-only.
 - The local integration flow passed: untracked -> staged -> committed -> clean.
 - A mobile `Buffer is not defined` failure was fixed with the browser Buffer
   polyfill recorded in commit `8a90e91`.
 
 ## Remaining evidence
 
-The user verified the pushed Changes build, including staging behavior and
-scroll preservation. Filtering, sorting, revert, and keyboard multi-selection
-remain planned refinements.
+The user verified the pushed Changes build, including staging behavior, scroll
+preservation, and working Pull and Push toolbar actions. Filtering, sorting,
+revert, keyboard multi-selection, and progress-modal treatment remain planned
+refinements.

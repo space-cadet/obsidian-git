@@ -37,5 +37,6 @@ the basic local and fetched-remote views demonstrate a need for them.
 - The local history API returned three commits and changed-file counts from the
   current repository without using its configured remote.
 - The user verified that the local Commits display works in the pushed build.
-- Remote history source loading is covered by the production build; live
-  Fetch and installed-host verification remain open.
+- The user verified that the Remote commits display works in the pushed build.
+- Installed-host verification of the complete history workflow remains a
+  separate platform record.

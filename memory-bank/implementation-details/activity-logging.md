@@ -27,4 +27,6 @@ multi-level retention policy, or analytics layer without a demonstrated need.
 ## Completion evidence
 
 The user verified the pushed build and confirmed that Log entries persist and
-render correctly. Clear and export are still outside the current scope.
+render correctly, including remote-operation diagnostics. Clear and export are
+still outside the current scope; richer Git-style operation summaries remain
+planned.
