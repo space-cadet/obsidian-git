@@ -1,6 +1,6 @@
 # Session 2026-09-06 - Changes, release, and runtime
 *Created: 2026-09-06 04:45:17 IST*
-*Last Updated: 2026-09-06 04:45:17 IST*
+*Last Updated: 2026-09-06 14:21:47 IST*
 
 ## Session Title
 
@@ -78,4 +78,14 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 
 - Added a Settings toggle for including Activity history in plugin-data
   exports; the default is off and the export records the choice.
-- The next planned implementation focus is T7 core Git operations.
+
+## 2026-09-06 Core Git operations
+
+- Implemented direct HTTP(S) Fetch, fast-forward-only Pull, Push, and Clone
+  through `isomorphic-git` and the Obsidian filesystem bridge.
+- Added Settings buttons with busy states, queued execution, Activity entries,
+  and success or failure notices.
+- Clone requires an empty vault-relative destination; Pull does not resolve
+  merge conflicts in this increment.
+- Production build and `git diff --check` pass. Real test-remote and
+  installed-host acceptance remain open.

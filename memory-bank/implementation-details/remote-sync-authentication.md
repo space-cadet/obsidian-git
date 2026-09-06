@@ -27,8 +27,15 @@ recorded.
   username/token credential pair.
 - A connection test records success or failure in the Log and reports the
   remote default branch when available.
+- Settings now expose Fetch, fast-forward-only Pull, Push, and Clone actions.
+- Fetch, Pull, and Push attach or refresh the configured `origin` remote before
+  running; Clone requires an empty vault-relative destination.
+- Remote operations are queued so two Git mutations cannot run concurrently,
+  and each result is recorded in Activity with a notice.
 
 ## Completion evidence
 
-The user can authenticate, clone or connect a repository, pull changes, and
-push a commit using a test remote.
+The source implementation supports authentication, clone or connect, pull,
+fetch, and push through the configured HTTP(S) remote. Production build and
+static diff checks pass. A real test-remote run and installed-host acceptance
+are still required before this task is complete.

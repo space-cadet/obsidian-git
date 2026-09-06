@@ -1,19 +1,20 @@
 # Active Context
 
-*Last Updated: 2026-09-06 14:16:37 IST*
+*Last Updated: 2026-09-06 14:21:47 IST*
 
 ## Current Focus
 
 - **T2, T6, T7, T4, T5, T10** — Settings data portability, Commits, core Git operations, Changes, Log, and pushed-build
   verification are the current record
-- **Next** — implement T7 core Git operations, then verify Settings import/export
-  and the local Commits surface
+- **Next** — verify T7 against a real test remote and installed host, then
+  continue T4/T5 refinements
 
 ## Current State
 
-The pushed build contains the verified Changes and Log updates, auto-saving
-Settings, and the first remote connection/authentication increment. Remaining
-work is tracked by the lettered subtasks in T4, T5, T7, and T10.
+The source now contains the first complete T7 core Git operation path in
+addition to the verified Changes and Log updates, auto-saving Settings, and
+versioned plugin data portability. Remaining work is live remote and installed
+host verification, followed by the lettered UI refinements in T4 and T5.
 
 ## Current Decisions
 
@@ -23,6 +24,6 @@ work is tracked by the lettered subtasks in T4, T5, T7, and T10.
 
 ## Next Actions
 
-1. Implement T7c/T7d fetch, pull, push, and clone.
+1. Run T7c/T7d against a real test remote and the installed Obsidian host.
 2. Verify Settings import/export and the versioned data shape in the pushed host.
-3. Verify the T6 local Commits list, then continue T4/T5 refinements.
+3. Continue T4/T5 refinements after remote acceptance is recorded.

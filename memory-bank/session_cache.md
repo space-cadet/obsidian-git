@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 14:16:37 IST*
+*Last Updated: 2026-09-06 14:21:47 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -32,7 +32,8 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T7c/T7d: Implement fetch, pull, push, and clone.
+1. T7c/T7d: Run the implemented fetch, pull, push, and clone flows against a
+   real test remote and installed host.
 2. T4f/T4g and T5e: Continue planned UI and Log refinements.
 
 ## 2026-09-06 Commits Update
@@ -63,7 +64,8 @@ Build the Settings panel immediately after the shell with only the configuration
 - Activity history is now optional in plugin-data exports and disabled by
   default.
 - Export metadata records whether activity was included.
-- The next implementation focus is core Git remote operations under T7.
+- Core Git remote operations are now implemented under T7; live remote and
+  installed-host verification remain.
 
 ## 2026-09-06 Update
 

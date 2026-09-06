@@ -1,5 +1,6 @@
-import { requestUrl } from "obsidian";
+import { DataAdapter, requestUrl } from "obsidian";
 import * as git from "isomorphic-git";
+import { ObsidianGitFs, validateRepositoryPath } from "./repository";
 
 export const REMOTE_TOKEN_SECRET_ID = "git-sync-remote-token";
 
@@ -13,6 +14,14 @@ export interface RemoteConnectionInfo {
 	defaultBranch: string | null;
 	branches: string[];
 	capabilities: string[];
+}
+
+export interface RemoteRepositoryOptions {
+	adapter: DataAdapter;
+	repositoryPath: string;
+	remoteUrl: string;
+	branchName: string;
+	credential: RemoteCredential | null;
 }
 
 export async function testRemoteConnection(
@@ -34,6 +43,116 @@ export async function testRemoteConnection(
 		branches: Object.keys(info.heads ?? {}).sort(),
 		capabilities: info.capabilities,
 	};
+}
+
+export async function fetchRepository(options: RemoteRepositoryOptions): Promise<void> {
+	const { fs, dir, url, branch } = await prepareRemote(options);
+	await git.fetch({
+		fs,
+		http: obsidianHttp,
+		dir,
+		remote: "origin",
+		url,
+		ref: branch,
+		singleBranch: true,
+		onAuth: authCallback(options.credential),
+	});
+}
+
+export async function pullRepository(options: RemoteRepositoryOptions): Promise<void> {
+	const { fs, dir, url, branch } = await prepareRemote(options);
+	await git.pull({
+		fs,
+		http: obsidianHttp,
+		dir,
+		remote: "origin",
+		url,
+		ref: branch,
+		singleBranch: true,
+		fastForwardOnly: true,
+		onAuth: authCallback(options.credential),
+	});
+}
+
+export async function pushRepository(options: RemoteRepositoryOptions): Promise<void> {
+	const { fs, dir, url, branch } = await prepareRemote(options);
+	const result = await git.push({
+		fs,
+		http: obsidianHttp,
+		dir,
+		remote: "origin",
+		url,
+		ref: branch,
+		remoteRef: branch,
+		onAuth: authCallback(options.credential),
+	});
+	if (result.error) throw new Error(result.error);
+}
+
+export async function cloneRepository(options: RemoteRepositoryOptions): Promise<void> {
+	const dir = validateRepositoryDirectory(options.repositoryPath);
+	const url = validateRemoteUrl(options.remoteUrl);
+	const branch = validateBranchName(options.branchName);
+	const fs = new ObsidianGitFs(options.adapter);
+	const listing = await listDirectory(options.adapter, dir);
+	if (listing && (listing.files.length > 0 || listing.folders.length > 0)) {
+		throw new Error(`The clone destination '${dir}' is not empty.`);
+	}
+
+	await git.clone({
+		fs,
+		http: obsidianHttp,
+		dir,
+		url,
+		ref: branch,
+		singleBranch: true,
+		onAuth: authCallback(options.credential),
+	});
+}
+
+async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
+	fs: ObsidianGitFs;
+	dir: string;
+	url: string;
+	branch: string;
+}> {
+	const dir = validateRepositoryDirectory(options.repositoryPath);
+	const url = validateRemoteUrl(options.remoteUrl);
+	const branch = validateBranchName(options.branchName);
+	const fs = new ObsidianGitFs(options.adapter);
+	await git.addRemote({ fs, dir, remote: "origin", url, force: true });
+	return { fs, dir, url, branch };
+}
+
+function validateRepositoryDirectory(value: string): string {
+	const error = validateRepositoryPath(value);
+	if (error) throw new Error(error);
+	const path = value.trim().replace(/^\.\/+/, "").replace(/\/+$/, "") || ".";
+	if (path === ".") return path;
+	return path;
+}
+
+function validateBranchName(value: string): string {
+	const branch = value.trim();
+	if (!branch) throw new Error("Enter a branch before using a remote operation.");
+	if (branch.startsWith("-") || branch.includes("..") || branch.includes(" ")) {
+		throw new Error("Use a simple branch name without spaces or '..'.");
+	}
+	return branch;
+}
+
+async function listDirectory(adapter: DataAdapter, path: string): Promise<{ files: string[]; folders: string[] } | null> {
+	try {
+		return await adapter.list(path);
+	} catch {
+		return null;
+	}
+}
+
+function authCallback(credential: RemoteCredential | null): (url: string, auth: git.GitAuth) => git.GitAuth {
+	return (_url, auth) => credential
+		? { ...auth, username: credential.username, password: credential.token }
+		: auth;
 }
 
 function validateRemoteUrl(value: string): string {

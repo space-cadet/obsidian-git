@@ -28,8 +28,9 @@ Each component owns its small state, operations, UI, and focused checks.
   implemented; clear and export remain pending.
 - T6: local commit history list, commit details, and changed-file display are
   implemented; remote history remains unavailable until fetch/sync exists.
-- T7: remote connection testing and SecretStorage-backed credentials are
-  implemented; fetch, pull, push, and clone remain pending.
+- T7: remote connection testing, SecretStorage-backed credentials, Fetch,
+  fast-forward-only Pull, Push, and Clone are implemented; live remote and
+  installed-host acceptance remain pending.
 - T9: updater and rolling branch-release ordering are implemented; real-host installation remains pending.
 - T10: local, GitHub, and user-installed pushed-build evidence exists; platform-
   specific desktop, Android, and iOS acceptance remains to be recorded.

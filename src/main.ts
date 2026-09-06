@@ -21,7 +21,15 @@ import {
 	unstageFile,
 } from "./repository";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
-import { REMOTE_TOKEN_SECRET_ID, RemoteCredential, testRemoteConnection } from "./remote";
+import {
+	cloneRepository,
+	fetchRepository,
+	pushRepository,
+	pullRepository,
+	REMOTE_TOKEN_SECRET_ID,
+	RemoteCredential,
+	testRemoteConnection,
+} from "./remote";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 const PLUGIN_DATA_FORMAT = "obsidian-git-sync";
@@ -83,6 +91,7 @@ export default class GitSyncPlugin extends Plugin {
 	private activity: ActivityEntry[] = [];
 	private updater: PluginUpdater | null = null;
 	private dataSave: Promise<void> = Promise.resolve();
+	private remoteOperationQueue: Promise<void> = Promise.resolve();
 	private settingsSaveTimer: number | null = null;
 
 	async onload(): Promise<void> {
@@ -249,6 +258,51 @@ export default class GitSyncPlugin extends Plugin {
 			this.recordActivity(`Remote connection failed: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
+	}
+
+	async fetchRemote(): Promise<void> {
+		return this.runRemoteOperation("Fetch", () => fetchRepository(this.remoteRepositoryOptions()));
+	}
+
+	async pullRemote(): Promise<void> {
+		return this.runRemoteOperation("Pull", () => pullRepository(this.remoteRepositoryOptions()));
+	}
+
+	async pushRemote(): Promise<void> {
+		return this.runRemoteOperation("Push", () => pushRepository(this.remoteRepositoryOptions()));
+	}
+
+	async cloneRemote(): Promise<void> {
+		return this.runRemoteOperation("Clone", () => cloneRepository(this.remoteRepositoryOptions()));
+	}
+
+	private remoteRepositoryOptions() {
+		return {
+			adapter: this.app.vault.adapter,
+			repositoryPath: this.settings.repositoryPath,
+			remoteUrl: this.settings.remoteUrl,
+			branchName: this.settings.branchName,
+			credential: this.getRemoteCredential(),
+		};
+	}
+
+	private runRemoteOperation(name: string, operation: () => Promise<void>): Promise<void> {
+		const next = this.remoteOperationQueue
+			.catch(() => undefined)
+			.then(async () => {
+				try {
+					await operation();
+					this.recordActivity(`${name} completed for ${this.settings.branchName}.`);
+					this.refreshViews();
+					new Notice(`${name} completed.`);
+				} catch (error) {
+					const detail = error instanceof Error ? error.message : `${name} failed.`;
+					this.recordActivity(`${name} failed: ${detail}`, "ERROR");
+					new Notice(`${name} failed: ${detail}`);
+				}
+			});
+		this.remoteOperationQueue = next;
+		return next;
 	}
 
 	async checkForUpdates(manual: boolean): Promise<void> {
@@ -1156,6 +1210,58 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.scheduleSettingsSave();
 				});
 			});
+
+		containerEl.createEl("h3", { text: "Remote operations" });
+		containerEl.createEl("p", {
+			text: "Fetch, pull, and push use the configured repository and branch. Clone requires an empty vault-relative destination.",
+			cls: "setting-item-description",
+		});
+		const remoteOperationSetting = (
+			name: string,
+			description: string,
+			label: string,
+			action: () => Promise<void>,
+		): void => {
+			new Setting(containerEl)
+				.setName(name)
+				.setDesc(description)
+				.addButton((button) => button
+					.setButtonText(label)
+					.onClick(async () => {
+						button.setDisabled(true);
+						button.setButtonText("Working…");
+						try {
+							await action();
+						} finally {
+							button.setButtonText(label);
+							button.setDisabled(false);
+						}
+					}));
+		};
+		remoteOperationSetting(
+			"Fetch",
+			"Download remote branch updates without changing local files.",
+			"Fetch",
+			() => this.plugin.fetchRemote(),
+		);
+		remoteOperationSetting(
+			"Pull",
+			"Fast-forward the local branch from the configured remote branch.",
+			"Pull",
+			() => this.plugin.pullRemote(),
+		);
+		remoteOperationSetting(
+			"Push",
+			"Upload the current local branch to the configured remote branch.",
+			"Push",
+			() => this.plugin.pushRemote(),
+		);
+		remoteOperationSetting(
+			"Clone",
+			"Create the repository in the configured path; the destination must be empty.",
+			"Clone",
+			() => this.plugin.cloneRemote(),
+		);
 
 		containerEl.createEl("h3", { text: "Commit identity" });
 		containerEl.createEl("p", {
