@@ -17,7 +17,6 @@ import {
 	RepositoryState,
 	stageFile,
 	unstageFile,
-	validateRepositoryPath,
 } from "./repository";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 import { REMOTE_TOKEN_SECRET_ID, RemoteCredential, testRemoteConnection } from "./remote";
@@ -40,6 +39,17 @@ interface GitSyncSettings {
 interface ActivityEntry {
 	message: string;
 	timestamp: number;
+	level: ActivityLevel;
+}
+
+type ActivityLevel = "DEBUG" | "INFO" | "METRIC" | "ERROR";
+
+interface StoredPluginData extends Partial<GitSyncSettings> {
+	activity?: Array<{
+		message: string;
+		timestamp: number;
+		level?: ActivityLevel;
+	}>;
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -59,6 +69,8 @@ export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
 	private activity: ActivityEntry[] = [];
 	private updater: PluginUpdater | null = null;
+	private dataSave: Promise<void> = Promise.resolve();
+	private settingsSaveTimer: number | null = null;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -90,6 +102,11 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		if (this.settingsSaveTimer !== null) {
+			window.clearTimeout(this.settingsSaveTimer);
+			this.settingsSaveTimer = null;
+		}
+		void this.persistData();
 		this.app.workspace.detachLeavesOfType(VIEW_TYPE_GIT_SYNC);
 	}
 
@@ -111,31 +128,64 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const saved = (await this.loadData()) as Partial<GitSyncSettings> | null;
+		const saved = (await this.loadData()) as StoredPluginData | null;
 		this.settings = {
 			...DEFAULT_SETTINGS,
 			...saved,
 			repositoryPath: saved?.repositoryPath?.trim() || DEFAULT_SETTINGS.repositoryPath,
+			remoteUsername: saved?.remoteUsername?.trim() || DEFAULT_SETTINGS.remoteUsername,
 		};
+		this.activity = (saved?.activity ?? [])
+			.filter((entry) => typeof entry.message === "string" && Number.isFinite(entry.timestamp))
+			.map((entry): ActivityEntry => {
+				const level: ActivityLevel = entry.level === "DEBUG" || entry.level === "METRIC" || entry.level === "ERROR"
+					? entry.level
+					: "INFO";
+				return { message: entry.message, timestamp: entry.timestamp, level };
+			})
+			.slice(0, 50);
 	}
 
 	async saveSettings(): Promise<void> {
-		await this.saveData(this.settings);
-		this.recordActivity("Saved repository settings.");
+		await this.persistData();
 		this.refreshViews();
 	}
 
-	recordActivity(message: string): void {
-		this.activity.unshift({ message, timestamp: Date.now() });
+	private persistData(): Promise<void> {
+		const data: StoredPluginData = {
+			...this.settings,
+			activity: this.activity,
+		};
+		this.dataSave = this.dataSave
+			.catch(() => undefined)
+			.then(() => this.saveData(data));
+		return this.dataSave;
+	}
+
+	scheduleSettingsSave(): void {
+		if (this.settingsSaveTimer !== null) window.clearTimeout(this.settingsSaveTimer);
+		this.settingsSaveTimer = window.setTimeout(() => {
+			this.settingsSaveTimer = null;
+			void this.saveSettings();
+		}, 250);
+	}
+
+	recordActivity(message: string, level: ActivityLevel = "INFO"): void {
+		this.activity.unshift({ message, timestamp: Date.now(), level });
 		this.activity = this.activity.slice(0, 50);
+		void this.persistData();
 	}
 
 	getActivity(): readonly ActivityEntry[] {
 		return this.activity;
 	}
 
+	getRemoteToken(): string | null {
+		return this.app.secretStorage.getSecret(REMOTE_TOKEN_SECRET_ID);
+	}
+
 	getRemoteCredential(): RemoteCredential | null {
-		const token = this.app.secretStorage.getSecret(REMOTE_TOKEN_SECRET_ID);
+		const token = this.getRemoteToken();
 		if (!token) return null;
 		return {
 			username: this.settings.remoteUsername.trim() || "git",
@@ -145,11 +195,7 @@ export default class GitSyncPlugin extends Plugin {
 
 	saveRemoteToken(value: string): void {
 		const token = value.trim();
-		if (token) this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, token);
-	}
-
-	clearRemoteToken(): void {
-		this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, "");
+		this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, token);
 	}
 
 	async checkRemoteConnection(): Promise<void> {
@@ -160,7 +206,7 @@ export default class GitSyncPlugin extends Plugin {
 			new Notice(`Remote connection succeeded.${branch}`);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Remote connection failed.";
-			this.recordActivity(`Remote connection failed: ${detail}`);
+			this.recordActivity(`Remote connection failed: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
 	}
@@ -174,7 +220,7 @@ export default class GitSyncPlugin extends Plugin {
 			channel: this.settings.updateChannel,
 		});
 		this.settings.lastUpdateCheck = Date.now();
-		await this.saveData(this.settings);
+		await this.persistData();
 
 		if (result.kind === "available") {
 			this.recordActivity(`Update available: ${result.release.tag_name}.`);
@@ -186,7 +232,7 @@ export default class GitSyncPlugin extends Plugin {
 					new Notice("Stable update installed. Reload Obsidian to apply it.");
 				} catch (error) {
 					const message = error instanceof Error ? error.message : "Unable to install the update.";
-					this.recordActivity(`Automatic update failed: ${message}`);
+					this.recordActivity(`Automatic update failed: ${message}`, "ERROR");
 					if (manual) new Notice(`Update failed: ${message}`);
 				}
 				return;
@@ -606,7 +652,7 @@ class GitSyncView extends ItemView {
 			await this.refreshChangesOnly();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update selected files.";
-			this.plugin.recordActivity(`Could not update selected files: ${detail}`);
+			this.plugin.recordActivity(`Could not update selected files: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
 	}
@@ -623,7 +669,7 @@ class GitSyncView extends ItemView {
 			await this.refreshChangesOnly();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update staging.";
-			this.plugin.recordActivity(`Could not update ${change.path}: ${detail}`);
+			this.plugin.recordActivity(`Could not update ${change.path}: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
 	}
@@ -654,7 +700,7 @@ class GitSyncView extends ItemView {
 			await this.refreshRepositoryState();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to create the commit.";
-			this.plugin.recordActivity(`Commit failed: ${detail}`);
+			this.plugin.recordActivity(`Commit failed: ${detail}`, "ERROR");
 			new Notice(detail);
 		} finally {
 			this.committing = false;
@@ -727,24 +773,22 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderActivity(content: HTMLElement): void {
-		content.createDiv({ cls: "git-sync-state-title", text: "Log" });
 		const entries = this.plugin.getActivity();
 		if (entries.length === 0) {
 			content.createEl("p", {
-				text: "No activity recorded yet.",
+				text: "No log entries recorded yet.",
 				cls: "git-sync-state-description",
 			});
 			return;
 		}
 
-		const list = content.createEl("ul", { cls: "git-sync-activity-list" });
+		const list = content.createDiv({ cls: "git-sync-log-list" });
 		for (const entry of entries) {
-			const item = list.createEl("li");
-			item.createDiv({ text: entry.message });
-			item.createDiv({
-				text: new Date(entry.timestamp).toLocaleTimeString(),
-				cls: "git-sync-activity-time",
-			});
+			const item = list.createDiv({ cls: "git-sync-log-entry" });
+			item.createDiv({ text: formatLogTimestamp(entry.timestamp), cls: "git-sync-log-time" });
+			const level = item.createDiv({ text: entry.level, cls: "git-sync-log-level" });
+			level.setAttribute("data-log-level", entry.level);
+			item.createDiv({ text: entry.message, cls: "git-sync-log-message" });
 		}
 	}
 
@@ -805,6 +849,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.repositoryPath);
 				text.onChange((value) => {
 					this.plugin.settings.repositoryPath = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
@@ -839,8 +884,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 			.addToggle((toggle) =>
 				toggle.setValue(this.plugin.settings.autoUpdate).onChange(async (value) => {
 					this.plugin.settings.autoUpdate = value;
-					await this.plugin.saveData(this.plugin.settings);
-					this.plugin.recordActivity("Saved updater settings.");
+					await this.plugin.saveSettings();
 				}),
 			);
 
@@ -873,6 +917,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.remoteUrl);
 				text.onChange((value) => {
 					this.plugin.settings.remoteUrl = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
@@ -884,18 +929,44 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.remoteUsername);
 				text.onChange((value) => {
 					this.plugin.settings.remoteUsername = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
+		let revealToken = false;
+		let tokenInput: HTMLInputElement | null = null;
+		const updateTokenField = (button: HTMLElement): void => {
+			if (tokenInput) {
+				const token = this.plugin.getRemoteToken() ?? "";
+				tokenInput.value = revealToken ? token : maskRemoteToken(token);
+				tokenInput.readOnly = !revealToken;
+			}
+			setIcon(button, revealToken ? "eye-off" : "eye");
+			button.setAttribute("aria-label", revealToken ? "Hide remote token" : "Show remote token");
+			button.setAttribute("title", revealToken ? "Hide token" : "Show token");
+		};
 		new Setting(containerEl)
 			.setName("Remote token or password")
 			.setDesc("Stored in Obsidian SecretStorage and never in plugin settings.")
 			.addText((text) => {
-				text.inputEl.type = "password";
+				tokenInput = text.inputEl;
+				text.inputEl.type = "text";
+				text.inputEl.autocomplete = "off";
+				text.inputEl.readOnly = true;
 				text.setPlaceholder("Enter a token or password");
-				text.onChange((value) => this.plugin.saveRemoteToken(value));
+				text.inputEl.value = maskRemoteToken(this.plugin.getRemoteToken() ?? "");
+				text.onChange((value) => {
+					if (revealToken) this.plugin.saveRemoteToken(value);
+				});
 			})
-			.addButton((button) => button.setButtonText("Clear").onClick(() => this.plugin.clearRemoteToken()));
+			.addButton((button) => {
+				button.buttonEl.empty();
+				updateTokenField(button.buttonEl);
+				button.onClick(() => {
+					revealToken = !revealToken;
+					updateTokenField(button.buttonEl);
+				});
+			});
 
 		new Setting(containerEl)
 			.setName("Test remote connection")
@@ -921,6 +992,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.branchName);
 				text.onChange((value) => {
 					this.plugin.settings.branchName = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
@@ -937,6 +1009,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.authorName);
 				text.onChange((value) => {
 					this.plugin.settings.authorName = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
@@ -948,30 +1021,14 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.authorEmail);
 				text.onChange((value) => {
 					this.plugin.settings.authorEmail = value.trim();
+					this.plugin.scheduleSettingsSave();
 				});
 			});
 
-		const feedback = containerEl.createDiv({ cls: "git-sync-settings-feedback" });
-		new Setting(containerEl)
-			.setName("Save settings")
-			.setDesc("Repository path and branch are required. Commit identity is needed before committing.")
-			.addButton((button) => {
-				button.setButtonText("Save");
-				button.setCta();
-				button.onClick(async () => {
-					const settings = this.plugin.settings;
-					const pathError = validateRepositoryPath(settings.repositoryPath);
-					if (pathError || !settings.branchName) {
-						feedback.setText(pathError || "Enter a branch before saving.");
-						feedback.addClass("is-error");
-						return;
-					}
-
-					await this.plugin.saveSettings();
-					feedback.removeClass("is-error");
-					feedback.setText("Settings saved.");
-				});
-			});
+		containerEl.createEl("p", {
+			text: "Settings save automatically when changed.",
+			cls: "setting-item-description",
+		});
 	}
 }
 
@@ -986,6 +1043,18 @@ function repositoryActivityMessage(state: RepositoryState): string {
 		case "checking":
 			return `Checking repository at ${state.repositoryPath}.`;
 	}
+}
+
+function formatLogTimestamp(timestamp: number): string {
+	const date = new Date(timestamp);
+	const pad = (value: number): string => `0${value}`.slice(-2);
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function maskRemoteToken(token: string): string {
+	if (!token) return "";
+	if (token.length <= 8) return `${token.slice(0, 2)}…${token.slice(-2)}`;
+	return `${token.slice(0, 4)}…${token.slice(-4)}`;
 }
 
 function changeCode(status: string): string {

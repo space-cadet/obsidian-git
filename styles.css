@@ -129,6 +129,7 @@
 }
 
 .git-sync-content {
+	flex: 1 1 auto;
 	min-height: 0;
 	padding: 0 12px 16px;
 	overflow: auto;
@@ -143,23 +144,72 @@
 	color: var(--text-muted);
 }
 
-.git-sync-activity-list {
-	margin: 16px 0 0;
-	padding: 0;
-	list-style: none;
+.git-sync-log-list {
+	margin: 0 -12px;
 	text-align: left;
 }
 
-.git-sync-activity-list li {
+.git-sync-log-entry {
+	display: grid;
+	grid-template-columns: minmax(118px, 0.95fr) minmax(58px, 0.7fr) minmax(0, 2fr);
+	gap: 10px;
+	align-items: start;
 	margin: 0;
-	padding: 10px 0;
+	padding: 10px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.git-sync-activity-time {
-	margin-top: 3px;
-	color: var(--text-faint);
+.git-sync-log-entry:nth-child(even) {
+	background: var(--background-secondary);
+}
+
+.git-sync-log-time {
+	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
+	font-variant-numeric: tabular-nums;
+	line-height: 1.4;
+}
+
+.git-sync-log-level {
+	align-self: start;
+	padding: 3px 6px;
+	border-radius: var(--radius-s);
+	background: var(--background-primary);
+	color: var(--interactive-accent);
+	font-size: var(--font-ui-smaller);
+	font-weight: 700;
+	line-height: 1.25;
+	text-align: center;
+}
+
+.git-sync-log-level[data-log-level="DEBUG"] {
+	color: var(--text-normal);
+}
+
+.git-sync-log-level[data-log-level="METRIC"] {
+	color: var(--text-muted);
+}
+
+.git-sync-log-level[data-log-level="ERROR"] {
+	color: var(--text-error);
+}
+
+.git-sync-log-message {
+	min-width: 0;
+	line-height: 1.4;
+	overflow-wrap: anywhere;
+}
+
+@media (max-width: 360px) {
+	.git-sync-log-entry {
+		grid-template-columns: minmax(92px, 0.95fr) minmax(52px, 0.7fr) minmax(0, 1.5fr);
+		gap: 6px;
+		padding-inline: 8px;
+	}
+
+	.git-sync-log-level {
+		padding-inline: 4px;
+	}
 }
 
 .git-sync-changes-list {
