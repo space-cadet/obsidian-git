@@ -112,6 +112,15 @@ export async function unstageFile(adapter: DataAdapter, repositoryPath: string, 
 	await git.resetIndex({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
 }
 
+export async function unstageFiles(adapter: DataAdapter, repositoryPath: string, paths: string[]): Promise<void> {
+	const fs = new ObsidianGitFs(adapter);
+	const dir = normalizedRepositoryPath(repositoryPath);
+	const cache = {};
+	for (const path of paths) {
+		await git.resetIndex({ fs, dir, filepath: path, cache });
+	}
+}
+
 export async function removeFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
 	await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
 }

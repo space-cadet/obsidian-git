@@ -131,9 +131,6 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 
 export async function pushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
-	const statusStartedAt = Date.now();
-	const workingTreeChanges = await readWorkingTreeChanges(fs, dir);
-	diagnostic(options, `Push: working-tree status scan completed in ${formatMilliseconds(Date.now() - statusStartedAt)} (${workingTreeChanges} changes).`);
 	const pushPlan: PushPlan = { localOid: "", remoteOid: "" };
 	diagnostic(options, `Push: sending ${branch} to ${url}.`);
 	const result = await git.push({
@@ -175,10 +172,6 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 			: "";
 		details.push(`${commitLabel}${fileLabel} sent.`);
 	}
-	if (workingTreeChanges > 0) {
-		details.push(`${workingTreeChanges} uncommitted file${workingTreeChanges === 1 ? "" : "s"} not included; commit first to push them.`);
-	}
-
 	return {
 		summary: pushPlan.localOid && pushPlan.localOid === pushPlan.remoteOid ? "Everything up-to-date." : `Pushed ${branch} to origin.`,
 		details,
@@ -260,11 +253,6 @@ async function resolveOptionalRef(fs: ObsidianGitFs, dir: string, ref: string): 
 	}
 }
 
-async function readWorkingTreeChanges(fs: ObsidianGitFs, dir: string): Promise<number> {
-	const matrix = await git.statusMatrix({ fs, dir, refresh: false });
-	return matrix.filter(([, head, workdir, stage]) => head !== workdir || head !== stage).length;
-}
-
 async function countCommitsToPush(
 	fs: ObsidianGitFs,
 	dir: string,
@@ -295,10 +283,6 @@ function isZeroOid(value: string): boolean {
 
 function shortOid(value: string | null): string {
 	return value ? value.slice(0, 7) : "none";
-}
-
-function formatMilliseconds(milliseconds: number): string {
-	return `${Math.max(0, Math.round(milliseconds))} ms`;
 }
 
 async function listDirectory(adapter: DataAdapter, path: string): Promise<{ files: string[]; folders: string[] } | null> {

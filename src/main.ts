@@ -26,6 +26,7 @@ import {
 	RepositoryState,
 	stageFile,
 	unstageFile,
+	unstageFiles,
 } from "./repository";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 import {
@@ -1420,7 +1421,7 @@ class GitSyncView extends ItemView {
 		let completed = false;
 		try {
 			if (unstage) {
-				for (const change of changes) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				await unstageFiles(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
 			} else {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
 			}
@@ -1453,7 +1454,7 @@ class GitSyncView extends ItemView {
 		let completed = false;
 		try {
 			if (unstage) {
-				for (const change of selected) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				await unstageFiles(this.app.vault.adapter, this.plugin.settings.repositoryPath, selected.map((change) => change.path));
 			} else {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, selected.map((change) => change.path));
 			}
