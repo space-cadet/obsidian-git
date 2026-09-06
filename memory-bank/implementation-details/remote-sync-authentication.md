@@ -34,6 +34,9 @@ recorded.
   and each result is recorded in Activity with a notice.
 - Remote operations now show immediate in-progress feedback before the network
   request completes, so a slow or rejected operation is not visually silent.
+- Settings clicks, operation start, transport milestones, and completion or
+  failure are all written to the live Activity view. Errors include Git error
+  codes and callers when the transport provides them.
 
 ## Completion evidence
 

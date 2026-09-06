@@ -224,6 +224,10 @@ export default class GitSyncPlugin extends Plugin {
 		this.activity.unshift({ message, timestamp: Date.now(), level });
 		this.activity = this.activity.slice(0, 50);
 		void this.persistData();
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
+			const view = leaf.view;
+			if (view instanceof GitSyncView) view.refreshActivity();
+		}
 	}
 
 	getActivity(): readonly ActivityEntry[] {
@@ -284,6 +288,7 @@ export default class GitSyncPlugin extends Plugin {
 			remoteUrl: this.settings.remoteUrl,
 			branchName: this.settings.branchName,
 			credential: this.getRemoteCredential(),
+			onDiagnostic: (message: string) => this.recordActivity(message, "DEBUG"),
 		};
 	}
 
@@ -299,7 +304,7 @@ export default class GitSyncPlugin extends Plugin {
 					this.refreshViews();
 					new Notice(`${name} completed.`);
 				} catch (error) {
-					const detail = error instanceof Error ? error.message : `${name} failed.`;
+					const detail = describeOperationError(error, `${name} failed.`);
 					this.recordActivity(`${name} failed: ${detail}`, "ERROR");
 					new Notice(`${name} failed: ${detail}`);
 				}
@@ -421,6 +426,10 @@ class GitSyncView extends ItemView {
 		return Promise.resolve();
 	}
 
+	refreshActivity(): void {
+		if (this.activeTab === "Log") this.render();
+	}
+
 	render(): void {
 		const root = this.contentEl;
 		root.empty();
@@ -526,13 +535,47 @@ class GitSyncView extends ItemView {
 		refreshButton.disabled = !repository;
 		refreshButton.addEventListener("click", () => void this.refreshRepositoryState());
 
+		const comparisonState = this.getComparisonState(repository);
 		const comparison = context.createDiv({ cls: "git-sync-comparison-status" });
 		const comparisonIcon = comparison.createSpan({ cls: "git-sync-comparison-icon" });
-		setIcon(comparisonIcon, "alert-circle");
+		comparisonIcon.setAttribute("data-comparison-state", comparisonState.kind);
+		setIcon(comparisonIcon, comparisonState.icon);
 		comparison.createDiv({
 			cls: "git-sync-comparison-text",
-			text: repository ? "Repository comparison unavailable" : "Repository not configured",
+			text: comparisonState.label,
 		});
+	}
+
+	private getComparisonState(repository: string): {
+		kind: "unconfigured" | "checking" | "unavailable" | "up-to-date" | "local-ahead" | "remote-ahead" | "diverged";
+		icon: string;
+		label: string;
+	} {
+		if (!repository) return { kind: "unconfigured", icon: "alert-circle", label: "Repository not configured" };
+		if (this.repositoryState?.kind !== "ready" || !this.commits || this.remoteCommits === null) {
+			return { kind: "checking", icon: "loader", label: "Checking repository comparison" };
+		}
+		if (!this.remoteHistoryAvailable) {
+			return { kind: "unavailable", icon: "alert-circle", label: "Remote comparison unavailable" };
+		}
+
+		const localHead = this.commits[0]?.oid;
+		const remoteHead = this.remoteCommits[0]?.oid;
+		if ((!localHead && !remoteHead) || localHead === remoteHead) {
+			return { kind: "up-to-date", icon: "check-circle", label: "Up to date" };
+		}
+		if (!localHead || !remoteHead) {
+			return localHead
+				? { kind: "local-ahead", icon: "arrow-up", label: "Local is ahead" }
+				: { kind: "remote-ahead", icon: "arrow-down", label: "Remote is ahead" };
+		}
+		if (this.remoteCommits.some((commit) => commit.oid === localHead)) {
+			return { kind: "remote-ahead", icon: "arrow-down", label: "Remote is ahead" };
+		}
+		if (this.commits.some((commit) => commit.oid === remoteHead)) {
+			return { kind: "local-ahead", icon: "arrow-up", label: "Local is ahead" };
+		}
+		return { kind: "diverged", icon: "git-compare", label: "Branches have diverged" };
 	}
 
 	async refreshRepositoryState(): Promise<void> {
@@ -1269,6 +1312,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				.addButton((button) => button
 					.setButtonText(label)
 					.onClick(async () => {
+						this.plugin.recordActivity(`${name} requested from Settings.`);
 						button.setDisabled(true);
 						button.setButtonText("Working…");
 						try {
@@ -1551,6 +1595,16 @@ function maskRemoteToken(token: string): string {
 	if (!token) return "";
 	if (token.length <= 8) return `${token.slice(0, 2)}…${token.slice(-2)}`;
 	return `${token.slice(0, 4)}…${token.slice(-4)}`;
+}
+
+function describeOperationError(error: unknown, fallback: string): string {
+	if (error instanceof Error) {
+		const details: string[] = [error.message || fallback];
+		if (isRecord(error) && typeof error.code === "string") details.push(`code=${error.code}`);
+		if (isRecord(error) && typeof error.caller === "string") details.push(`caller=${error.caller}`);
+		return details.join(" ");
+	}
+	return typeof error === "string" && error ? error : fallback;
 }
 
 function changeCode(status: string): string {

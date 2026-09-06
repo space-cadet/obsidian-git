@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 14:52:24 IST*
+*Last Updated: 2026-09-06 15:02:18 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -75,6 +75,13 @@ Build the Settings panel immediately after the shell with only the configuration
   a distinct empty state.
 - Fetch, Pull, Push, and Clone show immediate in-progress notices and Activity
   entries before completing or reporting an error.
+
+## 2026-09-06 Remote diagnostics and comparison status
+
+- Settings clicks, remote setup, transport milestones, and structured failures
+  now appear in the live Log view.
+- The repository header compares local and fetched remote heads instead of
+  always saying that comparison is unavailable.
 
 ## 2026-09-06 Update
 

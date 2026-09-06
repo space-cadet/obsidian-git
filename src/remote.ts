@@ -22,6 +22,7 @@ export interface RemoteRepositoryOptions {
 	remoteUrl: string;
 	branchName: string;
 	credential: RemoteCredential | null;
+	onDiagnostic?: (message: string) => void;
 }
 
 export async function testRemoteConnection(
@@ -47,7 +48,8 @@ export async function testRemoteConnection(
 
 export async function fetchRepository(options: RemoteRepositoryOptions): Promise<void> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
-	await git.fetch({
+	diagnostic(options, `Fetch: requesting origin/${branch} from ${url}.`);
+	const result = await git.fetch({
 		fs,
 		http: obsidianHttp,
 		dir,
@@ -57,10 +59,12 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 		singleBranch: true,
 		onAuth: authCallback(options.credential),
 	});
+	diagnostic(options, `Fetch: received ${result.fetchHead ? result.fetchHead.slice(0, 7) : "no commit"}.`);
 }
 
 export async function pullRepository(options: RemoteRepositoryOptions): Promise<void> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	diagnostic(options, `Pull: requesting origin/${branch} from ${url}.`);
 	await git.pull({
 		fs,
 		http: obsidianHttp,
@@ -72,10 +76,12 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		fastForwardOnly: true,
 		onAuth: authCallback(options.credential),
 	});
+	diagnostic(options, `Pull: completed fast-forward check for ${branch}.`);
 }
 
 export async function pushRepository(options: RemoteRepositoryOptions): Promise<void> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	diagnostic(options, `Push: sending ${branch} to ${url}.`);
 	const result = await git.push({
 		fs,
 		http: obsidianHttp,
@@ -86,6 +92,7 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 		remoteRef: branch,
 		onAuth: authCallback(options.credential),
 	});
+	diagnostic(options, `Push: server response ${result.ok ? "accepted" : result.error ?? "rejected"}.`);
 	if (result.error) throw new Error(result.error);
 }
 
@@ -99,6 +106,7 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		throw new Error(`The clone destination '${dir}' is not empty.`);
 	}
 
+	diagnostic(options, `Clone: requesting ${branch} from ${url} into ${dir}.`);
 	await git.clone({
 		fs,
 		http: obsidianHttp,
@@ -108,6 +116,7 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		singleBranch: true,
 		onAuth: authCallback(options.credential),
 	});
+	diagnostic(options, `Clone: completed repository setup in ${dir}.`);
 }
 
 async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
@@ -120,7 +129,9 @@ async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
 	const url = validateRemoteUrl(options.remoteUrl);
 	const branch = validateBranchName(options.branchName);
 	const fs = new ObsidianGitFs(options.adapter);
+	diagnostic(options, `Remote setup: validated ${dir} and branch ${branch}.`);
 	await git.addRemote({ fs, dir, remote: "origin", url, force: true });
+	diagnostic(options, `Remote setup: origin configured for ${url}.`);
 	return { fs, dir, url, branch };
 }
 
@@ -153,6 +164,10 @@ function authCallback(credential: RemoteCredential | null): (url: string, auth: 
 	return (_url, auth) => credential
 		? { ...auth, username: credential.username, password: credential.token }
 		: auth;
+}
+
+function diagnostic(options: RemoteRepositoryOptions, message: string): void {
+	options.onDiagnostic?.(`[remote] ${message}`);
 }
 
 function validateRemoteUrl(value: string): string {

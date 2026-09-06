@@ -21,6 +21,8 @@ repository has no configured or reachable remote.
   and uses the same timeline and expanded details as Local history.
 - Remote commits use an `ORIGIN` badge; an unfetched branch has an explicit
   state prompting the user to Fetch.
+- The repository context header reports the comparison state when fetched
+  local and remote history is available.
 
 ## KISS boundary
 

@@ -118,6 +118,20 @@
 	color: var(--text-warning);
 }
 
+.git-sync-comparison-icon[data-comparison-state="up-to-date"] {
+	color: var(--text-success);
+}
+
+.git-sync-comparison-icon[data-comparison-state="checking"] {
+	color: var(--interactive-accent);
+}
+
+.git-sync-comparison-icon[data-comparison-state="local-ahead"],
+.git-sync-comparison-icon[data-comparison-state="remote-ahead"],
+.git-sync-comparison-icon[data-comparison-state="diverged"] {
+	color: var(--text-warning);
+}
+
 .git-sync-comparison-icon svg {
 	width: 18px;
 	height: 18px;

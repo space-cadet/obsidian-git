@@ -1,6 +1,6 @@
 # Session 2026-09-06 - Changes, release, and runtime
 *Created: 2026-09-06 04:45:17 IST*
-*Last Updated: 2026-09-06 14:52:24 IST*
+*Last Updated: 2026-09-06 15:02:18 IST*
 
 ## Session Title
 
@@ -98,3 +98,12 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 - Fetch, Pull, Push, and Clone now show immediate in-progress feedback and
   record their start before waiting for the remote request.
 - Production build passed; live remote and installed-host verification remain.
+
+## 2026-09-06 Remote diagnostics and comparison status
+
+- Settings clicks, operation start, remote setup, transport milestones, and
+  structured failures now appear in the live Log view.
+- The repository context now reports comparison status from local and fetched
+  remote heads instead of always showing `Remote comparison unavailable`.
+- Production build and diff checks pass; live remote and installed-host
+  verification remain.
