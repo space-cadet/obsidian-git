@@ -203,6 +203,9 @@ class GitSyncView extends ItemView {
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
 	private committing = false;
+	private commitMessage = "";
+	private changesContentEl: HTMLElement | null = null;
+	private changesActionBarEl: HTMLElement | null = null;
 	private refreshGeneration = 0;
 	private lastRepositoryActivity = "";
 
@@ -263,6 +266,8 @@ class GitSyncView extends ItemView {
 		this.renderRepositoryContext(root, repository);
 
 		const content = root.createDiv({ cls: "git-sync-content" });
+		this.changesContentEl = null;
+		this.changesActionBarEl = null;
 		if (this.activeTab === "Log") {
 			this.renderActivity(content);
 			return;
@@ -303,8 +308,9 @@ class GitSyncView extends ItemView {
 		}
 
 		if (this.activeTab === "Changes") {
+			this.changesContentEl = content;
 			this.renderChanges(content);
-			this.renderChangesActionBar(root);
+			this.changesActionBarEl = this.renderChangesActionBar(root);
 			return;
 		}
 
@@ -406,6 +412,10 @@ class GitSyncView extends ItemView {
 		const message = commit.createEl("textarea", {
 			attr: { placeholder: "Commit message", "aria-label": "Commit message", rows: "3" },
 		});
+		message.value = this.commitMessage;
+		message.addEventListener("input", () => {
+			this.commitMessage = message.value;
+		});
 		const commitActions = commit.createDiv({ cls: "git-sync-commit-actions" });
 		const commitButton = commitActions.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
 		commitButton.disabled = stagedCount === 0 || this.committing;
@@ -461,7 +471,7 @@ class GitSyncView extends ItemView {
 	private renderChangeRow(list: HTMLElement, change: ChangedFile): void {
 		const item = list.createEl("li", { cls: "git-sync-change" });
 		const checkbox = item.createEl("input", {
-			attr: { type: "checkbox", "aria-label": `Select ${change.path}` },
+			attr: { type: "checkbox", "aria-label": `Select ${change.path}`, "data-change-path": change.path },
 		});
 		checkbox.checked = this.selectedPaths.has(change.path);
 		checkbox.disabled = this.committing;
@@ -481,6 +491,7 @@ class GitSyncView extends ItemView {
 				type: "button",
 				"aria-label": `${change.staged ? "Unstage" : "Stage"} ${change.path}`,
 				title: change.staged ? "Unstage" : "Stage",
+				"data-change-path": change.path,
 			},
 		});
 		setIcon(action, "more-horizontal");
@@ -488,7 +499,7 @@ class GitSyncView extends ItemView {
 		action.addEventListener("click", () => void this.toggleStage(change));
 	}
 
-	private renderChangesActionBar(root: HTMLElement): void {
+	private renderChangesActionBar(root: HTMLElement): HTMLElement {
 		const bar = root.createDiv({ cls: "git-sync-bottom-bar" });
 		const selectAll = bar.createEl("button", {
 			cls: "git-sync-bottom-action is-primary",
@@ -502,7 +513,7 @@ class GitSyncView extends ItemView {
 
 		const stage = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Stage selected files", title: "Stage selected" },
+			attr: { type: "button", "aria-label": "Stage selected files", title: "Stage selected", "data-git-sync-action": "stage" },
 		});
 		setIcon(stage, "arrow-down-to-line");
 		stage.disabled = !this.hasSelectedUncommitted() || this.committing;
@@ -510,7 +521,7 @@ class GitSyncView extends ItemView {
 
 		const unstage = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Unstage selected files", title: "Unstage selected" },
+			attr: { type: "button", "aria-label": "Unstage selected files", title: "Unstage selected", "data-git-sync-action": "unstage" },
 		});
 		setIcon(unstage, "arrow-up-to-line");
 		unstage.disabled = !this.hasSelectedStaged() || this.committing;
@@ -522,6 +533,15 @@ class GitSyncView extends ItemView {
 		});
 		setIcon(refresh, "refresh-cw");
 		refresh.addEventListener("click", () => void this.refreshRepositoryState());
+		return bar;
+	}
+
+	private updateChangesActionBar(): void {
+		if (!this.changesActionBarEl) return;
+		const stage = this.changesActionBarEl.querySelector<HTMLButtonElement>('[data-git-sync-action="stage"]');
+		const unstage = this.changesActionBarEl.querySelector<HTMLButtonElement>('[data-git-sync-action="unstage"]');
+		if (stage) stage.disabled = !this.hasSelectedUncommitted() || this.committing;
+		if (unstage) unstage.disabled = !this.hasSelectedStaged() || this.committing;
 	}
 
 	private selectAllChanges(): void {
@@ -549,7 +569,7 @@ class GitSyncView extends ItemView {
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 				this.selectedPaths.delete(change.path);
 			}
-			await this.refreshRepositoryState();
+			await this.refreshChangesOnly();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update selected files.";
 			this.plugin.recordActivity(`Could not update selected files: ${detail}`);
@@ -566,7 +586,7 @@ class GitSyncView extends ItemView {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 				this.plugin.recordActivity(`Staged ${change.path}.`);
 			}
-			await this.refreshRepositoryState();
+			await this.refreshChangesOnly();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update staging.";
 			this.plugin.recordActivity(`Could not update ${change.path}: ${detail}`);
@@ -595,6 +615,7 @@ class GitSyncView extends ItemView {
 				email: authorEmail,
 			});
 			this.plugin.recordActivity(`Committed ${oid.slice(0, 7)}: ${trimmedMessage}`);
+			this.commitMessage = "";
 			new Notice("Commit created.");
 			await this.refreshRepositoryState();
 		} catch (error) {
@@ -604,6 +625,63 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.committing = false;
 			this.render();
+		}
+	}
+
+	private async refreshChangesOnly(): Promise<void> {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
+			await this.refreshRepositoryState();
+			return;
+		}
+
+		try {
+			this.changes = await readChanges(this.app.vault.adapter, repositoryPath);
+			const availablePaths = new Set(this.changes.map((change) => change.path));
+			for (const selectedPath of this.selectedPaths) {
+				if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+			}
+			this.changesError = null;
+		} catch (error) {
+			this.changes = null;
+			this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
+		}
+
+		this.updateChangesContent();
+	}
+
+	private updateChangesContent(): void {
+		const content = this.changesContentEl;
+		if (!content || !content.isConnected || this.activeTab !== "Changes") {
+			this.render();
+			return;
+		}
+
+		const scrollTop = content.scrollTop;
+		const activeElement = content.ownerDocument.activeElement;
+		const focusedPath = activeElement instanceof HTMLElement
+			? activeElement.getAttribute("data-change-path")
+			: null;
+		const focusedTextarea = activeElement instanceof HTMLTextAreaElement && content.contains(activeElement);
+		const textareaSelection = focusedTextarea && activeElement instanceof HTMLTextAreaElement
+			? { start: activeElement.selectionStart, end: activeElement.selectionEnd }
+			: null;
+
+		content.empty();
+		this.renderChanges(content);
+		content.scrollTop = scrollTop;
+		this.updateChangesActionBar();
+
+		if (focusedTextarea) {
+			const textarea = content.querySelector<HTMLTextAreaElement>(".git-sync-commit textarea");
+			if (textarea) {
+				textarea.focus();
+				if (textareaSelection) textarea.setSelectionRange(textareaSelection.start, textareaSelection.end);
+			}
+		} else if (focusedPath) {
+			const focusedControl = Array.from(content.querySelectorAll<HTMLElement>("[data-change-path]"))
+				.find((element) => element.getAttribute("data-change-path") === focusedPath);
+			focusedControl?.focus();
 		}
 	}
 
