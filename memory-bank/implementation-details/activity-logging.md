@@ -13,9 +13,11 @@ Explain recent plugin actions in a simple Activity view.
 
 ## Implemented state
 
-The Activity tab retains up to 50 in-memory entries for startup, local
-repository reads and errors, settings saves, and updater events. Persistence,
-clear, and export remain pending.
+The Log tab retains the latest 50 entries in plugin data. Each entry stores a
+message, timestamp, and severity level (`DEBUG`, `INFO`, `METRIC`, or `ERROR`).
+The view renders full date/time stamps, severity badges, alternating rows, and
+wrapped messages inside the scrollable content area. Writes are serialized so
+activity and settings updates do not overwrite one another.
 
 ## KISS boundary
 
@@ -24,5 +26,5 @@ multi-level retention policy, or analytics layer without a demonstrated need.
 
 ## Completion evidence
 
-Current operations appear once with a useful result. Reopen persistence remains
-open because the initial implementation keeps activity in memory only.
+The user verified the pushed build and confirmed that Log entries persist and
+render correctly. Clear and export are still outside the current scope.

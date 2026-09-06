@@ -18,6 +18,16 @@ Implement one direct path first. Do not add multiple credential providers,
 device flow, retry policy, or recovery automation until a real requirement is
 recorded.
 
+## Current implementation
+
+- Remote URLs are restricted to HTTP or HTTPS and tested through Obsidian's
+  request bridge.
+- Remote username and token/password settings are available.
+- Tokens use Obsidian SecretStorage and are exposed to operations only as a
+  username/token credential pair.
+- A connection test records success or failure in the Log and reports the
+  remote default branch when available.
+
 ## Completion evidence
 
 The user can authenticate, clone or connect a repository, pull changes, and

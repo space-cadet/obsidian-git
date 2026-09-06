@@ -19,8 +19,13 @@
   pnpm 9 frozen install/build and a Bufferless Git integration check passed.
 - Corrected rolling branch-build ordering and timestamps to use `updated_at`;
   mobile Changes rendering was observed after the Buffer polyfill fix.
+- Completed the verified Changes and Log UI increments, Settings auto-save and
+  token visibility, and the first remote connection/authentication increment.
+- User verified the pushed Changes and Log behavior, including preserved scroll
+  position after staging updates.
 
 ## Next
 
-- Verify updater installation, reload, and rollback in Obsidian.
-- Polish the Changes panel UI and record installed-host acceptance.
+- Continue T7c/T7d for fetch, pull, push, and clone.
+- Continue T4f/T4g and T5e for Changes refinements and Log clear/export.
+- Record platform-specific T10 acceptance when those hosts are tested.

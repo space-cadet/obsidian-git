@@ -26,8 +26,8 @@ changes, commit, and the remote workflow that the platform supports.
 
 TypeScript, production-build, and whitespace checks passed locally. GitHub
 build-and-release workflows passed for the sidebar, local repository, activity,
-updater, and sidebar Settings changes. Desktop installation/reload and Android
-or iOS acceptance have not been performed.
+updater, and sidebar Settings changes. The user installed the pushed build and
+verified the Log and Changes behavior.
 
 ## Current session evidence
 
@@ -36,4 +36,5 @@ or iOS acceptance have not been performed.
   clean states.
 - Mobile initially exposed `Buffer is not defined`; the Buffer polyfill fix was
   pushed in `8a90e91`, after which the user observed the Changes panel rendering.
-- Full installed-host reload, commit-and-clean, and rollback checks remain open.
+- Platform-specific desktop, Android, and iOS results are not identified in the
+  current evidence and should be recorded separately when tested.

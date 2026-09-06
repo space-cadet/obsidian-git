@@ -1,19 +1,18 @@
 # Active Context
 
-*Last Updated: 2026-09-06 04:45:17 IST*
+*Last Updated: 2026-09-06 12:49:25 IST*
 
 ## Current Focus
 
-- **T4, T9, T10** — local Changes workflow, rolling-release updater correction,
-  and mobile runtime evidence are the current record
-- **Next** — UI polish and installed-host acceptance remain
+- **T4, T5, T7, T10** — Changes, Log, remote foundation, and pushed-build
+  verification are the current record
+- **Next** — continue T7 remote operations or the planned Changes refinements
 
 ## Current State
 
-The implementation now has a visible sidebar, Settings entry point,
-read-only local repository state, in-memory Activity, updater/release handling,
-and a local Changes workflow. The Changes presentation needs polish; complete
-installed-host commit, reload, rollback, and remote workflows remain.
+The pushed build contains the verified Changes and Log updates, auto-saving
+Settings, and the first remote connection/authentication increment. Remaining
+work is tracked by the lettered subtasks in T4, T5, T7, and T10.
 
 ## Current Decisions
 
@@ -23,6 +22,6 @@ installed-host commit, reload, rollback, and remote workflows remain.
 
 ## Next Actions
 
-1. Polish the Changes UI while preserving the working local actions.
-2. Verify installed-host commit, reload, and updater rollback workflows.
-3. Add durable Activity history only when its workflow needs it.
+1. Continue T7c/T7d for fetch, pull, push, and clone.
+2. Continue T4f/T4g for filtering, sorting, revert, and keyboard selection.
+3. Continue T5e for Log clear/export and record platform-specific T10 evidence.

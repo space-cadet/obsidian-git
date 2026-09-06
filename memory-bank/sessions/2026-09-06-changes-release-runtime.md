@@ -37,3 +37,15 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 
 - Polish the Changes UI while preserving the working mechanics.
 - Record installed-host commit, reload, updater rollback, and remote acceptance separately.
+
+## 2026-09-06 Update
+
+- T2, T4, T5, T7, and T10 records were updated with completed and planned
+  lettered subtasks.
+- The user verified the pushed Changes and Log behavior.
+- Implementation details are recorded in the linked knowledge-layer documents:
+  `implementation-details/settings-panel.md`,
+  `implementation-details/changes-panel.md`,
+  `implementation-details/activity-logging.md`, and
+  `implementation-details/remote-sync-authentication.md`.
+- Next focus: T7c/T7d, T4f/T4g, and T5e.

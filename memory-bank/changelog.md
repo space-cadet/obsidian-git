@@ -12,6 +12,11 @@
   stage/unstage, commit, and mobile Buffer support. - T4, T10
 - Corrected rolling branch-build ordering and timestamp display to use release
   `updated_at`. - T9
+- Added Settings auto-save and secure token visibility controls. - T2
+- Added the target Changes layout and render-preserving staging updates. - T4
+- Added persistent structured Log entries with full timestamps and severity. - T5
+- Added the initial remote connection and credential foundation. - T7
+- Recorded user verification of the pushed Changes and Log behavior. - T10
 
 ## 2026-09-05
 
