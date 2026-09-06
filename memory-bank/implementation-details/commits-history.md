@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Show the existing local commit history even when the repository has no
-configured or reachable remote.
+Show existing local and fetched remote commit history, including when the
+repository has no configured or reachable remote.
 
 ## Implemented state
 
@@ -17,14 +17,16 @@ configured or reachable remote.
   and changed files with Added/Modified/Deleted markers.
 - An empty repository reports `No local commits yet.` instead of treating the
   expected no-commit state as an error.
-- Remote history has an explicit unavailable state until remote fetch and sync
-  are implemented.
+- Remote history reads the fetched `refs/remotes/origin/<branch>` tracking ref
+  and uses the same timeline and expanded details as Local history.
+- Remote commits use an `ORIGIN` badge; an unfetched branch has an explicit
+  state prompting the user to Fetch.
 
 ## KISS boundary
 
-History is read-only and capped at the latest 50 local commits. Pagination,
+History is read-only and capped at the latest 50 commits per source. Pagination,
 branch trees, remote comparison, and history caching remain out of scope until
-the basic local view demonstrates a need for them.
+the basic local and fetched-remote views demonstrate a need for them.
 
 ## Verification
 
@@ -33,3 +35,5 @@ the basic local view demonstrates a need for them.
 - The local history API returned three commits and changed-file counts from the
   current repository without using its configured remote.
 - The user verified that the local Commits display works in the pushed build.
+- Remote history source loading is covered by the production build; live
+  Fetch and installed-host verification remain open.

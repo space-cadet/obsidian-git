@@ -39,6 +39,11 @@ export interface LocalCommit {
 	changes: CommitFileChange[];
 }
 
+export interface RemoteCommitHistory {
+	commits: LocalCommit[];
+	available: boolean;
+}
+
 export function validateRepositoryPath(value: string): string | null {
 	const path = value.trim();
 	if (!path) return "Enter a repository path.";
@@ -125,11 +130,41 @@ export async function readCommits(
 	repositoryPath: string,
 	depth = 50,
 ): Promise<LocalCommit[]> {
+	return readCommitsAtRef(adapter, repositoryPath, "HEAD", depth);
+}
+
+export async function readRemoteCommits(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	branchName: string,
+	depth = 50,
+): Promise<RemoteCommitHistory> {
+	const fs = new ObsidianGitFs(adapter);
+	const dir = normalizedRepositoryPath(repositoryPath);
+	const branch = branchName.trim();
+	if (!branch) return { commits: [], available: false };
+
+	const branches = await git.listBranches({ fs, dir, remote: "origin" });
+	if (branches.indexOf(branch) === -1) return { commits: [], available: false };
+
+	return {
+		commits: await readCommitsAtRef(adapter, repositoryPath, `refs/remotes/origin/${branch}`, depth),
+		available: true,
+	};
+}
+
+async function readCommitsAtRef(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	ref: string,
+	depth: number,
+): Promise<LocalCommit[]> {
 	let result: Awaited<ReturnType<typeof git.log>>;
 	try {
 		result = await git.log({
 			fs: new ObsidianGitFs(adapter),
 			dir: normalizedRepositoryPath(repositoryPath),
+			ref,
 			depth,
 			includeChanges: true,
 		});

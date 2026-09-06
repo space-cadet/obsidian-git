@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 14:21:47 IST*
+*Last Updated: 2026-09-06 14:52:24 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -32,8 +32,8 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T7c/T7d: Run the implemented fetch, pull, push, and clone flows against a
-   real test remote and installed host.
+1. T7c/T7d and T6: Run the implemented remote operations and Remote Commits
+   view against a real test remote and installed host.
 2. T4f/T4g and T5e: Continue planned UI and Log refinements.
 
 ## 2026-09-06 Commits Update
@@ -66,6 +66,15 @@ Build the Settings panel immediately after the shell with only the configuration
 - Export metadata records whether activity was included.
 - Core Git remote operations are now implemented under T7; live remote and
   installed-host verification remain.
+
+## 2026-09-06 Remote commits and operation feedback
+
+- The Remote Commits source now reads the fetched `origin/<branch>` tracking
+  ref in parallel with Local history and marks entries `ORIGIN`.
+- Unfetched remote history has a clear Fetch prompt; fetched empty history has
+  a distinct empty state.
+- Fetch, Pull, Push, and Clone show immediate in-progress notices and Activity
+  entries before completing or reporting an error.
 
 ## 2026-09-06 Update
 

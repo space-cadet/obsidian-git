@@ -15,6 +15,7 @@ import {
 	inspectLocalRepository,
 	LocalCommit,
 	readCommits,
+	readRemoteCommits,
 	readChanges,
 	RepositoryState,
 	stageFile,
@@ -290,6 +291,8 @@ export default class GitSyncPlugin extends Plugin {
 		const next = this.remoteOperationQueue
 			.catch(() => undefined)
 			.then(async () => {
+				this.recordActivity(`${name} started for ${this.settings.branchName}.`);
+				new Notice(`${name} in progress…`);
 				try {
 					await operation();
 					this.recordActivity(`${name} completed for ${this.settings.branchName}.`);
@@ -374,7 +377,10 @@ class GitSyncView extends ItemView {
 	private repositoryState: RepositoryState | null = null;
 	private changes: ChangedFile[] | null = null;
 	private commits: LocalCommit[] | null = null;
+	private remoteCommits: LocalCommit[] | null = null;
+	private remoteHistoryAvailable = false;
 	private commitsError: string | null = null;
+	private remoteCommitsError: string | null = null;
 	private commitSource: CommitSource = "local";
 	private selectedCommitOid: string | null = null;
 	private readonly selectedPaths = new Set<string>();
@@ -565,11 +571,28 @@ class GitSyncView extends ItemView {
 				this.commits = null;
 				this.commitsError = error instanceof Error ? error.message : "Unable to read local commits.";
 			}
+			try {
+				const remoteHistory = await readRemoteCommits(
+					this.app.vault.adapter,
+					repositoryPath,
+					this.plugin.settings.branchName,
+				);
+				this.remoteCommits = remoteHistory.commits;
+				this.remoteHistoryAvailable = remoteHistory.available;
+				this.remoteCommitsError = null;
+			} catch (error) {
+				this.remoteCommits = null;
+				this.remoteHistoryAvailable = false;
+				this.remoteCommitsError = error instanceof Error ? error.message : "Unable to read remote commits.";
+			}
 		} else {
 			this.changes = null;
 			this.changesError = null;
 			this.commits = null;
+			this.remoteCommits = null;
+			this.remoteHistoryAvailable = false;
 			this.commitsError = null;
+			this.remoteCommitsError = null;
 			this.selectedCommitOid = null;
 		}
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
@@ -609,11 +632,13 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderCommits(content: HTMLElement): void {
+		const commits = this.commitSource === "local" ? this.commits : this.remoteCommits;
+		const sourceLabel = this.commitSource === "local" ? "local" : "remote";
 		const header = content.createDiv({ cls: "git-sync-commits-header" });
 		header.createDiv({ cls: "git-sync-state-title", text: "Commits" });
 		header.createDiv({
 			cls: "git-sync-commits-count",
-			text: this.commits ? `${this.commits.length} local commit${this.commits.length === 1 ? "" : "s"}` : "Local history",
+			text: commits ? `${commits.length} ${sourceLabel} commit${commits.length === 1 ? "" : "s"}` : `${sourceLabel} history`,
 		});
 
 		const sourceToggle = content.createDiv({ cls: "git-sync-source-toggle", attr: { role: "tablist" } });
@@ -634,13 +659,22 @@ class GitSyncView extends ItemView {
 			});
 		}
 
-		if (this.commitSource === "remote") {
+		if (this.commitSource === "remote" && this.remoteCommitsError) {
+			content.createEl("p", { text: this.remoteCommitsError, cls: "git-sync-state-description" });
+			this.addRefreshButton(content);
+			return;
+		}
+		if (this.commitSource === "remote" && !this.remoteCommits) {
+			content.createEl("p", { text: "Reading remote commit history…", cls: "git-sync-state-description" });
+			return;
+		}
+		if (this.commitSource === "remote" && !this.remoteHistoryAvailable) {
 			const unavailable = content.createDiv({ cls: "git-sync-history-unavailable" });
 			const icon = unavailable.createSpan({ cls: "git-sync-history-unavailable-icon" });
 			setIcon(icon, "cloud-off");
-			unavailable.createDiv({ cls: "git-sync-state-title", text: "Remote history unavailable" });
+			unavailable.createDiv({ cls: "git-sync-state-title", text: "No fetched remote history" });
 			unavailable.createEl("p", {
-				text: "Connect and fetch a remote to compare its commits with this local repository.",
+				text: `Fetch origin/${this.plugin.settings.branchName} to load the remote commit history here.`,
 				cls: "git-sync-state-description",
 			});
 			return;
@@ -655,13 +689,20 @@ class GitSyncView extends ItemView {
 			content.createEl("p", { text: "Reading local commit history…", cls: "git-sync-state-description" });
 			return;
 		}
-		if (this.commits.length === 0) {
-			content.createDiv({ cls: "git-sync-history-empty", text: "No local commits yet." });
+		if (commits!.length === 0) {
+			content.createDiv({
+				cls: "git-sync-history-empty",
+				text: this.commitSource === "local" ? "No local commits yet." : "No commits on the fetched remote branch.",
+			});
 			return;
 		}
 
+		this.renderCommitList(content, commits!, this.commitSource === "local" ? "LOCAL" : "ORIGIN");
+	}
+
+	private renderCommitList(content: HTMLElement, commits: LocalCommit[], badge: "LOCAL" | "ORIGIN"): void {
 		const list = content.createEl("ol", { cls: "git-sync-commit-list" });
-		for (const commit of this.commits) {
+		for (const commit of commits) {
 			const item = list.createEl("li", { cls: "git-sync-commit-item" });
 			const selected = this.selectedCommitOid === commit.oid;
 			const button = item.createEl("button", {
@@ -680,7 +721,7 @@ class GitSyncView extends ItemView {
 			const meta = summary.createDiv({ cls: "git-sync-commit-meta" });
 			meta.createSpan({ cls: "git-sync-commit-oid", text: commit.oid.slice(0, 7) });
 			meta.createSpan({ text: commit.author.name || "Unknown author" });
-			meta.createSpan({ cls: "git-sync-commit-local-badge", text: "LOCAL" });
+			meta.createSpan({ cls: badge === "ORIGIN" ? "git-sync-commit-origin-badge" : "git-sync-commit-local-badge", text: badge });
 			const time = button.createSpan({ cls: "git-sync-commit-time", text: formatRelativeCommitTime(commit.author.timestamp) });
 			time.setAttribute("title", formatCommitTimestamp(commit.author.timestamp));
 			const chevron = button.createSpan({ cls: "git-sync-commit-chevron" });

@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-06 14:21:47 IST*
+*Last Updated: 2026-09-06 14:52:24 IST*
 
 ## Current Focus
 
@@ -11,10 +11,11 @@
 
 ## Current State
 
-The source now contains the first complete T7 core Git operation path in
-addition to the verified Changes and Log updates, auto-saving Settings, and
-versioned plugin data portability. Remaining work is live remote and installed
-host verification, followed by the lettered UI refinements in T4 and T5.
+The source now contains the first complete T7 core Git operation path and a
+fetched Remote Commits view in addition to the verified Changes and Log
+updates, auto-saving Settings, and versioned plugin data portability.
+Remaining work is live remote and installed host verification, followed by
+the lettered UI refinements in T4 and T5.
 
 ## Current Decisions
 
@@ -24,6 +25,7 @@ host verification, followed by the lettered UI refinements in T4 and T5.
 
 ## Next Actions
 
-1. Run T7c/T7d against a real test remote and the installed Obsidian host.
+1. Run T7c/T7d and the Remote Commits view against a real test remote and the
+   installed Obsidian host.
 2. Verify Settings import/export and the versioned data shape in the pushed host.
 3. Continue T4/T5 refinements after remote acceptance is recorded.

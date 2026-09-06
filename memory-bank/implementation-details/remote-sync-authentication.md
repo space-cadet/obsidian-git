@@ -32,6 +32,8 @@ recorded.
   running; Clone requires an empty vault-relative destination.
 - Remote operations are queued so two Git mutations cannot run concurrently,
   and each result is recorded in Activity with a notice.
+- Remote operations now show immediate in-progress feedback before the network
+  request completes, so a slow or rejected operation is not visually silent.
 
 ## Completion evidence
 

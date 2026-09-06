@@ -1,6 +1,6 @@
 # Session 2026-09-06 - Changes, release, and runtime
 *Created: 2026-09-06 04:45:17 IST*
-*Last Updated: 2026-09-06 14:21:47 IST*
+*Last Updated: 2026-09-06 14:52:24 IST*
 
 ## Session Title
 
@@ -89,3 +89,12 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   merge conflicts in this increment.
 - Production build and `git diff --check` pass. Real test-remote and
   installed-host acceptance remain open.
+
+## 2026-09-06 Remote commits and button feedback
+
+- Remote Commits now reads fetched `origin/<branch>` history in parallel with
+  Local history and displays the reference-style `ORIGIN` badge.
+- Remote history has separate unfetched and fetched-empty states.
+- Fetch, Pull, Push, and Clone now show immediate in-progress feedback and
+  record their start before waiting for the remote request.
+- Production build passed; live remote and installed-host verification remain.
