@@ -422,3 +422,266 @@
 	background: var(--background-secondary);
 	border-radius: 4px;
 }
+
+.git-sync-commits-header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 14px 0 10px;
+}
+
+.git-sync-commits-count {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-source-toggle {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	margin: 4px 0 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 999px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.git-sync-source-toggle button {
+	min-height: 38px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	font-weight: 600;
+}
+
+.git-sync-source-toggle button.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.git-sync-history-unavailable,
+.git-sync-history-empty {
+	padding: 36px 18px;
+	color: var(--text-muted);
+	text-align: center;
+}
+
+.git-sync-history-unavailable-icon {
+	display: inline-flex;
+	margin-bottom: 10px;
+	color: var(--text-warning);
+}
+
+.git-sync-history-unavailable-icon svg {
+	width: 24px;
+	height: 24px;
+}
+
+.git-sync-commit-list {
+	position: relative;
+	margin: 0 -12px;
+	padding: 0 0 12px;
+	list-style: none;
+}
+
+.git-sync-commit-item {
+	position: relative;
+}
+
+.git-sync-commit-item:not(:last-child)::before {
+	position: absolute;
+	top: 38px;
+	bottom: 0;
+	left: 28px;
+	width: 2px;
+	content: "";
+	background: var(--background-modifier-border);
+}
+
+.git-sync-commit-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-height: 78px;
+	padding: 12px;
+	border: 0;
+	border-bottom: 1px solid var(--background-modifier-border);
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	text-align: left;
+}
+
+.git-sync-commit-row:hover,
+.git-sync-commit-row.is-selected {
+	background: var(--background-secondary);
+}
+
+.git-sync-commit-marker {
+	display: inline-flex;
+	position: relative;
+	z-index: 1;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 22px;
+	width: 22px;
+	height: 22px;
+	border: 3px solid var(--interactive-accent);
+	border-radius: 50%;
+	background: var(--background-primary);
+}
+
+.git-sync-commit-summary {
+	min-width: 0;
+	flex: 1 1 auto;
+}
+
+.git-sync-commit-message {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-sync-commit-summary .git-sync-commit-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-commit-oid {
+	padding: 3px 6px;
+	border-radius: var(--radius-s);
+	background: var(--background-secondary);
+	font-family: var(--font-monospace);
+}
+
+.git-sync-commit-local-badge {
+	padding: 3px 6px;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+	font-size: 0.78em;
+	font-weight: 700;
+}
+
+.git-sync-commit-time {
+	flex: 0 0 auto;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.git-sync-commit-chevron {
+	display: inline-flex;
+	flex: 0 0 auto;
+	color: var(--text-muted);
+}
+
+.git-sync-commit-chevron svg {
+	width: 18px;
+	height: 18px;
+}
+
+.git-sync-commit-details {
+	margin: 0 12px 12px 44px;
+	padding: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.git-sync-commit-detail-message {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.git-sync-commit-detail-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 12px;
+	margin-top: 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-commit-detail-hash {
+	margin-top: 8px;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	overflow-wrap: anywhere;
+}
+
+.git-sync-commit-files-title {
+	margin-top: 14px;
+	font-size: var(--font-ui-smaller);
+	font-weight: 700;
+}
+
+.git-sync-commit-files-empty {
+	margin-top: 6px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-commit-files {
+	margin: 6px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.git-sync-commit-files li {
+	display: flex;
+	gap: 8px;
+	padding: 4px 0;
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-commit-file-status {
+	flex: 0 0 16px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.git-sync-commit-file-status[data-commit-file-status="Added"] {
+	color: var(--text-success);
+}
+
+.git-sync-commit-file-status[data-commit-file-status="Deleted"] {
+	color: var(--text-error);
+}
+
+.git-sync-commit-file-path {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+	.git-sync-commit-row {
+		gap: 7px;
+		padding-inline: 8px;
+	}
+
+	.git-sync-commit-item:not(:last-child)::before {
+		left: 24px;
+	}
+
+	.git-sync-commit-time {
+		font-size: 0;
+	}
+
+	.git-sync-commit-time::before {
+		content: "•";
+		font-size: var(--font-ui-smaller);
+	}
+
+	.git-sync-commit-details {
+		margin-left: 36px;
+	}
+}

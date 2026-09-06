@@ -22,6 +22,23 @@ export interface CommitAuthor {
 	email: string;
 }
 
+export interface CommitFileChange {
+	path: string;
+	status: "Added" | "Modified" | "Deleted";
+}
+
+export interface LocalCommit {
+	oid: string;
+	message: string;
+	author: CommitAuthor & {
+		timestamp: number;
+	};
+	committer: CommitAuthor & {
+		timestamp: number;
+	};
+	changes: CommitFileChange[];
+}
+
 export function validateRepositoryPath(value: string): string | null {
 	const path = value.trim();
 	if (!path) return "Enter a repository path.";
@@ -101,6 +118,44 @@ export async function commitChanges(
 		message,
 		author,
 	});
+}
+
+export async function readCommits(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	depth = 50,
+): Promise<LocalCommit[]> {
+	let result: Awaited<ReturnType<typeof git.log>>;
+	try {
+		result = await git.log({
+			fs: new ObsidianGitFs(adapter),
+			dir: normalizedRepositoryPath(repositoryPath),
+			depth,
+			includeChanges: true,
+		});
+	} catch (error) {
+		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") return [];
+		throw error;
+	}
+
+	return result.map(({ oid, commit }) => ({
+		oid,
+		message: commit.message,
+		author: {
+			name: commit.author.name,
+			email: commit.author.email,
+			timestamp: commit.author.timestamp,
+		},
+		committer: {
+			name: commit.committer.name,
+			email: commit.committer.email,
+			timestamp: commit.committer.timestamp,
+		},
+		changes: (commit.changes ?? []).map(([newOid, oldOid, path]) => ({
+			path: String(path),
+			status: newOid === null ? "Deleted" : oldOid === null ? "Added" : "Modified",
+		})),
+	}));
 }
 
 function normalizedRepositoryPath(path: string): string {

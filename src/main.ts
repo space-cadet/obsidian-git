@@ -13,6 +13,8 @@ import {
 	ChangedFile,
 	commitChanges,
 	inspectLocalRepository,
+	LocalCommit,
+	readCommits,
 	readChanges,
 	RepositoryState,
 	stageFile,
@@ -43,6 +45,7 @@ interface ActivityEntry {
 }
 
 type ActivityLevel = "DEBUG" | "INFO" | "METRIC" | "ERROR";
+type CommitSource = "local" | "remote";
 
 interface StoredPluginData extends Partial<GitSyncSettings> {
 	activity?: Array<{
@@ -279,6 +282,10 @@ class GitSyncView extends ItemView {
 	private activeTab = "Changes";
 	private repositoryState: RepositoryState | null = null;
 	private changes: ChangedFile[] | null = null;
+	private commits: LocalCommit[] | null = null;
+	private commitsError: string | null = null;
+	private commitSource: CommitSource = "local";
+	private selectedCommitOid: string | null = null;
 	private readonly selectedPaths = new Set<string>();
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
@@ -394,18 +401,13 @@ class GitSyncView extends ItemView {
 			return;
 		}
 
-		content.createDiv({ cls: "git-sync-state-title", text: this.activeTab });
-		content.createEl("p", {
-			text: `Local repository ready on ${this.repositoryState.branch}.`,
-			cls: "git-sync-state-description",
-		});
-		if (this.repositoryState.head) {
-			content.createEl("p", {
-				text: `HEAD ${this.repositoryState.head.slice(0, 7)}`,
-				cls: "git-sync-state-description",
-			});
+		if (this.activeTab === "Commits") {
+			this.renderCommits(content);
+			return;
 		}
-		content.createEl("p", { text: "Commit history is next.", cls: "git-sync-state-description" });
+
+		content.createDiv({ cls: "git-sync-state-title", text: this.activeTab });
+		content.createEl("p", { text: `Local repository ready on ${this.repositoryState.branch}.`, cls: "git-sync-state-description" });
 		this.addRefreshButton(content);
 	}
 
@@ -462,9 +464,22 @@ class GitSyncView extends ItemView {
 				this.changes = null;
 				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 			}
+			try {
+				this.commits = await readCommits(this.app.vault.adapter, repositoryPath);
+				this.commitsError = null;
+				if (this.selectedCommitOid && !this.commits.some((commit) => commit.oid === this.selectedCommitOid)) {
+					this.selectedCommitOid = null;
+				}
+			} catch (error) {
+				this.commits = null;
+				this.commitsError = error instanceof Error ? error.message : "Unable to read local commits.";
+			}
 		} else {
 			this.changes = null;
 			this.changesError = null;
+			this.commits = null;
+			this.commitsError = null;
+			this.selectedCommitOid = null;
 		}
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.recordRepositoryActivity(state);
@@ -500,6 +515,115 @@ class GitSyncView extends ItemView {
 		const commitButton = commitActions.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
 		commitButton.disabled = stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
+	}
+
+	private renderCommits(content: HTMLElement): void {
+		const header = content.createDiv({ cls: "git-sync-commits-header" });
+		header.createDiv({ cls: "git-sync-state-title", text: "Commits" });
+		header.createDiv({
+			cls: "git-sync-commits-count",
+			text: this.commits ? `${this.commits.length} local commit${this.commits.length === 1 ? "" : "s"}` : "Local history",
+		});
+
+		const sourceToggle = content.createDiv({ cls: "git-sync-source-toggle", attr: { role: "tablist" } });
+		for (const source of ["local", "remote"] as const) {
+			const button = sourceToggle.createEl("button", {
+				text: source === "local" ? "Local" : "Remote",
+				cls: source === this.commitSource ? "is-active" : "",
+				attr: {
+					type: "button",
+					role: "tab",
+					"aria-selected": String(source === this.commitSource),
+				},
+			});
+			button.addEventListener("click", () => {
+				this.commitSource = source;
+				this.selectedCommitOid = null;
+				this.render();
+			});
+		}
+
+		if (this.commitSource === "remote") {
+			const unavailable = content.createDiv({ cls: "git-sync-history-unavailable" });
+			const icon = unavailable.createSpan({ cls: "git-sync-history-unavailable-icon" });
+			setIcon(icon, "cloud-off");
+			unavailable.createDiv({ cls: "git-sync-state-title", text: "Remote history unavailable" });
+			unavailable.createEl("p", {
+				text: "Connect and fetch a remote to compare its commits with this local repository.",
+				cls: "git-sync-state-description",
+			});
+			return;
+		}
+
+		if (this.commitsError) {
+			content.createEl("p", { text: this.commitsError, cls: "git-sync-state-description" });
+			this.addRefreshButton(content);
+			return;
+		}
+		if (!this.commits) {
+			content.createEl("p", { text: "Reading local commit history…", cls: "git-sync-state-description" });
+			return;
+		}
+		if (this.commits.length === 0) {
+			content.createDiv({ cls: "git-sync-history-empty", text: "No local commits yet." });
+			return;
+		}
+
+		const list = content.createEl("ol", { cls: "git-sync-commit-list" });
+		for (const commit of this.commits) {
+			const item = list.createEl("li", { cls: "git-sync-commit-item" });
+			const selected = this.selectedCommitOid === commit.oid;
+			const button = item.createEl("button", {
+				cls: selected ? "git-sync-commit-row is-selected" : "git-sync-commit-row",
+				attr: {
+					type: "button",
+					"aria-expanded": String(selected),
+					"aria-label": `${selected ? "Hide" : "Show"} details for ${commitTitle(commit.message)}`,
+				},
+			});
+			const marker = button.createSpan({ cls: "git-sync-commit-marker" });
+			marker.setAttribute("aria-hidden", "true");
+			const summary = button.createDiv({ cls: "git-sync-commit-summary" });
+			const title = summary.createDiv({ cls: "git-sync-commit-message", text: commitTitle(commit.message) });
+			title.setAttribute("title", commit.message);
+			const meta = summary.createDiv({ cls: "git-sync-commit-meta" });
+			meta.createSpan({ cls: "git-sync-commit-oid", text: commit.oid.slice(0, 7) });
+			meta.createSpan({ text: commit.author.name || "Unknown author" });
+			meta.createSpan({ cls: "git-sync-commit-local-badge", text: "LOCAL" });
+			const time = button.createSpan({ cls: "git-sync-commit-time", text: formatRelativeCommitTime(commit.author.timestamp) });
+			time.setAttribute("title", formatCommitTimestamp(commit.author.timestamp));
+			const chevron = button.createSpan({ cls: "git-sync-commit-chevron" });
+			setIcon(chevron, selected ? "chevron-down" : "chevron-right");
+			button.addEventListener("click", () => {
+				this.selectedCommitOid = selected ? null : commit.oid;
+				this.render();
+			});
+
+			if (selected) this.renderCommitDetails(item, commit);
+		}
+	}
+
+	private renderCommitDetails(item: HTMLElement, commit: LocalCommit): void {
+		const details = item.createDiv({ cls: "git-sync-commit-details" });
+		details.createDiv({ cls: "git-sync-commit-detail-message", text: commit.message.trim() });
+		const author = details.createDiv({ cls: "git-sync-commit-detail-meta" });
+		author.createSpan({ text: `${commit.author.name || "Unknown author"} <${commit.author.email}>` });
+		author.createSpan({ text: formatCommitTimestamp(commit.author.timestamp) });
+		details.createDiv({ cls: "git-sync-commit-detail-hash", text: commit.oid });
+
+		const filesTitle = details.createDiv({ cls: "git-sync-commit-files-title", text: `Changed files (${commit.changes.length})` });
+		if (commit.changes.length === 0) {
+			details.createDiv({ cls: "git-sync-commit-files-empty", text: "No changed files recorded." });
+			return;
+		}
+		const files = details.createEl("ul", { cls: "git-sync-commit-files" });
+		for (const file of commit.changes) {
+			const row = files.createEl("li");
+			const status = row.createSpan({ cls: "git-sync-commit-file-status", text: commitFileCode(file.status) });
+			status.setAttribute("data-commit-file-status", file.status);
+			row.createSpan({ cls: "git-sync-commit-file-path", text: file.path });
+		}
+		filesTitle.setAttribute("aria-hidden", "true");
 	}
 
 	private renderChangeSection(
@@ -1049,6 +1173,35 @@ function formatLogTimestamp(timestamp: number): string {
 	const date = new Date(timestamp);
 	const pad = (value: number): string => `0${value}`.slice(-2);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function commitTitle(message: string): string {
+	return message.split("\n", 1)[0].trim() || "(no commit message)";
+}
+
+function formatRelativeCommitTime(timestamp: number): string {
+	const seconds = Math.max(0, Math.floor(Date.now() / 1000) - timestamp);
+	if (seconds < 60) return "just now";
+	if (seconds < 60 * 60) return `${Math.floor(seconds / 60)}m ago`;
+	if (seconds < 60 * 60 * 24) return `${Math.floor(seconds / (60 * 60))}h ago`;
+	if (seconds < 60 * 60 * 24 * 30) return `${Math.floor(seconds / (60 * 60 * 24))}d ago`;
+	if (seconds < 60 * 60 * 24 * 365) return `${Math.floor(seconds / (60 * 60 * 24 * 30))}mo ago`;
+	return `${Math.floor(seconds / (60 * 60 * 24 * 365))}y ago`;
+}
+
+function formatCommitTimestamp(timestamp: number): string {
+	return formatLogTimestamp(timestamp * 1000);
+}
+
+function commitFileCode(status: "Added" | "Modified" | "Deleted"): string {
+	switch (status) {
+		case "Added":
+			return "A";
+		case "Deleted":
+			return "D";
+		default:
+			return "M";
+	}
 }
 
 function maskRemoteToken(token: string): string {

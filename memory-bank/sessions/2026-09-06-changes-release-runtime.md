@@ -49,3 +49,12 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   `implementation-details/activity-logging.md`, and
   `implementation-details/remote-sync-authentication.md`.
 - Next focus: T7c/T7d, T4f/T4g, and T5e.
+
+## 2026-09-06 Commits follow-up
+
+- T6 local commit history is implemented with a Local/Remote source switch,
+  timeline list, expandable commit details, and changed-file markers.
+- Local history reads up to 50 commits without requiring a remote. Remote
+  history remains unavailable until fetch/sync exists.
+- Production build and `git diff --check` passed; local history returned real
+  commits and changed-file metadata from the current repository.

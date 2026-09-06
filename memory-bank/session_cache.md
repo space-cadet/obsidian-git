@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 12:49:25 IST*
+*Last Updated: 2026-09-06 13:32:58 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -34,6 +34,13 @@ Build the Settings panel immediately after the shell with only the configuration
 
 1. T7c/T7d: Implement fetch, pull, push, and clone.
 2. T4f/T4g and T5e: Continue planned UI and Log refinements.
+
+## 2026-09-06 Commits Update
+
+- T6 local commit history was implemented with a Local/Remote source switch,
+  timeline list, expandable commit details, and changed-file markers.
+- The local history query reads up to 50 commits without requiring a remote;
+  remote history remains unavailable until fetch/sync exists.
 
 ## 2026-09-06 Update
 

@@ -25,6 +25,8 @@ Each component owns its small state, operations, UI, and focused checks.
   revert, and keyboard selection remain planned.
 - T5: structured, persistent Log entries with timestamps and severity are
   implemented; clear and export remain pending.
+- T6: local commit history list, commit details, and changed-file display are
+  implemented; remote history remains unavailable until fetch/sync exists.
 - T7: remote connection testing and SecretStorage-backed credentials are
   implemented; fetch, pull, push, and clone remain pending.
 - T9: updater and rolling branch-release ordering are implemented; real-host installation remains pending.
