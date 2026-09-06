@@ -174,6 +174,13 @@ export default class GitSyncPlugin extends Plugin {
 		}, null, 2);
 	}
 
+	async exportDataToVault(): Promise<string> {
+		const path = `git-sync-data-${formatFileTimestamp(new Date())}.json`;
+		await this.app.vault.adapter.write(path, this.createExportData());
+		this.recordActivity(`Plugin data exported to ${path}.`);
+		return path;
+	}
+
 	async importData(json: string): Promise<void> {
 		let decoded: DecodedPluginData;
 		try {
@@ -1187,15 +1194,20 @@ class GitSyncSettingTab extends PluginSettingTab {
 		});
 		new Setting(containerEl)
 			.setName("Export plugin data")
-			.setDesc("Downloads a JSON backup of the current Git Sync settings and activity.")
+			.setDesc("Writes a timestamped JSON backup to the vault root. Remote credentials are not included.")
 			.addButton((button) => button
-				.setButtonText("Export JSON")
-				.onClick(() => {
+				.setButtonText("Export to vault")
+				.onClick(async () => {
+					button.setDisabled(true);
 					try {
-						downloadTextFile(`git-sync-data-${formatFileTimestamp(new Date())}.json`, this.plugin.createExportData());
-						new Notice("Plugin data exported. Remote credentials were not included.");
+						const path = await this.plugin.exportDataToVault();
+						new Notice(`Plugin data exported to ${path}.`);
 					} catch (error) {
-						new Notice(`Could not export plugin data: ${error instanceof Error ? error.message : "Unknown error"}`);
+						const detail = error instanceof Error ? error.message : "Unknown error";
+						this.plugin.recordActivity(`Plugin data export failed: ${detail}`, "ERROR");
+						new Notice(`Could not export plugin data: ${detail}`);
+					} finally {
+						button.setDisabled(false);
 					}
 				}));
 		new Setting(containerEl)
@@ -1246,19 +1258,6 @@ function formatCommitTimestamp(timestamp: number): string {
 
 function formatFileTimestamp(date: Date): string {
 	return date.toISOString().replace(/[:.]/g, "-");
-}
-
-function downloadTextFile(filename: string, contents: string): void {
-	const blob = new Blob([contents], { type: "application/json" });
-	const url = URL.createObjectURL(blob);
-	const link = document.createElement("a");
-	link.href = url;
-	link.download = filename;
-	link.style.display = "none";
-	document.body.appendChild(link);
-	link.click();
-	link.remove();
-	window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function chooseImportFile(plugin: GitSyncPlugin): void {

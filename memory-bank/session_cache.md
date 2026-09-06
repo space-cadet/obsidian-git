@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 13:59:01 IST*
+*Last Updated: 2026-09-06 14:05:57 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -49,6 +49,14 @@ Build the Settings panel immediately after the shell with only the configuration
   bounded activity; old flat data is accepted and migrated.
 - Export/import never includes the remote token and import preserves the
   current SecretStorage credential.
+
+## 2026-09-06 Export Fix Update
+
+- Export now writes a timestamped JSON file to the vault root instead of using
+  a browser download.
+- Successful and failed export operations are recorded in the Activity log;
+  success notices include the exact vault-relative path.
+- The user verified the local Commits display in the pushed build.
 
 ## 2026-09-06 Update
 

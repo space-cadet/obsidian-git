@@ -32,3 +32,4 @@ the basic local view demonstrates a need for them.
 - `git diff --check` passed.
 - The local history API returned three commits and changed-file counts from the
   current repository without using its configured remote.
+- The user verified that the local Commits display works in the pushed build.

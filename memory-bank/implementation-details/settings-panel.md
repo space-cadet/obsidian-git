@@ -30,9 +30,10 @@ basic configuration workflow requires them.
   `schemaVersion`, `settings`, and bounded `activity` fields.
 - Existing flat plugin data is accepted and migrated to the versioned envelope
   on load; unknown settings are ignored during normalization.
-- Settings can export and import JSON backups. The remote token is excluded,
-  imports require confirmation, and the current SecretStorage credential is
-  preserved.
+- Settings can export and import JSON backups. Export writes a timestamped file
+  to the vault root and records the path in Activity; the remote token is
+  excluded, imports require confirmation, and the current SecretStorage
+  credential is preserved.
 
 ## Completion evidence
 

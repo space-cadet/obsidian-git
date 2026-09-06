@@ -66,3 +66,10 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   `activity` fields. Legacy flat plugin data is accepted and migrated.
 - Remote credentials remain in SecretStorage and are excluded from exports and
   imports. Production build and diff checks passed.
+
+## 2026-09-06 Export fix follow-up
+
+- Replaced browser-download export with a timestamped vault-root JSON file.
+- Export success and failure now appear in Activity, and successful export
+  notices show the exact vault-relative path.
+- The user verified the local Commits display in the pushed build.
