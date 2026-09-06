@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-06 15:02:18 IST*
+*Last Updated: 2026-09-06 15:20:33 IST*
 
 ## Current Focus
 
@@ -17,7 +17,7 @@ updates, auto-saving Settings, and versioned plugin data portability.
 The repository header now reports comparison status, and remote operations
 write live diagnostic Activity entries. Remaining work is live remote and
 installed host verification, followed by the lettered UI refinements in T4 and
-T5.
+T5. Pull and Push are now also exposed in the Changes action bar.
 
 ## Current Decisions
 
@@ -27,7 +27,8 @@ T5.
 
 ## Next Actions
 
-1. Run T7c/T7d, the Remote Commits view, and diagnostic Log flow against a real
-   test remote and the installed Obsidian host.
+1. Run the Changes toolbar Pull/Push actions, T7c/T7d, the Remote Commits view,
+   and diagnostic Log flow against a real test remote and the installed
+   Obsidian host.
 2. Verify Settings import/export and the versioned data shape in the pushed host.
 3. Continue T4/T5 refinements after remote acceptance is recorded.

@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 15:02:18 IST*
+*Last Updated: 2026-09-06 15:20:33 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -82,6 +82,13 @@ Build the Settings panel immediately after the shell with only the configuration
   now appear in the live Log view.
 - The repository header compares local and fetched remote heads instead of
   always saying that comparison is unavailable.
+
+## 2026-09-06 Changes toolbar remote actions
+
+- Confirmed the Settings Pull/Push actions were not the buttons used in the
+  Changes workflow.
+- Added Pull and Push to the fixed Changes action bar and connected them to the
+  shared queued remote operation path.
 
 ## 2026-09-06 Update
 

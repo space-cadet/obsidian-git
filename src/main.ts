@@ -293,6 +293,7 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	private runRemoteOperation(name: string, operation: () => Promise<void>): Promise<void> {
+		this.recordActivity(`${name} requested.`);
 		const next = this.remoteOperationQueue
 			.catch(() => undefined)
 			.then(async () => {
@@ -906,6 +907,20 @@ class GitSyncView extends ItemView {
 		unstage.disabled = !this.hasSelectedStaged() || this.committing;
 		unstage.addEventListener("click", () => void this.applySelectedStage(true));
 
+		const pull = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Pull from remote", title: "Pull from remote", "data-git-sync-action": "pull" },
+		});
+		setIcon(pull, "download");
+		pull.addEventListener("click", () => void this.plugin.pullRemote());
+
+		const push = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Push to remote", title: "Push to remote", "data-git-sync-action": "push" },
+		});
+		setIcon(push, "upload");
+		push.addEventListener("click", () => void this.plugin.pushRemote());
+
 		const refresh = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
 			attr: { type: "button", "aria-label": "Refresh repository", title: "Refresh repository" },
@@ -1312,7 +1327,6 @@ class GitSyncSettingTab extends PluginSettingTab {
 				.addButton((button) => button
 					.setButtonText(label)
 					.onClick(async () => {
-						this.plugin.recordActivity(`${name} requested from Settings.`);
 						button.setDisabled(true);
 						button.setButtonText("Working…");
 						try {

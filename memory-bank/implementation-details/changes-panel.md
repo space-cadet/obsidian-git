@@ -27,10 +27,14 @@ the resulting clean state.
   backed by `isomorphic-git`; a remote URL is not required.
 - It renders changed files, individual Stage/Unstage controls, a commit message
   field, commit identity settings, and a Commit action.
+- Its fixed bottom action bar also exposes Pull and Push for the configured
+  remote, keeping remote synchronization next to the Changes workflow.
 - The approved mobile layout uses grouped staged and uncommitted sections,
   counts, collapsible headers, selection controls, and icon actions.
 - Stage and unstage refresh the Changes content while preserving the panel,
   active control, commit-message focus, and scroll position.
+- Pull and Push are connected to the shared remote operation queue and emit
+  Activity diagnostics while they run.
 - The local integration flow passed: untracked -> staged -> committed -> clean.
 - A mobile `Buffer is not defined` failure was fixed with the browser Buffer
   polyfill recorded in commit `8a90e91`.

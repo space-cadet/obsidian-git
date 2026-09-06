@@ -1,6 +1,6 @@
 # Session 2026-09-06 - Changes, release, and runtime
 *Created: 2026-09-06 04:45:17 IST*
-*Last Updated: 2026-09-06 15:02:18 IST*
+*Last Updated: 2026-09-06 15:20:33 IST*
 
 ## Session Title
 
@@ -107,3 +107,10 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   remote heads instead of always showing `Remote comparison unavailable`.
 - Production build and diff checks pass; live remote and installed-host
   verification remain.
+
+## 2026-09-06 Changes toolbar remote actions
+
+- Confirmed the bottom Changes toolbar previously contained only Select All,
+  Stage, Unstage, and Refresh; Pull and Push were not wired there.
+- Added visible Pull and Push toolbar buttons using the shared remote queue and
+  Activity diagnostics.

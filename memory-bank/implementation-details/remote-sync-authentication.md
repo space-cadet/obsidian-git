@@ -28,6 +28,7 @@ recorded.
 - A connection test records success or failure in the Log and reports the
   remote default branch when available.
 - Settings now expose Fetch, fast-forward-only Pull, Push, and Clone actions.
+- The Changes action bar also exposes Pull and Push next to local file actions.
 - Fetch, Pull, and Push attach or refresh the configured `origin` remote before
   running; Clone requires an empty vault-relative destination.
 - Remote operations are queued so two Git mutations cannot run concurrently,
