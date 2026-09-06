@@ -221,6 +221,12 @@
 	overflow-wrap: anywhere;
 }
 
+.git-sync-load-more {
+	display: block;
+	width: 100%;
+	margin: 12px 0;
+}
+
 @media (max-width: 360px) {
 	.git-sync-change-section-header {
 		gap: 4px;

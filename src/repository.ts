@@ -40,9 +40,15 @@ export interface LocalCommit {
 	changesLoaded: boolean;
 }
 
+export interface CommitHistory {
+	commits: LocalCommit[];
+	hasMore: boolean;
+}
+
 export interface RemoteCommitHistory {
 	commits: LocalCommit[];
 	available: boolean;
+	hasMore: boolean;
 }
 
 export function validateRepositoryPath(value: string): string | null {
@@ -155,8 +161,8 @@ export async function commitChanges(
 export async function readCommits(
 	adapter: DataAdapter,
 	repositoryPath: string,
-	depth = 50,
-): Promise<LocalCommit[]> {
+	depth = 100,
+): Promise<CommitHistory> {
 	return readCommitsAtRef(adapter, repositoryPath, "HEAD", depth);
 }
 
@@ -186,19 +192,21 @@ export async function readRemoteCommits(
 	adapter: DataAdapter,
 	repositoryPath: string,
 	branchName: string,
-	depth = 50,
+	depth = 100,
 ): Promise<RemoteCommitHistory> {
 	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
 	const branch = branchName.trim();
-	if (!branch) return { commits: [], available: false };
+	if (!branch) return { commits: [], available: false, hasMore: false };
 
 	const branches = await git.listBranches({ fs, dir, remote: "origin" });
-	if (branches.indexOf(branch) === -1) return { commits: [], available: false };
+	if (branches.indexOf(branch) === -1) return { commits: [], available: false, hasMore: false };
+	const history = await readCommitsAtRef(adapter, repositoryPath, `refs/remotes/origin/${branch}`, depth);
 
 	return {
-		commits: await readCommitsAtRef(adapter, repositoryPath, `refs/remotes/origin/${branch}`, depth),
+		commits: history.commits,
 		available: true,
+		hasMore: history.hasMore,
 	};
 }
 
@@ -207,37 +215,42 @@ async function readCommitsAtRef(
 	repositoryPath: string,
 	ref: string,
 	depth: number,
-): Promise<LocalCommit[]> {
+): Promise<CommitHistory> {
 	let result: Awaited<ReturnType<typeof git.log>>;
 	try {
 		result = await git.log({
 			fs: new ObsidianGitFs(adapter),
 			dir: normalizedRepositoryPath(repositoryPath),
 			ref,
-			depth,
+			depth: depth + 1,
 			includeChanges: false,
 		});
 	} catch (error) {
-		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") return [];
+		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") {
+			return { commits: [], hasMore: false };
+		}
 		throw error;
 	}
 
-	return result.map(({ oid, commit }) => ({
-		oid,
-		message: commit.message,
-		author: {
-			name: commit.author.name,
-			email: commit.author.email,
-			timestamp: commit.author.timestamp,
-		},
-		committer: {
-			name: commit.committer.name,
-			email: commit.committer.email,
-			timestamp: commit.committer.timestamp,
-		},
-		changes: [],
-		changesLoaded: false,
-	}));
+	return {
+		commits: result.slice(0, depth).map(({ oid, commit }) => ({
+			oid,
+			message: commit.message,
+			author: {
+				name: commit.author.name,
+				email: commit.author.email,
+				timestamp: commit.author.timestamp,
+			},
+			committer: {
+				name: commit.committer.name,
+				email: commit.committer.email,
+				timestamp: commit.committer.timestamp,
+			},
+			changes: [],
+			changesLoaded: false,
+		})),
+		hasMore: result.length > depth,
+	};
 }
 
 function mapCommitChanges(changes: Awaited<ReturnType<typeof git.log>>[number]["commit"]["changes"]): CommitFileChange[] {

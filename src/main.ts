@@ -44,7 +44,10 @@ import {
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 const PLUGIN_DATA_FORMAT = "obsidian-git-sync";
 const PLUGIN_DATA_SCHEMA_VERSION = 1 as const;
-const MAX_ACTIVITY_ENTRIES = 50;
+const ACTIVITY_PAGE_SIZE = 100;
+const MAX_ACTIVITY_ENTRIES = 1000;
+const ACTIVITY_LOG_COMPACTION_THRESHOLD = MAX_ACTIVITY_ENTRIES + ACTIVITY_PAGE_SIZE;
+const COMMIT_PAGE_SIZE = 100;
 
 interface GitSyncSettings {
 	repositoryPath: string;
@@ -96,7 +99,6 @@ interface StoredPluginData {
 	format: typeof PLUGIN_DATA_FORMAT;
 	schemaVersion: typeof PLUGIN_DATA_SCHEMA_VERSION;
 	settings: GitSyncSettings;
-	activity: ActivityEntry[];
 }
 
 interface DecodedPluginData {
@@ -122,6 +124,9 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
 	private activity: ActivityEntry[] = [];
+	private persistedActivity: ActivityEntry[] = [];
+	private activityLogEntryCount = 0;
+	private activityWrite: Promise<void> = Promise.resolve();
 	private updater: PluginUpdater | null = null;
 	private dataSave: Promise<void> = Promise.resolve();
 	private remoteOperationQueue: Promise<void> = Promise.resolve();
@@ -185,8 +190,11 @@ export default class GitSyncPlugin extends Plugin {
 	async loadSettings(): Promise<void> {
 		const decoded = decodePluginData(await this.loadData(), true);
 		this.settings = normalizeSettings(decoded.settings);
-		this.activity = normalizeActivity(decoded.activity);
-		if (decoded.legacy) void this.persistData();
+		const logActivity = await this.loadActivityLog();
+		const legacyActivity = normalizeActivity(decoded.activity);
+		this.activity = mergeActivity(logActivity, legacyActivity);
+		if (legacyActivity.length > 0) await this.replaceActivityLog(this.activity);
+		if (decoded.legacy || legacyActivity.length > 0) await this.persistData();
 	}
 
 	async saveSettings(): Promise<void> {
@@ -207,7 +215,6 @@ export default class GitSyncPlugin extends Plugin {
 			format: PLUGIN_DATA_FORMAT,
 			schemaVersion: PLUGIN_DATA_SCHEMA_VERSION,
 			settings: { ...this.settings },
-			activity: this.activity.slice(0, MAX_ACTIVITY_ENTRIES),
 		};
 	}
 
@@ -238,6 +245,7 @@ export default class GitSyncPlugin extends Plugin {
 		if (!window.confirm("Import Git Sync settings and activity? Existing plugin data will be replaced.")) return;
 		this.settings = normalizeSettings(decoded.settings);
 		this.activity = normalizeActivity(decoded.activity);
+		await this.replaceActivityLog(this.activity);
 		await this.persistData();
 		this.refreshViews();
 		this.recordActivity("Plugin data imported.");
@@ -253,9 +261,19 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	recordActivity(message: string, level: ActivityLevel = "INFO"): void {
-		this.activity.unshift({ message, timestamp: Date.now(), level });
-		this.activity = this.activity.slice(0, 50);
-		void this.persistData();
+		const entry = { message, timestamp: Date.now(), level };
+		this.activity.unshift(entry);
+		this.activity = this.activity.slice(0, MAX_ACTIVITY_ENTRIES);
+		void this.enqueueActivityWrite(async () => {
+			await this.app.vault.adapter.append(this.activityLogPath(), `${serializeActivityEntry(entry)}\n`);
+			this.persistedActivity.unshift(entry);
+			this.persistedActivity = this.persistedActivity.slice(0, MAX_ACTIVITY_ENTRIES);
+			this.activityLogEntryCount += 1;
+			if (this.activityLogEntryCount > ACTIVITY_LOG_COMPACTION_THRESHOLD) {
+				await this.writeActivityLog(this.persistedActivity);
+				this.activityLogEntryCount = this.persistedActivity.length;
+			}
+		}).catch(() => undefined);
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
 			const view = leaf.view;
 			if (view instanceof GitSyncView) view.refreshActivity();
@@ -264,6 +282,48 @@ export default class GitSyncPlugin extends Plugin {
 
 	getActivity(): readonly ActivityEntry[] {
 		return this.activity;
+	}
+
+	private activityLogPath(): string {
+		const pluginDirectory = this.manifest.dir?.replace(/\/+$/, "")
+			|| `${this.app.vault.configDir}/plugins/${this.manifest.id}`;
+		return `${pluginDirectory}/activity.log`;
+	}
+
+	private async loadActivityLog(): Promise<ActivityEntry[]> {
+		const path = this.activityLogPath();
+		if (!(await this.app.vault.adapter.exists(path))) {
+			this.persistedActivity = [];
+			this.activityLogEntryCount = 0;
+			return [];
+		}
+
+		const raw = await this.app.vault.adapter.read(path);
+		const entries = raw.split(/\r?\n/)
+			.map(parseActivityEntry)
+			.filter((entry): entry is ActivityEntry => entry !== null);
+		this.activityLogEntryCount = entries.length;
+		this.persistedActivity = entries.slice(-MAX_ACTIVITY_ENTRIES).reverse();
+		return this.persistedActivity.slice();
+	}
+
+	private enqueueActivityWrite(operation: () => Promise<void>): Promise<void> {
+		this.activityWrite = this.activityWrite.catch(() => undefined).then(operation);
+		return this.activityWrite;
+	}
+
+	private async replaceActivityLog(entries: ActivityEntry[]): Promise<void> {
+		await this.enqueueActivityWrite(async () => {
+			const recent = entries.slice(0, MAX_ACTIVITY_ENTRIES);
+			await this.writeActivityLog(recent);
+			this.persistedActivity = recent.slice();
+			this.activityLogEntryCount = recent.length;
+		});
+	}
+
+	private async writeActivityLog(entries: readonly ActivityEntry[]): Promise<void> {
+		const lines = entries.slice().reverse().map(serializeActivityEntry);
+		await this.app.vault.adapter.write(this.activityLogPath(), lines.length > 0 ? `${lines.join("\n")}\n` : "");
 	}
 
 	getRemoteToken(): string | null {
@@ -449,6 +509,13 @@ class GitSyncView extends ItemView {
 	private readonly commitChangesErrors = new Map<string, string>();
 	private readonly changeFilters = new Map<ChangeSection, Set<ChangeStatusFilter>>();
 	private readonly changeSorts = new Map<ChangeSection, ChangeSort>();
+	private readonly commitDepth = new Map<CommitSource, number>([
+		["local", COMMIT_PAGE_SIZE],
+		["remote", COMMIT_PAGE_SIZE],
+	]);
+	private readonly commitHasMore = new Map<CommitSource, boolean>();
+	private commitHistoryRepositoryPath = "";
+	private commitHistoryBranchName = "";
 	private longPressState: LongPressSelectionState | null = null;
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
@@ -457,6 +524,8 @@ class GitSyncView extends ItemView {
 	private changesContentEl: HTMLElement | null = null;
 	private changesScrollTop = 0;
 	private refreshGeneration = 0;
+	private activityVisibleCount = ACTIVITY_PAGE_SIZE;
+	private commitHistoryLoading = false;
 	private lastRepositoryActivity = "";
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
@@ -661,6 +730,18 @@ class GitSyncView extends ItemView {
 			this.plugin.recordActivity(`Repository refresh [${reason}] skipped: no repository path configured.`, "METRIC");
 			return;
 		}
+		const branchName = this.plugin.settings.branchName.trim();
+		if (this.commitHistoryRepositoryPath !== repositoryPath) {
+			this.commitDepth.set("local", COMMIT_PAGE_SIZE);
+			this.commitDepth.set("remote", COMMIT_PAGE_SIZE);
+			this.commitHasMore.clear();
+			this.commitHistoryRepositoryPath = repositoryPath;
+		}
+		if (this.commitHistoryBranchName !== branchName) {
+			this.commitDepth.set("remote", COMMIT_PAGE_SIZE);
+			this.commitHasMore.delete("remote");
+			this.commitHistoryBranchName = branchName;
+		}
 
 		const generation = ++this.refreshGeneration;
 		this.repositoryState = { kind: "checking", repositoryPath };
@@ -685,30 +766,39 @@ class GitSyncView extends ItemView {
 				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 			}
 			try {
+				const localCommitHistory = await timed(
+					"commits",
+					() => readCommits(this.app.vault.adapter, repositoryPath, this.commitDepth.get("local") ?? COMMIT_PAGE_SIZE),
+				);
 				this.commits = this.hydrateCommitChanges(
-					await timed("commits", () => readCommits(this.app.vault.adapter, repositoryPath)),
+					localCommitHistory.commits,
 					repositoryPath,
 				);
+				this.commitHasMore.set("local", localCommitHistory.hasMore);
 				this.commitsError = null;
 				if (this.selectedCommitOid && !this.commits.some((commit) => commit.oid === this.selectedCommitOid)) {
 					this.selectedCommitOid = null;
 				}
 			} catch (error) {
 				this.commits = null;
+				this.commitHasMore.set("local", false);
 				this.commitsError = error instanceof Error ? error.message : "Unable to read local commits.";
 			}
 			try {
-				const remoteHistory = await timed("remote-commits", () => readRemoteCommits(
+				const remoteCommitHistory = await timed("remote-commits", () => readRemoteCommits(
 					this.app.vault.adapter,
 					repositoryPath,
 					this.plugin.settings.branchName,
+					this.commitDepth.get("remote") ?? COMMIT_PAGE_SIZE,
 				));
-				this.remoteCommits = this.hydrateCommitChanges(remoteHistory.commits, repositoryPath);
-				this.remoteHistoryAvailable = remoteHistory.available;
+				this.remoteCommits = this.hydrateCommitChanges(remoteCommitHistory.commits, repositoryPath);
+				this.remoteHistoryAvailable = remoteCommitHistory.available;
+				this.commitHasMore.set("remote", remoteCommitHistory.hasMore);
 				this.remoteCommitsError = null;
 			} catch (error) {
 				this.remoteCommits = null;
 				this.remoteHistoryAvailable = false;
+				this.commitHasMore.set("remote", false);
 				this.remoteCommitsError = error instanceof Error ? error.message : "Unable to read remote commits.";
 			}
 		} else {
@@ -837,6 +927,15 @@ class GitSyncView extends ItemView {
 		}
 
 		this.renderCommitList(content, commits!, this.commitSource === "local" ? "LOCAL" : "ORIGIN");
+		if (this.commitHasMore.get(this.commitSource)) {
+			const loadMore = content.createEl("button", {
+				text: this.commitHistoryLoading ? "Loading commits…" : "Load more commits",
+				cls: "git-sync-load-more",
+				attr: { type: "button" },
+			});
+			loadMore.disabled = this.commitHistoryLoading;
+			loadMore.addEventListener("click", () => void this.loadMoreCommits());
+		}
 	}
 
 	private renderCommitList(content: HTMLElement, commits: LocalCommit[], badge: "LOCAL" | "ORIGIN"): void {
@@ -871,6 +970,52 @@ class GitSyncView extends ItemView {
 			});
 
 			if (selected) this.renderCommitDetails(item, commit);
+		}
+	}
+
+	private async loadMoreCommits(): Promise<void> {
+		if (this.commitHistoryLoading || !this.commitHasMore.get(this.commitSource)) return;
+		const source = this.commitSource;
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const previousDepth = this.commitDepth.get(source) ?? COMMIT_PAGE_SIZE;
+		const nextDepth = previousDepth + COMMIT_PAGE_SIZE;
+		this.commitDepth.set(source, nextDepth);
+		this.commitHistoryLoading = true;
+		this.render();
+		const startedAt = Date.now();
+
+		try {
+			if (source === "local") {
+				const history = await readCommits(this.app.vault.adapter, repositoryPath, nextDepth);
+				this.commits = this.hydrateCommitChanges(history.commits, repositoryPath);
+				this.commitHasMore.set(source, history.hasMore);
+				this.commitsError = null;
+			} else {
+				const history = await readRemoteCommits(
+					this.app.vault.adapter,
+					repositoryPath,
+					this.plugin.settings.branchName,
+					nextDepth,
+				);
+				this.remoteCommits = this.hydrateCommitChanges(history.commits, repositoryPath);
+				this.remoteHistoryAvailable = history.available;
+				this.commitHasMore.set(source, history.hasMore);
+				this.remoteCommitsError = null;
+			}
+			this.plugin.recordActivity(
+				`Loaded ${source} commits through ${nextDepth} entries in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
+				"METRIC",
+			);
+		} catch (error) {
+			this.commitDepth.set(source, previousDepth);
+			if (source === "local") {
+				this.commitsError = error instanceof Error ? error.message : "Unable to load more local commits.";
+			} else {
+				this.remoteCommitsError = error instanceof Error ? error.message : "Unable to load more remote commits.";
+			}
+		} finally {
+			this.commitHistoryLoading = false;
+			this.render();
 		}
 	}
 
@@ -1635,12 +1780,23 @@ class GitSyncView extends ItemView {
 		}
 
 		const list = content.createDiv({ cls: "git-sync-log-list" });
-		for (const entry of entries) {
+		for (const entry of entries.slice(0, this.activityVisibleCount)) {
 			const item = list.createDiv({ cls: "git-sync-log-entry" });
 			item.createDiv({ text: formatLogTimestamp(entry.timestamp), cls: "git-sync-log-time" });
 			const level = item.createDiv({ text: entry.level, cls: "git-sync-log-level" });
 			level.setAttribute("data-log-level", entry.level);
 			item.createDiv({ text: entry.message, cls: "git-sync-log-message" });
+		}
+		if (this.activityVisibleCount < entries.length) {
+			const loadMore = content.createEl("button", {
+				text: "Load more messages",
+				cls: "git-sync-load-more",
+				attr: { type: "button" },
+			});
+			loadMore.addEventListener("click", () => {
+				this.activityVisibleCount += ACTIVITY_PAGE_SIZE;
+				this.render();
+			});
 		}
 	}
 
@@ -2316,6 +2472,41 @@ function normalizeActivity(value: unknown): ActivityEntry[] {
 			level: entry.level === "DEBUG" || entry.level === "METRIC" || entry.level === "ERROR" ? entry.level : "INFO",
 		}))
 		.slice(0, MAX_ACTIVITY_ENTRIES);
+}
+
+function mergeActivity(...sources: ActivityEntry[][]): ActivityEntry[] {
+	const seen = new Set<string>();
+	const combined = sources.reduce<ActivityEntry[]>((all, source) => all.concat(source), []);
+	return combined
+		.filter((entry) => {
+			const key = activityKey(entry);
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		})
+		.sort((left, right) => right.timestamp - left.timestamp)
+		.slice(0, MAX_ACTIVITY_ENTRIES);
+}
+
+function activityKey(entry: ActivityEntry): string {
+	return `${entry.timestamp}\u0000${entry.level}\u0000${entry.message}`;
+}
+
+function serializeActivityEntry(entry: ActivityEntry): string {
+	const message = entry.message.replace(/[\r\n]+/g, "\\n");
+	return `${new Date(entry.timestamp).toISOString()} [${entry.level}] ${message}`;
+}
+
+function parseActivityEntry(line: string): ActivityEntry | null {
+	const match = /^(\S+)\s+\[(DEBUG|INFO|METRIC|ERROR)\]\s?(.*)$/.exec(line);
+	if (!match) return null;
+	const timestamp = Date.parse(match[1]);
+	if (!Number.isFinite(timestamp)) return null;
+	return {
+		timestamp,
+		level: match[2] as ActivityLevel,
+		message: match[3].replace(/\\n/g, "\n"),
+	};
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
