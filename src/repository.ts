@@ -37,6 +37,7 @@ export interface LocalCommit {
 		timestamp: number;
 	};
 	changes: CommitFileChange[];
+	changesLoaded: boolean;
 }
 
 export interface RemoteCommitHistory {
@@ -150,6 +151,28 @@ export async function readCommits(
 	return readCommitsAtRef(adapter, repositoryPath, "HEAD", depth);
 }
 
+export async function readCommitChanges(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	commitOid: string,
+): Promise<CommitFileChange[]> {
+	let result: Awaited<ReturnType<typeof git.log>>;
+	try {
+		result = await git.log({
+			fs: new ObsidianGitFs(adapter),
+			dir: normalizedRepositoryPath(repositoryPath),
+			ref: commitOid,
+			depth: 1,
+			includeChanges: true,
+		});
+	} catch (error) {
+		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") return [];
+		throw error;
+	}
+
+	return mapCommitChanges(result[0]?.commit.changes);
+}
+
 export async function readRemoteCommits(
 	adapter: DataAdapter,
 	repositoryPath: string,
@@ -183,7 +206,7 @@ async function readCommitsAtRef(
 			dir: normalizedRepositoryPath(repositoryPath),
 			ref,
 			depth,
-			includeChanges: true,
+			includeChanges: false,
 		});
 	} catch (error) {
 		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") return [];
@@ -203,10 +226,15 @@ async function readCommitsAtRef(
 			email: commit.committer.email,
 			timestamp: commit.committer.timestamp,
 		},
-		changes: (commit.changes ?? []).map(([newOid, oldOid, path]) => ({
-			path: String(path),
-			status: newOid === null ? "Deleted" : oldOid === null ? "Added" : "Modified",
-		})),
+		changes: [],
+		changesLoaded: false,
+	}));
+}
+
+function mapCommitChanges(changes: Awaited<ReturnType<typeof git.log>>[number]["commit"]["changes"]): CommitFileChange[] {
+	return (changes ?? []).map(([newOid, oldOid, path]) => ({
+		path: String(path),
+		status: newOid === null ? "Deleted" : oldOid === null ? "Added" : "Modified",
 	}));
 }
 

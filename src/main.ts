@@ -13,11 +13,13 @@ import {
 import { GIT_BRANCH, GIT_COMMIT_HASH } from "./build-info";
 import {
 	ChangedFile,
+	CommitFileChange,
 	addToGitignore,
 	commitChanges,
 	inspectLocalRepository,
 	LocalCommit,
 	readCommits,
+	readCommitChanges,
 	readRemoteCommits,
 	readChanges,
 	removeFile,
@@ -441,6 +443,9 @@ class GitSyncView extends ItemView {
 	private selectedCommitOid: string | null = null;
 	private readonly selectedPaths = new Set<string>();
 	private readonly selectionAnchors = new Map<ChangeSection, string>();
+	private readonly commitChangesCache = new Map<string, CommitFileChange[]>();
+	private readonly commitChangesLoading = new Set<string>();
+	private readonly commitChangesErrors = new Map<string, string>();
 	private readonly changeFilters = new Map<ChangeSection, Set<ChangeStatusFilter>>();
 	private readonly changeSorts = new Map<ChangeSection, ChangeSort>();
 	private longPressState: LongPressSelectionState | null = null;
@@ -685,7 +690,10 @@ class GitSyncView extends ItemView {
 				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 			}
 			try {
-				this.commits = await timed("commits", () => readCommits(this.app.vault.adapter, repositoryPath));
+				this.commits = this.hydrateCommitChanges(
+					await timed("commits", () => readCommits(this.app.vault.adapter, repositoryPath)),
+					repositoryPath,
+				);
 				this.commitsError = null;
 				if (this.selectedCommitOid && !this.commits.some((commit) => commit.oid === this.selectedCommitOid)) {
 					this.selectedCommitOid = null;
@@ -700,7 +708,7 @@ class GitSyncView extends ItemView {
 					repositoryPath,
 					this.plugin.settings.branchName,
 				));
-				this.remoteCommits = remoteHistory.commits;
+				this.remoteCommits = this.hydrateCommitChanges(remoteHistory.commits, repositoryPath);
 				this.remoteHistoryAvailable = remoteHistory.available;
 				this.remoteCommitsError = null;
 			} catch (error) {
@@ -879,6 +887,18 @@ class GitSyncView extends ItemView {
 		author.createSpan({ text: formatCommitTimestamp(commit.author.timestamp) });
 		details.createDiv({ cls: "git-sync-commit-detail-hash", text: commit.oid });
 
+		const cacheKey = this.commitChangesCacheKey(commit.oid);
+		const loadingError = this.commitChangesErrors.get(cacheKey);
+		if (!commit.changesLoaded) {
+			details.createDiv({ cls: "git-sync-commit-files-title", text: "Changed files" });
+			details.createDiv({
+				cls: loadingError ? "git-sync-commit-files-error" : "git-sync-commit-files-loading",
+				text: loadingError ? `Unable to load changed files: ${loadingError}` : "Loading changed files…",
+			});
+			void this.loadCommitChanges(commit.oid);
+			return;
+		}
+
 		const filesTitle = details.createDiv({ cls: "git-sync-commit-files-title", text: `Changed files (${commit.changes.length})` });
 		if (commit.changes.length === 0) {
 			details.createDiv({ cls: "git-sync-commit-files-empty", text: "No changed files recorded." });
@@ -892,6 +912,64 @@ class GitSyncView extends ItemView {
 			row.createSpan({ cls: "git-sync-commit-file-path", text: file.path });
 		}
 		filesTitle.setAttribute("aria-hidden", "true");
+	}
+
+	private hydrateCommitChanges(commits: LocalCommit[], repositoryPath: string): LocalCommit[] {
+		return commits.map((commit) => {
+			const changes = this.commitChangesCache.get(this.commitChangesCacheKey(commit.oid, repositoryPath));
+			return changes
+				? { ...commit, changes, changesLoaded: true }
+				: commit;
+		});
+	}
+
+	private async loadCommitChanges(commitOid: string): Promise<void> {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const cacheKey = this.commitChangesCacheKey(commitOid, repositoryPath);
+		if (this.commitChangesLoading.has(cacheKey)) return;
+		const cached = this.commitChangesCache.get(cacheKey);
+		if (cached) {
+			this.applyLoadedCommitChanges(commitOid, cached);
+			return;
+		}
+
+		this.commitChangesLoading.add(cacheKey);
+		this.commitChangesErrors.delete(cacheKey);
+		const startedAt = Date.now();
+		try {
+			const changes = await readCommitChanges(this.app.vault.adapter, repositoryPath, commitOid);
+			this.commitChangesCache.set(cacheKey, changes);
+			this.applyLoadedCommitChanges(commitOid, changes);
+			this.plugin.recordActivity(
+				`Commit ${commitOid.slice(0, 7)} changed-file details loaded in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`,
+				"METRIC",
+			);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to read changed files.";
+			this.commitChangesErrors.set(
+				cacheKey,
+				detail,
+			);
+			this.plugin.recordActivity(
+				`Commit ${commitOid.slice(0, 7)} changed-file details failed after ${formatMilliseconds(elapsedMilliseconds(startedAt))}: ${detail}`,
+				"ERROR",
+			);
+		} finally {
+			this.commitChangesLoading.delete(cacheKey);
+			if (this.selectedCommitOid === commitOid) this.render();
+		}
+	}
+
+	private applyLoadedCommitChanges(commitOid: string, changes: CommitFileChange[]): void {
+		const update = (commits: LocalCommit[] | null): LocalCommit[] | null => commits?.map((commit) =>
+			commit.oid === commitOid ? { ...commit, changes, changesLoaded: true } : commit,
+		) ?? null;
+		this.commits = update(this.commits);
+		this.remoteCommits = update(this.remoteCommits);
+	}
+
+	private commitChangesCacheKey(commitOid: string, repositoryPath = this.plugin.settings.repositoryPath.trim()): string {
+		return `${repositoryPath}\u0000${commitOid}`;
 	}
 
 	private renderChangeSection(

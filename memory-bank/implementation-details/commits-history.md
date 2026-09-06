@@ -7,14 +7,14 @@ repository has no configured or reachable remote.
 
 ## Implemented state
 
-- The local repository bridge reads up to 50 commits through `isomorphic-git`
-  `log` with changed-file metadata.
+- The local repository bridge reads up to 50 commit summaries through
+  `isomorphic-git` `log` without eagerly calculating changed-file metadata.
 - The Commits tab renders a Local/Remote source switch using the same visual
   language as the reference layout.
 - Local commits show the first-line message, abbreviated hash, author, relative
   time, and a `LOCAL` badge in a vertical timeline.
 - Selecting a commit expands its full message, author, timestamp, full hash,
-  and changed files with Added/Modified/Deleted markers.
+  and lazy-loaded changed files with Added/Modified/Deleted markers.
 - An empty repository reports `No local commits yet.` instead of treating the
   expected no-commit state as an error.
 - Remote history reads the fetched `refs/remotes/origin/<branch>` tracking ref
