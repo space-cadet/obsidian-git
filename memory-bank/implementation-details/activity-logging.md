@@ -19,6 +19,12 @@ The view renders full date/time stamps, severity badges, alternating rows, and
 wrapped messages inside the scrollable content area. Writes are serialized so
 activity and settings updates do not overwrite one another.
 
+Performance metrics are recorded in the same Log tab. Repository refreshes
+include timings for repository inspection, Changes, local commits, and remote
+commits, along with result counts. Tab switches, staging actions, and remote
+operations record their total elapsed time. Push also records the separate
+working-tree status-scan duration.
+
 ## KISS boundary
 
 Use one straightforward log source. Do not add a general event system,

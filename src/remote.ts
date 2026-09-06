@@ -131,7 +131,9 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 
 export async function pushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	const statusStartedAt = Date.now();
 	const workingTreeChanges = await readWorkingTreeChanges(fs, dir);
+	diagnostic(options, `Push: working-tree status scan completed in ${formatMilliseconds(Date.now() - statusStartedAt)} (${workingTreeChanges} changes).`);
 	const pushPlan: PushPlan = { localOid: "", remoteOid: "" };
 	diagnostic(options, `Push: sending ${branch} to ${url}.`);
 	const result = await git.push({
@@ -293,6 +295,10 @@ function isZeroOid(value: string): boolean {
 
 function shortOid(value: string | null): string {
 	return value ? value.slice(0, 7) : "none";
+}
+
+function formatMilliseconds(milliseconds: number): string {
+	return `${Math.max(0, Math.round(milliseconds))} ms`;
 }
 
 async function listDirectory(adapter: DataAdapter, path: string): Promise<{ files: string[]; folders: string[] } | null> {

@@ -337,6 +337,7 @@ export default class GitSyncPlugin extends Plugin {
 			.catch(() => undefined)
 			.then(async () => {
 				this.recordActivity(`${name} started for ${this.settings.branchName}.`);
+				const startedAt = Date.now();
 				const modal = new GitProgressModal(this.app, name, this.settings.branchName, {
 					onPhase: (event) => this.recordActivity(`${name}: ${event.phase}.`, "DEBUG"),
 					onMessage: (message) => this.recordActivity(`${name}: ${safeRemoteMessage(message)}`, "DEBUG"),
@@ -345,6 +346,7 @@ export default class GitSyncPlugin extends Plugin {
 				try {
 					const result = await operation(modal);
 					this.recordActivity(`${name} completed for ${this.settings.branchName}.`);
+					this.recordActivity(`${name} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 					this.recordActivity(`${name}: ${result.summary}`);
 					for (const detail of result.details) this.recordActivity(`${name}: ${detail}`, "DEBUG");
 					this.refreshViews();
@@ -353,6 +355,7 @@ export default class GitSyncPlugin extends Plugin {
 				} catch (error) {
 					const detail = describeOperationError(error, `${name} failed.`);
 					this.recordActivity(`${name} failed: ${detail}`, "ERROR");
+					this.recordActivity(`${name} failed after ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 					modal.fail(detail);
 					new Notice(`${name} failed: ${detail}`);
 				}
@@ -418,7 +421,7 @@ export default class GitSyncPlugin extends Plugin {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
 			const view = leaf.view;
 			if (view instanceof GitSyncView) {
-				void view.refreshRepositoryState();
+				void view.refreshRepositoryState("view-refresh");
 			}
 		}
 	}
@@ -469,7 +472,7 @@ class GitSyncView extends ItemView {
 
 	onOpen(): Promise<void> {
 		this.render();
-		void this.refreshRepositoryState();
+		void this.refreshRepositoryState("view-open");
 		return Promise.resolve();
 	}
 
@@ -499,8 +502,14 @@ class GitSyncView extends ItemView {
 				attr: { type: "button", role: "tab", "aria-selected": String(tabName === this.activeTab) },
 			});
 			tab.addEventListener("click", () => {
+				const startedAt = Date.now();
+				const previousTab = this.activeTab;
 				this.activeTab = tabName;
 				this.render();
+				this.plugin.recordActivity(
+					`Tab switch ${previousTab} -> ${tabName} rendered in ${elapsedMilliseconds(startedAt)}.`,
+					"METRIC",
+				);
 			});
 		}
 
@@ -589,7 +598,7 @@ class GitSyncView extends ItemView {
 		});
 		setIcon(refreshButton, "refresh-cw");
 		refreshButton.disabled = !repository;
-		refreshButton.addEventListener("click", () => void this.refreshRepositoryState());
+		refreshButton.addEventListener("click", () => void this.refreshRepositoryState("manual-refresh"));
 
 		const comparisonState = this.getComparisonState(repository);
 		const comparison = context.createDiv({ cls: "git-sync-comparison-status" });
@@ -634,11 +643,22 @@ class GitSyncView extends ItemView {
 		return { kind: "diverged", icon: "git-compare", label: "Branches have diverged" };
 	}
 
-	async refreshRepositoryState(): Promise<void> {
+	async refreshRepositoryState(reason = "refresh"): Promise<void> {
+		const startedAt = Date.now();
+		const phaseDurations: Array<{ label: string; elapsed: number }> = [];
+		const timed = async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
+			const phaseStartedAt = Date.now();
+			try {
+				return await operation();
+			} finally {
+				phaseDurations.push({ label, elapsed: Date.now() - phaseStartedAt });
+			}
+		};
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath) {
 			this.repositoryState = null;
 			this.render();
+			this.plugin.recordActivity(`Repository refresh [${reason}] skipped: no repository path configured.`, "METRIC");
 			return;
 		}
 
@@ -649,12 +669,12 @@ class GitSyncView extends ItemView {
 		} else {
 			this.render();
 		}
-		const state = await inspectLocalRepository(this.app.vault.adapter, repositoryPath);
+		const state = await timed("inspect", () => inspectLocalRepository(this.app.vault.adapter, repositoryPath));
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.repositoryState = state;
 		if (state.kind === "ready") {
 			try {
-				this.changes = await readChanges(this.app.vault.adapter, repositoryPath);
+				this.changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
 				const availablePaths = new Set(this.changes.map((change) => change.path));
 				for (const selectedPath of this.selectedPaths) {
 					if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
@@ -665,7 +685,7 @@ class GitSyncView extends ItemView {
 				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 			}
 			try {
-				this.commits = await readCommits(this.app.vault.adapter, repositoryPath);
+				this.commits = await timed("commits", () => readCommits(this.app.vault.adapter, repositoryPath));
 				this.commitsError = null;
 				if (this.selectedCommitOid && !this.commits.some((commit) => commit.oid === this.selectedCommitOid)) {
 					this.selectedCommitOid = null;
@@ -675,11 +695,11 @@ class GitSyncView extends ItemView {
 				this.commitsError = error instanceof Error ? error.message : "Unable to read local commits.";
 			}
 			try {
-				const remoteHistory = await readRemoteCommits(
+				const remoteHistory = await timed("remote-commits", () => readRemoteCommits(
 					this.app.vault.adapter,
 					repositoryPath,
 					this.plugin.settings.branchName,
-				);
+				));
 				this.remoteCommits = remoteHistory.commits;
 				this.remoteHistoryAvailable = remoteHistory.available;
 				this.remoteCommitsError = null;
@@ -699,6 +719,14 @@ class GitSyncView extends ItemView {
 			this.selectedCommitOid = null;
 		}
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+		const phases = phaseDurations.map(({ label, elapsed }) => `${label} ${formatMilliseconds(elapsed)}`).join(", ");
+		const changeCount = this.changes?.length ?? 0;
+		const localCommitCount = this.commits?.length ?? 0;
+		const remoteCommitCount = this.remoteCommits?.length ?? 0;
+		this.plugin.recordActivity(
+			`Repository refresh [${reason}] completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${phases}; ${changeCount} changes, ${localCommitCount} local commits, ${remoteCommitCount} remote commits).`,
+			"METRIC",
+		);
 		this.recordRepositoryActivity(state);
 		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
 			this.renderRepositoryContext(this.contentEl, repositoryPath);
@@ -1314,6 +1342,8 @@ class GitSyncView extends ItemView {
 		const changes = (this.changes ?? []).filter((change) => change.staged === unstage);
 		if (changes.length === 0) return;
 
+		const startedAt = Date.now();
+		const action = unstage ? "Unstage all" : "Stage all";
 		this.committing = true;
 		try {
 			for (const change of changes) {
@@ -1329,7 +1359,8 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.committing = false;
 		}
-		await this.refreshChangesOnly();
+		await this.refreshChangesOnly(unstage ? "unstage-all" : "stage-all");
+		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`, "METRIC");
 	}
 
 	private async applySelectedStage(unstage: boolean): Promise<void> {
@@ -1338,6 +1369,8 @@ class GitSyncView extends ItemView {
 		);
 		if (selected.length === 0) return;
 
+		const startedAt = Date.now();
+		const action = unstage ? "Unstage selected" : "Stage selected";
 		this.committing = true;
 		try {
 			for (const change of selected) {
@@ -1353,10 +1386,13 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.committing = false;
 		}
-		await this.refreshChangesOnly();
+		await this.refreshChangesOnly(unstage ? "unstage-selected" : "stage-selected");
+		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${selected.length} files).`, "METRIC");
 	}
 
 	private async toggleStage(change: ChangedFile): Promise<void> {
+		const startedAt = Date.now();
+		const action = change.staged ? "Unstage" : "Stage";
 		try {
 			if (change.staged) {
 				await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
@@ -1365,10 +1401,11 @@ class GitSyncView extends ItemView {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 				this.plugin.recordActivity(`Staged ${change.path}.`);
 			}
-			await this.refreshChangesOnly();
+			await this.refreshChangesOnly(change.staged ? "unstage-file" : "stage-file");
+			this.plugin.recordActivity(`${action} ${change.path} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update staging.";
-			this.plugin.recordActivity(`Could not update ${change.path}: ${detail}`, "ERROR");
+			this.plugin.recordActivity(`Could not update ${change.path} after ${formatMilliseconds(elapsedMilliseconds(startedAt))}: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
 	}
@@ -1396,7 +1433,7 @@ class GitSyncView extends ItemView {
 			this.plugin.recordActivity(`Committed ${oid.slice(0, 7)}: ${trimmedMessage}`);
 			this.commitMessage = "";
 			new Notice("Commit created.");
-			await this.refreshRepositoryState();
+			await this.refreshRepositoryState("commit");
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to create the commit.";
 			this.plugin.recordActivity(`Commit failed: ${detail}`, "ERROR");
@@ -1407,7 +1444,8 @@ class GitSyncView extends ItemView {
 		}
 	}
 
-	private async refreshChangesOnly(): Promise<void> {
+	private async refreshChangesOnly(reason = "changes-refresh"): Promise<void> {
+		const startedAt = Date.now();
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
 			await this.refreshRepositoryState();
@@ -1427,6 +1465,11 @@ class GitSyncView extends ItemView {
 		}
 
 		this.updateChangesContent();
+		const outcome = this.changesError ? `failed: ${this.changesError}` : `completed (${this.changes?.length ?? 0} changes)`;
+		this.plugin.recordActivity(
+			`Changes refresh [${reason}] ${outcome} in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
+			"METRIC",
+		);
 	}
 
 	private updateChangesContent(): void {
@@ -2193,6 +2236,14 @@ function booleanValue(value: unknown, fallback: boolean): boolean {
 
 function finiteNumber(value: unknown, fallback: number): number {
 	return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function elapsedMilliseconds(startedAt: number): number {
+	return Math.max(0, Date.now() - startedAt);
+}
+
+function formatMilliseconds(milliseconds: number): string {
+	return `${Math.max(0, Math.round(milliseconds))} ms`;
 }
 
 function commitFileCode(status: "Added" | "Modified" | "Deleted"): string {
