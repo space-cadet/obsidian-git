@@ -143,3 +143,17 @@ Build the Settings panel immediately after the shell with only the configuration
 - User verification of the pushed Changes and Log behavior was recorded.
 - Knowledge-layer implementation records are linked from the affected task
   files; no implementation detail is added here.
+
+## 2026-09-06 T8 progress modal update
+
+- Saved the approved progress-modal mockup at
+  `memory-bank/assets/progress-modal-mockup.png`.
+- Implemented phase-based progress and remote-message callbacks for Fetch,
+  Pull, Push, and Clone.
+- Added elapsed-time display, Activity logging for phase transitions and
+  sanitized remote messages, and retained completed/failed modal states.
+- The modal's Close action remains disabled while active and becomes available
+  only after completion or failure.
+- Cancellation remains pending until the HTTP bridge can honor an abort
+  signal; production build and diff checks passed, with live host acceptance
+  still remaining.

@@ -6,20 +6,22 @@
 
 - **T2, T4, T5, T6, T7** — data portability, Changes, Log, local/remote
   Commits, and core remote Git operations are the central session work
-- **Next** — refine operation UI and add progress modals and richer Git-style
-  messages
+- **Current** — T8 progress modal with elapsed time and retained final state;
+  richer Git-style results and cancellation feasibility remain open
 
 ## Current State
 
-The source now contains the complete first T7 core Git operation path and a
-fetched Remote Commits view in addition to the verified Changes and Log
-updates, auto-saving Settings, and versioned plugin data portability. The user
-verified Remote commits and confirmed that Pull and Push work from Changes.
-The repository header now reports comparison status, and remote operations
-write live diagnostic Activity entries. Pull, Push, and Fetch are exposed only
-in the Changes action bar; Settings now remains configuration-focused.
-Remaining work is progress-modal treatment, richer operation results, and
-edge-case verification.
+The source now contains the complete first T7 core Git operation path, a
+fetched Remote Commits view, and a phase-based T8 progress modal in addition to
+the verified Changes and Log updates, auto-saving Settings, and versioned
+plugin data portability. The user verified Remote commits and confirmed that
+Pull and Push work from Changes. The repository header reports comparison
+status, and remote operations write live diagnostic Activity entries. Pull,
+Push, and Fetch are exposed only in the Changes action bar; Settings remains
+configuration-focused. The progress modal includes elapsed time, sanitized
+remote messages, and a final state that stays open until the user closes it.
+Remaining work is richer operation results, cancellation only if the bridge
+can support it, and edge-case verification.
 
 ## Current Decisions
 
@@ -29,8 +31,9 @@ edge-case verification.
 
 ## Next Actions
 
-1. Add progress modals for Fetch, Pull, Push, and other long-running Git work.
-2. Replace generic operation notices with informative Git-style results while
+1. Replace generic operation notices with informative Git-style results while
    keeping token data out of diagnostics.
+2. Determine whether an abortable HTTP path can support a real cancellation
+   action; do not add a cosmetic Cancel button.
 3. Continue T4/T5 refinements and test divergence, authentication, and other
    remote edge cases separately.

@@ -1,6 +1,7 @@
 import {
 	App,
 	ItemView,
+	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
@@ -29,6 +30,7 @@ import {
 	pullRepository,
 	REMOTE_TOKEN_SECRET_ID,
 	RemoteCredential,
+	RemoteProgressEvent,
 	testRemoteConnection,
 } from "./remote";
 
@@ -266,22 +268,22 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async fetchRemote(): Promise<void> {
-		return this.runRemoteOperation("Fetch", () => fetchRepository(this.remoteRepositoryOptions()));
+		return this.runRemoteOperation("Fetch", (modal) => fetchRepository(this.remoteRepositoryOptions(modal)));
 	}
 
 	async pullRemote(): Promise<void> {
-		return this.runRemoteOperation("Pull", () => pullRepository(this.remoteRepositoryOptions()));
+		return this.runRemoteOperation("Pull", (modal) => pullRepository(this.remoteRepositoryOptions(modal)));
 	}
 
 	async pushRemote(): Promise<void> {
-		return this.runRemoteOperation("Push", () => pushRepository(this.remoteRepositoryOptions()));
+		return this.runRemoteOperation("Push", (modal) => pushRepository(this.remoteRepositoryOptions(modal)));
 	}
 
 	async cloneRemote(): Promise<void> {
-		return this.runRemoteOperation("Clone", () => cloneRepository(this.remoteRepositoryOptions()));
+		return this.runRemoteOperation("Clone", (modal) => cloneRepository(this.remoteRepositoryOptions(modal)));
 	}
 
-	private remoteRepositoryOptions() {
+	private remoteRepositoryOptions(progressModal?: GitProgressModal) {
 		return {
 			adapter: this.app.vault.adapter,
 			repositoryPath: this.settings.repositoryPath,
@@ -293,24 +295,36 @@ export default class GitSyncPlugin extends Plugin {
 				email: this.settings.authorEmail.trim(),
 			},
 			onDiagnostic: (message: string) => this.recordActivity(message, "DEBUG"),
+			onProgress: progressModal
+				? (event: RemoteProgressEvent) => progressModal.updateProgress(event)
+				: undefined,
+			onMessage: progressModal
+				? (message: string) => progressModal.addRemoteMessage(message)
+				: undefined,
 		};
 	}
 
-	private runRemoteOperation(name: string, operation: () => Promise<void>): Promise<void> {
+	private runRemoteOperation(name: string, operation: (modal: GitProgressModal) => Promise<void>): Promise<void> {
 		this.recordActivity(`${name} requested.`);
 		const next = this.remoteOperationQueue
 			.catch(() => undefined)
 			.then(async () => {
 				this.recordActivity(`${name} started for ${this.settings.branchName}.`);
-				new Notice(`${name} in progress…`);
+				const modal = new GitProgressModal(this.app, name, this.settings.branchName, {
+					onPhase: (event) => this.recordActivity(`${name}: ${event.phase}.`, "DEBUG"),
+					onMessage: (message) => this.recordActivity(`${name}: ${safeRemoteMessage(message)}`, "DEBUG"),
+				});
+				modal.open();
 				try {
-					await operation();
+					await operation(modal);
 					this.recordActivity(`${name} completed for ${this.settings.branchName}.`);
 					this.refreshViews();
+					modal.complete(`${name} completed for ${this.settings.branchName}.`);
 					new Notice(`${name} completed.`);
 				} catch (error) {
 					const detail = describeOperationError(error, `${name} failed.`);
 					this.recordActivity(`${name} failed: ${detail}`, "ERROR");
+					modal.fail(detail);
 					new Notice(`${name} failed: ${detail}`);
 				}
 			});
@@ -1354,6 +1368,179 @@ class GitSyncSettingTab extends PluginSettingTab {
 	}
 }
 
+interface GitProgressModalCallbacks {
+	onPhase?: (event: RemoteProgressEvent) => void;
+	onMessage?: (message: string) => void;
+}
+
+class GitProgressModal extends Modal {
+	private readonly startedAt = Date.now();
+	private readonly remoteMessages: string[] = [];
+	private elapsedEl: HTMLElement | null = null;
+	private phaseEl: HTMLElement | null = null;
+	private phaseIconEl: HTMLElement | null = null;
+	private percentEl: HTMLElement | null = null;
+	private progressEl: HTMLProgressElement | null = null;
+	private countEl: HTMLElement | null = null;
+	private remoteMessagesEl: HTMLElement | null = null;
+	private resultEl: HTMLElement | null = null;
+	private closeButton: HTMLButtonElement | null = null;
+	private elapsedTimer: number | null = null;
+	private lastPhase = "";
+	private pendingProgress: RemoteProgressEvent | null = null;
+	private pendingMessages: string[] = [];
+
+	constructor(
+		app: App,
+		private readonly operation: string,
+		private readonly branch: string,
+		private readonly callbacks: GitProgressModalCallbacks = {},
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.modalEl.addClass("git-sync-progress-modal");
+		this.contentEl.empty();
+		this.contentEl.addClass("git-sync-progress-content");
+
+		const heading = this.contentEl.createDiv({ cls: "git-sync-progress-heading" });
+		heading.createEl("h2", { text: `${this.operation} origin/${this.branch}` });
+		this.elapsedEl = heading.createDiv({
+			cls: "git-sync-progress-elapsed",
+			text: "Time elapsed: 00:00",
+		});
+
+		const phase = this.contentEl.createDiv({ cls: "git-sync-progress-phase" });
+		this.phaseIconEl = phase.createSpan({ cls: "git-sync-progress-icon" });
+		setIcon(this.phaseIconEl, "loader-circle");
+		this.phaseEl = phase.createSpan({ text: "Waiting for Git progress…" });
+		this.percentEl = phase.createSpan({ cls: "git-sync-progress-percent" });
+
+		this.progressEl = this.contentEl.createEl("progress", {
+			cls: "git-sync-progress-bar",
+			attr: { max: "100", value: "0", "aria-label": `${this.operation} progress` },
+		});
+		this.progressEl.hidden = true;
+		this.countEl = this.contentEl.createDiv({ cls: "git-sync-progress-count" });
+
+		this.remoteMessagesEl = this.contentEl.createDiv({ cls: "git-sync-progress-messages" });
+		this.resultEl = this.contentEl.createDiv({ cls: "git-sync-progress-result" });
+
+		const footer = this.contentEl.createDiv({ cls: "git-sync-progress-footer" });
+		this.closeButton = footer.createEl("button", {
+			text: "Close",
+			attr: { type: "button", "aria-label": "Close Git operation progress" },
+		});
+		this.closeButton.disabled = true;
+		this.closeButton.addEventListener("click", () => this.close());
+
+		this.elapsedTimer = window.setInterval(() => this.updateElapsed(), 1000);
+		this.updateElapsed();
+		if (this.pendingProgress) this.renderProgress(this.pendingProgress);
+		for (const message of this.pendingMessages) this.renderRemoteMessage(message);
+		this.pendingProgress = null;
+		this.pendingMessages = [];
+	}
+
+	onClose(): void {
+		if (this.elapsedTimer !== null) {
+			window.clearInterval(this.elapsedTimer);
+			this.elapsedTimer = null;
+		}
+		this.contentEl.empty();
+	}
+
+	updateProgress(event: RemoteProgressEvent): void {
+		const phase = event.phase.trim() || "Working…";
+		if (phase !== this.lastPhase) {
+			this.lastPhase = phase;
+			this.callbacks.onPhase?.({ ...event, phase });
+		}
+		if (!this.phaseEl || !this.progressEl || !this.percentEl || !this.countEl) {
+			this.pendingProgress = { ...event, phase };
+			return;
+		}
+		this.renderProgress({ ...event, phase });
+	}
+
+	addRemoteMessage(message: string): void {
+		const safeMessage = safeRemoteMessage(message);
+		if (!safeMessage) return;
+		this.callbacks.onMessage?.(safeMessage);
+		if (!this.remoteMessagesEl) {
+			this.pendingMessages.push(safeMessage);
+			return;
+		}
+		this.renderRemoteMessage(safeMessage);
+	}
+
+	complete(result: string): void {
+		this.finish("Completed", result, "check", "is-complete");
+	}
+
+	fail(detail: string): void {
+		this.finish("Failed", detail, "x", "is-error");
+	}
+
+	private renderProgress(event: RemoteProgressEvent): void {
+		if (!this.phaseEl || !this.progressEl || !this.percentEl || !this.countEl) return;
+		this.phaseEl.setText(event.phase);
+		const total = Number(event.total);
+		const loaded = Number(event.loaded);
+		if (Number.isFinite(total) && total > 0 && Number.isFinite(loaded)) {
+			const completed = Math.max(0, Math.floor(loaded));
+			const totalCount = Math.floor(total);
+			const percent = Math.max(0, Math.min(100, Math.round((completed / totalCount) * 100)));
+			this.progressEl.hidden = false;
+			this.progressEl.value = percent;
+			this.percentEl.setText(`${percent}%`);
+			this.countEl.setText(`${completed} / ${totalCount}`);
+			this.progressEl.setAttribute("aria-valuetext", `${event.phase}: ${percent}%`);
+		} else {
+			this.progressEl.hidden = true;
+			this.percentEl.setText("");
+			this.countEl.setText("Working…");
+		}
+	}
+
+	private renderRemoteMessage(message: string): void {
+		if (!this.remoteMessagesEl) return;
+		this.remoteMessages.push(message);
+		this.remoteMessages.splice(0, Math.max(0, this.remoteMessages.length - 4));
+		this.remoteMessagesEl.empty();
+		for (const entry of this.remoteMessages) {
+			this.remoteMessagesEl.createDiv({
+				cls: "git-sync-progress-message",
+				text: entry.startsWith("remote:") ? entry : `remote: ${entry}`,
+			});
+		}
+	}
+
+	private finish(state: "Completed" | "Failed", result: string, icon: string, className: string): void {
+		if (this.elapsedTimer !== null) {
+			window.clearInterval(this.elapsedTimer);
+			this.elapsedTimer = null;
+		}
+		this.updateElapsed();
+		this.modalEl.addClass(className);
+		if (this.phaseEl) this.phaseEl.setText(state);
+		if (this.phaseIconEl) {
+			this.phaseIconEl.empty();
+			setIcon(this.phaseIconEl, icon);
+		}
+		if (this.resultEl) this.resultEl.setText(result);
+		if (this.closeButton) {
+			this.closeButton.disabled = false;
+			this.closeButton.focus();
+		}
+	}
+
+	private updateElapsed(): void {
+		this.elapsedEl?.setText(`Time elapsed: ${formatElapsed(Date.now() - this.startedAt)}`);
+	}
+}
+
 function repositoryActivityMessage(state: RepositoryState): string {
 	switch (state.kind) {
 		case "missing":
@@ -1371,6 +1558,22 @@ function formatLogTimestamp(timestamp: number): string {
 	const date = new Date(timestamp);
 	const pad = (value: number): string => `0${value}`.slice(-2);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function formatElapsed(milliseconds: number): string {
+	const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+	const pad = (value: number): string => `0${value}`.slice(-2);
+	return `${hours > 0 ? `${pad(hours)}:` : ""}${pad(minutes)}:${pad(seconds)}`;
+}
+
+function safeRemoteMessage(message: string): string {
+	return message
+		.trim()
+		.replace(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, "$1[redacted]@")
+		.replace(/\b(token|password|authorization|bearer)\s*[:=]\s*\S+/gi, "$1: [redacted]");
 }
 
 function commitTitle(message: string): string {

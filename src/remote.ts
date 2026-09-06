@@ -21,6 +21,12 @@ export interface RemoteConnectionInfo {
 	capabilities: string[];
 }
 
+export interface RemoteProgressEvent {
+	phase: string;
+	loaded: number;
+	total: number;
+}
+
 export interface RemoteRepositoryOptions {
 	adapter: DataAdapter;
 	repositoryPath: string;
@@ -29,6 +35,8 @@ export interface RemoteRepositoryOptions {
 	credential: RemoteCredential | null;
 	author: RemoteAuthor | null;
 	onDiagnostic?: (message: string) => void;
+	onProgress?: (event: RemoteProgressEvent) => void | Promise<void>;
+	onMessage?: (message: string) => void | Promise<void>;
 }
 
 export async function testRemoteConnection(
@@ -64,6 +72,8 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 		ref: branch,
 		singleBranch: true,
 		onAuth: authCallback(options.credential),
+		onProgress: options.onProgress,
+		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Fetch: received ${result.fetchHead ? result.fetchHead.slice(0, 7) : "no commit"}.`);
 }
@@ -86,6 +96,8 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		author: options.author,
 		committer: options.author,
 		onAuth: authCallback(options.credential),
+		onProgress: options.onProgress,
+		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Pull: completed fast-forward check for ${branch}.`);
 }
@@ -102,6 +114,8 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 		ref: branch,
 		remoteRef: branch,
 		onAuth: authCallback(options.credential),
+		onProgress: options.onProgress,
+		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Push: server response ${result.ok ? "accepted" : result.error ?? "rejected"}.`);
 	if (result.error) throw new Error(result.error);
@@ -126,6 +140,8 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		ref: branch,
 		singleBranch: true,
 		onAuth: authCallback(options.credential),
+		onProgress: options.onProgress,
+		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Clone: completed repository setup in ${dir}.`);
 }
@@ -178,7 +194,13 @@ function authCallback(credential: RemoteCredential | null): (url: string, auth: 
 }
 
 function diagnostic(options: RemoteRepositoryOptions, message: string): void {
-	options.onDiagnostic?.(`[remote] ${message}`);
+	options.onDiagnostic?.(`[remote] ${redactRemoteText(message)}`);
+}
+
+function redactRemoteText(value: string): string {
+	return value
+		.replace(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, "$1[redacted]@")
+		.replace(/\b(token|password|authorization|bearer)\s*[:=]\s*\S+/gi, "$1: [redacted]");
 }
 
 function validateRemoteUrl(value: string): string {
