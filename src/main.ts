@@ -385,6 +385,9 @@ export default class GitSyncPlugin extends Plugin {
 				email: this.settings.authorEmail.trim(),
 			},
 			onDiagnostic: (message: string) => this.recordActivity(message, "DEBUG"),
+			onPhase: progressModal
+				? (phase: string) => progressModal.setPhase(phase)
+				: undefined,
 			onProgress: progressModal
 				? (event: RemoteProgressEvent) => progressModal.updateProgress(event)
 				: undefined,
@@ -402,7 +405,7 @@ export default class GitSyncPlugin extends Plugin {
 				this.recordActivity(`${name} started for ${this.settings.branchName}.`);
 				const startedAt = Date.now();
 				const modal = new GitProgressModal(this.app, name, this.settings.branchName, {
-					onPhase: (event) => this.recordActivity(`${name}: ${event.phase}.`, "DEBUG"),
+					onPhase: (phase) => this.recordActivity(`${name}: ${phase}.`, "DEBUG"),
 					onMessage: (message) => this.recordActivity(`${name}: ${safeRemoteMessage(message)}`, "DEBUG"),
 				});
 				modal.open();
@@ -2105,7 +2108,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 }
 
 interface GitProgressModalCallbacks {
-	onPhase?: (event: RemoteProgressEvent) => void;
+	onPhase?: (phase: string) => void;
 	onMessage?: (message: string) => void;
 }
 
@@ -2124,6 +2127,7 @@ class GitProgressModal extends Modal {
 	private closeButton: HTMLButtonElement | null = null;
 	private elapsedTimer: number | null = null;
 	private lastPhase = "";
+	private pendingPhase: string | null = null;
 	private pendingProgress: RemoteProgressEvent | null = null;
 	private pendingMessages: string[] = [];
 	private pendingFinish: { state: "Completed" | "Failed"; result: RemoteOperationResult; icon: string; className: string } | null = null;
@@ -2153,7 +2157,7 @@ class GitProgressModal extends Modal {
 		const phase = this.contentEl.createDiv({ cls: "git-sync-progress-phase" });
 		this.phaseIconEl = phase.createSpan({ cls: "git-sync-progress-icon" });
 		setIcon(this.phaseIconEl, "loader-circle");
-		this.phaseEl = phase.createSpan({ text: "Waiting for Git progress…" });
+		this.phaseEl = phase.createSpan({ text: "Starting operation…" });
 		this.percentEl = phase.createSpan({ cls: "git-sync-progress-percent" });
 		const spark = this.contentEl.createDiv({ cls: "git-sync-progress-spark", attr: { "aria-hidden": "true" } });
 		for (let index = 0; index < 7; index++) spark.createSpan();
@@ -2181,6 +2185,7 @@ class GitProgressModal extends Modal {
 
 		this.elapsedTimer = window.setInterval(() => this.updateElapsed(), 1000);
 		this.updateElapsed();
+		if (this.pendingPhase) this.setPhase(this.pendingPhase);
 		if (this.pendingProgress) this.renderProgress(this.pendingProgress);
 		for (const message of this.pendingMessages) this.renderRemoteMessage(message);
 		this.pendingProgress = null;
@@ -2200,11 +2205,21 @@ class GitProgressModal extends Modal {
 		this.contentEl.empty();
 	}
 
+	setPhase(phase: string): void {
+		const normalized = phase.trim() || "Working…";
+		this.lastPhase = normalized;
+		if (!this.phaseEl) {
+			this.pendingPhase = normalized;
+			return;
+		}
+		this.phaseEl.setText(normalized);
+	}
+
 	updateProgress(event: RemoteProgressEvent): void {
 		const phase = event.phase.trim() || "Working…";
 		if (phase !== this.lastPhase) {
 			this.lastPhase = phase;
-			this.callbacks.onPhase?.({ ...event, phase });
+			this.callbacks.onPhase?.(phase);
 		}
 		if (!this.phaseEl || !this.progressEl || !this.percentEl || !this.countEl) {
 			this.pendingProgress = { ...event, phase };

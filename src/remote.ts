@@ -40,6 +40,7 @@ export interface RemoteRepositoryOptions {
 	credential: RemoteCredential | null;
 	author: RemoteAuthor | null;
 	onDiagnostic?: (message: string) => void;
+	onPhase?: (phase: string) => void;
 	onProgress?: (event: RemoteProgressEvent) => void | Promise<void>;
 	onMessage?: (message: string) => void | Promise<void>;
 }
@@ -68,6 +69,7 @@ export async function testRemoteConnection(
 export async function fetchRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
 	const previousRemoteHead = await resolveOptionalRef(fs, dir, `refs/remotes/origin/${branch}`);
+	phase(options, `Contacting origin/${branch}…`);
 	diagnostic(options, `Fetch: requesting origin/${branch} from ${url}.`);
 	const result = await git.fetch({
 		fs,
@@ -81,6 +83,7 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 		onProgress: options.onProgress,
 		onMessage: options.onMessage,
 	});
+	phase(options, "Applying fetched history…");
 	diagnostic(options, `Fetch: received ${result.fetchHead ? result.fetchHead.slice(0, 7) : "no commit"}.`);
 	const fetchedHead = result.fetchHead;
 	return {
@@ -100,6 +103,7 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		throw new Error("Set your commit name and email before pulling.");
 	}
 	const previousLocalHead = await resolveOptionalRef(fs, dir, branch);
+	phase(options, `Contacting origin/${branch}…`);
 	diagnostic(options, `Pull: requesting origin/${branch} from ${url}.`);
 	await git.pull({
 		fs,
@@ -116,6 +120,7 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		onProgress: options.onProgress,
 		onMessage: options.onMessage,
 	});
+	phase(options, "Updating local branch…");
 	diagnostic(options, `Pull: completed fast-forward check for ${branch}.`);
 	const currentLocalHead = await resolveOptionalRef(fs, dir, branch);
 	const updated = currentLocalHead && currentLocalHead !== previousLocalHead;
@@ -132,6 +137,7 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 export async function pushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
 	const pushPlan: PushPlan = { localOid: "", remoteOid: "" };
+	phase(options, "Preparing local pack and contacting remote…");
 	diagnostic(options, `Push: sending ${branch} to ${url}.`);
 	const result = await git.push({
 		fs,
@@ -150,6 +156,7 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 			return true;
 		},
 	});
+	phase(options, "Finalizing push…");
 	diagnostic(options, `Push: server response ${result.ok ? "accepted" : result.error ?? "rejected"}.`);
 	if (result.error) throw new Error(result.error);
 
@@ -162,16 +169,6 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 		details.push(`   ${shortOid(pushPlan.remoteOid)}..${shortOid(pushPlan.localOid)}  ${branch} -> ${branch}`);
 	}
 
-	const commitSummary = pushPlan.localOid && pushPlan.localOid !== pushPlan.remoteOid
-		? await countCommitsToPush(fs, dir, branch, pushPlan.remoteOid)
-		: null;
-	if (commitSummary) {
-		const commitLabel = `${commitSummary.commits} commit${commitSummary.commits === 1 ? "" : "s"}`;
-		const fileLabel = commitSummary.files > 0
-			? `, ${commitSummary.files} file${commitSummary.files === 1 ? "" : "s"}`
-			: "";
-		details.push(`${commitLabel}${fileLabel} sent.`);
-	}
 	return {
 		summary: pushPlan.localOid && pushPlan.localOid === pushPlan.remoteOid ? "Everything up-to-date." : `Pushed ${branch} to origin.`,
 		details,
@@ -188,6 +185,7 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		throw new Error(`The clone destination '${dir}' is not empty.`);
 	}
 
+	phase(options, "Downloading repository…");
 	diagnostic(options, `Clone: requesting ${branch} from ${url} into ${dir}.`);
 	await git.clone({
 		fs,
@@ -200,6 +198,7 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		onProgress: options.onProgress,
 		onMessage: options.onMessage,
 	});
+	phase(options, "Checking out repository files…");
 	diagnostic(options, `Clone: completed repository setup in ${dir}.`);
 	return {
 		summary: `Cloned ${branch} from origin.`,
@@ -213,10 +212,12 @@ async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
 	url: string;
 	branch: string;
 }> {
+	phase(options, "Validating remote settings…");
 	const dir = validateRepositoryDirectory(options.repositoryPath);
 	const url = validateRemoteUrl(options.remoteUrl);
 	const branch = validateBranchName(options.branchName);
 	const fs = new ObsidianGitFs(options.adapter);
+	phase(options, "Configuring remote connection…");
 	diagnostic(options, `Remote setup: validated ${dir} and branch ${branch}.`);
 	await git.addRemote({ fs, dir, remote: "origin", url, force: true });
 	diagnostic(options, `Remote setup: origin configured for ${url}.`);
@@ -253,30 +254,6 @@ async function resolveOptionalRef(fs: ObsidianGitFs, dir: string, ref: string): 
 	}
 }
 
-async function countCommitsToPush(
-	fs: ObsidianGitFs,
-	dir: string,
-	branch: string,
-	remoteOid: string,
-): Promise<{ commits: number; files: number } | null> {
-	try {
-		const commits = await git.log({ fs, dir, ref: branch, depth: 100, includeChanges: true });
-		const pending = isZeroOid(remoteOid)
-			? commits
-			: commits.slice(0, commits.findIndex((entry) => entry.oid === remoteOid));
-		if (!isZeroOid(remoteOid) && !commits.some((entry) => entry.oid === remoteOid)) return null;
-		const files = new Set<string>();
-		for (const entry of pending) {
-			for (const change of entry.commit.changes ?? []) {
-				if (typeof change[2] === "string") files.add(change[2]);
-			}
-		}
-		return { commits: pending.length, files: files.size };
-	} catch {
-		return null;
-	}
-}
-
 function isZeroOid(value: string): boolean {
 	return /^0{40}$/.test(value);
 }
@@ -301,6 +278,11 @@ function authCallback(credential: RemoteCredential | null): (url: string, auth: 
 
 function diagnostic(options: RemoteRepositoryOptions, message: string): void {
 	options.onDiagnostic?.(`[remote] ${redactRemoteText(message)}`);
+}
+
+function phase(options: RemoteRepositoryOptions, message: string): void {
+	options.onPhase?.(message);
+	diagnostic(options, message);
 }
 
 function redactRemoteText(value: string): string {
