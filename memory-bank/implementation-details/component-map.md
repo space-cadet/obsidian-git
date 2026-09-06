@@ -18,7 +18,8 @@ Each component owns its small state, operations, UI, and focused checks.
 
 ## Current implementation status
 
-- T1 and T2: sidebar shell, settings tab, and sidebar Settings entry point are implemented.
+- T1 and T2: sidebar shell, settings tab, sidebar Settings entry point, and
+  versioned plugin data export/import are implemented.
 - T3: read-only local repository discovery is implemented; initialization remains pending.
 - T4: local Changes list, stage/unstage, commit controls, render-preserving
   updates, and DataAdapter Git operations are implemented; filter, sort,

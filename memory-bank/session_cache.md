@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 13:32:58 IST*
+*Last Updated: 2026-09-06 13:59:01 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -41,6 +41,14 @@ Build the Settings panel immediately after the shell with only the configuration
   timeline list, expandable commit details, and changed-file markers.
 - The local history query reads up to 50 commits without requiring a remote;
   remote history remains unavailable until fetch/sync exists.
+
+## 2026-09-06 Plugin Data Update
+
+- T2 now has versioned plugin data export/import in Settings.
+- New data uses an explicit format and schema version with nested settings and
+  bounded activity; old flat data is accepted and migrated.
+- Export/import never includes the remote token and import preserves the
+  current SecretStorage credential.
 
 ## 2026-09-06 Update
 

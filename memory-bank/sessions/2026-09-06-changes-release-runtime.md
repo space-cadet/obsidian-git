@@ -58,3 +58,11 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   history remains unavailable until fetch/sync exists.
 - Production build and `git diff --check` passed; local history returned real
   commits and changed-file metadata from the current repository.
+
+## 2026-09-06 Plugin data portability follow-up
+
+- Added versioned plugin data export/import to Settings.
+- New storage uses `format`, `schemaVersion`, `settings`, and bounded
+  `activity` fields. Legacy flat plugin data is accepted and migrated.
+- Remote credentials remain in SecretStorage and are excluded from exports and
+  imports. Production build and diff checks passed.

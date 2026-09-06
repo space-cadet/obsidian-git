@@ -24,6 +24,9 @@ import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./upd
 import { REMOTE_TOKEN_SECRET_ID, RemoteCredential, testRemoteConnection } from "./remote";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
+const PLUGIN_DATA_FORMAT = "obsidian-git-sync";
+const PLUGIN_DATA_SCHEMA_VERSION = 1 as const;
+const MAX_ACTIVITY_ENTRIES = 50;
 
 interface GitSyncSettings {
 	repositoryPath: string;
@@ -47,12 +50,17 @@ interface ActivityEntry {
 type ActivityLevel = "DEBUG" | "INFO" | "METRIC" | "ERROR";
 type CommitSource = "local" | "remote";
 
-interface StoredPluginData extends Partial<GitSyncSettings> {
-	activity?: Array<{
-		message: string;
-		timestamp: number;
-		level?: ActivityLevel;
-	}>;
+interface StoredPluginData {
+	format: typeof PLUGIN_DATA_FORMAT;
+	schemaVersion: typeof PLUGIN_DATA_SCHEMA_VERSION;
+	settings: GitSyncSettings;
+	activity: ActivityEntry[];
+}
+
+interface DecodedPluginData {
+	settings: Partial<GitSyncSettings>;
+	activity: unknown;
+	legacy: boolean;
 }
 
 const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -131,22 +139,10 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async loadSettings(): Promise<void> {
-		const saved = (await this.loadData()) as StoredPluginData | null;
-		this.settings = {
-			...DEFAULT_SETTINGS,
-			...saved,
-			repositoryPath: saved?.repositoryPath?.trim() || DEFAULT_SETTINGS.repositoryPath,
-			remoteUsername: saved?.remoteUsername?.trim() || DEFAULT_SETTINGS.remoteUsername,
-		};
-		this.activity = (saved?.activity ?? [])
-			.filter((entry) => typeof entry.message === "string" && Number.isFinite(entry.timestamp))
-			.map((entry): ActivityEntry => {
-				const level: ActivityLevel = entry.level === "DEBUG" || entry.level === "METRIC" || entry.level === "ERROR"
-					? entry.level
-					: "INFO";
-				return { message: entry.message, timestamp: entry.timestamp, level };
-			})
-			.slice(0, 50);
+		const decoded = decodePluginData(await this.loadData(), true);
+		this.settings = normalizeSettings(decoded.settings);
+		this.activity = normalizeActivity(decoded.activity);
+		if (decoded.legacy) void this.persistData();
 	}
 
 	async saveSettings(): Promise<void> {
@@ -155,14 +151,44 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	private persistData(): Promise<void> {
-		const data: StoredPluginData = {
-			...this.settings,
-			activity: this.activity,
-		};
+		const data = this.createStoredData();
 		this.dataSave = this.dataSave
 			.catch(() => undefined)
 			.then(() => this.saveData(data));
 		return this.dataSave;
+	}
+
+	private createStoredData(): StoredPluginData {
+		return {
+			format: PLUGIN_DATA_FORMAT,
+			schemaVersion: PLUGIN_DATA_SCHEMA_VERSION,
+			settings: { ...this.settings },
+			activity: this.activity.slice(0, MAX_ACTIVITY_ENTRIES),
+		};
+	}
+
+	createExportData(): string {
+		return JSON.stringify({
+			...this.createStoredData(),
+			exportedAt: new Date().toISOString(),
+		}, null, 2);
+	}
+
+	async importData(json: string): Promise<void> {
+		let decoded: DecodedPluginData;
+		try {
+			decoded = decodePluginData(JSON.parse(json), true, true);
+		} catch (error) {
+			throw error instanceof Error ? error : new Error("The selected file is not valid Git Sync data.");
+		}
+
+		if (!window.confirm("Import Git Sync settings and activity? Existing plugin data will be replaced.")) return;
+		this.settings = normalizeSettings(decoded.settings);
+		this.activity = normalizeActivity(decoded.activity);
+		await this.persistData();
+		this.refreshViews();
+		this.recordActivity("Plugin data imported.");
+		new Notice("Plugin data imported. Remote credentials were left unchanged.");
 	}
 
 	scheduleSettingsSave(): void {
@@ -1153,6 +1179,31 @@ class GitSyncSettingTab extends PluginSettingTab {
 			text: "Settings save automatically when changed.",
 			cls: "setting-item-description",
 		});
+
+		containerEl.createEl("h3", { text: "Plugin data" });
+		containerEl.createEl("p", {
+			text: "Export or import versioned settings and activity data. Remote credentials stay in Obsidian SecretStorage and are never included.",
+			cls: "setting-item-description",
+		});
+		new Setting(containerEl)
+			.setName("Export plugin data")
+			.setDesc("Downloads a JSON backup of the current Git Sync settings and activity.")
+			.addButton((button) => button
+				.setButtonText("Export JSON")
+				.onClick(() => {
+					try {
+						downloadTextFile(`git-sync-data-${formatFileTimestamp(new Date())}.json`, this.plugin.createExportData());
+						new Notice("Plugin data exported. Remote credentials were not included.");
+					} catch (error) {
+						new Notice(`Could not export plugin data: ${error instanceof Error ? error.message : "Unknown error"}`);
+					}
+				}));
+		new Setting(containerEl)
+			.setName("Import plugin data")
+			.setDesc("Replaces settings and activity from a Git Sync JSON backup. The current remote credential is kept.")
+			.addButton((button) => button
+				.setButtonText("Import JSON")
+				.onClick(() => chooseImportFile(this.plugin)));
 	}
 }
 
@@ -1191,6 +1242,137 @@ function formatRelativeCommitTime(timestamp: number): string {
 
 function formatCommitTimestamp(timestamp: number): string {
 	return formatLogTimestamp(timestamp * 1000);
+}
+
+function formatFileTimestamp(date: Date): string {
+	return date.toISOString().replace(/[:.]/g, "-");
+}
+
+function downloadTextFile(filename: string, contents: string): void {
+	const blob = new Blob([contents], { type: "application/json" });
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement("a");
+	link.href = url;
+	link.download = filename;
+	link.style.display = "none";
+	document.body.appendChild(link);
+	link.click();
+	link.remove();
+	window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function chooseImportFile(plugin: GitSyncPlugin): void {
+	const input = document.createElement("input");
+	input.type = "file";
+	input.accept = ".json,application/json";
+	input.style.display = "none";
+	input.addEventListener("change", () => {
+		const file = input.files?.[0];
+		input.remove();
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = () => {
+			void plugin.importData(String(reader.result ?? "")).catch((error) => {
+				new Notice(`Could not import plugin data: ${error instanceof Error ? error.message : "Unknown error"}`);
+			});
+		};
+		reader.onerror = () => new Notice("Could not read the selected plugin data file.");
+		reader.readAsText(file);
+	});
+	document.body.appendChild(input);
+	input.click();
+}
+
+function decodePluginData(value: unknown, allowLegacy: boolean, requireRecognizedData = false): DecodedPluginData {
+	if (!isRecord(value)) {
+		if (requireRecognizedData) throw new Error("Git Sync data must be a JSON object.");
+		return { settings: {}, activity: [], legacy: false };
+	}
+	if ("format" in value && value.format !== PLUGIN_DATA_FORMAT) {
+		throw new Error("This file belongs to a different plugin or data format.");
+	}
+
+	if (value.format === PLUGIN_DATA_FORMAT) {
+		if (value.schemaVersion !== PLUGIN_DATA_SCHEMA_VERSION) {
+			throw new Error(`Unsupported Git Sync data schema: ${String(value.schemaVersion)}.`);
+		}
+		if (!isRecord(value.settings)) throw new Error("Git Sync data is missing its settings object.");
+		return { settings: value.settings as Partial<GitSyncSettings>, activity: value.activity, legacy: false };
+	}
+
+	if (!allowLegacy) throw new Error("This is not a Git Sync data file.");
+	const legacyKeys = [
+		"repositoryPath",
+		"remoteUrl",
+		"remoteUsername",
+		"branchName",
+		"authorName",
+		"authorEmail",
+		"checkForUpdates",
+		"updateChannel",
+		"autoUpdate",
+		"lastUpdateCheck",
+		"activity",
+	];
+	if (requireRecognizedData && !legacyKeys.some((key) => key in value)) {
+		throw new Error("The selected file is not Git Sync plugin data.");
+	}
+	return {
+		settings: value as Partial<GitSyncSettings>,
+		activity: value.activity,
+		legacy: true,
+	};
+}
+
+function normalizeSettings(value: Partial<GitSyncSettings>): GitSyncSettings {
+	const settings = isRecord(value) ? value : {};
+	const updateChannel = settings.updateChannel === "stable" ? "stable" : "dev";
+	return {
+		repositoryPath: nonEmptyString(settings.repositoryPath) || DEFAULT_SETTINGS.repositoryPath,
+		remoteUrl: stringValue(settings.remoteUrl),
+		remoteUsername: nonEmptyString(settings.remoteUsername) || DEFAULT_SETTINGS.remoteUsername,
+		branchName: nonEmptyString(settings.branchName) || DEFAULT_SETTINGS.branchName,
+		authorName: stringValue(settings.authorName),
+		authorEmail: stringValue(settings.authorEmail),
+		checkForUpdates: booleanValue(settings.checkForUpdates, DEFAULT_SETTINGS.checkForUpdates),
+		updateChannel,
+		autoUpdate: booleanValue(settings.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
+		lastUpdateCheck: finiteNumber(settings.lastUpdateCheck, DEFAULT_SETTINGS.lastUpdateCheck),
+	};
+}
+
+function normalizeActivity(value: unknown): ActivityEntry[] {
+	if (!Array.isArray(value)) return [];
+	return value
+		.filter((entry): entry is Record<string, unknown> => isRecord(entry))
+		.filter((entry) => typeof entry.message === "string" && Number.isFinite(entry.timestamp))
+		.map((entry): ActivityEntry => ({
+			message: String(entry.message),
+			timestamp: Number(entry.timestamp),
+			level: entry.level === "DEBUG" || entry.level === "METRIC" || entry.level === "ERROR" ? entry.level : "INFO",
+		}))
+		.slice(0, MAX_ACTIVITY_ENTRIES);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string {
+	return typeof value === "string" ? value : "";
+}
+
+function nonEmptyString(value: unknown): string {
+	return stringValue(value).trim();
+}
+
+function booleanValue(value: unknown, fallback: boolean): boolean {
+	return typeof value === "boolean" ? value : fallback;
+}
+
+function finiteNumber(value: unknown, fallback: number): number {
+	return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function commitFileCode(status: "Added" | "Modified" | "Deleted"): string {

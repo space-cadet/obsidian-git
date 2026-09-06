@@ -16,8 +16,9 @@ Give the user a simple place to configure the repository used by the plugin.
 
 ## KISS boundary
 
-Do not add migrations, provider registries, multiple profiles, or advanced
-credential flows until the basic configuration workflow requires them.
+Keep migration limited to the versioned plugin-data envelope. Do not add
+provider registries, multiple profiles, or advanced credential flows until the
+basic configuration workflow requires them.
 
 ## Current implementation
 
@@ -25,6 +26,13 @@ credential flows until the basic configuration workflow requires them.
 - Remote tokens are stored in Obsidian SecretStorage rather than plugin data.
 - The token field is masked by default and becomes editable when revealed.
 - Deleting the revealed value clears the stored token.
+- Plugin data is stored in a versioned envelope with `format`,
+  `schemaVersion`, `settings`, and bounded `activity` fields.
+- Existing flat plugin data is accepted and migrated to the versioned envelope
+  on load; unknown settings are ignored during normalization.
+- Settings can export and import JSON backups. The remote token is excluded,
+  imports require confirmation, and the current SecretStorage credential is
+  preserved.
 
 ## Completion evidence
 
