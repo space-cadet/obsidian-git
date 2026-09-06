@@ -1771,7 +1771,7 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
-			await this.refreshRepositoryState(reason);
+			this.markChangesRefreshRequired(reason);
 			return;
 		}
 
@@ -1825,7 +1825,7 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
-			await this.refreshRepositoryState(reason);
+			this.markChangesRefreshRequired(reason);
 			return;
 		}
 
