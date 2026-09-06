@@ -288,6 +288,10 @@ export default class GitSyncPlugin extends Plugin {
 			remoteUrl: this.settings.remoteUrl,
 			branchName: this.settings.branchName,
 			credential: this.getRemoteCredential(),
+			author: {
+				name: this.settings.authorName.trim(),
+				email: this.settings.authorEmail.trim(),
+			},
 			onDiagnostic: (message: string) => this.recordActivity(message, "DEBUG"),
 		};
 	}

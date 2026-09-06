@@ -40,6 +40,10 @@ recorded.
 - Settings clicks, operation start, transport milestones, and completion or
   failure are all written to the live Activity view. Errors include Git error
   codes and callers when the transport provides them.
+- Pull supplies the configured commit identity to the Git library, avoiding a
+  dependency on `.git/config` user fields.
+- The Obsidian HTTP bridge normalizes array, async-iterator, and iterator Git
+  request bodies and exposes response bodies as async iterables.
 
 ## Completion evidence
 

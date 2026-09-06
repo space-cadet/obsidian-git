@@ -1,6 +1,6 @@
 # Session 2026-09-06 - Changes, release, and runtime
 *Created: 2026-09-06 04:45:17 IST*
-*Last Updated: 2026-09-06 15:20:33 IST*
+*Last Updated: 2026-09-06 15:41:06 IST*
 
 ## Session Title
 
@@ -115,3 +115,11 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
   Changes toolbar using the shared remote queue and Activity diagnostics.
 - The toolbar now uses its existing down/up/refresh icons for Pull, Push, and
   Fetch, while section controls retain staging actions.
+
+## 2026-09-06 Remote failure fixes
+
+- Pull failure evidence was `MissingNameError`; the remote pull path now passes
+  the configured author and committer.
+- Push failure evidence was `body.next is not a function`; the HTTP bridge now
+  accepts Git's array request body and exposes an async-iterable response.
+- Production build and diff checks pass; live remote acceptance remains.

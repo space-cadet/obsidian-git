@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 15:20:33 IST*
+*Last Updated: 2026-09-06 15:41:06 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -91,6 +91,13 @@ Build the Settings panel immediately after the shell with only the configuration
   queued remote operation path.
 - Its four actions now match the reference: Select All, Pull, Push, and Fetch;
   staging remains in the section-level controls.
+
+## 2026-09-06 Remote failure fixes
+
+- User Log evidence showed Pull failing with `MissingNameError`; Pull now uses
+  the configured author and committer identity.
+- User Log evidence showed Push failing with `body.next is not a function`; the
+  HTTP bridge now handles Git's array-of-chunks request body.
 
 ## 2026-09-06 Update
 

@@ -9,6 +9,11 @@ export interface RemoteCredential {
 	token: string;
 }
 
+export interface RemoteAuthor {
+	name: string;
+	email: string;
+}
+
 export interface RemoteConnectionInfo {
 	remoteUrl: string;
 	defaultBranch: string | null;
@@ -22,6 +27,7 @@ export interface RemoteRepositoryOptions {
 	remoteUrl: string;
 	branchName: string;
 	credential: RemoteCredential | null;
+	author: RemoteAuthor | null;
 	onDiagnostic?: (message: string) => void;
 }
 
@@ -64,6 +70,9 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 
 export async function pullRepository(options: RemoteRepositoryOptions): Promise<void> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	if (!options.author?.name || !options.author.email) {
+		throw new Error("Set your commit name and email before pulling.");
+	}
 	diagnostic(options, `Pull: requesting origin/${branch} from ${url}.`);
 	await git.pull({
 		fs,
@@ -74,6 +83,8 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		ref: branch,
 		singleBranch: true,
 		fastForwardOnly: true,
+		author: options.author,
+		committer: options.author,
 		onAuth: authCallback(options.credential),
 	});
 	diagnostic(options, `Pull: completed fast-forward check for ${branch}.`);
@@ -200,17 +211,34 @@ const obsidianHttp: any = {
 	},
 };
 
+const ASYNC_ITERATOR = (Symbol as unknown as { asyncIterator: symbol }).asyncIterator;
+
 async function collectBody(body: any): Promise<ArrayBuffer> {
 	const chunks: Uint8Array[] = [];
-	let size = 0;
-	while (true) {
-		const result = await body.next();
-		if (result.done) break;
-		if (result.value) {
-			chunks.push(result.value);
-			size += result.value.byteLength;
+	if (Array.isArray(body)) {
+		for (const chunk of body) chunks.push(toUint8Array(chunk));
+	} else if (body && typeof body[ASYNC_ITERATOR] === "function") {
+		for await (const chunk of body) chunks.push(toUint8Array(chunk));
+	} else if (body && typeof body.next === "function") {
+		while (true) {
+			const result = await body.next();
+			if (result.done) break;
+			if (result.value) chunks.push(toUint8Array(result.value));
 		}
+	} else {
+		throw new Error("Git HTTP request body is not readable.");
 	}
+
+	return combineChunks(chunks);
+}
+
+function toUint8Array(value: Uint8Array | ArrayBuffer): Uint8Array {
+	return value instanceof Uint8Array ? value : new Uint8Array(value);
+}
+
+function combineChunks(chunks: Uint8Array[]): ArrayBuffer {
+	let size = 0;
+	for (const chunk of chunks) size += chunk.byteLength;
 
 	const result = new Uint8Array(size);
 	let offset = 0;
@@ -228,6 +256,9 @@ function responseBody(buffer: ArrayBuffer): any {
 			if (consumed) return { done: true, value: undefined };
 			consumed = true;
 			return { done: false, value: new Uint8Array(buffer) };
+		},
+		[ASYNC_ITERATOR]() {
+			return this;
 		},
 	};
 }
