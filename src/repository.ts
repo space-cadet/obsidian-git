@@ -104,7 +104,7 @@ export async function readChanges(adapter: DataAdapter, repositoryPath: string):
 		}));
 }
 
-export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
+export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string | string[]): Promise<void> {
 	await git.add({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
 }
 

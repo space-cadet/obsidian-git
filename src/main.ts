@@ -1417,13 +1417,18 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const action = unstage ? "Unstage all" : "Stage all";
 		this.committing = true;
+		let completed = false;
 		try {
+			if (unstage) {
+				for (const change of changes) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+			} else {
+				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
+			}
 			for (const change of changes) {
-				if (unstage) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
-				else await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 				this.selectedPaths.delete(change.path);
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 			}
+			completed = true;
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update all changed files.";
 			this.plugin.recordActivity(`Could not update all changed files: ${detail}`, "ERROR");
@@ -1431,7 +1436,8 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.committing = false;
 		}
-		await this.refreshChangesOnly(unstage ? "unstage-all" : "stage-all");
+		if (completed) this.applyKnownStagingState(changes, !unstage);
+		else await this.refreshChangesOnly(unstage ? "unstage-all-reconcile" : "stage-all-reconcile");
 		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`, "METRIC");
 	}
 
@@ -1444,13 +1450,18 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const action = unstage ? "Unstage selected" : "Stage selected";
 		this.committing = true;
+		let completed = false;
 		try {
+			if (unstage) {
+				for (const change of selected) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+			} else {
+				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, selected.map((change) => change.path));
+			}
 			for (const change of selected) {
-				if (unstage) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
-				else await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 				this.selectedPaths.delete(change.path);
 			}
+			completed = true;
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update selected files.";
 			this.plugin.recordActivity(`Could not update selected files: ${detail}`, "ERROR");
@@ -1458,7 +1469,8 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.committing = false;
 		}
-		await this.refreshChangesOnly(unstage ? "unstage-selected" : "stage-selected");
+		if (completed) this.applyKnownStagingState(selected, !unstage);
+		else await this.refreshChangesOnly(unstage ? "unstage-selected-reconcile" : "stage-selected-reconcile");
 		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${selected.length} files).`, "METRIC");
 	}
 
@@ -1473,13 +1485,28 @@ class GitSyncView extends ItemView {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 				this.plugin.recordActivity(`Staged ${change.path}.`);
 			}
-			await this.refreshChangesOnly(change.staged ? "unstage-file" : "stage-file");
+			this.applyKnownStagingState([change], !change.staged);
 			this.plugin.recordActivity(`${action} ${change.path} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update staging.";
 			this.plugin.recordActivity(`Could not update ${change.path} after ${formatMilliseconds(elapsedMilliseconds(startedAt))}: ${detail}`, "ERROR");
 			new Notice(detail);
 		}
+	}
+
+	private applyKnownStagingState(changes: ChangedFile[], staged: boolean): void {
+		const paths = new Set(changes.map((change) => change.path));
+		this.changes = this.changes?.map((change) => {
+			if (!paths.has(change.path)) return change;
+			const status = staged && change.status === "Untracked"
+				? "Added"
+				: !staged && change.status === "Added"
+					? "Untracked"
+					: change.status;
+			return { ...change, status, staged };
+		}) ?? null;
+		this.changesError = null;
+		this.updateChangesContent();
 	}
 
 	private async commit(message: string): Promise<void> {
