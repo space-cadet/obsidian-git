@@ -97,10 +97,19 @@ export async function inspectLocalRepository(
 	}
 }
 
-export async function readChanges(adapter: DataAdapter, repositoryPath: string): Promise<ChangedFile[]> {
+export async function readChanges(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	filepaths?: string[],
+): Promise<ChangedFile[]> {
 	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
-	const matrix = await git.statusMatrix({ fs, dir, refresh: false });
+	const matrix = await git.statusMatrix({
+		fs,
+		dir,
+		refresh: false,
+		...(filepaths ? { filepaths } : {}),
+	});
 	return matrix
 		.filter(([, head, workdir, stage]) => head !== workdir || head !== stage)
 		.map(([path, head, workdir, stage]) => ({

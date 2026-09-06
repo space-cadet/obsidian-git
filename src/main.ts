@@ -415,13 +415,18 @@ export default class GitSyncPlugin extends Plugin {
 					this.recordActivity(`${name} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 					this.recordActivity(`${name}: ${result.summary}`);
 					for (const detail of result.details) this.recordActivity(`${name}: ${detail}`, "DEBUG");
-					this.refreshViews();
+					if (name === "Pull" || name === "Clone") {
+						this.refreshViews(`${name.toLowerCase()}-metadata-refresh`, false);
+					} else {
+						this.refreshRemoteHistoryViews(`${name.toLowerCase()}-history-refresh`);
+					}
 					modal.complete(result);
 					new Notice(`${name} completed.`);
 				} catch (error) {
 					const detail = describeOperationError(error, `${name} failed.`);
 					this.recordActivity(`${name} failed: ${detail}`, "ERROR");
 					this.recordActivity(`${name} failed after ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
+					if (name === "Pull" || name === "Clone") this.markChangesRefreshRequiredViews(name);
 					modal.fail(detail);
 					new Notice(`${name} failed: ${detail}`);
 				}
@@ -483,12 +488,26 @@ export default class GitSyncPlugin extends Plugin {
 		}).open();
 	}
 
-	refreshViews(): void {
+	refreshViews(reason = "view-refresh", refreshChanges = true): void {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
 			const view = leaf.view;
 			if (view instanceof GitSyncView) {
-				void view.refreshRepositoryState("view-refresh");
+				void view.refreshRepositoryState(reason, refreshChanges);
 			}
+		}
+	}
+
+	refreshRemoteHistoryViews(reason = "remote-history-refresh"): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
+			const view = leaf.view;
+			if (view instanceof GitSyncView) void view.refreshRemoteHistory(reason);
+		}
+	}
+
+	markChangesRefreshRequiredViews(reason: string): void {
+		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
+			const view = leaf.view;
+			if (view instanceof GitSyncView) view.markChangesRefreshRequired(reason);
 		}
 	}
 }
@@ -522,6 +541,8 @@ class GitSyncView extends ItemView {
 	private longPressState: LongPressSelectionState | null = null;
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
+	private changesRefreshRequired = false;
+	private changesRefreshReason = "";
 	private committing = false;
 	private commitMessage = "";
 	private changesContentEl: HTMLElement | null = null;
@@ -715,7 +736,7 @@ class GitSyncView extends ItemView {
 		return { kind: "diverged", icon: "git-compare", label: "Branches have diverged" };
 	}
 
-	async refreshRepositoryState(reason = "refresh"): Promise<void> {
+	async refreshRepositoryState(reason = "refresh", refreshChanges = true): Promise<void> {
 		const startedAt = Date.now();
 		const phaseDurations: Array<{ label: string; elapsed: number }> = [];
 		const timed = async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
@@ -747,6 +768,13 @@ class GitSyncView extends ItemView {
 		}
 
 		const generation = ++this.refreshGeneration;
+		this.changesRefreshRequired = !refreshChanges;
+		this.changesRefreshReason = refreshChanges ? "" : reason;
+		if (!refreshChanges) {
+			this.changes = null;
+			this.changesError = null;
+			this.selectedPaths.clear();
+		}
 		this.repositoryState = { kind: "checking", repositoryPath };
 		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
 			this.renderRepositoryContext(this.contentEl, repositoryPath);
@@ -757,16 +785,20 @@ class GitSyncView extends ItemView {
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.repositoryState = state;
 		if (state.kind === "ready") {
-			try {
-				this.changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
-				const availablePaths = new Set(this.changes.map((change) => change.path));
-				for (const selectedPath of this.selectedPaths) {
-					if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+			if (refreshChanges) {
+				this.changesRefreshRequired = false;
+				this.changesRefreshReason = "";
+				try {
+					this.changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
+					const availablePaths = new Set(this.changes.map((change) => change.path));
+					for (const selectedPath of this.selectedPaths) {
+						if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+					}
+					this.changesError = null;
+				} catch (error) {
+					this.changes = null;
+					this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 				}
-				this.changesError = null;
-			} catch (error) {
-				this.changes = null;
-				this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
 			}
 			try {
 				const localCommitHistory = await timed(
@@ -819,8 +851,10 @@ class GitSyncView extends ItemView {
 		const changeCount = this.changes?.length ?? 0;
 		const localCommitCount = this.commits?.length ?? 0;
 		const remoteCommitCount = this.remoteCommits?.length ?? 0;
+		const refreshLabel = refreshChanges ? "Repository refresh" : "Repository metadata refresh";
+		const changeSummary = refreshChanges ? `${changeCount} changes` : "Changes scan deferred";
 		this.plugin.recordActivity(
-			`Repository refresh [${reason}] completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${phases}; ${changeCount} changes, ${localCommitCount} local commits, ${remoteCommitCount} remote commits).`,
+			`${refreshLabel} [${reason}] completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${phases}; ${changeSummary}, ${localCommitCount} local commits, ${remoteCommitCount} remote commits).`,
 			"METRIC",
 		);
 		this.recordRepositoryActivity(state);
@@ -833,6 +867,17 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderChanges(content: HTMLElement): void {
+		if (this.changesRefreshRequired) {
+			const notice = content.createDiv({ cls: "git-sync-refresh-required" });
+			notice.createDiv({ cls: "git-sync-state-title", text: "Changes need refreshing" });
+			notice.createEl("p", {
+				text: `The working tree may have changed after ${this.changesRefreshReason}. Refresh the repository to read the current Changes list.`,
+				cls: "git-sync-state-description",
+			});
+			const refresh = notice.createEl("button", { text: "Refresh repository", attr: { type: "button" } });
+			refresh.addEventListener("click", () => void this.refreshRepositoryState("manual-refresh"));
+			return;
+		}
 		if (this.changesError) {
 			content.createEl("p", { text: this.changesError, cls: "git-sync-state-description" });
 			return;
@@ -1484,7 +1529,7 @@ class GitSyncView extends ItemView {
 			await addToGitignore(this.app.vault.adapter, this.plugin.settings.repositoryPath, path);
 			this.plugin.recordActivity(`Added ${path} to .gitignore.`);
 			new Notice("Added to .gitignore.");
-			await this.refreshChangesOnly();
+			await this.refreshChangesForPaths([path, ".gitignore"], [".gitignore"], "gitignore-refresh");
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update .gitignore.";
 			this.plugin.recordActivity(`Could not update .gitignore: ${detail}`, "ERROR");
@@ -1507,7 +1552,7 @@ class GitSyncView extends ItemView {
 			this.selectedPaths.delete(change.path);
 			this.plugin.recordActivity(`Removed ${change.path} with git rm.`);
 			new Notice("File removed with git rm.");
-			await this.refreshRepositoryState();
+			this.applyKnownChangeUpdates([change.path], [{ path: change.path, status: "Deleted", staged: true }]);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to remove the file with git rm.";
 			this.plugin.recordActivity(`Could not remove ${change.path}: ${detail}`, "ERROR");
@@ -1586,7 +1631,7 @@ class GitSyncView extends ItemView {
 			this.committing = false;
 		}
 		if (completed) this.applyKnownStagingState(changes, !unstage);
-		else await this.refreshChangesOnly(unstage ? "unstage-all-reconcile" : "stage-all-reconcile");
+		else this.markChangesRefreshRequired(unstage ? "unstage all" : "stage all");
 		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`, "METRIC");
 	}
 
@@ -1619,7 +1664,7 @@ class GitSyncView extends ItemView {
 			this.committing = false;
 		}
 		if (completed) this.applyKnownStagingState(selected, !unstage);
-		else await this.refreshChangesOnly(unstage ? "unstage-selected-reconcile" : "stage-selected-reconcile");
+		else this.markChangesRefreshRequired(unstage ? "unstage selected" : "stage selected");
 		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${selected.length} files).`, "METRIC");
 	}
 
@@ -1671,6 +1716,9 @@ class GitSyncView extends ItemView {
 			this.openSettings();
 			return;
 		}
+		const stagedPaths = (this.changes ?? [])
+			.filter((change) => change.staged)
+			.map((change) => change.path);
 		this.committing = true;
 		this.render();
 		try {
@@ -1681,7 +1729,7 @@ class GitSyncView extends ItemView {
 			this.plugin.recordActivity(`Committed ${oid.slice(0, 7)}: ${trimmedMessage}`);
 			this.commitMessage = "";
 			new Notice("Commit created.");
-			await this.refreshRepositoryState("commit");
+			await this.refreshAfterCommit(oid, stagedPaths);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to create the commit.";
 			this.plugin.recordActivity(`Commit failed: ${detail}`, "ERROR");
@@ -1692,32 +1740,118 @@ class GitSyncView extends ItemView {
 		}
 	}
 
-	private async refreshChangesOnly(reason = "changes-refresh"): Promise<void> {
+	private async refreshAfterCommit(commitOid: string, committedPaths: string[]): Promise<void> {
+		const startedAt = Date.now();
+		this.applyKnownChangeUpdates(committedPaths, []);
+		if (this.repositoryState?.kind === "ready") {
+			this.repositoryState = { ...this.repositoryState, head: commitOid };
+		}
+
+		try {
+			const history = await readCommits(
+				this.app.vault.adapter,
+				this.plugin.settings.repositoryPath,
+				this.commitDepth.get("local") ?? COMMIT_PAGE_SIZE,
+			);
+			this.commits = this.hydrateCommitChanges(history.commits, this.plugin.settings.repositoryPath);
+			this.commitHasMore.set("local", history.hasMore);
+			this.commitsError = null;
+		} catch (error) {
+			this.commitsError = error instanceof Error ? error.message : "Unable to read local commits.";
+		}
+
+		this.render();
+		this.plugin.recordActivity(
+			`Commit refresh completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} without a full Changes scan.`,
+			"METRIC",
+		);
+	}
+
+	async refreshRemoteHistory(reason = "remote-history-refresh"): Promise<void> {
 		const startedAt = Date.now();
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
-			await this.refreshRepositoryState();
+			await this.refreshRepositoryState(reason);
+			return;
+		}
+
+		const generation = ++this.refreshGeneration;
+		try {
+			const history = await readRemoteCommits(
+				this.app.vault.adapter,
+				repositoryPath,
+				this.plugin.settings.branchName,
+				this.commitDepth.get("remote") ?? COMMIT_PAGE_SIZE,
+			);
+			if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+			this.remoteCommits = this.hydrateCommitChanges(history.commits, repositoryPath);
+			this.remoteHistoryAvailable = history.available;
+			this.commitHasMore.set("remote", history.hasMore);
+			this.remoteCommitsError = null;
+		} catch (error) {
+			if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+			this.remoteCommits = null;
+			this.remoteHistoryAvailable = false;
+			this.commitHasMore.set("remote", false);
+			this.remoteCommitsError = error instanceof Error ? error.message : "Unable to read remote commits.";
+		}
+
+		this.plugin.recordActivity(
+			`Remote history refresh [${reason}] completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
+			"METRIC",
+		);
+		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
+			this.renderRepositoryContext(this.contentEl, repositoryPath);
+			this.updateChangesContent();
+		} else {
+			this.render();
+		}
+	}
+
+	markChangesRefreshRequired(reason: string): void {
+		this.changesRefreshRequired = true;
+		this.changesRefreshReason = reason;
+		this.changes = null;
+		this.changesError = null;
+		this.selectedPaths.clear();
+		this.render();
+	}
+
+	private async refreshChangesForPaths(
+		affectedPaths: string[],
+		filepaths: string[],
+		reason: string,
+	): Promise<void> {
+		const startedAt = Date.now();
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (!repositoryPath || this.repositoryState?.kind !== "ready") {
+			await this.refreshRepositoryState(reason);
 			return;
 		}
 
 		try {
-			this.changes = await readChanges(this.app.vault.adapter, repositoryPath);
-			const availablePaths = new Set(this.changes.map((change) => change.path));
-			for (const selectedPath of this.selectedPaths) {
-				if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
-			}
-			this.changesError = null;
-		} catch (error) {
-			this.changes = null;
-			this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
+			const updates = await readChanges(this.app.vault.adapter, repositoryPath, filepaths);
+			this.applyKnownChangeUpdates(affectedPaths, updates);
+			this.plugin.recordActivity(
+				`Changes refresh [${reason}] completed for ${filepaths.length} path${filepaths.length === 1 ? "" : "s"} in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
+				"METRIC",
+			);
+		} catch {
+			this.markChangesRefreshRequired(reason);
 		}
+	}
 
+	private applyKnownChangeUpdates(affectedPaths: string[], updates: ChangedFile[]): void {
+		const affected = new Set(affectedPaths);
+		this.changes = (this.changes ?? [])
+			.filter((change) => !affected.has(change.path))
+			.concat(updates);
+		this.changesError = null;
+		const availablePaths = new Set(this.changes.map((change) => change.path));
+		for (const selectedPath of this.selectedPaths) {
+			if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+		}
 		this.updateChangesContent();
-		const outcome = this.changesError ? `failed: ${this.changesError}` : `completed (${this.changes?.length ?? 0} changes)`;
-		this.plugin.recordActivity(
-			`Changes refresh [${reason}] ${outcome} in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
-			"METRIC",
-		);
 	}
 
 	private updateChangesContent(): void {

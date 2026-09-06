@@ -158,6 +158,19 @@
 	color: var(--text-muted);
 }
 
+.git-sync-refresh-required {
+	margin: 16px 0;
+	padding: 14px;
+	border: 1px solid var(--background-modifier-border);
+	border-left: 3px solid var(--text-warning);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.git-sync-refresh-required .git-sync-state-description {
+	margin: 8px 0 12px;
+}
+
 .git-sync-log-list {
 	margin: 0 -12px;
 	text-align: left;
