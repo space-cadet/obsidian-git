@@ -27,8 +27,10 @@ recorded.
   username/token credential pair.
 - A connection test records success or failure in the Log and reports the
   remote default branch when available.
-- Settings now expose Fetch, fast-forward-only Pull, Push, and Clone actions.
-- The Changes action bar also exposes Pull and Push next to local file actions.
+- Settings hold the remote URL, branch, and SecretStorage-backed credential
+  configuration; Git operations are kept in the Changes action bar.
+- The Changes action bar exposes Fetch through the refresh action, plus Pull and
+  Push next to the local file actions.
 - Fetch, Pull, and Push attach or refresh the configured `origin` remote before
   running; Clone requires an empty vault-relative destination.
 - Remote operations are queued so two Git mutations cannot run concurrently,

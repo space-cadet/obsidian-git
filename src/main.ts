@@ -1310,58 +1310,6 @@ class GitSyncSettingTab extends PluginSettingTab {
 				});
 			});
 
-		containerEl.createEl("h3", { text: "Remote operations" });
-		containerEl.createEl("p", {
-			text: "Fetch, pull, and push use the configured repository and branch. Clone requires an empty vault-relative destination.",
-			cls: "setting-item-description",
-		});
-		const remoteOperationSetting = (
-			name: string,
-			description: string,
-			label: string,
-			action: () => Promise<void>,
-		): void => {
-			new Setting(containerEl)
-				.setName(name)
-				.setDesc(description)
-				.addButton((button) => button
-					.setButtonText(label)
-					.onClick(async () => {
-						button.setDisabled(true);
-						button.setButtonText("Working…");
-						try {
-							await action();
-						} finally {
-							button.setButtonText(label);
-							button.setDisabled(false);
-						}
-					}));
-		};
-		remoteOperationSetting(
-			"Fetch",
-			"Download remote branch updates without changing local files.",
-			"Fetch",
-			() => this.plugin.fetchRemote(),
-		);
-		remoteOperationSetting(
-			"Pull",
-			"Fast-forward the local branch from the configured remote branch.",
-			"Pull",
-			() => this.plugin.pullRemote(),
-		);
-		remoteOperationSetting(
-			"Push",
-			"Upload the current local branch to the configured remote branch.",
-			"Push",
-			() => this.plugin.pushRemote(),
-		);
-		remoteOperationSetting(
-			"Clone",
-			"Create the repository in the configured path; the destination must be empty.",
-			"Clone",
-			() => this.plugin.cloneRemote(),
-		);
-
 		containerEl.createEl("h3", { text: "Commit identity" });
 		containerEl.createEl("p", {
 			text: "Used only when creating local commits.",

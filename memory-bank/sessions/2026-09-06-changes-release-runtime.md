@@ -110,7 +110,6 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 
 ## 2026-09-06 Changes toolbar remote actions
 
-- Confirmed the bottom Changes toolbar previously contained only Select All,
-  Stage, Unstage, and Refresh; Pull and Push were not wired there.
-- Added visible Pull and Push toolbar buttons using the shared remote queue and
-  Activity diagnostics.
+- Confirmed the bottom Changes toolbar is the intended home for Git actions.
+- Removed duplicate Settings operation controls and kept Pull and Push in the
+  Changes toolbar using the shared remote queue and Activity diagnostics.

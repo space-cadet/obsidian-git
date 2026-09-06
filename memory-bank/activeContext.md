@@ -17,7 +17,8 @@ updates, auto-saving Settings, and versioned plugin data portability.
 The repository header now reports comparison status, and remote operations
 write live diagnostic Activity entries. Remaining work is live remote and
 installed host verification, followed by the lettered UI refinements in T4 and
-T5. Pull and Push are now also exposed in the Changes action bar.
+T5. Pull and Push are exposed only in the Changes action bar; Settings now
+remains configuration-focused.
 
 ## Current Decisions
 

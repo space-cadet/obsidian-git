@@ -85,10 +85,10 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## 2026-09-06 Changes toolbar remote actions
 
-- Confirmed the Settings Pull/Push actions were not the buttons used in the
-  Changes workflow.
-- Added Pull and Push to the fixed Changes action bar and connected them to the
-  shared queued remote operation path.
+- Removed the duplicate Settings operation controls so Git actions have one
+  home in the Changes action bar.
+- The Changes action bar owns Pull and Push and connects them to the shared
+  queued remote operation path.
 
 ## 2026-09-06 Update
 
