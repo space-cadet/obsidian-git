@@ -122,7 +122,7 @@ function statusLabel(head: number, workdir: number, stage: number): string {
 	return "Changed";
 }
 
-class ObsidianGitFs {
+export class ObsidianGitFs {
 	readonly promises = {
 		readFile: async (path: string, options?: string | { encoding?: string }): Promise<Uint8Array | string> => {
 			try {

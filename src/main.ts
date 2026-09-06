@@ -20,12 +20,14 @@ import {
 	validateRepositoryPath,
 } from "./repository";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
+import { REMOTE_TOKEN_SECRET_ID, RemoteCredential, testRemoteConnection } from "./remote";
 
 const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 
 interface GitSyncSettings {
 	repositoryPath: string;
 	remoteUrl: string;
+	remoteUsername: string;
 	branchName: string;
 	authorName: string;
 	authorEmail: string;
@@ -43,6 +45,7 @@ interface ActivityEntry {
 const DEFAULT_SETTINGS: GitSyncSettings = {
 	repositoryPath: ".",
 	remoteUrl: "",
+	remoteUsername: "git",
 	branchName: "main",
 	authorName: "",
 	authorEmail: "",
@@ -129,6 +132,37 @@ export default class GitSyncPlugin extends Plugin {
 
 	getActivity(): readonly ActivityEntry[] {
 		return this.activity;
+	}
+
+	getRemoteCredential(): RemoteCredential | null {
+		const token = this.app.secretStorage.getSecret(REMOTE_TOKEN_SECRET_ID);
+		if (!token) return null;
+		return {
+			username: this.settings.remoteUsername.trim() || "git",
+			token,
+		};
+	}
+
+	saveRemoteToken(value: string): void {
+		const token = value.trim();
+		if (token) this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, token);
+	}
+
+	clearRemoteToken(): void {
+		this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, "");
+	}
+
+	async checkRemoteConnection(): Promise<void> {
+		try {
+			const info = await testRemoteConnection(this.settings.remoteUrl, this.getRemoteCredential());
+			const branch = info.defaultBranch ? ` Default branch: ${info.defaultBranch}.` : "";
+			this.recordActivity(`Remote connection succeeded: ${info.remoteUrl}.${branch}`);
+			new Notice(`Remote connection succeeded.${branch}`);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Remote connection failed.";
+			this.recordActivity(`Remote connection failed: ${detail}`);
+			new Notice(detail);
+		}
 	}
 
 	async checkForUpdates(manual: boolean): Promise<void> {
@@ -833,7 +867,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Remote URL")
-			.setDesc("Optional until remote sync is enabled.")
+			.setDesc("HTTP or HTTPS URL for the Git remote.")
 			.addText((text) => {
 				text.setPlaceholder("https://github.com/user/repository.git");
 				text.setValue(this.plugin.settings.remoteUrl);
@@ -841,6 +875,43 @@ class GitSyncSettingTab extends PluginSettingTab {
 					this.plugin.settings.remoteUrl = value.trim();
 				});
 			});
+
+		new Setting(containerEl)
+			.setName("Remote username")
+			.setDesc("Username sent with the remote token or password.")
+			.addText((text) => {
+				text.setPlaceholder("git");
+				text.setValue(this.plugin.settings.remoteUsername);
+				text.onChange((value) => {
+					this.plugin.settings.remoteUsername = value.trim();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Remote token or password")
+			.setDesc("Stored in Obsidian SecretStorage and never in plugin settings.")
+			.addText((text) => {
+				text.inputEl.type = "password";
+				text.setPlaceholder("Enter a token or password");
+				text.onChange((value) => this.plugin.saveRemoteToken(value));
+			})
+			.addButton((button) => button.setButtonText("Clear").onClick(() => this.plugin.clearRemoteToken()));
+
+		new Setting(containerEl)
+			.setName("Test remote connection")
+			.setDesc("Checks the configured HTTP remote and reports its default branch.")
+			.addButton((button) =>
+				button.setButtonText("Test connection").onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText("Testing…");
+					try {
+						await this.plugin.checkRemoteConnection();
+					} finally {
+						button.setButtonText("Test connection");
+						button.setDisabled(false);
+					}
+				}),
+			);
 
 		new Setting(containerEl)
 			.setName("Branch")
