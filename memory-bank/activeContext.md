@@ -1,13 +1,14 @@
 # Active Context
 
-*Last Updated: 2026-09-06*
+*Last Updated: 2026-09-06 19:49:01 IST*
 
 ## Current Focus
 
 - **T2, T4, T5, T6, T7** — data portability, Changes, Log, local/remote
   Commits, and core remote Git operations are the central session work
 - **Current** — T8 progress modal with elapsed time, retained final state, and
-  richer Git-style operation results; cancellation feasibility remains open
+  richer Git-style operation results; the user verified the pushed mobile
+  behavior and cancellation feasibility remains open
 
 ## Current State
 
@@ -25,8 +26,9 @@ no commits to send and a real ref update, including uncommitted files that were
 not included. The modal output fields now scroll vertically on small screens,
 and the progress accent is intentionally subdued. Changes refreshes preserve
 the existing panel shell and restore scroll after layout instead of showing the
-intermediate full-tab reload. Remaining work is cancellation only if the
-bridge can support it and edge-case verification.
+intermediate full-tab reload. The user verified the pushed behavior. Remaining
+work is cancellation only if the bridge can support it, destructive-action
+confirmation, and edge-case verification.
 
 ## Current Decisions
 
@@ -38,5 +40,6 @@ bridge can support it and edge-case verification.
 
 1. Determine whether an abortable HTTP path can support a real cancellation
    action; do not add a cosmetic Cancel button.
-2. Continue T4/T5 refinements and test divergence, authentication, and other
+2. Add destructive-action confirmation if a workflow requires it.
+3. Continue T4/T5 refinements and test divergence, authentication, and other
    remote edge cases separately.

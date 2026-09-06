@@ -50,5 +50,5 @@ recorded.
 The source implementation supports authentication, clone or connect, pull,
 fetch, and push through the configured HTTP(S) remote. Production build and
 static diff checks pass. The user verified the pushed remote workflow, including
-Pull and Push from the Changes toolbar. Progress modals, richer Git-style
-messages, and additional edge-case acceptance remain planned.
+Pull and Push from the Changes toolbar. Progress modals and Git-style result
+messages are implemented; additional edge-case acceptance remains planned.

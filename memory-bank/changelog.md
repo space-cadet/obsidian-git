@@ -24,6 +24,12 @@
   Settings operation controls. - T4
 - Fixed Pull author identity and Push request-body handling after user Log
   evidence; the user confirmed both toolbar actions now work. - T5, T7
+- Added Git-style progress modals for Fetch, Pull, Push, and Clone with elapsed
+  time, retained final state, remote messages, and Activity logging. - T5, T7, T8
+- Added operation-specific no-op/ref-update results, commit/file counts, and
+  warnings for uncommitted files excluded from Push. - T7, T8
+- Added scrollable modal output, subdued progress animation, and in-place
+  Changes refreshes that preserve mobile scroll position. - T4, T8
 
 ## 2026-09-05
 

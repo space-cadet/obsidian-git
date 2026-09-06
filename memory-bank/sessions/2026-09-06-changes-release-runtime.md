@@ -154,3 +154,31 @@ T2, T4, T5, T6, T7: data portability, Changes, Log, Commits, and remote Git
 - Add progress modals for long-running operations.
 - Replace generic notices with more informative Git-style results.
 - Test additional remote edge cases and record platform-specific acceptance.
+
+## 2026-09-06 Progress modal and Changes polish closeout
+
+## Session Title
+
+T4, T5, T7, T8: Git Sync UI, remote operations, progress modals, and mobile polish
+
+## Completed Work
+
+- Researched Git CLI progress and permanent result formats and recorded them in `implementation-details/progress-errors-dialogs.md`.
+- Saved the approved progress-modal mockup in `memory-bank/assets/progress-modal-mockup.png`.
+- Implemented Fetch, Pull, Push, and Clone progress callbacks, elapsed time, retained final states, sanitized remote messages, and Activity logging.
+- Added Git-style no-op/ref-update summaries, short object IDs, commit/file counts, and warnings for uncommitted Push files.
+- Added the `git-test-small` pull fixture under `/Users/deepak/code/git-test` and pushed three files to `origin/main`.
+- Fixed mobile modal output scrolling, softened the animation, and preserved the Changes shell and scroll position through refresh, stage, and unstage.
+- The user verified the pushed behavior on the tested mobile host.
+
+## Verification
+
+- Production build and `git diff --check` passed after the implementation and polish changes.
+- `codex/kiss-restart` is clean and synchronized with its remote.
+- The `git-test-small` fixture branch is clean and synchronized with `origin/main`.
+
+## Planned Work
+
+- Add cancellation only when the HTTP bridge exposes a tested abort path.
+- Add destructive-action confirmation if required.
+- Continue T4f/T4g/T5e and separate remote edge-case/platform verification.

@@ -23,10 +23,17 @@
   token visibility, and the first remote connection/authentication increment.
 - User verified the pushed Changes and Log behavior, including preserved scroll
   position after staging updates.
+- Added and pushed the Git-style progress modal with elapsed time, retained
+  completion/failure state, remote diagnostics, and Activity logging.
+- Added operation-specific Fetch, Pull, Push, and Clone results, including
+  no-op detection, ref updates, commit/file counts, and uncommitted-file warnings.
+- Polished mobile behavior with scrollable modal output, subdued animation, and
+  Changes refreshes that preserve the tab shell and scroll position.
 
 ## Next
 
-- Add progress modals and richer Git-style result messages for remote actions.
+- Implement cancellation only if the HTTP bridge supports a real abort path.
+- Add confirmation dialogs for destructive actions if the workflow requires them.
 - Continue T4f/T4g and T5e for Changes refinements and Log clear/export.
 - Record platform-specific T10 acceptance when those hosts are tested.
 

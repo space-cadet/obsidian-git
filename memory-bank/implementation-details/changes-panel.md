@@ -44,8 +44,7 @@ the resulting clean state.
 
 ## Remaining evidence
 
-The user verified the pushed Changes build, including staging behavior and
-working Pull and Push toolbar actions. Scroll preservation is being reverified
-after the in-place refresh correction. Filtering, sorting,
-revert, keyboard multi-selection, and progress-modal treatment remain planned
-refinements.
+The user verified the pushed Changes build, including staging behavior, working
+Pull and Push toolbar actions, scroll preservation, and the in-place refresh
+correction. Filtering, sorting, revert, and keyboard multi-selection remain
+planned refinements.
