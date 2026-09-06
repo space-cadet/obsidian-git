@@ -1,4 +1,4 @@
-import { DataAdapter } from "obsidian";
+import { DataAdapter, Stat } from "obsidian";
 import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
 
@@ -258,6 +258,11 @@ function statusLabel(head: number, workdir: number, stage: number): string {
 }
 
 export class ObsidianGitFs {
+	// Obsidian's mobile vault index can briefly retain a path after the backing
+	// file has been moved or deleted. Validate listed entries once and reuse the
+	// result for isomorphic-git's immediately following lstat call.
+	private readonly validatedStats = new Map<string, Stat>();
+
 	readonly promises = {
 		readFile: async (path: string, options?: string | { encoding?: string }): Promise<Uint8Array | string> => {
 			try {
@@ -284,7 +289,35 @@ export class ObsidianGitFs {
 		readdir: async (path: string): Promise<string[]> => {
 			try {
 				const listed = await this.adapter.list(this.normalized(path));
-				return [...listed.files, ...listed.folders].map((entry) => entry.split("/").pop() ?? entry);
+				const directory = this.normalized(path);
+				const stripDirectoryPrefix = (entry: string): string => {
+					const normalizedEntry = entry.replace(/^\.\//, "");
+					if (directory !== "." && normalizedEntry.startsWith(`${directory}/`)) {
+						return normalizedEntry.slice(directory.length + 1);
+					}
+					return normalizedEntry;
+				};
+				const entries = [...listed.files, ...listed.folders];
+				const existingEntries = await Promise.all(
+					entries.map(async (entry) => {
+						const relativePath = stripDirectoryPrefix(entry);
+						const candidatePath = directory === "." ? relativePath : `${directory}/${relativePath}`;
+						try {
+							const stat = await this.adapter.stat(candidatePath);
+							return stat ? { relativePath, candidatePath, stat } : null;
+						} catch (error) {
+							if (isMissingPathError(error)) return null;
+							throw error;
+						}
+					}),
+				);
+
+				for (const entry of existingEntries) {
+					if (entry) this.validatedStats.set(entry.candidatePath, entry.stat);
+				}
+				return existingEntries
+					.filter((entry): entry is { relativePath: string; candidatePath: string; stat: Stat } => entry !== null)
+					.map((entry) => entry.relativePath);
 			} catch (error) {
 				throw this.fileSystemError(path, error);
 			}
@@ -308,12 +341,10 @@ export class ObsidianGitFs {
 	}
 
 	private async stat(path: string): Promise<git.Stat> {
-		let value;
-		try {
-			value = await this.adapter.stat(this.normalized(path));
-		} catch (error) {
-			throw this.fileSystemError(path, error);
-		}
+		const normalizedPath = this.normalized(path);
+		const validated = this.validatedStats.get(normalizedPath);
+		const value = validated ?? await this.readStat(normalizedPath, path);
+		if (validated) this.validatedStats.delete(normalizedPath);
 		if (!value) {
 			throw this.fileSystemError(path);
 		}
@@ -335,6 +366,14 @@ export class ObsidianGitFs {
 		} as git.Stat;
 	}
 
+	private async readStat(path: string, originalPath: string): Promise<Stat | null> {
+		try {
+			return await this.adapter.stat(path);
+		} catch (error) {
+			throw this.fileSystemError(originalPath, error);
+		}
+	}
+
 	private fileSystemError(path: string, cause?: unknown): Error & { code: string } {
 		if (cause && typeof cause === "object" && "code" in cause) {
 			return cause as Error & { code: string };
@@ -349,4 +388,10 @@ export class ObsidianGitFs {
 		error.code = "EINVAL";
 		return error;
 	}
+}
+
+function isMissingPathError(error: unknown): boolean {
+	if (!error || typeof error !== "object") return false;
+	const candidate = error as { code?: unknown; message?: unknown };
+	return candidate.code === "ENOENT" || /no such file|not found/i.test(String(candidate.message ?? ""));
 }

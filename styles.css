@@ -171,6 +171,13 @@
 	margin: 0;
 	padding: 10px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
+	user-select: text;
+	-webkit-user-select: text;
+}
+
+.git-sync-log-entry * {
+	user-select: text;
+	-webkit-user-select: text;
 }
 
 .git-sync-log-entry:nth-child(even) {
