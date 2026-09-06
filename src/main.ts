@@ -507,14 +507,8 @@ class GitSyncView extends ItemView {
 				attr: { type: "button", role: "tab", "aria-selected": String(tabName === this.activeTab) },
 			});
 			tab.addEventListener("click", () => {
-				const startedAt = Date.now();
-				const previousTab = this.activeTab;
 				this.activeTab = tabName;
 				this.render();
-				this.plugin.recordActivity(
-					`Tab switch ${previousTab} -> ${tabName} rendered in ${elapsedMilliseconds(startedAt)}.`,
-					"METRIC",
-				);
 			});
 		}
 
