@@ -1,13 +1,13 @@
 # Active Context
 
-*Last Updated: 2026-09-06 13:59:01 IST*
+*Last Updated: 2026-09-06 14:16:37 IST*
 
 ## Current Focus
 
-- **T2, T6, T4, T5, T7, T10** — Settings data portability, Commits, Changes, Log, remote foundation, and pushed-build
+- **T2, T6, T7, T4, T5, T10** — Settings data portability, Commits, core Git operations, Changes, Log, and pushed-build
   verification are the current record
-- **Next** — verify Settings import/export and the local Commits surface, then
-  continue T7 remote operations or the planned Changes refinements
+- **Next** — implement T7 core Git operations, then verify Settings import/export
+  and the local Commits surface
 
 ## Current State
 
@@ -23,6 +23,6 @@ work is tracked by the lettered subtasks in T4, T5, T7, and T10.
 
 ## Next Actions
 
-1. Verify Settings import/export and the versioned data shape in the pushed host.
-2. Verify the T6 local Commits list and detail interaction in the pushed host.
-3. Continue T7c/T7d for fetch, pull, push, and clone, then T4/T5 refinements.
+1. Implement T7c/T7d fetch, pull, push, and clone.
+2. Verify Settings import/export and the versioned data shape in the pushed host.
+3. Verify the T6 local Commits list, then continue T4/T5 refinements.

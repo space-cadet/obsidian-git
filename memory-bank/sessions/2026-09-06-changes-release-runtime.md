@@ -73,3 +73,9 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 - Export success and failure now appear in Activity, and successful export
   notices show the exact vault-relative path.
 - The user verified the local Commits display in the pushed build.
+
+## 2026-09-06 Activity export preference
+
+- Added a Settings toggle for including Activity history in plugin-data
+  exports; the default is off and the export records the choice.
+- The next planned implementation focus is T7 core Git operations.

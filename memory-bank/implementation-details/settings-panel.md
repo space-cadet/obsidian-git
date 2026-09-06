@@ -34,6 +34,8 @@ basic configuration workflow requires them.
   to the vault root and records the path in Activity; the remote token is
   excluded, imports require confirmation, and the current SecretStorage
   credential is preserved.
+- Activity inclusion in exports is controlled by a Settings toggle and is off
+  by default; export metadata records whether activity was included.
 
 ## Completion evidence
 

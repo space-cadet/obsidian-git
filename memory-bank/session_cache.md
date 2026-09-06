@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 14:05:57 IST*
+*Last Updated: 2026-09-06 14:16:37 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
 **Focus Task**: T4, T5, T7, T10: Changes, Log, remote foundation, and verification
@@ -57,6 +57,13 @@ Build the Settings panel immediately after the shell with only the configuration
 - Successful and failed export operations are recorded in the Activity log;
   success notices include the exact vault-relative path.
 - The user verified the local Commits display in the pushed build.
+
+## 2026-09-06 Activity Export Update
+
+- Activity history is now optional in plugin-data exports and disabled by
+  default.
+- Export metadata records whether activity was included.
+- The next implementation focus is core Git remote operations under T7.
 
 ## 2026-09-06 Update
 

@@ -39,6 +39,7 @@ interface GitSyncSettings {
 	updateChannel: "stable" | "dev";
 	autoUpdate: boolean;
 	lastUpdateCheck: number;
+	includeActivityInExports: boolean;
 }
 
 interface ActivityEntry {
@@ -74,6 +75,7 @@ const DEFAULT_SETTINGS: GitSyncSettings = {
 	updateChannel: "dev",
 	autoUpdate: false,
 	lastUpdateCheck: 0,
+	includeActivityInExports: false,
 };
 
 export default class GitSyncPlugin extends Plugin {
@@ -167,10 +169,12 @@ export default class GitSyncPlugin extends Plugin {
 		};
 	}
 
-	createExportData(): string {
+	createExportData(includeActivity = this.settings.includeActivityInExports): string {
 		return JSON.stringify({
 			...this.createStoredData(),
+			activity: includeActivity ? this.activity.slice(0, MAX_ACTIVITY_ENTRIES) : [],
 			exportedAt: new Date().toISOString(),
+			activityIncluded: includeActivity,
 		}, null, 2);
 	}
 
@@ -1193,6 +1197,15 @@ class GitSyncSettingTab extends PluginSettingTab {
 			cls: "setting-item-description",
 		});
 		new Setting(containerEl)
+			.setName("Include activity in exports")
+			.setDesc("Adds the recent Activity history to exported files. Disabled by default.")
+			.addToggle((toggle) => toggle
+				.setValue(this.plugin.settings.includeActivityInExports)
+				.onChange(async (value) => {
+					this.plugin.settings.includeActivityInExports = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
 			.setName("Export plugin data")
 			.setDesc("Writes a timestamped JSON backup to the vault root. Remote credentials are not included.")
 			.addButton((button) => button
@@ -1312,6 +1325,7 @@ function decodePluginData(value: unknown, allowLegacy: boolean, requireRecognize
 		"updateChannel",
 		"autoUpdate",
 		"lastUpdateCheck",
+		"includeActivityInExports",
 		"activity",
 	];
 	if (requireRecognizedData && !legacyKeys.some((key) => key in value)) {
@@ -1336,9 +1350,10 @@ function normalizeSettings(value: Partial<GitSyncSettings>): GitSyncSettings {
 		authorEmail: stringValue(settings.authorEmail),
 		checkForUpdates: booleanValue(settings.checkForUpdates, DEFAULT_SETTINGS.checkForUpdates),
 		updateChannel,
-		autoUpdate: booleanValue(settings.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
-		lastUpdateCheck: finiteNumber(settings.lastUpdateCheck, DEFAULT_SETTINGS.lastUpdateCheck),
-	};
+			autoUpdate: booleanValue(settings.autoUpdate, DEFAULT_SETTINGS.autoUpdate),
+			lastUpdateCheck: finiteNumber(settings.lastUpdateCheck, DEFAULT_SETTINGS.lastUpdateCheck),
+			includeActivityInExports: booleanValue(settings.includeActivityInExports, DEFAULT_SETTINGS.includeActivityInExports),
+		};
 }
 
 function normalizeActivity(value: unknown): ActivityEntry[] {
