@@ -111,6 +111,23 @@ export async function unstageFile(adapter: DataAdapter, repositoryPath: string, 
 	await git.resetIndex({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
 }
 
+export async function removeFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
+	await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+}
+
+export async function addToGitignore(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
+	const repository = normalizedRepositoryPath(repositoryPath);
+	const gitignorePath = repository === "." ? ".gitignore" : `${repository}/.gitignore`;
+	const current = await adapter.exists(gitignorePath) ? await adapter.read(gitignorePath) : "";
+	const normalizedPath = path.trim().replace(/^\.\/+/, "");
+	if (!normalizedPath) throw new Error("The file path is empty.");
+
+	const lines = current.split(/\r?\n/);
+	if (lines.some((line) => line.trim() === normalizedPath)) return;
+	const prefix = current && !current.endsWith("\n") ? `${current}\n` : current;
+	await adapter.write(gitignorePath, `${prefix}${normalizedPath}\n`);
+}
+
 export async function commitChanges(
 	adapter: DataAdapter,
 	repositoryPath: string,

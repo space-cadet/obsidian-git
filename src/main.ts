@@ -1,6 +1,7 @@
 import {
 	App,
 	ItemView,
+	Menu,
 	Modal,
 	Notice,
 	Plugin,
@@ -12,12 +13,14 @@ import {
 import { GIT_BRANCH, GIT_COMMIT_HASH } from "./build-info";
 import {
 	ChangedFile,
+	addToGitignore,
 	commitChanges,
 	inspectLocalRepository,
 	LocalCommit,
 	readCommits,
 	readRemoteCommits,
 	readChanges,
+	removeFile,
 	RepositoryState,
 	stageFile,
 	unstageFile,
@@ -62,6 +65,29 @@ interface ActivityEntry {
 
 type ActivityLevel = "DEBUG" | "INFO" | "METRIC" | "ERROR";
 type CommitSource = "local" | "remote";
+type ChangeSection = "staged" | "uncommitted";
+type ChangeStatusFilter = "Untracked" | "Added" | "Modified" | "Deleted";
+type ChangeSort = "path-asc" | "path-desc" | "status-path" | "folder-name";
+
+const CHANGE_STATUS_FILTERS: ChangeStatusFilter[] = ["Untracked", "Added", "Modified", "Deleted"];
+const CHANGE_SORTS: Array<{ value: ChangeSort; label: string }> = [
+	{ value: "path-asc", label: "Path (A–Z)" },
+	{ value: "path-desc", label: "Path (Z–A)" },
+	{ value: "status-path", label: "Status, then path" },
+	{ value: "folder-name", label: "Folder, then name" },
+];
+
+interface LongPressSelectionState {
+	section: ChangeSection;
+	path: string;
+	visibleChanges: ChangedFile[];
+	pointerId: number;
+	startX: number;
+	startY: number;
+	timer: number;
+	active: boolean;
+	suppressClick: boolean;
+}
 
 interface StoredPluginData {
 	format: typeof PLUGIN_DATA_FORMAT;
@@ -411,6 +437,10 @@ class GitSyncView extends ItemView {
 	private commitSource: CommitSource = "local";
 	private selectedCommitOid: string | null = null;
 	private readonly selectedPaths = new Set<string>();
+	private readonly selectionAnchors = new Map<ChangeSection, string>();
+	private readonly changeFilters = new Map<ChangeSection, Set<ChangeStatusFilter>>();
+	private readonly changeSorts = new Map<ChangeSection, ChangeSort>();
+	private longPressState: LongPressSelectionState | null = null;
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
 	private changesError: string | null = null;
 	private committing = false;
@@ -444,6 +474,7 @@ class GitSyncView extends ItemView {
 	}
 
 	onClose(): Promise<void> {
+		this.cancelLongPressSelection();
 		this.contentEl.empty();
 		return Promise.resolve();
 	}
@@ -453,6 +484,7 @@ class GitSyncView extends ItemView {
 	}
 
 	render(): void {
+		this.cancelLongPressSelection();
 		this.captureChangesScrollTop();
 		const root = this.contentEl;
 		root.empty();
@@ -836,7 +868,7 @@ class GitSyncView extends ItemView {
 
 	private renderChangeSection(
 		content: HTMLElement,
-		section: "staged" | "uncommitted",
+		section: ChangeSection,
 		title: string,
 		changes: ChangedFile[],
 		bulkAction: string,
@@ -845,6 +877,38 @@ class GitSyncView extends ItemView {
 		const header = sectionEl.createDiv({ cls: "git-sync-change-section-header" });
 		header.createDiv({ cls: "git-sync-section-title", text: title });
 		header.createDiv({ cls: "git-sync-section-count", text: String(changes.length) });
+		const filter = header.createEl("button", {
+			cls: "git-sync-section-action",
+			attr: {
+				type: "button",
+				"aria-label": `Filter ${title.toLowerCase()}`,
+				title: "Filter by status",
+				"data-active": String(this.hasChangeFilter(section)),
+			},
+		});
+		setIcon(filter, "filter");
+		filter.addEventListener("click", (event) => this.showChangeFilterMenu(section, event));
+		const sort = header.createEl("button", {
+			cls: "git-sync-section-action",
+			attr: {
+				type: "button",
+				"aria-label": `Sort ${title.toLowerCase()}`,
+				title: `Sort: ${this.getChangeSortLabel(section)}`,
+			},
+		});
+		setIcon(sort, "arrow-down-up");
+		sort.addEventListener("click", (event) => this.showChangeSortMenu(section, event));
+		const sectionAction = header.createEl("button", {
+			cls: "git-sync-section-action",
+			attr: {
+				type: "button",
+				"aria-label": section === "staged" ? "Unstage all staged files" : "Stage all uncommitted files",
+				title: section === "staged" ? "Unstage all" : "Stage all",
+			},
+		});
+		setIcon(sectionAction, section === "staged" ? "minus" : "plus");
+		sectionAction.disabled = changes.length === 0 || this.committing;
+		sectionAction.addEventListener("click", () => void this.applyAllStage(section === "staged"));
 		const collapse = header.createEl("button", {
 			cls: "git-sync-icon-button",
 			attr: { type: "button", "aria-label": `${this.collapsedSections.has(section) ? "Expand" : "Collapse"} ${title}` },
@@ -857,48 +921,75 @@ class GitSyncView extends ItemView {
 		});
 
 		if (this.collapsedSections.has(section)) return;
-
-		const selectedInSection = changes.filter((change) => this.selectedPaths.has(change.path));
-		const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
-		toolbar.createDiv({ cls: "git-sync-select-label", text: "Select files" });
-		const clear = toolbar.createEl("button", { text: "Clear selection", attr: { type: "button" } });
-		clear.disabled = selectedInSection.length === 0;
-		clear.addEventListener("click", () => {
-			for (const change of changes) this.selectedPaths.delete(change.path);
-			this.render();
-		});
-		const action = toolbar.createEl("button", { text: bulkAction, attr: { type: "button" } });
-		action.disabled = selectedInSection.length === 0 || this.committing;
-		action.addEventListener("click", () => void this.applySelectedStage(section === "staged"));
+		const visibleChanges = this.getVisibleChanges(section, changes);
 
 		if (changes.length === 0) {
 			sectionEl.createDiv({ cls: "git-sync-section-empty", text: section === "staged" ? "No staged files" : "No uncommitted changes" });
 			return;
 		}
 
+		if (visibleChanges.length === 0) {
+			sectionEl.createDiv({ cls: "git-sync-section-empty", text: "No files match this filter" });
+			return;
+		}
+
+		const selectedInSection = changes.filter((change) => this.selectedPaths.has(change.path));
+		if (selectedInSection.length > 1) {
+			const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
+			toolbar.createDiv({ cls: "git-sync-select-label", text: `${selectedInSection.length} selected` });
+			const clear = toolbar.createEl("button", {
+				cls: "git-sync-selection-action",
+				attr: { type: "button", "aria-label": "Clear selection", title: "Clear selection" },
+			});
+			setIcon(clear, "x");
+			clear.addEventListener("click", () => {
+				for (const change of changes) this.selectedPaths.delete(change.path);
+				this.render();
+			});
+			const action = toolbar.createEl("button", {
+				cls: "git-sync-selection-action",
+				attr: {
+					type: "button",
+					"aria-label": bulkAction === "Stage selected" ? "Stage selected files" : "Unstage selected files",
+					title: bulkAction === "Stage selected" ? "Stage selected files" : "Unstage selected files",
+				},
+			});
+			setIcon(action, section === "staged" ? "arrow-down-to-line" : "arrow-up-to-line");
+			action.disabled = this.committing;
+			action.addEventListener("click", () => void this.applySelectedStage(section === "staged"));
+		}
+
 		const list = sectionEl.createEl("ul", { cls: "git-sync-changes-list" });
-		for (const change of changes) this.renderChangeRow(list, change);
+		for (const [index, change] of visibleChanges.entries()) {
+			this.renderChangeRow(list, change, section, index, visibleChanges);
+		}
 	}
 
-	private renderChangeRow(list: HTMLElement, change: ChangedFile): void {
-		const item = list.createEl("li", { cls: "git-sync-change" });
+	private renderChangeRow(
+		list: HTMLElement,
+		change: ChangedFile,
+		section: ChangeSection,
+		index: number,
+		visibleChanges: ChangedFile[],
+	): void {
+		const item = list.createEl("li", {
+			cls: this.selectedPaths.has(change.path) ? "git-sync-change is-selected" : "git-sync-change",
+			attr: { "data-change-path": change.path, "data-change-section": section },
+		});
 		const checkbox = item.createEl("input", {
 			attr: { type: "checkbox", "aria-label": `Select ${change.path}`, "data-change-path": change.path },
 		});
 		checkbox.checked = this.selectedPaths.has(change.path);
 		checkbox.disabled = this.committing;
-		checkbox.addEventListener("change", () => {
-			if (checkbox.checked) this.selectedPaths.add(change.path);
-			else this.selectedPaths.delete(change.path);
-			this.render();
+		checkbox.addEventListener("click", (event) => {
+			event.preventDefault();
+			this.handleSelectionClick(section, change.path, event, visibleChanges);
 		});
 
 		const code = item.createSpan({ cls: "git-sync-change-code", text: changeCode(change.status) });
 		code.setAttribute("data-change-status", change.status);
-		const path = item.createDiv({ cls: "git-sync-change-path", text: change.path });
-		path.setAttribute("title", change.path);
-		const action = item.createEl("button", {
-			cls: "git-sync-change-menu",
+		const directAction = item.createEl("button", {
+			cls: "git-sync-change-direct-action",
 			attr: {
 				type: "button",
 				"aria-label": `${change.staged ? "Unstage" : "Stage"} ${change.path}`,
@@ -906,9 +997,278 @@ class GitSyncView extends ItemView {
 				"data-change-path": change.path,
 			},
 		});
-		setIcon(action, "more-horizontal");
-		action.disabled = this.committing;
-		action.addEventListener("click", () => void this.toggleStage(change));
+		setIcon(directAction, change.staged ? "minus" : "plus");
+		directAction.disabled = this.committing;
+		directAction.addEventListener("click", () => void this.toggleStage(change));
+		const path = item.createDiv({ cls: "git-sync-change-path", text: change.path });
+		path.setAttribute("title", change.path);
+		const menuButton = item.createEl("button", {
+			cls: "git-sync-change-menu",
+			attr: {
+				type: "button",
+				"aria-label": `More actions for ${change.path}`,
+				title: "More actions",
+				"data-change-path": change.path,
+			},
+		});
+		setIcon(menuButton, "more-horizontal");
+		menuButton.disabled = this.committing;
+		menuButton.addEventListener("click", (event) => this.showChangeMenu(change, event));
+		this.bindLongPressSelection(item, section, change.path, visibleChanges, index);
+	}
+
+	private getVisibleChanges(section: ChangeSection, changes: ChangedFile[]): ChangedFile[] {
+		const filters = this.changeFilters.get(section);
+		const filtered = filters && filters.size > 0
+			? changes.filter((change) => filters.has(changeFilterKey(change.status)))
+			: [...changes];
+		const sort = this.changeSorts.get(section) ?? "path-asc";
+		return filtered.sort((left, right) => compareChanges(left, right, sort));
+	}
+
+	private hasChangeFilter(section: ChangeSection): boolean {
+		const filters = this.changeFilters.get(section);
+		return Boolean(filters && filters.size < CHANGE_STATUS_FILTERS.length);
+	}
+
+	private getChangeSortLabel(section: ChangeSection): string {
+		return CHANGE_SORTS.find((sort) => sort.value === (this.changeSorts.get(section) ?? "path-asc"))?.label ?? "Path (A–Z)";
+	}
+
+	private showChangeFilterMenu(section: ChangeSection, event: MouseEvent): void {
+		const menu = new Menu();
+		const filters = this.changeFilters.get(section);
+		menu.addItem((item) => item
+			.setTitle("All status types")
+			.setIcon("list")
+			.setChecked(!filters || filters.size === 0)
+			.onClick(() => {
+				this.changeFilters.delete(section);
+				this.render();
+			}));
+		for (const status of CHANGE_STATUS_FILTERS) {
+			menu.addItem((item) => item
+				.setTitle(`${changeCode(status)} ${status}`)
+				.setChecked(!filters || filters.size === 0 || filters.has(status))
+				.onClick(() => this.toggleChangeFilter(section, status)));
+		}
+		menu.showAtMouseEvent(event);
+	}
+
+	private toggleChangeFilter(section: ChangeSection, status: ChangeStatusFilter): void {
+		const current = new Set(this.changeFilters.get(section) ?? CHANGE_STATUS_FILTERS);
+		if (current.has(status)) current.delete(status);
+		else current.add(status);
+		if (current.size === 0 || current.size === CHANGE_STATUS_FILTERS.length) this.changeFilters.delete(section);
+		else this.changeFilters.set(section, current);
+		this.render();
+	}
+
+	private showChangeSortMenu(section: ChangeSection, event: MouseEvent): void {
+		const current = this.changeSorts.get(section) ?? "path-asc";
+		const menu = new Menu();
+		for (const sort of CHANGE_SORTS) {
+			menu.addItem((item) => item
+				.setTitle(sort.label)
+				.setChecked(current === sort.value)
+				.onClick(() => {
+					this.changeSorts.set(section, sort.value);
+					this.render();
+				}));
+		}
+		menu.showAtMouseEvent(event);
+	}
+
+	private handleSelectionClick(
+		section: ChangeSection,
+		path: string,
+		event: MouseEvent,
+		visibleChanges: ChangedFile[],
+	): void {
+		if (event.shiftKey) {
+			const anchor = this.selectionAnchors.get(section);
+			if (anchor) this.selectChangeRange(section, anchor, path, visibleChanges);
+			else this.selectedPaths.add(path);
+		} else {
+			if (event.metaKey || event.ctrlKey) {
+				if (this.selectedPaths.has(path)) this.selectedPaths.delete(path);
+				else this.selectedPaths.add(path);
+			} else if (this.selectedPaths.has(path)) {
+				this.selectedPaths.delete(path);
+			} else {
+				this.selectedPaths.add(path);
+			}
+			this.selectionAnchors.set(section, path);
+		}
+		this.render();
+	}
+
+	private selectChangeRange(section: ChangeSection, anchor: string, target: string, changes: ChangedFile[]): void {
+		const anchorIndex = changes.findIndex((change) => change.path === anchor);
+		const targetIndex = changes.findIndex((change) => change.path === target);
+		if (anchorIndex === -1 || targetIndex === -1) {
+			this.selectedPaths.add(target);
+			return;
+		}
+		const start = Math.min(anchorIndex, targetIndex);
+		const end = Math.max(anchorIndex, targetIndex);
+		for (const change of changes.slice(start, end + 1)) this.selectedPaths.add(change.path);
+	}
+
+	private bindLongPressSelection(
+		item: HTMLElement,
+		section: ChangeSection,
+		path: string,
+		visibleChanges: ChangedFile[],
+		_index: number,
+	): void {
+		item.addEventListener("pointerdown", (event) => {
+			if (event.pointerType === "mouse" || (event.target instanceof HTMLElement && event.target.closest("button, input"))) return;
+			this.cancelLongPressSelection();
+			item.setPointerCapture?.(event.pointerId);
+			const state: LongPressSelectionState = {
+				section,
+				path,
+				visibleChanges,
+				pointerId: event.pointerId,
+				startX: event.clientX,
+				startY: event.clientY,
+				timer: 0,
+				active: false,
+				suppressClick: false,
+			};
+			state.timer = window.setTimeout(() => {
+				if (this.longPressState !== state) return;
+				state.active = true;
+				state.suppressClick = true;
+				this.selectionAnchors.set(section, path);
+				this.selectedPaths.add(path);
+				item.addClass("is-selected");
+			}, 450);
+			this.longPressState = state;
+		});
+
+		item.addEventListener("pointermove", (event) => {
+			const state = this.longPressState;
+			if (!state || state.pointerId !== event.pointerId) return;
+			if (!state.active) {
+				const moved = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+				if (moved > 10) this.cancelLongPressSelection();
+				return;
+			}
+			event.preventDefault();
+			const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>(".git-sync-change");
+			if (!target || target.dataset.changeSection !== section) return;
+			const targetPath = target.dataset.changePath;
+			if (!targetPath) return;
+			this.selectChangeRange(section, path, targetPath, visibleChanges);
+			this.updateRenderedSelectionState(section);
+		});
+
+		const finish = (event: PointerEvent) => {
+			const state = this.longPressState;
+			if (!state || state.pointerId !== event.pointerId) return;
+			window.clearTimeout(state.timer);
+			item.releasePointerCapture?.(event.pointerId);
+			this.longPressState = null;
+			if (state.active) {
+				this.updateRenderedSelectionState(section);
+				this.render();
+			}
+		};
+		item.addEventListener("pointerup", finish);
+		item.addEventListener("pointercancel", finish);
+		item.addEventListener("contextmenu", (event) => {
+			if (this.longPressState?.active) event.preventDefault();
+		});
+	}
+
+	private updateRenderedSelectionState(section: ChangeSection): void {
+		for (const row of this.contentEl.querySelectorAll<HTMLElement>(`.git-sync-change[data-change-section="${section}"]`)) {
+			const path = row.dataset.changePath;
+			const selected = Boolean(path && this.selectedPaths.has(path));
+			row.classList.toggle("is-selected", selected);
+			const checkbox = row.querySelector<HTMLInputElement>("input[type=checkbox]");
+			if (checkbox) checkbox.checked = selected;
+		}
+	}
+
+	private cancelLongPressSelection(): void {
+		if (this.longPressState) window.clearTimeout(this.longPressState.timer);
+		this.longPressState = null;
+	}
+
+	private showChangeMenu(change: ChangedFile, event: MouseEvent): void {
+		const menu = new Menu();
+		menu.addItem((item) => item.setTitle("Open file").setIcon("file").onClick(() => this.openChangedFile(change.path)));
+		menu.addItem((item) => item.setTitle("Copy path").setIcon("copy").onClick(() => void this.copyChangedPath(change.path)));
+		menu.addSeparator();
+		menu.addItem((item) => item
+			.setTitle(change.staged ? "Unstage" : "Stage")
+			.setIcon(change.staged ? "minus" : "plus")
+			.onClick(() => void this.toggleStage(change)));
+		menu.addItem((item) => item.setTitle("Add to gitignore").setIcon("file-minus").onClick(() => void this.ignoreChangedFile(change.path)));
+		menu.addItem((item) => item
+			.setTitle("Delete (git rm)")
+			.setIcon("trash-2")
+			.setWarning(true)
+			.setDisabled(change.status === "Untracked")
+			.onClick(() => this.confirmRemoveChangedFile(change)));
+		menu.showAtMouseEvent(event);
+	}
+
+	private openChangedFile(path: string): void {
+		this.app.workspace.openLinkText(this.vaultPathForChange(path), "", false);
+	}
+
+	private async copyChangedPath(path: string): Promise<void> {
+		try {
+			await navigator.clipboard.writeText(this.vaultPathForChange(path));
+			new Notice("Path copied.");
+		} catch {
+			new Notice("Unable to copy the path.");
+		}
+	}
+
+	private async ignoreChangedFile(path: string): Promise<void> {
+		try {
+			await addToGitignore(this.app.vault.adapter, this.plugin.settings.repositoryPath, path);
+			this.plugin.recordActivity(`Added ${path} to .gitignore.`);
+			new Notice("Added to .gitignore.");
+			await this.refreshChangesOnly();
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to update .gitignore.";
+			this.plugin.recordActivity(`Could not update .gitignore: ${detail}`, "ERROR");
+			new Notice(detail);
+		}
+	}
+
+	private confirmRemoveChangedFile(change: ChangedFile): void {
+		new ConfirmActionModal(
+			this.app,
+			"Delete changed file?",
+			`This runs git rm for ${change.path} and stages the deletion.`,
+			() => void this.removeChangedFile(change),
+		).open();
+	}
+
+	private async removeChangedFile(change: ChangedFile): Promise<void> {
+		try {
+			await removeFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+			this.selectedPaths.delete(change.path);
+			this.plugin.recordActivity(`Removed ${change.path} with git rm.`);
+			new Notice("File removed with git rm.");
+			await this.refreshRepositoryState();
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to remove the file with git rm.";
+			this.plugin.recordActivity(`Could not remove ${change.path}: ${detail}`, "ERROR");
+			new Notice(detail);
+		}
+	}
+
+	private vaultPathForChange(path: string): string {
+		const repository = this.plugin.settings.repositoryPath.trim().replace(/^\.\/+/, "").replace(/\/+$/, "");
+		return repository && repository !== "." ? `${repository}/${path}` : path;
 	}
 
 	private renderChangesActionBar(root: HTMLElement): HTMLElement {
@@ -950,12 +1310,35 @@ class GitSyncView extends ItemView {
 		for (const change of this.changes ?? []) this.selectedPaths.add(change.path);
 	}
 
+	private async applyAllStage(unstage: boolean): Promise<void> {
+		const changes = (this.changes ?? []).filter((change) => change.staged === unstage);
+		if (changes.length === 0) return;
+
+		this.committing = true;
+		try {
+			for (const change of changes) {
+				if (unstage) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				else await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
+				this.selectedPaths.delete(change.path);
+				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
+			}
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to update all changed files.";
+			this.plugin.recordActivity(`Could not update all changed files: ${detail}`, "ERROR");
+			new Notice(detail);
+		} finally {
+			this.committing = false;
+		}
+		await this.refreshChangesOnly();
+	}
+
 	private async applySelectedStage(unstage: boolean): Promise<void> {
 		const selected = (this.changes ?? []).filter((change) =>
 			this.selectedPaths.has(change.path) && change.staged === unstage,
 		);
 		if (selected.length === 0) return;
 
+		this.committing = true;
 		try {
 			for (const change of selected) {
 				if (unstage) await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
@@ -963,12 +1346,14 @@ class GitSyncView extends ItemView {
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 				this.selectedPaths.delete(change.path);
 			}
-			await this.refreshChangesOnly();
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : "Unable to update selected files.";
 			this.plugin.recordActivity(`Could not update selected files: ${detail}`, "ERROR");
 			new Notice(detail);
+		} finally {
+			this.committing = false;
 		}
+		await this.refreshChangesOnly();
 	}
 
 	private async toggleStage(change: ChangedFile): Promise<void> {
@@ -1144,6 +1529,31 @@ class GitSyncView extends ItemView {
 		}).setting;
 		settings.open();
 		settings.openTabById(this.plugin.manifest.id);
+	}
+}
+
+class ConfirmActionModal extends Modal {
+	constructor(
+		app: App,
+		private readonly title: string,
+		private readonly description: string,
+		private readonly onConfirm: () => void,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.contentEl.empty();
+		this.contentEl.createEl("h2", { text: this.title });
+		this.contentEl.createEl("p", { text: this.description });
+		const actions = this.contentEl.createDiv({ cls: "git-sync-confirm-actions" });
+		const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
+		cancel.addEventListener("click", () => this.close());
+		const confirm = actions.createEl("button", { text: "Delete", cls: "mod-warning", attr: { type: "button" } });
+		confirm.addEventListener("click", () => {
+			this.close();
+			this.onConfirm();
+		});
 	}
 }
 
@@ -1810,6 +2220,29 @@ function describeOperationError(error: unknown, fallback: string): string {
 		return details.join(" ");
 	}
 	return typeof error === "string" && error ? error : fallback;
+}
+
+function changeFilterKey(status: string): ChangeStatusFilter {
+	if (status === "Untracked") return "Untracked";
+	if (status.startsWith("Added")) return "Added";
+	if (status.includes("Deleted")) return "Deleted";
+	return "Modified";
+}
+
+function compareChanges(left: ChangedFile, right: ChangedFile, sort: ChangeSort): number {
+	const pathCompare = left.path.localeCompare(right.path, undefined, { sensitivity: "base" });
+	if (sort === "path-desc") return -pathCompare;
+	if (sort === "status-path") {
+		const statusCompare = changeFilterKey(left.status).localeCompare(changeFilterKey(right.status));
+		return statusCompare || pathCompare;
+	}
+	if (sort === "folder-name") {
+		const leftParts = left.path.split("/");
+		const rightParts = right.path.split("/");
+		const folderCompare = leftParts.slice(0, -1).join("/").localeCompare(rightParts.slice(0, -1).join("/"), undefined, { sensitivity: "base" });
+		return folderCompare || leftParts[leftParts.length - 1].localeCompare(rightParts[rightParts.length - 1], undefined, { sensitivity: "base" });
+	}
+	return pathCompare;
 }
 
 function changeCode(status: string): string {

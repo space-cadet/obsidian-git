@@ -11,6 +11,11 @@ Show local file changes and provide the basic local commit workflow.
 - Commit message
 - Commit action
 
+## UI mockups
+
+- [`changes-multiselect-mockup-v1.png`](../assets/changes-multiselect-mockup-v1.png) is the preferred base layout for compact selection actions and multi-selection feedback.
+- [`changes-multiselect-mockup-v2.png`](../assets/changes-multiselect-mockup-v2.png) adds the section filter/sort controls, section-specific `+`/`−` actions, and the expanded file overflow menu.
+
 ## KISS boundary
 
 Start with a clear list and direct actions. Add selection modes, bulk actions,
