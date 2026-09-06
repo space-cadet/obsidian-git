@@ -30,6 +30,7 @@ import {
 	pullRepository,
 	REMOTE_TOKEN_SECRET_ID,
 	RemoteCredential,
+	RemoteOperationResult,
 	RemoteProgressEvent,
 	testRemoteConnection,
 } from "./remote";
@@ -304,7 +305,7 @@ export default class GitSyncPlugin extends Plugin {
 		};
 	}
 
-	private runRemoteOperation(name: string, operation: (modal: GitProgressModal) => Promise<void>): Promise<void> {
+	private runRemoteOperation(name: string, operation: (modal: GitProgressModal) => Promise<RemoteOperationResult>): Promise<void> {
 		this.recordActivity(`${name} requested.`);
 		const next = this.remoteOperationQueue
 			.catch(() => undefined)
@@ -316,10 +317,12 @@ export default class GitSyncPlugin extends Plugin {
 				});
 				modal.open();
 				try {
-					await operation(modal);
+					const result = await operation(modal);
 					this.recordActivity(`${name} completed for ${this.settings.branchName}.`);
+					this.recordActivity(`${name}: ${result.summary}`);
+					for (const detail of result.details) this.recordActivity(`${name}: ${detail}`, "DEBUG");
 					this.refreshViews();
-					modal.complete(`${name} completed for ${this.settings.branchName}.`);
+					modal.complete(result);
 					new Notice(`${name} completed.`);
 				} catch (error) {
 					const detail = describeOperationError(error, `${name} failed.`);
@@ -1383,12 +1386,14 @@ class GitProgressModal extends Modal {
 	private progressEl: HTMLProgressElement | null = null;
 	private countEl: HTMLElement | null = null;
 	private remoteMessagesEl: HTMLElement | null = null;
+	private detailsEl: HTMLElement | null = null;
 	private resultEl: HTMLElement | null = null;
 	private closeButton: HTMLButtonElement | null = null;
 	private elapsedTimer: number | null = null;
 	private lastPhase = "";
 	private pendingProgress: RemoteProgressEvent | null = null;
 	private pendingMessages: string[] = [];
+	private pendingFinish: { state: "Completed" | "Failed"; result: RemoteOperationResult; icon: string; className: string } | null = null;
 
 	constructor(
 		app: App,
@@ -1404,6 +1409,7 @@ class GitProgressModal extends Modal {
 		this.contentEl.empty();
 		this.contentEl.addClass("git-sync-progress-content");
 
+		this.contentEl.createDiv({ cls: "git-sync-progress-kicker", text: operationKicker(this.operation) });
 		const heading = this.contentEl.createDiv({ cls: "git-sync-progress-heading" });
 		heading.createEl("h2", { text: `${this.operation} origin/${this.branch}` });
 		this.elapsedEl = heading.createDiv({
@@ -1416,6 +1422,8 @@ class GitProgressModal extends Modal {
 		setIcon(this.phaseIconEl, "loader-circle");
 		this.phaseEl = phase.createSpan({ text: "Waiting for Git progress…" });
 		this.percentEl = phase.createSpan({ cls: "git-sync-progress-percent" });
+		const spark = this.contentEl.createDiv({ cls: "git-sync-progress-spark", attr: { "aria-hidden": "true" } });
+		for (let index = 0; index < 7; index++) spark.createSpan();
 
 		this.progressEl = this.contentEl.createEl("progress", {
 			cls: "git-sync-progress-bar",
@@ -1425,6 +1433,9 @@ class GitProgressModal extends Modal {
 		this.countEl = this.contentEl.createDiv({ cls: "git-sync-progress-count" });
 
 		this.remoteMessagesEl = this.contentEl.createDiv({ cls: "git-sync-progress-messages" });
+		this.remoteMessagesEl.hidden = true;
+		this.detailsEl = this.contentEl.createDiv({ cls: "git-sync-progress-details" });
+		this.detailsEl.hidden = true;
 		this.resultEl = this.contentEl.createDiv({ cls: "git-sync-progress-result" });
 
 		const footer = this.contentEl.createDiv({ cls: "git-sync-progress-footer" });
@@ -1441,6 +1452,11 @@ class GitProgressModal extends Modal {
 		for (const message of this.pendingMessages) this.renderRemoteMessage(message);
 		this.pendingProgress = null;
 		this.pendingMessages = [];
+		if (this.pendingFinish) {
+			const finish = this.pendingFinish;
+			this.pendingFinish = null;
+			this.finish(finish.state, finish.result, finish.icon, finish.className);
+		}
 	}
 
 	onClose(): void {
@@ -1475,12 +1491,12 @@ class GitProgressModal extends Modal {
 		this.renderRemoteMessage(safeMessage);
 	}
 
-	complete(result: string): void {
+	complete(result: RemoteOperationResult): void {
 		this.finish("Completed", result, "check", "is-complete");
 	}
 
 	fail(detail: string): void {
-		this.finish("Failed", detail, "x", "is-error");
+		this.finish("Failed", { summary: "The operation could not be completed.", details: [detail] }, "x", "is-error");
 	}
 
 	private renderProgress(event: RemoteProgressEvent): void {
@@ -1506,6 +1522,7 @@ class GitProgressModal extends Modal {
 
 	private renderRemoteMessage(message: string): void {
 		if (!this.remoteMessagesEl) return;
+		this.remoteMessagesEl.hidden = false;
 		this.remoteMessages.push(message);
 		this.remoteMessages.splice(0, Math.max(0, this.remoteMessages.length - 4));
 		this.remoteMessagesEl.empty();
@@ -1517,7 +1534,11 @@ class GitProgressModal extends Modal {
 		}
 	}
 
-	private finish(state: "Completed" | "Failed", result: string, icon: string, className: string): void {
+	private finish(state: "Completed" | "Failed", result: RemoteOperationResult, icon: string, className: string): void {
+		if (!this.phaseEl || !this.resultEl || !this.closeButton) {
+			this.pendingFinish = { state, result, icon, className };
+			return;
+		}
 		if (this.elapsedTimer !== null) {
 			window.clearInterval(this.elapsedTimer);
 			this.elapsedTimer = null;
@@ -1529,15 +1550,40 @@ class GitProgressModal extends Modal {
 			this.phaseIconEl.empty();
 			setIcon(this.phaseIconEl, icon);
 		}
-		if (this.resultEl) this.resultEl.setText(result);
-		if (this.closeButton) {
-			this.closeButton.disabled = false;
-			this.closeButton.focus();
+		this.resultEl.setText(result.summary);
+		this.renderDetails(result.details);
+		if (this.progressEl && !this.progressEl.hidden && state === "Completed") {
+			this.progressEl.value = 100;
+			this.percentEl?.setText("100%");
+			this.countEl?.setText("Transfer complete");
+		} else if (this.countEl) {
+			this.countEl.setText(state === "Completed" ? "No transfer needed" : "Transfer stopped");
+		}
+		this.closeButton.disabled = false;
+		this.closeButton.focus();
+	}
+
+	private renderDetails(details: string[]): void {
+		if (!this.detailsEl) return;
+		this.detailsEl.empty();
+		this.detailsEl.hidden = details.length === 0;
+		for (const detail of details) {
+			this.detailsEl.createDiv({ cls: "git-sync-progress-detail", text: detail });
 		}
 	}
 
 	private updateElapsed(): void {
 		this.elapsedEl?.setText(`Time elapsed: ${formatElapsed(Date.now() - this.startedAt)}`);
+	}
+}
+
+function operationKicker(operation: string): string {
+	switch (operation) {
+		case "Push": return "Sending your local commits to the remote";
+		case "Pull": return "Bringing remote commits into this vault";
+		case "Fetch": return "Checking the remote without changing your files";
+		case "Clone": return "Setting up a fresh local repository";
+		default: return "Git is working";
 	}
 }
 
@@ -1571,6 +1617,7 @@ function formatElapsed(milliseconds: number): string {
 
 function safeRemoteMessage(message: string): string {
 	return message
+		.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
 		.trim()
 		.replace(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, "$1[redacted]@")
 		.replace(/\b(token|password|authorization|bearer)\s*[:=]\s*\S+/gi, "$1: [redacted]");

@@ -157,3 +157,15 @@ Build the Settings panel immediately after the shell with only the configuration
 - Cancellation remains pending until the HTTP bridge can honor an abort
   signal; production build and diff checks passed, with live host acceptance
   still remaining.
+
+## 2026-09-06 T8 result and visual polish update
+
+- Investigation of `git-test-small` (checked out locally as
+  `/Users/deepak/code/git-test`) confirmed that Push only sends commits; files
+  added or edited in the working tree are not included until committed.
+- Remote operations now return Git-style summaries. Push distinguishes
+  `Everything up-to-date.` from a ref update, reports short object IDs and
+  commit/file counts where available, and warns about uncommitted files.
+- The modal now hides empty remote output, strips control characters from
+  messages, and adds operation-specific explanatory text, a result transcript,
+  and a restrained animated accent.

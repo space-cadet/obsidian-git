@@ -41,6 +41,12 @@ what to do after a failure.
   after either state is reached, and the user closes the modal explicitly.
 - Phase transitions and sanitized remote messages are recorded in Activity;
   individual percentage updates are not persisted as separate rows.
+- Fetch, Pull, Push, and Clone now return operation-specific result summaries.
+  The modal distinguishes `Already up to date.` / `Everything up-to-date.` from
+  an actual ref update and shows the relevant short object IDs, commit/file
+  counts where available, and uncommitted files that a push cannot include.
+- The modal also includes a short operation-specific explanation, a compact
+  Git-style result transcript, and a restrained animated progress accent.
 
 ## Git CLI behavior to reproduce
 
@@ -199,12 +205,13 @@ depends on the command and whether it has objects or working-tree files to
 process; the UI must render the supplied phase text rather than assume every
 CLI phase will occur.
 
-The current wrappers in `src/remote.ts` do not pass `onProgress` or `onMessage`
-through, so the current operation presentation can only show the already-
-recorded generic started/completed/failed notices. The current Obsidian HTTP
-bridge also buffers the request and response through `requestUrl`; its
-`onProgress` and `AbortSignal` fields are not wired to a byte-progress or
-cancellation path.
+The wrappers in `src/remote.ts` pass `onProgress` and `onMessage` through and
+return operation-specific result summaries. Push also captures the library's
+pre-push local/remote object IDs, so the UI can distinguish a no-op from a ref
+update and can explain when uncommitted files were not part of the push. The
+current Obsidian HTTP bridge still buffers the request and response through
+`requestUrl`; its `onProgress` and `AbortSignal` fields are not wired to a
+byte-progress or cancellation path.
 
 ## Modal feasibility
 

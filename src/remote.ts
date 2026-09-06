@@ -27,6 +27,11 @@ export interface RemoteProgressEvent {
 	total: number;
 }
 
+export interface RemoteOperationResult {
+	summary: string;
+	details: string[];
+}
+
 export interface RemoteRepositoryOptions {
 	adapter: DataAdapter;
 	repositoryPath: string;
@@ -60,8 +65,9 @@ export async function testRemoteConnection(
 	};
 }
 
-export async function fetchRepository(options: RemoteRepositoryOptions): Promise<void> {
+export async function fetchRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	const previousRemoteHead = await resolveOptionalRef(fs, dir, `refs/remotes/origin/${branch}`);
 	diagnostic(options, `Fetch: requesting origin/${branch} from ${url}.`);
 	const result = await git.fetch({
 		fs,
@@ -76,13 +82,24 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Fetch: received ${result.fetchHead ? result.fetchHead.slice(0, 7) : "no commit"}.`);
+	const fetchedHead = result.fetchHead;
+	return {
+		summary: fetchedHead && fetchedHead !== previousRemoteHead
+			? `Updated origin/${branch} to ${shortOid(fetchedHead)}.`
+			: "Already up to date.",
+		details: [
+			`From ${redactRemoteText(url)}`,
+			fetchedHead ? `origin/${branch} -> ${shortOid(fetchedHead)}` : `No commits received from origin/${branch}.`,
+		],
+	};
 }
 
-export async function pullRepository(options: RemoteRepositoryOptions): Promise<void> {
+export async function pullRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
 	if (!options.author?.name || !options.author.email) {
 		throw new Error("Set your commit name and email before pulling.");
 	}
+	const previousLocalHead = await resolveOptionalRef(fs, dir, branch);
 	diagnostic(options, `Pull: requesting origin/${branch} from ${url}.`);
 	await git.pull({
 		fs,
@@ -100,10 +117,22 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Pull: completed fast-forward check for ${branch}.`);
+	const currentLocalHead = await resolveOptionalRef(fs, dir, branch);
+	const updated = currentLocalHead && currentLocalHead !== previousLocalHead;
+	return {
+		summary: updated
+			? `Fast-forwarded ${branch} to ${shortOid(currentLocalHead)}.`
+			: "Already up to date.",
+		details: updated && previousLocalHead
+			? [`Local ${branch}: ${shortOid(previousLocalHead)}..${shortOid(currentLocalHead)}`]
+			: [`Local ${branch}: ${shortOid(currentLocalHead)}`],
+	};
 }
 
-export async function pushRepository(options: RemoteRepositoryOptions): Promise<void> {
+export async function pushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	const workingTreeChanges = await readWorkingTreeChanges(fs, dir);
+	const pushPlan: PushPlan = { localOid: "", remoteOid: "" };
 	diagnostic(options, `Push: sending ${branch} to ${url}.`);
 	const result = await git.push({
 		fs,
@@ -116,12 +145,45 @@ export async function pushRepository(options: RemoteRepositoryOptions): Promise<
 		onAuth: authCallback(options.credential),
 		onProgress: options.onProgress,
 		onMessage: options.onMessage,
+		onPrePush: ({ localRef, remoteRef }) => {
+			pushPlan.localOid = localRef.oid;
+			pushPlan.remoteOid = remoteRef.oid;
+			return true;
+		},
 	});
 	diagnostic(options, `Push: server response ${result.ok ? "accepted" : result.error ?? "rejected"}.`);
 	if (result.error) throw new Error(result.error);
+
+	const details = [`To ${redactRemoteText(url)}`];
+	if (pushPlan.localOid && pushPlan.localOid === pushPlan.remoteOid) {
+		details.push("Everything up-to-date.");
+	} else if (pushPlan.localOid && isZeroOid(pushPlan.remoteOid)) {
+		details.push(`* [new branch] ${branch} -> ${branch}`);
+	} else if (pushPlan.localOid) {
+		details.push(`   ${shortOid(pushPlan.remoteOid)}..${shortOid(pushPlan.localOid)}  ${branch} -> ${branch}`);
+	}
+
+	const commitSummary = pushPlan.localOid && pushPlan.localOid !== pushPlan.remoteOid
+		? await countCommitsToPush(fs, dir, branch, pushPlan.remoteOid)
+		: null;
+	if (commitSummary) {
+		const commitLabel = `${commitSummary.commits} commit${commitSummary.commits === 1 ? "" : "s"}`;
+		const fileLabel = commitSummary.files > 0
+			? `, ${commitSummary.files} file${commitSummary.files === 1 ? "" : "s"}`
+			: "";
+		details.push(`${commitLabel}${fileLabel} sent.`);
+	}
+	if (workingTreeChanges > 0) {
+		details.push(`${workingTreeChanges} uncommitted file${workingTreeChanges === 1 ? "" : "s"} not included; commit first to push them.`);
+	}
+
+	return {
+		summary: pushPlan.localOid && pushPlan.localOid === pushPlan.remoteOid ? "Everything up-to-date." : `Pushed ${branch} to origin.`,
+		details,
+	};
 }
 
-export async function cloneRepository(options: RemoteRepositoryOptions): Promise<void> {
+export async function cloneRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const dir = validateRepositoryDirectory(options.repositoryPath);
 	const url = validateRemoteUrl(options.remoteUrl);
 	const branch = validateBranchName(options.branchName);
@@ -144,6 +206,10 @@ export async function cloneRepository(options: RemoteRepositoryOptions): Promise
 		onMessage: options.onMessage,
 	});
 	diagnostic(options, `Clone: completed repository setup in ${dir}.`);
+	return {
+		summary: `Cloned ${branch} from origin.`,
+		details: [`Repository ready at ${dir}.`],
+	};
 }
 
 async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
@@ -177,6 +243,56 @@ function validateBranchName(value: string): string {
 		throw new Error("Use a simple branch name without spaces or '..'.");
 	}
 	return branch;
+}
+
+interface PushPlan {
+	localOid: string;
+	remoteOid: string;
+}
+
+async function resolveOptionalRef(fs: ObsidianGitFs, dir: string, ref: string): Promise<string | null> {
+	try {
+		return await git.resolveRef({ fs, dir, ref });
+	} catch {
+		return null;
+	}
+}
+
+async function readWorkingTreeChanges(fs: ObsidianGitFs, dir: string): Promise<number> {
+	const matrix = await git.statusMatrix({ fs, dir, refresh: false });
+	return matrix.filter(([, head, workdir, stage]) => head !== workdir || head !== stage).length;
+}
+
+async function countCommitsToPush(
+	fs: ObsidianGitFs,
+	dir: string,
+	branch: string,
+	remoteOid: string,
+): Promise<{ commits: number; files: number } | null> {
+	try {
+		const commits = await git.log({ fs, dir, ref: branch, depth: 100, includeChanges: true });
+		const pending = isZeroOid(remoteOid)
+			? commits
+			: commits.slice(0, commits.findIndex((entry) => entry.oid === remoteOid));
+		if (!isZeroOid(remoteOid) && !commits.some((entry) => entry.oid === remoteOid)) return null;
+		const files = new Set<string>();
+		for (const entry of pending) {
+			for (const change of entry.commit.changes ?? []) {
+				if (typeof change[2] === "string") files.add(change[2]);
+			}
+		}
+		return { commits: pending.length, files: files.size };
+	} catch {
+		return null;
+	}
+}
+
+function isZeroOid(value: string): boolean {
+	return /^0{40}$/.test(value);
+}
+
+function shortOid(value: string | null): string {
+	return value ? value.slice(0, 7) : "none";
 }
 
 async function listDirectory(adapter: DataAdapter, path: string): Promise<{ files: string[]; folders: string[] } | null> {
