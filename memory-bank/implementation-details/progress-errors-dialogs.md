@@ -46,7 +46,9 @@ what to do after a failure.
   an actual ref update and shows the relevant short object IDs, commit/file
   counts where available, and uncommitted files that a push cannot include.
 - The modal also includes a short operation-specific explanation, a compact
-  Git-style result transcript, and a restrained animated progress accent.
+  Git-style result transcript, and a restrained animated progress accent. The
+  remote and result fields are vertically scrollable on small screens, and the
+  accent respects reduced-motion preferences.
 
 ## Git CLI behavior to reproduce
 

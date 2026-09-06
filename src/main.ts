@@ -416,6 +416,7 @@ class GitSyncView extends ItemView {
 	private committing = false;
 	private commitMessage = "";
 	private changesContentEl: HTMLElement | null = null;
+	private changesScrollTop = 0;
 	private refreshGeneration = 0;
 	private lastRepositoryActivity = "";
 
@@ -452,6 +453,7 @@ class GitSyncView extends ItemView {
 	}
 
 	render(): void {
+		this.captureChangesScrollTop();
 		const root = this.contentEl;
 		root.empty();
 		root.addClass("git-sync-sidebar");
@@ -524,6 +526,7 @@ class GitSyncView extends ItemView {
 			this.changesContentEl = content;
 			this.renderChanges(content);
 			this.renderChangesActionBar(root);
+			this.restoreChangesScrollTop(content);
 			return;
 		}
 
@@ -538,7 +541,8 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderRepositoryContext(root: HTMLElement, repository: string): void {
-		const context = root.createDiv({ cls: "git-sync-repository-context" });
+		const context = root.querySelector<HTMLElement>(".git-sync-repository-context") ?? root.createDiv({ cls: "git-sync-repository-context" });
+		context.empty();
 		const branch = context.createDiv({ cls: "git-sync-branch-context" });
 		const branchIcon = branch.createSpan({ cls: "git-sync-branch-icon" });
 		setIcon(branchIcon, "git-branch");
@@ -608,7 +612,11 @@ class GitSyncView extends ItemView {
 
 		const generation = ++this.refreshGeneration;
 		this.repositoryState = { kind: "checking", repositoryPath };
-		this.render();
+		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
+			this.renderRepositoryContext(this.contentEl, repositoryPath);
+		} else {
+			this.render();
+		}
 		const state = await inspectLocalRepository(this.app.vault.adapter, repositoryPath);
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.repositoryState = state;
@@ -660,7 +668,12 @@ class GitSyncView extends ItemView {
 		}
 		if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 		this.recordRepositoryActivity(state);
-		this.render();
+		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
+			this.renderRepositoryContext(this.contentEl, repositoryPath);
+			this.updateChangesContent();
+		} else {
+			this.render();
+		}
 	}
 
 	private renderChanges(content: HTMLElement): void {
@@ -1038,7 +1051,7 @@ class GitSyncView extends ItemView {
 			return;
 		}
 
-		const scrollTop = content.scrollTop;
+		this.captureChangesScrollTop();
 		const activeElement = content.ownerDocument.activeElement;
 		const focusedPath = activeElement instanceof HTMLElement
 			? activeElement.getAttribute("data-change-path")
@@ -1050,7 +1063,7 @@ class GitSyncView extends ItemView {
 
 		content.empty();
 		this.renderChanges(content);
-		content.scrollTop = scrollTop;
+		this.restoreChangesScrollTop(content);
 
 		if (focusedTextarea) {
 			const textarea = content.querySelector<HTMLTextAreaElement>(".git-sync-commit textarea");
@@ -1063,6 +1076,17 @@ class GitSyncView extends ItemView {
 				.find((element) => element.getAttribute("data-change-path") === focusedPath);
 			focusedControl?.focus();
 		}
+	}
+
+	private captureChangesScrollTop(): void {
+		if (this.changesContentEl?.isConnected) this.changesScrollTop = this.changesContentEl.scrollTop;
+	}
+
+	private restoreChangesScrollTop(content: HTMLElement): void {
+		content.scrollTop = this.changesScrollTop;
+		window.requestAnimationFrame(() => {
+			if (content.isConnected) content.scrollTop = this.changesScrollTop;
+		});
 	}
 
 	private recordRepositoryActivity(state: RepositoryState): void {

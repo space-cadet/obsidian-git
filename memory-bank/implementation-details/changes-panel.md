@@ -31,8 +31,11 @@ the resulting clean state.
   remote, keeping remote synchronization next to the Changes workflow.
 - The approved mobile layout uses grouped staged and uncommitted sections,
   counts, collapsible headers, selection controls, and icon actions.
-- Stage and unstage refresh the Changes content while preserving the panel,
-  active control, commit-message focus, and scroll position.
+- Stage and unstage refresh only the Changes content while preserving the
+  panel shell, active control, commit-message focus, and scroll position. A
+  later mobile check found that full repository refreshes still rebuilt the
+  visible Changes state; those refreshes now update the existing shell in
+  place and restore scroll after layout.
 - Pull and Push are connected to the shared remote operation queue and emit
   Activity diagnostics while they run; Settings remains configuration-only.
 - The local integration flow passed: untracked -> staged -> committed -> clean.
@@ -41,7 +44,8 @@ the resulting clean state.
 
 ## Remaining evidence
 
-The user verified the pushed Changes build, including staging behavior, scroll
-preservation, and working Pull and Push toolbar actions. Filtering, sorting,
+The user verified the pushed Changes build, including staging behavior and
+working Pull and Push toolbar actions. Scroll preservation is being reverified
+after the in-place refresh correction. Filtering, sorting,
 revert, keyboard multi-selection, and progress-modal treatment remain planned
 refinements.

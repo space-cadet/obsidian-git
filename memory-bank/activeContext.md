@@ -22,8 +22,11 @@ configuration-focused. The progress modal includes elapsed time, sanitized
 remote messages, a Git-style operation result transcript, and a final state
 that stays open until the user closes it. Push explains the difference between
 no commits to send and a real ref update, including uncommitted files that were
-not included. Remaining work is cancellation only if the bridge can support it
-and edge-case verification.
+not included. The modal output fields now scroll vertically on small screens,
+and the progress accent is intentionally subdued. Changes refreshes preserve
+the existing panel shell and restore scroll after layout instead of showing the
+intermediate full-tab reload. Remaining work is cancellation only if the
+bridge can support it and edge-case verification.
 
 ## Current Decisions
 

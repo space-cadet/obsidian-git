@@ -169,3 +169,12 @@ Build the Settings panel immediately after the shell with only the configuration
 - The modal now hides empty remote output, strips control characters from
   messages, and adds operation-specific explanatory text, a result transcript,
   and a restrained animated accent.
+
+## 2026-09-06 T4/T8 follow-up polish
+
+- Added bounded vertical scrolling to the modal's remote and result output
+  fields, reduced the accent animation's speed/contrast, and added a
+  reduced-motion fallback.
+- Changes refreshes now reuse the visible repository context and Changes shell
+  when possible. Scroll position is stored and restored immediately and after
+  the next animation frame to cover mobile layout recalculation.
