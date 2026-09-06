@@ -27,7 +27,7 @@ the resulting clean state.
   backed by `isomorphic-git`; a remote URL is not required.
 - It renders changed files, individual Stage/Unstage controls, a commit message
   field, commit identity settings, and a Commit action.
-- Its fixed bottom action bar also exposes Pull and Push for the configured
+- Its fixed bottom action bar exposes Pull, Push, and Fetch for the configured
   remote, keeping remote synchronization next to the Changes workflow.
 - The approved mobile layout uses grouped staged and uncommitted sections,
   counts, collapsible headers, selection controls, and icon actions.

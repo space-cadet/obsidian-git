@@ -395,7 +395,6 @@ class GitSyncView extends ItemView {
 	private committing = false;
 	private commitMessage = "";
 	private changesContentEl: HTMLElement | null = null;
-	private changesActionBarEl: HTMLElement | null = null;
 	private refreshGeneration = 0;
 	private lastRepositoryActivity = "";
 
@@ -461,7 +460,6 @@ class GitSyncView extends ItemView {
 
 		const content = root.createDiv({ cls: "git-sync-content" });
 		this.changesContentEl = null;
-		this.changesActionBarEl = null;
 		if (this.activeTab === "Log") {
 			this.renderActivity(content);
 			return;
@@ -504,7 +502,7 @@ class GitSyncView extends ItemView {
 		if (this.activeTab === "Changes") {
 			this.changesContentEl = content;
 			this.renderChanges(content);
-			this.changesActionBarEl = this.renderChangesActionBar(root);
+			this.renderChangesActionBar(root);
 			return;
 		}
 
@@ -891,63 +889,31 @@ class GitSyncView extends ItemView {
 			this.render();
 		});
 
-		const stage = bar.createEl("button", {
-			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Stage selected files", title: "Stage selected", "data-git-sync-action": "stage" },
-		});
-		setIcon(stage, "arrow-down-to-line");
-		stage.disabled = !this.hasSelectedUncommitted() || this.committing;
-		stage.addEventListener("click", () => void this.applySelectedStage(false));
-
-		const unstage = bar.createEl("button", {
-			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Unstage selected files", title: "Unstage selected", "data-git-sync-action": "unstage" },
-		});
-		setIcon(unstage, "arrow-up-to-line");
-		unstage.disabled = !this.hasSelectedStaged() || this.committing;
-		unstage.addEventListener("click", () => void this.applySelectedStage(true));
-
 		const pull = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Pull from remote", title: "Pull from remote", "data-git-sync-action": "pull" },
+			attr: { type: "button", "aria-label": "Pull from remote", title: "Pull from remote" },
 		});
-		setIcon(pull, "download");
+		setIcon(pull, "arrow-down-to-line");
 		pull.addEventListener("click", () => void this.plugin.pullRemote());
 
 		const push = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Push to remote", title: "Push to remote", "data-git-sync-action": "push" },
+			attr: { type: "button", "aria-label": "Push to remote", title: "Push to remote" },
 		});
-		setIcon(push, "upload");
+		setIcon(push, "arrow-up-to-line");
 		push.addEventListener("click", () => void this.plugin.pushRemote());
 
 		const refresh = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Refresh repository", title: "Refresh repository" },
+			attr: { type: "button", "aria-label": "Fetch from remote", title: "Fetch from remote" },
 		});
 		setIcon(refresh, "refresh-cw");
-		refresh.addEventListener("click", () => void this.refreshRepositoryState());
+		refresh.addEventListener("click", () => void this.plugin.fetchRemote());
 		return bar;
-	}
-
-	private updateChangesActionBar(): void {
-		if (!this.changesActionBarEl) return;
-		const stage = this.changesActionBarEl.querySelector<HTMLButtonElement>('[data-git-sync-action="stage"]');
-		const unstage = this.changesActionBarEl.querySelector<HTMLButtonElement>('[data-git-sync-action="unstage"]');
-		if (stage) stage.disabled = !this.hasSelectedUncommitted() || this.committing;
-		if (unstage) unstage.disabled = !this.hasSelectedStaged() || this.committing;
 	}
 
 	private selectAllChanges(): void {
 		for (const change of this.changes ?? []) this.selectedPaths.add(change.path);
-	}
-
-	private hasSelectedStaged(): boolean {
-		return (this.changes ?? []).some((change) => change.staged && this.selectedPaths.has(change.path));
-	}
-
-	private hasSelectedUncommitted(): boolean {
-		return (this.changes ?? []).some((change) => !change.staged && this.selectedPaths.has(change.path));
 	}
 
 	private async applySelectedStage(unstage: boolean): Promise<void> {
@@ -1064,7 +1030,6 @@ class GitSyncView extends ItemView {
 		content.empty();
 		this.renderChanges(content);
 		content.scrollTop = scrollTop;
-		this.updateChangesActionBar();
 
 		if (focusedTextarea) {
 			const textarea = content.querySelector<HTMLTextAreaElement>(".git-sync-commit textarea");

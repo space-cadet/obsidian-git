@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-06 15:20:33 IST*
+*Last Updated: 2026-09-06 15:35:46 IST*
 
 ## Current Focus
 
@@ -17,8 +17,8 @@ updates, auto-saving Settings, and versioned plugin data portability.
 The repository header now reports comparison status, and remote operations
 write live diagnostic Activity entries. Remaining work is live remote and
 installed host verification, followed by the lettered UI refinements in T4 and
-T5. Pull and Push are exposed only in the Changes action bar; Settings now
-remains configuration-focused.
+T5. Pull, Push, and Fetch are exposed only in the Changes action bar; Settings
+now remains configuration-focused.
 
 ## Current Decisions
 

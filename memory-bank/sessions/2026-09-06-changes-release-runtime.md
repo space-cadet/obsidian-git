@@ -113,3 +113,5 @@ T4: Changes Panel; T9: Updater and Release; T10: Platform Integration and Verifi
 - Confirmed the bottom Changes toolbar is the intended home for Git actions.
 - Removed duplicate Settings operation controls and kept Pull and Push in the
   Changes toolbar using the shared remote queue and Activity diagnostics.
+- The toolbar now uses its existing down/up/refresh icons for Pull, Push, and
+  Fetch, while section controls retain staging actions.

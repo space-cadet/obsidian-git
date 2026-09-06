@@ -89,6 +89,8 @@ Build the Settings panel immediately after the shell with only the configuration
   home in the Changes action bar.
 - The Changes action bar owns Pull and Push and connects them to the shared
   queued remote operation path.
+- Its four actions now match the reference: Select All, Pull, Push, and Fetch;
+  staging remains in the section-level controls.
 
 ## 2026-09-06 Update
 
