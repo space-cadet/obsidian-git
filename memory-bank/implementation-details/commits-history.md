@@ -1,5 +1,7 @@
 # T6: Commits and History
 
+*Last Updated: 2026-09-07 05:29:49 IST*
+
 ## Purpose
 
 Show existing local and fetched remote commit history, including when the
@@ -7,7 +9,7 @@ repository has no configured or reachable remote.
 
 ## Implemented state
 
-- The local repository bridge reads up to 50 commit summaries through
+- The local repository bridge reads 100 commit summaries per page through
   `isomorphic-git` `log` without eagerly calculating changed-file metadata.
 - The Commits tab renders a Local/Remote source switch using the same visual
   language as the reference layout.
@@ -23,12 +25,14 @@ repository has no configured or reachable remote.
   state prompting the user to Fetch.
 - The repository context header reports the comparison state when fetched
   local and remote history is available.
+- Local and remote sources have independent pagination and “Load more commits”
+  controls. Expanded commit details load changed files lazily and cache them.
 
 ## KISS boundary
 
-History is read-only and capped at the latest 50 commits per source. Pagination,
-branch trees, remote comparison, and history caching remain out of scope until
-the basic local and fetched-remote views demonstrate a need for them.
+History is read-only and paginated at 100 commits per source. Branch trees and
+broad history caches remain out of scope; expanded commit details use a small
+per-view cache because they are explicitly requested by the user.
 
 ## Verification
 

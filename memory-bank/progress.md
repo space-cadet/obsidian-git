@@ -30,11 +30,26 @@
 - Polished mobile behavior with scrollable modal output, subdued animation, and
   Changes refreshes that preserve the tab shell and scroll position.
 
+## 2026-09-07
+
+- Added Changes multi-selection, per-section filtering/sorting, file overflow
+  actions, and targeted staging/commit/gitignore reconciliation.
+- Added paginated Local/Remote history with lazy changed-file details and
+  paginated plain-text Activity backed by `activity.log`.
+- Deferred full Changes scans to initial/context/manual Refresh paths and made
+  uncertain post-Pull/Clone state explicit.
+- Added stale-path filtering and validated-stat reuse in the filesystem bridge.
+- Recorded latency instrumentation, tuning commits, evidence boundaries, and
+  the remaining controlled large-vault benchmark plan.
+- Final production build and `git diff --check` passed; branch parity is
+  `574633a` locally and on `origin/codex/kiss-restart`.
+
 ## Next
 
 - Implement cancellation only if the HTTP bridge supports a real abort path.
-- Add confirmation dialogs for destructive actions if the workflow requires them.
-- Continue T4f/T4g and T5e for Changes refinements and Log clear/export.
+- Keep T4 revert and T5 clear/export as remaining refinements.
+- Capture controlled cold/warm large-vault timings and continue remote edge-case
+  and platform-specific T10 acceptance.
 - Record platform-specific T10 acceptance when those hosts are tested.
 
 ## 2026-09-06 Session Closeout

@@ -1,5 +1,7 @@
 # T8: Progress, Errors, and Dialogs
 
+*Last Updated: 2026-09-07 05:29:49 IST*
+
 ## Purpose
 
 Make active operations and failures understandable without adding a framework.
@@ -49,6 +51,9 @@ what to do after a failure.
   Git-style result transcript, and a restrained animated progress accent. The
   remote and result fields are vertically scrollable on small screens, and the
   accent respects reduced-motion preferences.
+- Destructive `git rm` actions use a confirmation modal. Cancellation remains
+  intentionally absent until the HTTP bridge and Git operation expose a tested
+  abort path.
 
 ## Git CLI behavior to reproduce
 

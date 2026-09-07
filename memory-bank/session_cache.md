@@ -1,17 +1,17 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 19:49:01 IST*
+*Last Updated: 2026-09-07 05:29:49 IST*
 
 **Started**: 2026-09-05 23:36:24 IST
-**Focus Task**: T4, T5, T7, T8: Git Sync UI, remote operations, progress modals, and mobile polish
-**Session File**: `sessions/2026-09-06-changes-release-runtime.md`
-**Status**: 🔄 Active: 10, Paused: 0, Completed: 0
+**Focus Task**: T4, T5, T7, T8, T10: Changes, Activity, remote latency, and acceptance
+**Session File**: `sessions/2026-09-07-night.md`
+**Status**: 🔄 Active: 9, Paused: 0, Completed: 1
 
 ## Overview
 
-- Active: 10 | Paused: 0 | Completed: 0
-- Last Session: 2026-09-06
+- Active: 9 | Paused: 0 | Completed: 1
+- Last Session: 2026-09-07
 - Current Period: night
 
 ## Active Tasks
@@ -32,9 +32,9 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T8: Add progress modals and operation-state presentation for Git actions.
-2. T4/T5/T7: Refine UI and replace generic notices with richer Git-style results.
-3. T10: Record platform-specific acceptance separately when those hosts are tested.
+1. T4: Finish the planned revert refinement.
+2. T5: Add Log clear/export if still required.
+3. T10: Capture controlled large-vault timings and platform-specific acceptance.
 
 ## 2026-09-06 Commits Update
 
@@ -185,3 +185,18 @@ Build the Settings panel immediately after the shell with only the configuration
 - The user verified the pushed progress modal, Pull, Push, and Changes refresh behavior on mobile.
 - Memory Bank records were updated for T4, T5, T7, T8, and T10; no new tasks or implementation documents were needed.
 - Next work: real cancellation only with abort support, destructive confirmation if needed, T4f/T4g/T5e, remote edge cases, and explicit T10 platform records.
+
+## 2026-09-07 Latency and refresh closeout
+
+- T6 is complete for the read-only Local/Remote history scope: details are
+  lazy-loaded and both sources paginate independently in pages of 100.
+- T4 now records multi-selection, filtering/sorting, overflow actions, local
+  reconciliation, and explicit/manual full-refresh ownership; revert remains.
+- T5 now records bounded plain-text `activity.log`, selectable 100-message
+  pages, compaction, and phase-level timings; clear/export remain.
+- T7/T8 now record retained remote phases/results and Pull/Clone
+  Changes-needs-refresh states; cancellation remains deferred without abort.
+- T3 records stale-path filtering and validated-stat reuse for adapter reads.
+- New knowledge-layer record: `implementation-details/latency-benchmarking.md`.
+- Final build and diff checks passed; local and remote-tracking HEADs resolve to
+  `574633a`. Controlled large-vault cold/warm timing and host acceptance remain.

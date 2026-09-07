@@ -1,5 +1,7 @@
 # T7: Remote Sync and Authentication
 
+*Last Updated: 2026-09-07 05:29:49 IST*
+
 ## Purpose
 
 Connect the local repository to a configured remote for the common sync flows.
@@ -37,6 +39,9 @@ recorded.
   and each result is recorded in Activity with a notice.
 - Remote operations now show immediate in-progress feedback before the network
   request completes, so a slow or rejected operation is not visually silent.
+- Remote setup, transfer, and finalization phases are reported to the progress
+  modal and Activity. Push completes after the server result without the old
+  working-tree/history summary scan.
 - Settings clicks, operation start, transport milestones, and completion or
   failure are all written to the live Activity view. Errors include Git error
   codes and callers when the transport provides them.
@@ -44,6 +49,8 @@ recorded.
   dependency on `.git/config` user fields.
 - The Obsidian HTTP bridge normalizes array, async-iterator, and iterator Git
   request bodies and exposes response bodies as async iterables.
+- Pull and Clone refresh repository metadata and explicitly mark Changes as
+  needing refresh instead of blocking completion on a full vault scan.
 
 ## Completion evidence
 

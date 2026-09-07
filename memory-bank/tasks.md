@@ -1,7 +1,7 @@
 # Memory Bank - Obsidian Git
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-06 19:49:01 IST*
+*Last Updated: 2026-09-07 05:29:49 IST*
 
 ## Overview
 
@@ -29,7 +29,7 @@ This is the Memory Bank for the clean Obsidian Git rebuild.
 | T3 | Vault and Local Repository | 🔄 | HIGH | 2026-09-05 | T1, T2 | [Details](tasks/T3.md) |
 | T4 | Changes Panel | 🔄 | HIGH | 2026-09-05 | T1, T2, T3 | [Details](tasks/T4.md) |
 | T5 | Activity and Logging | 🔄 | MEDIUM | 2026-09-05 | T1, T2 | [Details](tasks/T5.md) |
-| T6 | Commits and History | 🔄 | MEDIUM | 2026-09-05 | T1, T2, T3 | [Details](tasks/T6.md) |
+| T6 | Commits and History | ✅ | MEDIUM | 2026-09-05 | T1, T2, T3 | [Details](tasks/T6.md) |
 | T7 | Remote Sync and Authentication | 🔄 | HIGH | 2026-09-05 | T2, T3 | [Details](tasks/T7.md) |
 | T8 | Progress Errors and Dialogs | 🔄 | MEDIUM | 2026-09-05 | T1, T3, T7 | [Details](tasks/T8.md) |
 | T9 | Updater and Release | 🔄 | MEDIUM | 2026-09-05 | T1, T2 | [Details](tasks/T9.md) |
@@ -84,7 +84,7 @@ T9: Updater and Release
 
 ## Status Summary
 
-- **Active**: 10
-- **Completed**: 0
+- **Active**: 9
+- **Completed**: 1
 - **Paused**: 0
 - **Total**: 10

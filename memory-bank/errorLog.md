@@ -1,5 +1,12 @@
 # Error Log
 
+## 2026-09-07
+
+- **Stale mobile adapter paths**: Obsidian's index could list a path that had
+  already moved or been deleted, producing `ENOENT`/`lstat` failures during Git
+  reads. The filesystem bridge now filters missing entries and reuses validated
+  stats for the following calls in `da7a4a6`.
+
 ## 2026-09-05
 
 - **mb-core integration test**: `mb db test` failed because its workflow test

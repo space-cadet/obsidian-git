@@ -1,5 +1,7 @@
 # T10: Platform Integration and Verification
 
+*Last Updated: 2026-09-07 05:29:49 IST*
+
 ## Purpose
 
 Confirm that the completed components behave in the actual Obsidian hosts.
@@ -40,3 +42,7 @@ verified the Log and Changes behavior.
   Push work from the Changes toolbar.
 - Platform-specific desktop, Android, and iOS results are not identified in the
   current evidence and should be recorded separately when tested.
+- The final tuning sequence passed the production build and `git diff --check`;
+  local HEAD and `origin/codex/kiss-restart` both resolve to `574633a`.
+- Latency evidence remains diagnostic: controlled cold/warm measurements in the
+  large `typora-notes` vault and explicit host identity records are still open.

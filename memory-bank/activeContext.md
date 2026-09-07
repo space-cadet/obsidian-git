@@ -1,45 +1,38 @@
 # Active Context
 
-*Last Updated: 2026-09-06 19:49:01 IST*
+*Last Updated: 2026-09-07 05:29:49 IST*
 
 ## Current Focus
 
-- **T2, T4, T5, T6, T7** — data portability, Changes, Log, local/remote
-  Commits, and core remote Git operations are the central session work
-- **Current** — T8 progress modal with elapsed time, retained final state, and
-  richer Git-style operation results; the user verified the pushed mobile
-  behavior and cancellation feasibility remains open
+- **T4, T5, T7, T8, T10** — Changes, Activity, remote operations, progress
+  feedback, and platform/performance verification remain active
+- **Completed** — T6 read-only Local/Remote commit history with lazy details and
+  independent pagination
 
 ## Current State
 
-The source now contains the complete first T7 core Git operation path, a
-fetched Remote Commits view, and a phase-based T8 progress modal in addition to
-the verified Changes and Log updates, auto-saving Settings, and versioned
-plugin data portability. The user verified Remote commits and confirmed that
-Pull and Push work from Changes. The repository header reports comparison
-status, and remote operations write live diagnostic Activity entries. Pull,
-Push, and Fetch are exposed only in the Changes action bar; Settings remains
-configuration-focused. The progress modal includes elapsed time, sanitized
-remote messages, a Git-style operation result transcript, and a final state
-that stays open until the user closes it. Push explains the difference between
-no commits to send and a real ref update, including uncommitted files that were
-not included. The modal output fields now scroll vertically on small screens,
-and the progress accent is intentionally subdued. Changes refreshes preserve
-the existing panel shell and restore scroll after layout instead of showing the
-intermediate full-tab reload. The user verified the pushed behavior. Remaining
-work is cancellation only if the bridge can support it, destructive-action
-confirmation, and edge-case verification.
+The source now contains multi-selection, filtering/sorting, file overflow
+actions, targeted Changes reconciliation, paginated Activity and commit
+history, retained remote progress/results, and a manual full-refresh policy.
+Activity is persisted as bounded plain text in `activity.log`; commit details
+load lazily, and Pull/Clone expose an explicit Changes-needs-refresh state.
+The filesystem bridge filters stale adapter paths and reuses validated stats.
+The user verified the pushed Changes, Log, Remote commits, Pull/Push, and
+progress-modal behavior. Remaining work is Changes revert, Log clear/export,
+cancellation only with a tested abort path, remote edge cases, and controlled
+cold/warm timings in the large target vault.
 
 ## Current Decisions
 
 - Tasks are organized by app component, not abstract project goals.
 - Keep the task tree shallow and the implementation direct.
 - Do not add edge-case machinery without a demonstrated need.
+- Keep vault-wide Changes scans explicit; use known-state or targeted
+  reconciliation for successful mutations and surface uncertainty visibly.
 
 ## Next Actions
 
-1. Determine whether an abortable HTTP path can support a real cancellation
-   action; do not add a cosmetic Cancel button.
-2. Add destructive-action confirmation if a workflow requires it.
-3. Continue T4/T5 refinements and test divergence, authentication, and other
-   remote edge cases separately.
+1. Capture repeated cold/warm latency timings in the large `typora-notes` vault.
+2. Keep T4 revert and T5 clear/export as the remaining UI refinements.
+3. Determine whether an abortable HTTP path can support real cancellation;
+   continue remote edge-case testing separately.

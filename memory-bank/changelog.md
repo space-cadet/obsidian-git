@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-07
+
+- Added the latency investigation and tuning record with commit-level evidence,
+  explicit refresh policy, verification limits, and a large-vault benchmark plan. - T4, T5, T6, T7, T10
+- Added Changes multi-selection, per-section filtering/sorting, file overflow
+  actions, and targeted mutation reconciliation. - T4
+- Added plain-text Activity persistence, bounded compaction, selectable 100-message
+  pages, phase timings, and removed noisy tab/Push scans. - T5
+- Added lazy commit details and independent 100-commit Local/Remote pagination. - T6
+- Added retained remote phase/result diagnostics and manual Changes refresh states. - T7, T8
+- Recorded stale-path filtering and validated-stat reuse for mobile adapter reads. - T3, T4
+- Recorded final build, diff, parity, and remaining large-vault/host acceptance gaps. - T10
+
 ## 2026-09-06
 
 - Added the Git Sync sidebar shell, repository states, Activity tab, and

@@ -1,5 +1,7 @@
 # T5: Activity and Logging
 
+*Last Updated: 2026-09-07 05:29:49 IST*
+
 ## Purpose
 
 Explain recent plugin actions in a simple Activity view.
@@ -13,17 +15,21 @@ Explain recent plugin actions in a simple Activity view.
 
 ## Implemented state
 
-The Log tab retains the latest 50 entries in plugin data. Each entry stores a
-message, timestamp, and severity level (`DEBUG`, `INFO`, `METRIC`, or `ERROR`).
+The Log tab reads plain-text entries from the plugin-owned `activity.log`.
+Each entry stores a message, timestamp, and severity level (`DEBUG`, `INFO`,
+`METRIC`, or `ERROR`). Writes are serialized and compacted to the latest 1,000
+entries after a bounded append threshold; plugin-data export can include a
+separate bounded Activity snapshot when explicitly enabled.
 The view renders full date/time stamps, severity badges, alternating rows, and
 wrapped messages inside the scrollable content area. Writes are serialized so
 activity and settings updates do not overwrite one another.
 
-Performance metrics are recorded in the same Log tab. Repository refreshes
-include timings for repository inspection, Changes, local commits, and remote
-commits, along with result counts. Tab switches, staging actions, and remote
-operations record their total elapsed time. Push also records the separate
-working-tree status-scan duration.
+The Log tab shows the 100 most recent messages initially and supports loading
+older pages. Log text is selectable for copying. Repository refreshes include
+timings for inspection, Changes, local commits, and remote commits, along with
+result counts; stage, unstage, commit, targeted refresh, and remote operations
+record elapsed-time entries. Tab-switch metrics and the avoidable Push
+working-tree scan were removed.
 
 ## KISS boundary
 
@@ -34,4 +40,5 @@ multi-level retention policy, or analytics layer without a demonstrated need.
 
 The user verified the pushed build and confirmed that Log entries persist and
 render correctly, including remote-operation diagnostics and Git-style result
-details. Clear and export remain outside the current scope.
+details. Clear and a dedicated Log export action remain outside the current
+scope.
