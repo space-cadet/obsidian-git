@@ -192,12 +192,13 @@ export async function readCommitChanges(
 	repositoryPath: string,
 	commitOid: string,
 ): Promise<CommitFileChange[]> {
+	const resolvedOid = await resolveCommitOid(adapter, repositoryPath, commitOid);
 	let result: Awaited<ReturnType<typeof git.log>>;
 	try {
 		result = await git.log({
 			fs: new ObsidianGitFs(adapter),
 			dir: normalizedRepositoryPath(repositoryPath),
-			ref: commitOid,
+			ref: resolvedOid,
 			depth: 1,
 			includeChanges: true,
 		});
@@ -272,6 +273,24 @@ async function readCommitsAtRef(
 		})),
 		hasMore: result.length > depth,
 	};
+}
+
+async function resolveCommitOid(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	commitOid: string,
+): Promise<string> {
+	const oid = commitOid.trim();
+	if (oid.length >= 40) return oid;
+	try {
+		return await git.expandOid({
+			fs: new ObsidianGitFs(adapter),
+			dir: normalizedRepositoryPath(repositoryPath),
+			oid,
+		});
+	} catch {
+		return oid;
+	}
 }
 
 function mapCommitChanges(changes: Awaited<ReturnType<typeof git.log>>[number]["commit"]["changes"]): CommitFileChange[] {

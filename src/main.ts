@@ -28,6 +28,7 @@ import {
 	unstageFile,
 	unstageFiles,
 } from "./repository";
+import { createIntegrationProvider } from "./integrationProvider";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 import {
 	cloneRepository,
@@ -157,6 +158,10 @@ export default class GitSyncPlugin extends Plugin {
 			callback: () => void this.checkForUpdates(true),
 		});
 		this.recordActivity("Git Sync started.");
+
+		(this as unknown as { api?: unknown }).api = {
+			integrationProvider: createIntegrationProvider(this),
+		};
 
 		if (this.settings.checkForUpdates && Date.now() - this.settings.lastUpdateCheck > 24 * 60 * 60 * 1000) {
 			void this.checkForUpdates(false);
