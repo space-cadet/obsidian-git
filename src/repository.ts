@@ -120,7 +120,19 @@ export async function readChanges(
 }
 
 export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string | string[]): Promise<void> {
-	await git.add({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+	const fs = new ObsidianGitFs(adapter);
+	const dir = normalizedRepositoryPath(repositoryPath);
+	const paths = Array.isArray(path) ? path : [path];
+	const present: string[] = [];
+	const missing: string[] = [];
+	for (const candidate of paths) {
+		if (await adapter.exists(pathInRepository(repositoryPath, candidate))) present.push(candidate);
+		else missing.push(candidate);
+	}
+	if (present.length > 0) await git.add({ fs, dir, filepath: present });
+	for (const candidate of missing) {
+		await git.remove({ fs, dir, filepath: candidate });
+	}
 }
 
 export async function unstageFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
