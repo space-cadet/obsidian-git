@@ -60,10 +60,29 @@
   completed at `f0201a9`; desktop Force Push also reached the remote.
 - Current local and remote main parity is `f67860e`.
 
+## 2026-09-18
+
+- Fixed deleted-file staging: `stageFile` routes missing workdir paths to
+  `git.remove`, un-breaking Stage on Deleted rows and Stage-all/selected
+  batches (T11, `a0e5705`).
+- Shipped the Integration Provider API v1 read slice — `git.status`,
+  `git.changed_files`, `git.log`, `git.commit_changes` with short-hash
+  resolution — for obsidian-ai consumption (T12, `a6f636b`).
+- Added the shared repository snapshot cache behind provider reads (T13,
+  `056c620`).
+- Added provider write tools — `git.stage` (explicit paths, deletions via
+  missing-path routing), `git.commit` (settings author, returns hash),
+  `git.pull`/`git.push` — with snapshot-cache invalidation on pull/push
+  (T39b, `2e4f1d9`).
+- Verified end-to-end from obsidian-ai: 17-check smoke covering deletion
+  staging, commit hash == HEAD, and cache invalidation; 492/492 obsidian-ai
+  tests green, both repos pushed to main.
+
 ## Next
 
 - Implement cancellation only if the HTTP bridge supports a real abort path.
 - Keep T4 revert and T5 clear/export as remaining refinements.
+- Rename or remove remote filenames that mobile cannot create.
 - Capture controlled cold/warm large-vault timings and continue remote edge-case
   and platform-specific T10 acceptance.
 - Record platform-specific T10 acceptance when those hosts are tested.

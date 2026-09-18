@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-18
+
+- Stage on deleted files now routes missing workdir paths to `git.remove`,
+  fixing Stage/Stage-all/Stage-selected on Deleted rows. - T11
+- Added `plugin.api.integrationProvider` (API v1): read-only git.status,
+  changed_files, log, and commit_changes with short-hash resolution and
+  actionable error cases. - T12
+- Provider read capabilities now share a cached repository snapshot. - T13
+- Added provider write tools: git.stage (explicit paths, deletions staged),
+  git.commit (settings author, returns hash), git.pull, git.push; snapshot
+  cache invalidates on pull/push. - T39b
+
 ## 2026-09-10
 
 - Promoted the from-scratch rewrite to `main` and preserved the former main

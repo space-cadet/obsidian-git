@@ -1,17 +1,17 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-10 04:05:00 IST*
+*Last Updated: 2026-09-19 03:45 IST*
 
-**Started**: 2026-09-05 23:36:24 IST
-**Focus Task**: T4, T7, T8, T9, T10: Main promotion, force sync, release, and mobile acceptance
-**Session File**: `sessions/2026-09-10-night.md`
-**Status**: 🔄 Active: 9, Paused: 0, Completed: 1
+**Started**: 2026-09-18 00:15 IST
+**Focus Task**: T11, T12, T13, T39b: Integration Provider read/write delivery
+**Session File**: `sessions/2026-09-18-night.md`
+**Status**: 🔄 Active: 9, Paused: 0, Completed: 5
 
 ## Overview
 
-- Active: 9 | Paused: 0 | Completed: 1
-- Last Session: 2026-09-07
+- Active: 9 | Paused: 0 | Completed: 5
+- Last Session: 2026-09-18
 - Current Period: night
 
 ## Active Tasks
@@ -35,6 +35,21 @@ Build the Settings panel immediately after the shell with only the configuration
 1. T4: Finish the planned revert refinement.
 2. T5: Add Log clear/export if still required.
 3. T10: Capture controlled large-vault timings and platform-specific acceptance.
+
+## 2026-09-18 Session Closeout
+
+- Session title: T11, T12, T13, T39b — Integration Provider read/write delivery.
+- T11: deletion-aware staging (`a0e5705`) — deleted rows stage via `git.remove`.
+- T12: `plugin.api.integrationProvider` read slice (`a6f636b`) — git.status,
+  changed_files, log, commit_changes with short-hash resolution.
+- T13: shared repository snapshot cache for provider reads (`056c620`).
+- T39b: provider write tools (`2e4f1d9`) — git.stage/commit/pull/push with
+  pull/push cache invalidation; explicit paths only.
+- Verified end-to-end from obsidian-ai: 17-check smoke (deletion staging,
+  commit hash == HEAD, cache invalidation); 492/492 tests on the consumer.
+- All commits pushed to main; trees clean.
+- Remaining: mobile-incompatible remote filenames, T4 revert, T5
+  clear/export, real cancellation, remote edge cases, large-vault timings.
 
 ## 2026-09-06 Commits Update
 

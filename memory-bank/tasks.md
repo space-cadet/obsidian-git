@@ -1,7 +1,7 @@
 # Memory Bank - Obsidian Git
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-10 04:05:00 IST*
+*Last Updated: 2026-09-19 03:45 IST*
 
 ## Overview
 
@@ -34,6 +34,10 @@ This is the Memory Bank for the clean Obsidian Git rebuild.
 | T8 | Progress Errors and Dialogs | 🔄 | MEDIUM | 2026-09-05 | T1, T3, T7 | [Details](tasks/T8.md) |
 | T9 | Updater and Release | 🔄 | MEDIUM | 2026-09-05 | T1, T2 | [Details](tasks/T9.md) |
 | T10 | Platform Integration and Verification | 🔄 | HIGH | 2026-09-05 | T1, T2, T3, T4, T5, T6, T7, T8, T9 | [Details](tasks/T10.md) |
+| T11 | Stage File Deletions via git.remove | ✅ | HIGH | 2026-09-18 | T3, T4 | [Details](tasks/T11.md) |
+| T12 | Integration Provider API (Read-Only Git Capabilities) | ✅ | HIGH | 2026-09-18 | T3, T4, T6 | [Details](tasks/T12.md) |
+| T13 | Repository Snapshot Cache for Provider Reads | ✅ | MEDIUM | 2026-09-18 | T12 | [Details](tasks/T13.md) |
+| T39b | Git Write Tools for the Integration Provider | ✅ | HIGH | 2026-09-18 | T11, T12, T13 | [Details](tasks/T39b.md) |
 
 ## Pending Tasks
 
@@ -80,11 +84,24 @@ T8: Progress Errors and Dialogs
 T9: Updater and Release
   └── T1
   └── T2
+T11: Stage File Deletions via git.remove
+  └── T3
+  └── T4
+T12: Integration Provider API (Read-Only Git Capabilities)
+  └── T3
+  └── T4
+  └── T6
+T13: Repository Snapshot Cache for Provider Reads
+  └── T12
+T39b: Git Write Tools for the Integration Provider
+  └── T11
+  └── T12
+  └── T13
 ```
 
 ## Status Summary
 
 - **Active**: 9
-- **Completed**: 1
+- **Completed**: 5
 - **Paused**: 0
-- **Total**: 10
+- **Total**: 14

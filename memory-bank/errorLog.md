@@ -1,5 +1,12 @@
 # Error Log
 
+## 2026-09-18
+
+- **Deleted-file staging (`NotFoundError`)**: `git.add` lstats the workdir
+  path, so staging any "Deleted" row threw and poisoned Stage-all/selected
+  batches. Fixed by routing paths missing from the workdir to `git.remove`
+  in `stageFile` (T11, `a0e5705`).
+
 ## 2026-09-10
 
 - **Deleted-file staging**: `isomorphic-git` `git.add` reports a missing file
