@@ -102,14 +102,7 @@ export async function readChanges(
 	repositoryPath: string,
 	filepaths?: string[],
 ): Promise<ChangedFile[]> {
-	const fs = new ObsidianGitFs(adapter);
-	const dir = normalizedRepositoryPath(repositoryPath);
-	const matrix = await git.statusMatrix({
-		fs,
-		dir,
-		refresh: false,
-		...(filepaths ? { filepaths } : {}),
-	});
+	const matrix = await readStatusMatrix(adapter, repositoryPath, filepaths);
 	return matrix
 		.filter(([, head, workdir, stage]) => head !== workdir || head !== stage)
 		.map(([path, head, workdir, stage]) => ({
@@ -119,7 +112,97 @@ export async function readChanges(
 		}));
 }
 
+type StatusMatrixRow = [string, 0 | 1, 0 | 1 | 2, 0 | 1 | 2 | 3];
+
+async function readStatusMatrix(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	filepaths?: string[],
+): Promise<StatusMatrixRow[]> {
+	const fs = new ObsidianGitFs(adapter);
+	const dir = normalizedRepositoryPath(repositoryPath);
+	return git.statusMatrix({
+		fs,
+		dir,
+		refresh: false,
+		...(filepaths ? { filepaths } : {}),
+	});
+}
+
+export interface RepositorySnapshot {
+	at: number;
+	state: RepositoryState;
+	counts: {
+		total: number;
+		staged: number;
+		unstaged: number;
+		conflicts: number;
+	};
+	changes: ChangedFile[];
+}
+
+/** How long a snapshot stays fresh before the next read walks the tree again. */
+export const REPOSITORY_SNAPSHOT_TTL_MS = 30_000;
+
+const repositorySnapshotCache = new Map<string, RepositorySnapshot>();
+
+function invalidateRepositorySnapshot(repositoryPath: string): void {
+	repositorySnapshotCache.delete(normalizedRepositoryPath(repositoryPath));
+}
+
+/**
+ * One repository pass (statusMatrix is the expensive walk) shared by the
+ * integration provider's status-style capabilities. A full-tree statusMatrix
+ * over a large vault can take tens of seconds on mobile storage, so
+ * back-to-back tool calls reuse the same snapshot for a short TTL.
+ */
+export async function readRepositorySnapshot(
+	adapter: DataAdapter,
+	repositoryPath: string,
+): Promise<RepositorySnapshot> {
+	const key = normalizedRepositoryPath(repositoryPath);
+	const cached = repositorySnapshotCache.get(key);
+	if (cached && Date.now() - cached.at < REPOSITORY_SNAPSHOT_TTL_MS) {
+		return cached;
+	}
+	const state = await inspectLocalRepository(adapter, repositoryPath);
+	if (state.kind !== "ready") {
+		return {
+			at: Date.now(),
+			state,
+			counts: { total: 0, staged: 0, unstaged: 0, conflicts: 0 },
+			changes: [],
+		};
+	}
+	const matrix = await readStatusMatrix(adapter, repositoryPath);
+	let staged = 0;
+	let unstaged = 0;
+	let conflicts = 0;
+	const changes: ChangedFile[] = [];
+	for (const [path, head, workdir, stage] of matrix) {
+		if (head !== workdir || head !== stage) {
+			changes.push({
+				path,
+				status: statusLabel(head, workdir, stage),
+				staged: head === stage ? false : stage === workdir,
+			});
+		}
+		if (head !== stage && !(head === 0 && stage === 0)) staged += 1;
+		if (workdir !== stage) unstaged += 1;
+		if (stage === 3) conflicts += 1;
+	}
+	const snapshot: RepositorySnapshot = {
+		at: Date.now(),
+		state,
+		counts: { total: changes.length, staged, unstaged, conflicts },
+		changes,
+	};
+	repositorySnapshotCache.set(key, snapshot);
+	return snapshot;
+}
+
 export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string | string[]): Promise<void> {
+	invalidateRepositorySnapshot(repositoryPath);
 	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
 	const paths = Array.isArray(path) ? path : [path];
@@ -140,6 +223,7 @@ export async function unstageFile(adapter: DataAdapter, repositoryPath: string, 
 }
 
 export async function unstageFiles(adapter: DataAdapter, repositoryPath: string, paths: string[]): Promise<void> {
+	invalidateRepositorySnapshot(repositoryPath);
 	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
 	const cache = {};
@@ -149,6 +233,7 @@ export async function unstageFiles(adapter: DataAdapter, repositoryPath: string,
 }
 
 export async function removeFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
+	invalidateRepositorySnapshot(repositoryPath);
 	await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
 }
 
@@ -171,6 +256,7 @@ export async function commitChanges(
 	message: string,
 	author: CommitAuthor,
 ): Promise<string> {
+	invalidateRepositorySnapshot(repositoryPath);
 	return git.commit({
 		fs: new ObsidianGitFs(adapter),
 		dir: normalizedRepositoryPath(repositoryPath),

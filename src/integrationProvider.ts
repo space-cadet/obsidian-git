@@ -1,9 +1,9 @@
 import type { App } from "obsidian";
 import {
 	inspectLocalRepository,
-	readChanges,
 	readCommitChanges,
 	readCommits,
+	readRepositorySnapshot,
 	type ChangedFile,
 } from "./repository";
 
@@ -116,7 +116,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				id: "git.status",
 				title: "Repository status",
 				description:
-					"Show the configured Git repository's branch, HEAD commit, and a summary of working-tree changes (counts plus changed paths). Read-only.",
+					"Show the configured Git repository's branch, HEAD commit, and a summary of working-tree changes (counts plus changed paths). Read-only. Uses a short-lived (30s) snapshot of the working tree, so results may be momentarily stale after staging or committing elsewhere.",
 				risk: "read",
 				inputSchema: {
 					type: "object",
@@ -125,9 +125,12 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				},
 				execute: async () =>
 					guard(async (repo) => {
-						const files = await readChanges(repo.adapter, repo.repositoryPath);
-						const staged = files.filter((file) => file.staged);
-						const unstaged = files.filter((file) => !file.staged);
+						const snapshot = await readRepositorySnapshot(
+							repo.adapter,
+							repo.repositoryPath,
+						);
+						const files = snapshot.changes;
+						const { staged, unstaged, conflicts } = snapshot.counts;
 						const byStatus = new Map<string, number>();
 						for (const file of files) {
 							byStatus.set(file.status, (byStatus.get(file.status) ?? 0) + 1);
@@ -136,8 +139,9 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 							`Repository: ${repo.repositoryPath}`,
 							`Branch: ${repo.branch ?? "(detached HEAD)"}`,
 							`HEAD: ${repo.head ?? "(unknown)"}`,
-							`Changes: ${files.length} total (${staged.length} staged, ${unstaged.length} unstaged)`,
+							`Changes: ${files.length} total (${staged} staged, ${unstaged} unstaged)`,
 						];
+						if (conflicts > 0) lines.push(`Conflicts: ${conflicts}`);
 						for (const [status, count] of byStatus) lines.push(`  ${status}: ${count}`);
 						if (files.length > 0) {
 							lines.push("", formatFileList(files.slice(0, MAX_FILES)));
@@ -152,7 +156,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				id: "git.changed_files",
 				title: "List changed files",
 				description:
-					"List files that differ between the working tree, index, and HEAD. Optionally filter by status (e.g. Modified, Added, Deleted, Untracked) and limit the number of results. Read-only.",
+					"List files that differ between the working tree, index, and HEAD. Optionally filter by status (e.g. Modified, Added, Deleted, Untracked) and limit the number of results. Read-only. Shares a short-lived (30s) snapshot with git.status, so results may be momentarily cached.",
 				risk: "read",
 				inputSchema: {
 					type: "object",
@@ -171,7 +175,11 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				},
 				execute: async (args) =>
 					guard(async (repo) => {
-						const files = await readChanges(repo.adapter, repo.repositoryPath);
+						const snapshot = await readRepositorySnapshot(
+							repo.adapter,
+							repo.repositoryPath,
+						);
+						const files = snapshot.changes;
 						const statusFilter =
 							typeof args.status === "string" && args.status.trim()
 								? args.status.trim().toLowerCase()
