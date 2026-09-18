@@ -142,11 +142,11 @@ export interface RepositorySnapshot {
 }
 
 /** How long a snapshot stays fresh before the next read walks the tree again. */
-export const REPOSITORY_SNAPSHOT_TTL_MS = 30_000;
+export const REPOSITORY_SNAPSHOT_TTL_MS = 120_000;
 
 const repositorySnapshotCache = new Map<string, RepositorySnapshot>();
 
-function invalidateRepositorySnapshot(repositoryPath: string): void {
+export function invalidateRepositorySnapshot(repositoryPath: string): void {
 	repositorySnapshotCache.delete(normalizedRepositoryPath(repositoryPath));
 }
 
