@@ -1,5 +1,7 @@
 # Latency Investigation and Tuning
 
+*Last Updated: 2026-09-30 12:54:30 IST*
+
 *Last Updated: 2026-09-07 05:21:33 IST*
 
 ## Purpose
@@ -104,15 +106,20 @@ Pull's internal phases. Git output is sanitized before it reaches Activity.
 
 ### Authoritative full refresh
 
-Initial view open, settings-driven refreshes, and the explicit Refresh control
-still perform the complete local repository read. That read measures inspection,
-Changes, local commits, and remote commits independently. Commit history starts
-at 100 entries per source and requests one extra entry to determine whether
-another page exists.
+Initial view open and repository refreshes from the Changes tab inspect the
+repository and read the complete Changes status, but defer commit history.
+Opening the Commits tab loads local and remote history on demand. Refreshes
+while Commits is active still reload both histories. Each history query starts
+at 100 entries and requests one extra entry to determine whether another page
+exists.
 
-This is intentional: the full status read is the authoritative way to discover
-unknown working-tree changes. It is no longer launched automatically by every
-successful operation.
+The full status read remains authoritative for discovering unknown
+working-tree changes. The latest user-provided view-open measurement took
+43.1 seconds: 28.3 seconds for Changes, 8.1 seconds for local history, and
+6.6 seconds for remote history. Deferring history removes about 14.7 seconds
+of work from the initial Changes view; this expected saving has not yet been
+measured in an installed Obsidian host. The full Changes scan remains the main
+cost and still requires an incremental status design to reduce.
 
 ### Targeted and local updates
 
@@ -127,6 +134,15 @@ successful operation.
 - A successful commit removes the committed paths from Changes, updates the
   known branch head, and refreshes bounded commit history without a full Changes
   scan.
+
+### Background refresh while inactive
+
+The Changes view offers Off, 5, 15, 30, and 60 second quiet-period choices.
+While the view is open but not active, create/modify/delete/rename events are
+coalesced by repository-relative path. After the selected quiet period,
+`readChanges` checks only those paths. Returning to the view flushes pending
+paths immediately. No periodic vault-wide scan is scheduled. This is
+source/build-verified; installed-host timing and event behavior remain open.
 
 ### Remote operations
 

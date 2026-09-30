@@ -126,6 +126,10 @@
 	color: var(--interactive-accent);
 }
 
+.git-sync-comparison-icon[data-comparison-state="deferred"] {
+	color: var(--text-muted);
+}
+
 .git-sync-comparison-icon[data-comparison-state="local-ahead"],
 .git-sync-comparison-icon[data-comparison-state="remote-ahead"],
 .git-sync-comparison-icon[data-comparison-state="diverged"] {
@@ -240,59 +244,16 @@
 	margin: 12px 0;
 }
 
-.git-sync-icon-spinning svg {
-	animation: git-sync-spin 1s linear infinite;
+.git-sync-branch-refreshing svg {
+	animation: git-sync-branch-refresh 1s linear infinite;
 }
 
-.git-sync-button-loading::after {
-	content: "";
-	display: inline-block;
-	width: 0.85em;
-	height: 0.85em;
-	margin-left: 0.6em;
-	vertical-align: -0.1em;
-	border: 2px solid currentColor;
-	border-right-color: transparent;
-	border-radius: 50%;
-	animation: git-sync-spin 0.8s linear infinite;
-}
-
-.git-sync-inline-loading::before {
-	content: "";
-	display: inline-block;
-	width: 0.8em;
-	height: 0.8em;
-	margin-right: 0.55em;
-	vertical-align: -0.08em;
-	border: 2px solid var(--interactive-accent);
-	border-right-color: transparent;
-	border-radius: 50%;
-	animation: git-sync-spin 0.8s linear infinite;
-}
-
-.git-sync-settings-save-status.is-saving::before {
-	content: "";
-	display: inline-block;
-	width: 0.75em;
-	height: 0.75em;
-	margin-right: 0.5em;
-	vertical-align: -0.06em;
-	border: 2px solid var(--interactive-accent);
-	border-right-color: transparent;
-	border-radius: 50%;
-	animation: git-sync-spin 0.8s linear infinite;
-}
-
-@keyframes git-sync-spin {
+@keyframes git-sync-branch-refresh {
 	to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.git-sync-icon-spinning svg,
-	.git-sync-button-loading::after,
-	.git-sync-inline-loading::before,
-	.git-sync-change.is-busy::after,
-	.git-sync-settings-save-status.is-saving::before {
+	.git-sync-branch-refreshing svg {
 		animation: none;
 	}
 }
@@ -551,17 +512,6 @@
 	box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
-.git-sync-change.is-busy::after {
-	content: "";
-	flex: 0 0 auto;
-	width: 15px;
-	height: 15px;
-	border: 2px solid var(--interactive-accent);
-	border-right-color: transparent;
-	border-radius: 50%;
-	animation: git-sync-spin 0.8s linear infinite;
-}
-
 .git-sync-change input[type="checkbox"] {
 	flex: 0 0 auto;
 	width: 18px;
@@ -616,6 +566,12 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+.git-sync-change-activity {
+	margin-left: 8px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
 }
 
 .git-sync-change-menu {
@@ -1017,44 +973,6 @@
 	font-weight: 600;
 }
 
-.git-sync-progress-spark {
-	display: flex;
-	align-items: flex-end;
-	gap: 4px;
-	height: 18px;
-	margin: 7px 0 5px 29px;
-}
-
-.git-sync-progress-spark span {
-	display: block;
-	width: 4px;
-	height: 6px;
-	border-radius: 999px;
-	background: var(--interactive-accent);
-	opacity: 0.4;
-	animation: git-sync-progress-spark 1.8s ease-in-out infinite;
-}
-
-.git-sync-progress-spark span:nth-child(2) { animation-delay: 0.18s; }
-.git-sync-progress-spark span:nth-child(3) { animation-delay: 0.36s; }
-.git-sync-progress-spark span:nth-child(4) { animation-delay: 0.54s; }
-.git-sync-progress-spark span:nth-child(5) { animation-delay: 0.72s; }
-.git-sync-progress-spark span:nth-child(6) { animation-delay: 0.90s; }
-.git-sync-progress-spark span:nth-child(7) { animation-delay: 1.08s; }
-
-@keyframes git-sync-progress-spark {
-	0%, 100% { height: 5px; opacity: 0.35; }
-	50% { height: 10px; opacity: 0.7; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.git-sync-progress-spark span {
-		animation: none;
-		height: 7px;
-		opacity: 0.55;
-	}
-}
-
 .git-sync-progress-icon {
 	display: inline-flex;
 	flex: 0 0 auto;
@@ -1146,20 +1064,6 @@
 
 .git-sync-progress-modal.is-error .git-sync-progress-result {
 	color: var(--text-error);
-}
-
-.git-sync-progress-modal.is-complete .git-sync-progress-spark span {
-	background: var(--text-success);
-	animation: none;
-	height: 7px;
-	opacity: 0.9;
-}
-
-.git-sync-progress-modal.is-error .git-sync-progress-spark span {
-	background: var(--text-error);
-	animation: none;
-	height: 7px;
-	opacity: 0.9;
 }
 
 .git-sync-progress-footer {

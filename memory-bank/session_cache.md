@@ -1,7 +1,7 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-30 09:34:50 IST*
+*Last Updated: 2026-09-30 12:54:30 IST*
 
 **Started**: 2026-09-30 09:09 IST
 **Focus Task**: T4: Changes tree and integration staging refresh
@@ -47,6 +47,18 @@ Build the Settings panel immediately after the shell with only the configuration
   automatically. Known listed paths update in memory; unknown paths use a
   path-scoped read. Host `pnpm build` passed; live Obsidian interaction remains
   unverified.
+
+## 2026-09-30 Refresh Follow-up
+
+- T8/T10: Kept only the branch refresh icon animated. Initial Changes loads
+  defer commit history until the Commits tab is opened.
+- The latest user-provided 43.1-second view-open metric included a 28.3-second
+  Changes scan and 14.7 seconds of commit history work. Build passed; installed
+  host timing and further full-scan optimization remain open.
+- Added a configurable inactive-view refresh delay (Off, 5, 15, 30, or 60
+  seconds). File events coalesce to path-scoped refreshes and pending paths
+  apply immediately when Git Sync becomes active again. Build passed; installed
+  host behavior remains unverified.
 
 ## 2026-09-18 Session Closeout
 

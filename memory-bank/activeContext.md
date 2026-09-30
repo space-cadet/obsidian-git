@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-30 09:34:50 IST*
+*Last Updated: 2026-09-30 12:54:30 IST*
 
 ## Current Focus
 
@@ -17,6 +17,8 @@
 The source now contains multi-selection, filtering/sorting, file overflow
 actions, targeted Changes reconciliation, paginated Activity and commit
 history, retained remote progress/results, and a manual full-refresh policy.
+Changes refreshes defer local and remote commit history until the Commits tab
+is opened; the full Changes scan remains the main measured latency cost.
 Activity is persisted as bounded plain text in `activity.log`; commit details
 load lazily, and Pull/Clone expose an explicit Changes-needs-refresh state.
 The filesystem bridge filters stale adapter paths and reuses validated stats.
@@ -37,6 +39,13 @@ work is Changes revert, renaming or removing remote filenames that mobile
 cannot create, Log clear/export, cancellation only with a tested abort path,
 remote edge cases, and controlled cold/warm timings in the large target vault.
 
+The Changes panel now has a configurable background refresh delay (Off, 5,
+15, 30, or 60 seconds). While its view is open but inactive, vault file events
+are coalesced and only affected repository paths are checked after the quiet
+period; returning to the view flushes pending paths immediately. This avoids
+periodic full-vault scans. Production build passed; live Obsidian behavior has
+not yet been verified.
+
 ## Current Decisions
 
 - Tasks are organized by app component, not abstract project goals.
@@ -44,6 +53,8 @@ remote edge cases, and controlled cold/warm timings in the large target vault.
 - Do not add edge-case machinery without a demonstrated need.
 - Keep vault-wide Changes scans explicit; use known-state or targeted
   reconciliation for successful mutations and surface uncertainty visibly.
+- Background refresh is event-driven and path-scoped; do not add periodic
+  vault-wide status scans.
 - Treat mobile-incompatible remote paths as an explicit compatibility boundary:
   skip and report them on mobile, while preserving complete checkout behavior
   on desktop.
