@@ -150,8 +150,32 @@
 	flex: 1 1 auto;
 	min-height: 0;
 	padding: 0 12px;
-	overflow: auto;
+	overflow-x: hidden;
+	overflow-y: auto;
 	text-align: left;
+}
+
+.git-sync-ignore-notice {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	min-width: 0;
+	margin: 8px 0;
+	padding: 8px;
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+}
+
+.git-sync-ignore-description {
+	min-width: 0;
+	flex: 1 1 150px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.git-sync-ignore-notice button {
+	flex: 0 0 auto;
 }
 
 .git-sync-state-title {
@@ -384,14 +408,17 @@
 }
 
 .git-sync-change-section {
+	min-width: 0;
 	margin: 0 -12px;
 	border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .git-sync-change-section-header {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
+	min-width: 0;
 	min-height: 48px;
 	padding: 6px 12px;
 }
@@ -442,9 +469,12 @@
 }
 
 .git-sync-section-title {
+	min-width: 0;
+	flex: 1 1 5em;
 	font-size: var(--font-ui-small);
 	font-weight: 700;
 	letter-spacing: 0.04em;
+	overflow-wrap: anywhere;
 }
 
 .git-sync-section-count {
@@ -483,8 +513,10 @@
 
 .git-sync-change-toolbar {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
+	min-width: 0;
 	min-height: 48px;
 	padding: 6px 12px;
 	border-top: 1px solid var(--background-modifier-border);

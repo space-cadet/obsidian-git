@@ -652,6 +652,7 @@ class GitSyncView extends ItemView {
 	private backgroundRefreshTimer: number | null = null;
 	private backgroundEventsRegistered = false;
 	private backgroundViewOpen = false;
+	private gitignoreEditorPendingRefresh = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
 		super(leaf);
@@ -680,7 +681,15 @@ class GitSyncView extends ItemView {
 				this.queueBackgroundFileRefresh(file, oldPath);
 			}));
 			this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
-				if (leaf === this.leaf) this.flushPendingBackgroundRefresh();
+				if (leaf !== this.leaf) return;
+				if (this.gitignoreEditorPendingRefresh) {
+					this.gitignoreEditorPendingRefresh = false;
+					this.clearBackgroundRefreshTimer();
+					this.pendingBackgroundRefreshPaths.clear();
+					void this.refreshRepositoryState("gitignore-edit");
+					return;
+				}
+				this.flushPendingBackgroundRefresh();
 			}));
 			this.backgroundEventsRegistered = true;
 		}
@@ -1180,6 +1189,16 @@ class GitSyncView extends ItemView {
 		}
 		const staged = this.changes.filter((change) => change.staged);
 		const uncommitted = this.changes.filter((change) => !change.staged);
+		const ignoreNotice = content.createDiv({ cls: "git-sync-ignore-notice" });
+		ignoreNotice.createDiv({
+			text: "Ignore rules hide untracked files; tracked files may still appear.",
+			cls: "git-sync-ignore-description",
+		});
+		const editIgnore = ignoreNotice.createEl("button", {
+			text: "Edit .gitignore",
+			attr: { type: "button" },
+		});
+		editIgnore.addEventListener("click", () => void this.editGitignore());
 		this.renderChangeSection(content, "staged", "STAGED", staged, "Unstage selected");
 		this.renderChangeSection(content, "uncommitted", "UNCOMMITTED CHANGES", uncommitted, "Stage selected");
 
@@ -1548,7 +1567,7 @@ class GitSyncView extends ItemView {
 		}
 
 		const selectedInSection = visibleChanges.filter((change) => this.selectedPaths.has(change.path));
-		if (selectedInSection.length > 1) {
+		if (selectedInSection.length > 0) {
 			const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
 			const selectedActionName = section === "staged" ? "Unstage selected" : "Stage selected";
 			const selectedActionLoading = this.activeChangeAction === selectedActionName;
@@ -1967,6 +1986,26 @@ class GitSyncView extends ItemView {
 		} finally {
 			this.pendingFileActions.delete(path);
 			this.updateChangesContent();
+		}
+	}
+
+	private async editGitignore(): Promise<void> {
+		const path = this.vaultPathForChange(".gitignore");
+		try {
+			const existing = this.app.vault.getAbstractFileByPath(path);
+			if (existing && !(existing instanceof TFile)) {
+				throw new Error("The repository .gitignore path is not a file.");
+			}
+			if (!existing) await this.app.vault.create(path, "");
+			const file = this.app.vault.getAbstractFileByPath(path);
+			if (!(file instanceof TFile)) throw new Error("Unable to find the repository .gitignore file.");
+			await this.refreshChangesForPaths([".gitignore"], [".gitignore"], "gitignore-open");
+			this.gitignoreEditorPendingRefresh = true;
+			await this.app.workspace.getLeaf(true).openFile(file);
+		} catch (error) {
+			this.gitignoreEditorPendingRefresh = false;
+			const detail = error instanceof Error ? error.message : "Unable to open .gitignore.";
+			new Notice(detail);
 		}
 	}
 

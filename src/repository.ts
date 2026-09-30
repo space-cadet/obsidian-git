@@ -125,6 +125,7 @@ async function readStatusMatrix(
 		fs,
 		dir,
 		refresh: false,
+		ignored: false,
 		...(filepaths ? { filepaths } : {}),
 	});
 }
