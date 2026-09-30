@@ -652,7 +652,6 @@ class GitSyncView extends ItemView {
 	private backgroundRefreshTimer: number | null = null;
 	private backgroundEventsRegistered = false;
 	private backgroundViewOpen = false;
-	private gitignoreEditorPendingRefresh = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
 		super(leaf);
@@ -682,13 +681,6 @@ class GitSyncView extends ItemView {
 			}));
 			this.registerEvent(this.app.workspace.on("active-leaf-change", (leaf) => {
 				if (leaf !== this.leaf) return;
-				if (this.gitignoreEditorPendingRefresh) {
-					this.gitignoreEditorPendingRefresh = false;
-					this.clearBackgroundRefreshTimer();
-					this.pendingBackgroundRefreshPaths.clear();
-					void this.refreshRepositoryState("gitignore-edit");
-					return;
-				}
 				this.flushPendingBackgroundRefresh();
 			}));
 			this.backgroundEventsRegistered = true;
@@ -808,7 +800,7 @@ class GitSyncView extends ItemView {
 			tab.addEventListener("click", () => {
 				this.activeTab = tabName;
 				this.render();
-				if (tabName === "Commits" && (!this.commits || !this.remoteCommits)) {
+				if (tabName === "Commits" && this.repositoryState?.kind === "ready" && (!this.commits || !this.remoteCommits)) {
 					void this.loadCommitHistories("commits-tab");
 				}
 			});
@@ -836,12 +828,20 @@ class GitSyncView extends ItemView {
 		}
 
 		if (!this.repositoryState || this.repositoryState.kind === "checking") {
-			const title = content.createDiv({ cls: "git-sync-state-title", text: "Checking repository" });
-			title.setAttribute("aria-busy", "true");
-			content.createEl("p", {
-				text: "Reading local repository information…",
-				cls: "git-sync-state-description",
-			});
+			if (this.activeTab === "Changes") {
+				this.changesContentEl = content;
+				this.renderChanges(content);
+				this.renderChangesActionBar(root);
+				this.restoreChangesScrollTop(content);
+			} else if (this.activeTab === "Commits") {
+				this.renderCommits(content);
+			} else {
+				content.createEl("p", {
+					text: "Checking repository…",
+					cls: "git-sync-state-description",
+					attr: { "aria-busy": "true" },
+				});
+			}
 			return;
 		}
 
@@ -1159,6 +1159,7 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderChanges(content: HTMLElement): void {
+		this.renderIgnoreTools(content);
 		if (this.changesRefreshRequired) {
 			const notice = content.createDiv({ cls: "git-sync-refresh-required" });
 			notice.createDiv({ cls: "git-sync-state-title", text: "Changes need refreshing" });
@@ -1189,16 +1190,6 @@ class GitSyncView extends ItemView {
 		}
 		const staged = this.changes.filter((change) => change.staged);
 		const uncommitted = this.changes.filter((change) => !change.staged);
-		const ignoreNotice = content.createDiv({ cls: "git-sync-ignore-notice" });
-		ignoreNotice.createDiv({
-			text: "Ignore rules hide untracked files; tracked files may still appear.",
-			cls: "git-sync-ignore-description",
-		});
-		const editIgnore = ignoreNotice.createEl("button", {
-			text: "Edit .gitignore",
-			attr: { type: "button" },
-		});
-		editIgnore.addEventListener("click", () => void this.editGitignore());
 		this.renderChangeSection(content, "staged", "STAGED", staged, "Unstage selected");
 		this.renderChangeSection(content, "uncommitted", "UNCOMMITTED CHANGES", uncommitted, "Stage selected");
 
@@ -1222,6 +1213,21 @@ class GitSyncView extends ItemView {
 		});
 		commitButton.disabled = stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
+	}
+
+	private renderIgnoreTools(content: HTMLElement): void {
+		const tools = content.createDiv({ cls: "git-sync-ignore-tools" });
+		const edit = tools.createEl("button", {
+			cls: "git-sync-ignore-button",
+			text: "Edit .gitignore",
+			attr: {
+				type: "button",
+				"aria-label": "Edit repository .gitignore rules",
+				title: "Git hides ignored untracked files; tracked files may still appear.",
+			},
+		});
+		setIcon(edit, "file-text");
+		edit.addEventListener("click", () => void this.editGitignore());
 	}
 
 	private renderCommits(content: HTMLElement): void {
@@ -1674,8 +1680,12 @@ class GitSyncView extends ItemView {
 				text: this.hasChangeFilter(section) ? `${folder.descendants.length} visible` : String(folder.descendants.length),
 				attr: { "aria-label": `${folder.descendants.length} visible changed files` },
 			});
-			if (selectedCount > 0) {
-				row.createSpan({ cls: "git-sync-folder-selected-count", text: `${selectedCount} selected` });
+			if (selectedCount > 0 && selectedCount < folder.descendants.length) {
+				row.createSpan({
+					cls: "git-sync-folder-selected-count",
+					text: `${selectedCount}/${folder.descendants.length} selected`,
+					attr: { title: `${selectedCount} of ${folder.descendants.length} visible files selected` },
+				});
 			}
 
 			if (collapsed) return;
@@ -1992,18 +2002,16 @@ class GitSyncView extends ItemView {
 	private async editGitignore(): Promise<void> {
 		const path = this.vaultPathForChange(".gitignore");
 		try {
-			const existing = this.app.vault.getAbstractFileByPath(path);
-			if (existing && !(existing instanceof TFile)) {
-				throw new Error("The repository .gitignore path is not a file.");
-			}
-			if (!existing) await this.app.vault.create(path, "");
-			const file = this.app.vault.getAbstractFileByPath(path);
-			if (!(file instanceof TFile)) throw new Error("Unable to find the repository .gitignore file.");
-			await this.refreshChangesForPaths([".gitignore"], [".gitignore"], "gitignore-open");
-			this.gitignoreEditorPendingRefresh = true;
-			await this.app.workspace.getLeaf(true).openFile(file);
+			const adapter = this.app.vault.adapter;
+			const exists = await adapter.exists(path);
+			const contents = exists ? await adapter.read(path) : "";
+			new GitignoreEditorModal(this.app, contents, async (nextContents) => {
+				await adapter.write(path, nextContents);
+				invalidateRepositorySnapshot(this.plugin.settings.repositoryPath);
+				await this.refreshRepositoryState("gitignore-edit");
+				new Notice(".gitignore saved.");
+			}).open();
 		} catch (error) {
-			this.gitignoreEditorPendingRefresh = false;
 			const detail = error instanceof Error ? error.message : "Unable to open .gitignore.";
 			new Notice(detail);
 		}
@@ -2088,6 +2096,11 @@ class GitSyncView extends ItemView {
 		});
 		setIcon(refresh, "refresh-cw");
 		refresh.addEventListener("click", () => void this.plugin.fetchRemote());
+		const repositoryReady = this.repositoryState?.kind === "ready";
+		for (const action of Array.from(bar.querySelectorAll<HTMLButtonElement>("button"))) {
+			action.disabled = !repositoryReady;
+		}
+		selectAll.disabled = !repositoryReady || !this.changes?.length;
 		return bar;
 	}
 
@@ -2583,6 +2596,48 @@ class ConfirmActionModal extends Modal {
 		confirm.addEventListener("click", () => {
 			this.close();
 			this.onConfirm();
+		});
+	}
+}
+
+class GitignoreEditorModal extends Modal {
+	constructor(
+		app: App,
+		private readonly initialContents: string,
+		private readonly onSave: (contents: string) => Promise<void>,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.contentEl.empty();
+		this.contentEl.createEl("h2", { text: "Edit .gitignore" });
+		this.contentEl.createEl("p", {
+			text: "Add one ignore rule per line. Tracked files can still appear in Changes.",
+			cls: "setting-item-description",
+		});
+		const editor = this.contentEl.createEl("textarea", {
+			cls: "git-sync-gitignore-editor",
+			attr: { "aria-label": ".gitignore rules", spellcheck: "false" },
+		});
+		editor.value = this.initialContents;
+		const actions = this.contentEl.createDiv({ cls: "git-sync-confirm-actions" });
+		const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
+		cancel.addEventListener("click", () => this.close());
+		const save = actions.createEl("button", { text: "Save", cls: "mod-cta", attr: { type: "button" } });
+		save.addEventListener("click", () => {
+			void (async () => {
+				save.disabled = true;
+				save.setText("Saving…");
+				try {
+					await this.onSave(editor.value);
+					this.close();
+				} catch (error) {
+					save.disabled = false;
+					save.setText("Save");
+					new Notice(error instanceof Error ? error.message : "Unable to save .gitignore.");
+				}
+			})();
 		});
 	}
 }
