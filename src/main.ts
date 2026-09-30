@@ -1159,7 +1159,6 @@ class GitSyncView extends ItemView {
 	}
 
 	private renderChanges(content: HTMLElement): void {
-		this.renderIgnoreTools(content);
 		if (this.changesRefreshRequired) {
 			const notice = content.createDiv({ cls: "git-sync-refresh-required" });
 			notice.createDiv({ cls: "git-sync-state-title", text: "Changes need refreshing" });
@@ -1213,21 +1212,6 @@ class GitSyncView extends ItemView {
 		});
 		commitButton.disabled = stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
-	}
-
-	private renderIgnoreTools(content: HTMLElement): void {
-		const tools = content.createDiv({ cls: "git-sync-ignore-tools" });
-		const edit = tools.createEl("button", {
-			cls: "git-sync-ignore-button",
-			text: "Edit .gitignore",
-			attr: {
-				type: "button",
-				"aria-label": "Edit repository .gitignore rules",
-				title: "Git hides ignored untracked files; tracked files may still appear.",
-			},
-		});
-		setIcon(edit, "file-text");
-		edit.addEventListener("click", () => void this.editGitignore());
 	}
 
 	private renderCommits(content: HTMLElement): void {
@@ -1636,6 +1620,7 @@ class GitSyncView extends ItemView {
 			const item = parentList.createEl("li", { cls: "git-sync-change-folder" });
 			const row = item.createDiv({ cls: "git-sync-folder-row" });
 			const selectedCount = folder.descendants.filter((change) => this.selectedPaths.has(change.path)).length;
+			const folderActionPending = this.pendingFileActions.has(folder.path);
 			const checkbox = row.createEl("input", {
 				attr: {
 					type: "checkbox",
@@ -1644,7 +1629,7 @@ class GitSyncView extends ItemView {
 			});
 			checkbox.checked = selectedCount === folder.descendants.length;
 			checkbox.indeterminate = selectedCount > 0 && selectedCount < folder.descendants.length;
-			checkbox.disabled = this.committing;
+			checkbox.disabled = this.committing || folderActionPending;
 			checkbox.addEventListener("click", (event) => {
 				event.preventDefault();
 				const select = selectedCount < folder.descendants.length;
@@ -1683,10 +1668,21 @@ class GitSyncView extends ItemView {
 			if (selectedCount > 0 && selectedCount < folder.descendants.length) {
 				row.createSpan({
 					cls: "git-sync-folder-selected-count",
-					text: `${selectedCount}/${folder.descendants.length} selected`,
+					text: `${selectedCount}/${folder.descendants.length}`,
 					attr: { title: `${selectedCount} of ${folder.descendants.length} visible files selected` },
 				});
 			}
+			const folderMenu = row.createEl("button", {
+				cls: "git-sync-change-menu git-sync-folder-menu",
+				attr: {
+					type: "button",
+					"aria-label": `More actions for folder ${folder.path}`,
+					title: "Folder actions",
+				},
+			});
+			setIcon(folderMenu, "more-horizontal");
+			folderMenu.disabled = this.committing || folderActionPending;
+			folderMenu.addEventListener("click", (event) => this.showFolderMenu(folder, section, event));
 
 			if (collapsed) return;
 			const children = item.createEl("ul", { cls: "git-sync-change-tree-children" });
@@ -1968,6 +1964,92 @@ class GitSyncView extends ItemView {
 		menu.showAtMouseEvent(event);
 	}
 
+	private showFolderMenu(folder: ChangeTreeFolder, section: ChangeSection, event: MouseEvent): void {
+		const menu = new Menu();
+		menu.addItem((item) => item
+			.setTitle("Copy folder path")
+			.setIcon("copy")
+			.onClick(() => void this.copyChangedPath(folder.path)));
+		menu.addSeparator();
+		const unstage = section === "staged";
+		const stageable = folder.descendants.filter((change) => change.staged === unstage);
+		menu.addItem((item) => item
+			.setTitle(`${unstage ? "Unstage" : "Stage"} visible files in folder`)
+			.setIcon(unstage ? "minus" : "plus")
+			.setDisabled(this.committing || stageable.length === 0)
+			.onClick(() => void this.applyFolderStage(section, folder)));
+		if (!unstage && folder.descendants.some((change) => change.status === "Untracked")) {
+			menu.addItem((item) => item
+				.setTitle("Add folder to .gitignore")
+				.setIcon("file-minus")
+				.setDisabled(this.committing)
+				.onClick(() => void this.ignoreChangedFolder(folder)));
+		}
+		menu.showAtMouseEvent(event);
+	}
+
+	private async ignoreChangedFolder(folder: ChangeTreeFolder): Promise<void> {
+		const folderPrefix = `${folder.path}/`;
+		const affectedPaths = (this.changes ?? [])
+			.filter((change) => change.path.startsWith(folderPrefix))
+			.map((change) => change.path);
+		this.pendingFileActions.add(folder.path);
+		this.updateChangesContent();
+		try {
+			await addToGitignore(this.app.vault.adapter, this.plugin.settings.repositoryPath, `${folder.path}/`);
+			this.plugin.recordActivity(`Added ${folder.path}/ to .gitignore.`);
+			new Notice(`Added ${folder.path}/ to .gitignore.`);
+			await this.refreshChangesForPaths(
+				[...affectedPaths, ".gitignore"],
+				[...affectedPaths, ".gitignore"],
+				"gitignore-folder-refresh",
+			);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to add the folder to .gitignore.";
+			this.plugin.recordActivity(`Could not update .gitignore: ${detail}`, "ERROR");
+			new Notice(detail);
+		} finally {
+			this.pendingFileActions.delete(folder.path);
+			this.updateChangesContent();
+		}
+	}
+
+	private async applyFolderStage(section: ChangeSection, folder: ChangeTreeFolder): Promise<void> {
+		const unstage = section === "staged";
+		const changes = folder.descendants.filter((change) => change.staged === unstage);
+		if (changes.length === 0 || this.committing) return;
+
+		const startedAt = Date.now();
+		const action = `${unstage ? "Unstage" : "Stage"} folder ${folder.path}`;
+		this.committing = true;
+		this.activeChangeAction = action;
+		this.render();
+		let completed = false;
+		try {
+			if (unstage) {
+				await unstageFiles(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
+			} else {
+				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
+			}
+			for (const change of changes) {
+				this.selectedPaths.delete(change.path);
+				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
+			}
+			completed = true;
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : `Unable to ${unstage ? "unstage" : "stage"} folder files.`;
+			this.plugin.recordActivity(`Could not update ${folder.path}: ${detail}`, "ERROR");
+			new Notice(detail);
+		} finally {
+			this.committing = false;
+			this.activeChangeAction = "";
+			this.render();
+		}
+		if (completed) this.applyKnownStagingState(changes, !unstage);
+		else this.markChangesRefreshRequired(`${unstage ? "unstage" : "stage"} folder`);
+		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} visible files).`, "METRIC");
+	}
+
 	private openChangedFile(path: string): void {
 		this.app.workspace.openLinkText(this.vaultPathForChange(path), "", false);
 	}
@@ -2096,6 +2178,13 @@ class GitSyncView extends ItemView {
 		});
 		setIcon(refresh, "refresh-cw");
 		refresh.addEventListener("click", () => void this.plugin.fetchRemote());
+
+		const editIgnore = bar.createEl("button", {
+			cls: "git-sync-bottom-action",
+			attr: { type: "button", "aria-label": "Edit .gitignore", title: "Edit .gitignore" },
+		});
+		setIcon(editIgnore, "file-text");
+		editIgnore.addEventListener("click", () => void this.editGitignore());
 		const repositoryReady = this.repositoryState?.kind === "ready";
 		for (const action of Array.from(bar.querySelectorAll<HTMLButtonElement>("button"))) {
 			action.disabled = !repositoryReady;
