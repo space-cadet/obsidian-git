@@ -1,6 +1,6 @@
 # T4: Changes Panel
 
-*Last Updated: 2026-09-10 04:05:00 IST*
+*Last Updated: 2026-09-30 09:34:50 IST*
 
 ## Purpose
 
@@ -40,6 +40,13 @@ the resulting clean state.
   counts, collapsible headers, selection controls, and icon actions.
 - Desktop Cmd/Ctrl-click, Shift-click ranges, mobile long-press dragging,
   per-section status filters/sorts, and file overflow actions are implemented.
+- Changed files render in a collapsible folder tree inside their Staged or
+  Uncommitted Changes section. Folder selection adds or removes its descendant
+  changed-file paths in the existing selection set; a mixed selection uses a
+  partial checkbox. The tree is built after status filtering, so folder counts,
+  checkbox state, and folder selection cover only currently visible matching
+  files. Bulk selected actions likewise operate on the visible selection.
+- The approved tree mockup is `../assets/changes-tree-mockup.png`.
 - Stage and unstage refresh only the Changes content while preserving the
   panel shell, active control, commit-message focus, and scroll position. A
   later mobile check found that full repository refreshes still rebuilt the
@@ -53,6 +60,9 @@ the resulting clean state.
 - Full vault-wide Changes scans are authoritative but manual: they run on
   initial/context refreshes or explicit Refresh. Successful known mutations
   reconcile local state, while uncertain states show “Changes need refreshing”.
+- Successful integration-provider staging notifies open Git Sync views. Known
+  paths update in memory without another status read; unknown paths use a
+  path-scoped read, and queued notifications apply after an active full refresh.
 - The local integration flow passed: untracked -> staged -> committed -> clean.
 - A mobile `Buffer is not defined` failure was fixed with the browser Buffer
   polyfill recorded in commit `8a90e91`.
@@ -64,8 +74,9 @@ Pull and Push toolbar actions, scroll preservation, and the in-place refresh
 correction. Revert remains a planned refinement; selection, filtering, sorting,
 overflow actions, and targeted reconciliation are implemented.
 
-The initial deleted-file staging report was reproduced against
-`isomorphic-git` 1.41.9: `git.add` reports a missing path when the worktree file
-has already been deleted, while `git.remove` stages the deletion. The Changes
-individual staging flow still needs to route this case through deletion-aware
-handling.
+Deleted-file staging was fixed under T11: `stageFile` routes missing worktree
+paths through `git.remove`, including individual and bulk Changes actions.
+
+The folder-tree and integration-stage refresh implementations passed
+`pnpm build` with host access. Installed desktop and mobile visual acceptance,
+and live integration staging in Obsidian, remain open.

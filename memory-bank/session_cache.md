@@ -1,11 +1,11 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-09-19 03:45 IST*
+*Last Updated: 2026-09-30 09:34:50 IST*
 
-**Started**: 2026-09-18 00:15 IST
-**Focus Task**: T11, T12, T13, T39b: Integration Provider read/write delivery
-**Session File**: `sessions/2026-09-18-night.md`
+**Started**: 2026-09-30 09:09 IST
+**Focus Task**: T4: Changes tree and integration staging refresh
+**Session File**: `sessions/2026-09-30-day.md`
 **Status**: 🔄 Active: 9, Paused: 0, Completed: 5
 
 ## Overview
@@ -32,9 +32,21 @@ Build the Settings panel immediately after the shell with only the configuration
 
 ## Next Session Focus
 
-1. T4: Finish the planned revert refinement.
+1. T4: Verify the folder tree visually on installed desktop and mobile hosts; finish the planned revert refinement.
 2. T5: Add Log clear/export if still required.
 3. T10: Capture controlled large-vault timings and platform-specific acceptance.
+
+## 2026-09-30 Session Update
+
+- T4: Added the approved folder-tree mockup at
+  `assets/changes-tree-mockup.png` and implemented collapsible folder rows,
+  descendant checkboxes, filtered visible-file counts, and visible-selection
+  staging. A host `pnpm build` passed; installed-host visual acceptance remains
+  open.
+- T4/T39b: Integration-provider staging now updates open Changes views
+  automatically. Known listed paths update in memory; unknown paths use a
+  path-scoped read. Host `pnpm build` passed; live Obsidian interaction remains
+  unverified.
 
 ## 2026-09-18 Session Closeout
 

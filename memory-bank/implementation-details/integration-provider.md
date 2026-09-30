@@ -1,7 +1,7 @@
 # Integration Provider API
 
 *Created: 2026-09-18*
-*Last Updated: 2026-09-19 03:45 IST*
+*Last Updated: 2026-09-30 09:33 IST*
 
 ## Overview
 
@@ -34,7 +34,11 @@ actionable errors, not throws.
   (T11); `readCommitChanges` resolves short hashes (T12); shared
   snapshot cache (T13) with invalidation on stage/commit/pull/push
   (extended by T39b).
-- Registration from `src/main.ts`.
+- Registration from `src/main.ts`; successful `git.stage` calls notify open Git Sync views with the affected paths.
+
+## Changes View Refresh
+
+Integration staging refreshes the open Changes panel automatically. Paths already in its cached Changes list update their staged state in memory, with no extra vault status read. Paths absent from the list use a path-scoped status read. Notifications queue behind an in-progress repository refresh and then reconcile against its result; if there is no cached Changes baseline, the view performs a Changes-only status scan without rereading commit history. With no open Git Sync view, staging does not trigger UI reads.
 
 ## Snapshot Cache Discipline
 

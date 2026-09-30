@@ -1,6 +1,6 @@
 # Active Context
 
-*Last Updated: 2026-09-19 03:45 IST*
+*Last Updated: 2026-09-30 09:34:50 IST*
 
 ## Current Focus
 
@@ -20,14 +20,21 @@ history, retained remote progress/results, and a manual full-refresh policy.
 Activity is persisted as bounded plain text in `activity.log`; commit details
 load lazily, and Pull/Clone expose an explicit Changes-needs-refresh state.
 The filesystem bridge filters stale adapter paths and reuses validated stats.
+The Changes panel now renders filtered changes as nested folders and files;
+folder selection and selected staging actions cover only currently visible
+files. The user approved the tree mockup saved at
+`memory-bank/assets/changes-tree-mockup.png`. `pnpm build` passed for the tree
+and integration-stage refresh updates; installed desktop/mobile and live
+Obsidian acceptance remain open. Provider staging updates known paths locally
+and reads only unknown paths by path, avoiding a new full Changes scan.
 The rewrite is published from `main`. On 2026-09-18 the provider delivery
 landed: `plugin.api.integrationProvider` exposes git.status/changed_files/
 log/commit_changes plus write tools git.stage/commit/pull/push, with a shared
 snapshot cache invalidated on every mutation. Deleted-file staging now routes
 missing paths to `git.remove`. Verified end-to-end from obsidian-ai (17-check
 smoke: deletion staging, commit hash == HEAD, cache invalidation). Remaining
-work is renaming or removing remote filenames that mobile cannot create,
-Changes revert, Log clear/export, cancellation only with a tested abort path,
+work is Changes revert, renaming or removing remote filenames that mobile
+cannot create, Log clear/export, cancellation only with a tested abort path,
 remote edge cases, and controlled cold/warm timings in the large target vault.
 
 ## Current Decisions

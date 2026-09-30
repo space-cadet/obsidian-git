@@ -25,6 +25,7 @@ const MAX_FILES = 200;
 
 export interface GitSyncPluginLike {
 	app: App;
+	refreshIntegrationStage?: (paths: string[]) => Promise<void>;
 	settings: {
 		repositoryPath: string;
 		remoteUrl: string;
@@ -340,6 +341,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 						};
 					}
 					await stageFile(repo.adapter, repo.repositoryPath, paths);
+					await plugin.refreshIntegrationStage?.(paths);
 					return {
 						success: true,
 						content: `Staged ${paths.length} path(s):\n${paths

@@ -98,6 +98,14 @@ interface LongPressSelectionState {
 	suppressClick: boolean;
 }
 
+interface ChangeTreeFolder {
+	name: string;
+	path: string;
+	folders: Map<string, ChangeTreeFolder>;
+	files: ChangedFile[];
+	descendants: ChangedFile[];
+}
+
 interface StoredPluginData {
 	format: typeof PLUGIN_DATA_FORMAT;
 	schemaVersion: typeof PLUGIN_DATA_SCHEMA_VERSION;
@@ -133,6 +141,7 @@ export default class GitSyncPlugin extends Plugin {
 	private updater: PluginUpdater | null = null;
 	private dataSave: Promise<void> = Promise.resolve();
 	private remoteOperationQueue: Promise<void> = Promise.resolve();
+	private integrationStageQueue: Promise<void> = Promise.resolve();
 	private settingsSaveTimer: number | null = null;
 
 	async onload(): Promise<void> {
@@ -524,6 +533,18 @@ export default class GitSyncPlugin extends Plugin {
 		}
 	}
 
+	refreshIntegrationStage(paths: string[]): Promise<void> {
+		this.integrationStageQueue = this.integrationStageQueue
+			.catch(() => undefined)
+			.then(async () => {
+				const views = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)
+					.map((leaf) => leaf.view)
+					.filter((view): view is GitSyncView => view instanceof GitSyncView);
+				await Promise.all(views.map((view) => view.refreshIntegrationStage(paths)));
+			});
+		return this.integrationStageQueue;
+	}
+
 	refreshRemoteHistoryViews(reason = "remote-history-refresh"): void {
 		for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)) {
 			const view = leaf.view;
@@ -567,9 +588,12 @@ class GitSyncView extends ItemView {
 	private commitHistoryBranchName = "";
 	private longPressState: LongPressSelectionState | null = null;
 	private readonly collapsedSections = new Set<"staged" | "uncommitted">();
+	private readonly collapsedChangeFolders = new Set<string>();
 	private changesError: string | null = null;
 	private changesRefreshRequired = false;
 	private changesRefreshReason = "";
+	private repositoryRefreshInProgress = false;
+	private readonly pendingIntegrationStagePaths = new Set<string>();
 	private committing = false;
 	private commitMessage = "";
 	private changesContentEl: HTMLElement | null = null;
@@ -604,6 +628,9 @@ class GitSyncView extends ItemView {
 
 	onClose(): Promise<void> {
 		this.cancelLongPressSelection();
+		this.refreshGeneration += 1;
+		this.repositoryRefreshInProgress = false;
+		this.pendingIntegrationStagePaths.clear();
 		this.contentEl.empty();
 		return Promise.resolve();
 	}
@@ -776,6 +803,7 @@ class GitSyncView extends ItemView {
 		};
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath) {
+			this.repositoryRefreshInProgress = false;
 			this.repositoryState = null;
 			this.render();
 			this.plugin.recordActivity(`Repository refresh [${reason}] skipped: no repository path configured.`, "METRIC");
@@ -795,6 +823,7 @@ class GitSyncView extends ItemView {
 		}
 
 		const generation = ++this.refreshGeneration;
+		this.repositoryRefreshInProgress = true;
 		this.changesRefreshRequired = !refreshChanges;
 		this.changesRefreshReason = refreshChanges ? "" : reason;
 		if (!refreshChanges) {
@@ -816,7 +845,9 @@ class GitSyncView extends ItemView {
 				this.changesRefreshRequired = false;
 				this.changesRefreshReason = "";
 				try {
-					this.changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
+					const changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
+					if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+					this.changes = changes;
 					const availablePaths = new Set(this.changes.map((change) => change.path));
 					for (const selectedPath of this.selectedPaths) {
 						if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
@@ -891,6 +922,8 @@ class GitSyncView extends ItemView {
 		} else {
 			this.render();
 		}
+		this.repositoryRefreshInProgress = false;
+		this.flushPendingIntegrationStagePaths();
 	}
 
 	private renderChanges(content: HTMLElement): void {
@@ -1254,7 +1287,7 @@ class GitSyncView extends ItemView {
 			return;
 		}
 
-		const selectedInSection = changes.filter((change) => this.selectedPaths.has(change.path));
+		const selectedInSection = visibleChanges.filter((change) => this.selectedPaths.has(change.path));
 		if (selectedInSection.length > 1) {
 			const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
 			toolbar.createDiv({ cls: "git-sync-select-label", text: `${selectedInSection.length} selected` });
@@ -1264,7 +1297,7 @@ class GitSyncView extends ItemView {
 			});
 			setIcon(clear, "x");
 			clear.addEventListener("click", () => {
-				for (const change of changes) this.selectedPaths.delete(change.path);
+				for (const change of visibleChanges) this.selectedPaths.delete(change.path);
 				this.render();
 			});
 			const action = toolbar.createEl("button", {
@@ -1277,13 +1310,103 @@ class GitSyncView extends ItemView {
 			});
 			setIcon(action, section === "staged" ? "arrow-down-to-line" : "arrow-up-to-line");
 			action.disabled = this.committing;
-			action.addEventListener("click", () => void this.applySelectedStage(section === "staged"));
+			action.addEventListener("click", () => void this.applySelectedStage(section, visibleChanges));
 		}
 
 		const list = sectionEl.createEl("ul", { cls: "git-sync-changes-list" });
-		for (const [index, change] of visibleChanges.entries()) {
-			this.renderChangeRow(list, change, section, index, visibleChanges);
+		this.renderChangeTree(list, section, visibleChanges);
+	}
+
+	private renderChangeTree(list: HTMLElement, section: ChangeSection, changes: ChangedFile[]): void {
+		const root: ChangeTreeFolder = { name: "", path: "", folders: new Map(), files: [], descendants: [] };
+		const changeIndexes = new Map(changes.map((change, index) => [change.path, index]));
+		for (const change of changes) {
+			const parts = change.path.split("/").filter(Boolean);
+			let parent = root;
+			for (const name of parts.slice(0, -1)) {
+				let folder = parent.folders.get(name);
+				if (!folder) {
+					folder = {
+						name,
+						path: parent.path ? `${parent.path}/${name}` : name,
+						folders: new Map(),
+						files: [],
+						descendants: [],
+					};
+					parent.folders.set(name, folder);
+				}
+				folder.descendants.push(change);
+				parent = folder;
+			}
+			parent.files.push(change);
 		}
+
+		const renderFolder = (parentList: HTMLElement, folder: ChangeTreeFolder): void => {
+			const item = parentList.createEl("li", { cls: "git-sync-change-folder" });
+			const row = item.createDiv({ cls: "git-sync-folder-row" });
+			const selectedCount = folder.descendants.filter((change) => this.selectedPaths.has(change.path)).length;
+			const checkbox = row.createEl("input", {
+				attr: {
+					type: "checkbox",
+					"aria-label": `Select ${folder.descendants.length} visible changed files in ${folder.path}`,
+				},
+			});
+			checkbox.checked = selectedCount === folder.descendants.length;
+			checkbox.indeterminate = selectedCount > 0 && selectedCount < folder.descendants.length;
+			checkbox.disabled = this.committing;
+			checkbox.addEventListener("click", (event) => {
+				event.preventDefault();
+				const select = selectedCount < folder.descendants.length;
+				for (const change of folder.descendants) {
+					if (select) this.selectedPaths.add(change.path);
+					else this.selectedPaths.delete(change.path);
+				}
+				this.render();
+			});
+
+			const key = `${section}\u0000${folder.path}`;
+			const collapsed = this.collapsedChangeFolders.has(key);
+			const toggle = row.createEl("button", {
+				cls: "git-sync-folder-toggle",
+				attr: {
+					type: "button",
+					"aria-label": `${collapsed ? "Expand" : "Collapse"} ${folder.path}`,
+					"aria-expanded": String(!collapsed),
+					title: `${collapsed ? "Expand" : "Collapse"} ${folder.name}`,
+				},
+			});
+			setIcon(toggle, collapsed ? "chevron-right" : "chevron-down");
+			toggle.addEventListener("click", () => {
+				if (collapsed) this.collapsedChangeFolders.delete(key);
+				else this.collapsedChangeFolders.add(key);
+				this.render();
+			});
+			const icon = row.createSpan({ cls: "git-sync-folder-icon" });
+			setIcon(icon, "folder");
+			row.createSpan({ cls: "git-sync-folder-name", text: folder.name });
+			row.createSpan({
+				cls: "git-sync-folder-count",
+				text: this.hasChangeFilter(section) ? `${folder.descendants.length} visible` : String(folder.descendants.length),
+				attr: { "aria-label": `${folder.descendants.length} visible changed files` },
+			});
+			if (selectedCount > 0) {
+				row.createSpan({ cls: "git-sync-folder-selected-count", text: `${selectedCount} selected` });
+			}
+
+			if (collapsed) return;
+			const children = item.createEl("ul", { cls: "git-sync-change-tree-children" });
+			for (const child of [...folder.folders.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))) {
+				renderFolder(children, child);
+			}
+			for (const change of folder.files) {
+				this.renderChangeRow(children, change, section, changeIndexes.get(change.path) ?? 0, changes);
+			}
+		};
+
+		for (const folder of [...root.folders.values()].sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: "base" }))) {
+			renderFolder(list, folder);
+		}
+		for (const change of root.files) this.renderChangeRow(list, change, section, changeIndexes.get(change.path) ?? 0, changes);
 	}
 
 	private renderChangeRow(
@@ -1321,7 +1444,8 @@ class GitSyncView extends ItemView {
 		setIcon(directAction, change.staged ? "minus" : "plus");
 		directAction.disabled = this.committing;
 		directAction.addEventListener("click", () => void this.toggleStage(change));
-		const path = item.createDiv({ cls: "git-sync-change-path", text: change.path });
+		const displayName = change.path.split("/").filter(Boolean).pop() ?? change.path;
+		const path = item.createDiv({ cls: "git-sync-change-path", text: displayName });
 		path.setAttribute("title", change.path);
 		const menuButton = item.createEl("button", {
 			cls: "git-sync-change-menu",
@@ -1676,8 +1800,9 @@ class GitSyncView extends ItemView {
 		this.plugin.recordActivity(`${action} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`, "METRIC");
 	}
 
-	private async applySelectedStage(unstage: boolean): Promise<void> {
-		const selected = (this.changes ?? []).filter((change) =>
+	private async applySelectedStage(section: ChangeSection, visibleChanges: ChangedFile[]): Promise<void> {
+		const unstage = section === "staged";
+		const selected = visibleChanges.filter((change) =>
 			this.selectedPaths.has(change.path) && change.staged === unstage,
 		);
 		if (selected.length === 0) return;
@@ -1858,10 +1983,91 @@ class GitSyncView extends ItemView {
 		this.render();
 	}
 
+	async refreshIntegrationStage(paths: string[]): Promise<void> {
+		const affectedPaths = [...new Set(paths)];
+		if (affectedPaths.length === 0) return;
+		if (this.repositoryRefreshInProgress) {
+			for (const path of affectedPaths) this.pendingIntegrationStagePaths.add(path);
+			return;
+		}
+		if (this.repositoryState?.kind !== "ready") {
+			if (!this.repositoryState) {
+				for (const path of affectedPaths) this.pendingIntegrationStagePaths.add(path);
+				void this.refreshRepositoryState("integration-stage");
+			} else {
+				this.markChangesRefreshRequired("integration-stage");
+			}
+			return;
+		}
+		if (!this.changes || this.changesRefreshRequired) {
+			await this.refreshChangesSnapshot("integration-stage");
+			return;
+		}
+
+		const generation = ++this.refreshGeneration;
+		const affected = new Set(affectedPaths);
+		const knownChanges = this.changes.filter((change) => affected.has(change.path));
+		const knownPaths = new Set(knownChanges.map((change) => change.path));
+		const unknownPaths = affectedPaths.filter((path) => !knownPaths.has(path));
+		if (knownChanges.length > 0) this.applyKnownStagingState(knownChanges, true);
+		if (unknownPaths.length > 0) {
+			await this.refreshChangesForPaths(unknownPaths, unknownPaths, "integration-stage", generation);
+		}
+		this.plugin.recordActivity(
+			`Changes updated after integration staging for ${affectedPaths.length} path${affectedPaths.length === 1 ? "" : "s"} (${knownChanges.length} updated locally, ${unknownPaths.length} checked by path).`,
+			"METRIC",
+		);
+	}
+
+	private async refreshChangesSnapshot(reason: string): Promise<void> {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (!repositoryPath) {
+			this.markChangesRefreshRequired(reason);
+			return;
+		}
+		const generation = ++this.refreshGeneration;
+		const startedAt = Date.now();
+		this.repositoryRefreshInProgress = true;
+		try {
+			const changes = await readChanges(this.app.vault.adapter, repositoryPath);
+			if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
+			this.changes = changes;
+			this.changesRefreshRequired = false;
+			this.changesRefreshReason = "";
+			this.changesError = null;
+			const availablePaths = new Set(changes.map((change) => change.path));
+			for (const selectedPath of this.selectedPaths) {
+				if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
+			}
+		} catch (error) {
+			if (generation !== this.refreshGeneration) return;
+			this.changes = null;
+			this.changesError = error instanceof Error ? error.message : "Unable to read local changes.";
+		} finally {
+			if (generation === this.refreshGeneration) {
+				this.repositoryRefreshInProgress = false;
+				this.updateChangesContent();
+				this.plugin.recordActivity(
+					`Changes refresh [${reason}] completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${this.changes?.length ?? 0} changes).`,
+					"METRIC",
+				);
+				this.flushPendingIntegrationStagePaths();
+			}
+		}
+	}
+
+	private flushPendingIntegrationStagePaths(): void {
+		if (this.pendingIntegrationStagePaths.size === 0) return;
+		const paths = [...this.pendingIntegrationStagePaths];
+		this.pendingIntegrationStagePaths.clear();
+		void this.refreshIntegrationStage(paths);
+	}
+
 	private async refreshChangesForPaths(
 		affectedPaths: string[],
 		filepaths: string[],
 		reason: string,
+		generation = this.refreshGeneration,
 	): Promise<void> {
 		const startedAt = Date.now();
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
@@ -1872,13 +2078,14 @@ class GitSyncView extends ItemView {
 
 		try {
 			const updates = await readChanges(this.app.vault.adapter, repositoryPath, filepaths);
+			if (generation !== this.refreshGeneration) return;
 			this.applyKnownChangeUpdates(affectedPaths, updates);
 			this.plugin.recordActivity(
 				`Changes refresh [${reason}] completed for ${filepaths.length} path${filepaths.length === 1 ? "" : "s"} in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
 				"METRIC",
 			);
 		} catch {
-			this.markChangesRefreshRequired(reason);
+			if (generation === this.refreshGeneration) this.markChangesRefreshRequired(reason);
 		}
 	}
 

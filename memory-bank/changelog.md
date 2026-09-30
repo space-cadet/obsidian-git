@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-30
+
+- Added a collapsible folder tree to Changes. Folder selection includes only
+  matching files visible under the active status filter; bulk selected actions
+  follow the visible selection. - T4
+- Refresh open Changes views automatically after integration-provider staging;
+  reconcile listed paths locally and query only unknown paths. - T4, T39b
+
 ## 2026-09-18
 
 - Stage on deleted files now routes missing workdir paths to `git.remove`,
