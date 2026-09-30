@@ -1185,6 +1185,9 @@ class GitSyncView extends ItemView {
 				cls: "git-sync-state-description",
 				attr: { "aria-busy": "true" },
 			});
+			this.renderChangeSection(content, "staged", "STAGED", [], "Unstage selected", true);
+			this.renderChangeSection(content, "uncommitted", "UNCOMMITTED CHANGES", [], "Stage selected", true);
+			this.renderCommitComposer(content, null);
 			return;
 		}
 		const staged = this.changes.filter((change) => change.staged);
@@ -1192,10 +1195,18 @@ class GitSyncView extends ItemView {
 		this.renderChangeSection(content, "staged", "STAGED", staged, "Unstage selected");
 		this.renderChangeSection(content, "uncommitted", "UNCOMMITTED CHANGES", uncommitted, "Stage selected");
 
-		const stagedCount = staged.length;
+		this.renderCommitComposer(content, staged.length);
+	}
+
+	private renderCommitComposer(content: HTMLElement, stagedCount: number | null): void {
 		const commit = content.createDiv({ cls: "git-sync-commit" });
 		commit.createDiv({ text: "Commit staged changes", cls: "git-sync-commit-title" });
-		commit.createDiv({ text: `${stagedCount} file${stagedCount === 1 ? "" : "s"} staged`, cls: "git-sync-commit-meta" });
+		commit.createDiv({
+			text: stagedCount === null
+				? "Checking staged files…"
+				: `${stagedCount} file${stagedCount === 1 ? "" : "s"} staged`,
+			cls: "git-sync-commit-meta",
+		});
 		const message = commit.createEl("textarea", {
 			attr: { placeholder: "Commit message", "aria-label": "Commit message", rows: "3" },
 		});
@@ -1210,7 +1221,7 @@ class GitSyncView extends ItemView {
 			cls: "mod-cta",
 			attr: { type: "button", "aria-busy": String(committing) },
 		});
-		commitButton.disabled = stagedCount === 0 || this.committing;
+		commitButton.disabled = stagedCount === null || stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
 	}
 
@@ -1253,6 +1264,7 @@ class GitSyncView extends ItemView {
 				cls: "git-sync-state-description",
 				attr: { "aria-busy": "true" },
 			});
+			this.renderCommitLoadingPlaceholder(content);
 			return;
 		}
 		if (this.commitSource === "remote" && this.remoteHistoryLoading) {
@@ -1285,6 +1297,7 @@ class GitSyncView extends ItemView {
 				cls: "git-sync-state-description",
 				attr: { "aria-busy": "true" },
 			});
+			this.renderCommitLoadingPlaceholder(content);
 			return;
 		}
 		if (commits!.length === 0) {
@@ -1304,6 +1317,15 @@ class GitSyncView extends ItemView {
 			});
 			loadMore.disabled = this.commitHistoryLoading;
 			loadMore.addEventListener("click", () => void this.loadMoreCommits());
+		}
+	}
+
+	private renderCommitLoadingPlaceholder(content: HTMLElement): void {
+		const list = content.createDiv({ cls: "git-sync-commit-loading-list", attr: { "aria-hidden": "true" } });
+		for (let index = 0; index < 4; index += 1) {
+			const row = list.createDiv({ cls: "git-sync-commit-loading-row" });
+			row.createSpan({ cls: "git-sync-loading-line is-commit-title" });
+			row.createSpan({ cls: "git-sync-loading-line is-commit-meta" });
 		}
 	}
 
@@ -1487,6 +1509,7 @@ class GitSyncView extends ItemView {
 		title: string,
 		changes: ChangedFile[],
 		bulkAction: string,
+		loading = false,
 	): void {
 		const sectionEl = content.createDiv({ cls: "git-sync-change-section" });
 		const header = sectionEl.createDiv({ cls: "git-sync-change-section-header" });
@@ -1495,7 +1518,7 @@ class GitSyncView extends ItemView {
 			this.activeChangeAction === `${section === "staged" ? "Unstage" : "Stage"} selected`;
 		header.createDiv({
 			cls: "git-sync-section-count",
-			text: actionInProgress ? `${section === "staged" ? "Unstaging" : "Staging"}…` : String(changes.length),
+			text: loading ? "…" : actionInProgress ? `${section === "staged" ? "Unstaging" : "Staging"}…` : String(changes.length),
 		});
 		const filter = header.createEl("button", {
 			cls: "git-sync-section-action",
@@ -1530,7 +1553,7 @@ class GitSyncView extends ItemView {
 		});
 		setIcon(sectionAction, section === "staged" ? "minus" : "plus");
 		sectionAction.createSpan({ text: sectionActionName });
-		sectionAction.disabled = changes.length === 0 || this.committing;
+		sectionAction.disabled = loading || changes.length === 0 || this.committing;
 		sectionAction.addEventListener("click", () => void this.applyAllStage(section === "staged"));
 		const collapse = header.createEl("button", {
 			cls: "git-sync-icon-button",
@@ -1544,6 +1567,19 @@ class GitSyncView extends ItemView {
 		});
 
 		if (this.collapsedSections.has(section)) return;
+		if (loading) {
+			const placeholders = sectionEl.createDiv({
+				cls: "git-sync-change-loading-list",
+				attr: { "aria-hidden": "true" },
+			});
+			for (let index = 0; index < 2; index += 1) {
+				const row = placeholders.createDiv({ cls: "git-sync-change-loading-row" });
+				row.createSpan({ cls: "git-sync-loading-checkbox" });
+				row.createSpan({ cls: "git-sync-loading-action" });
+				row.createSpan({ cls: "git-sync-loading-line" });
+			}
+			return;
+		}
 		const visibleChanges = this.getVisibleChanges(section, changes);
 
 		if (changes.length === 0) {

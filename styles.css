@@ -559,6 +559,64 @@
 	text-align: center;
 }
 
+.git-sync-change-loading-list {
+	padding: 0 12px;
+}
+
+.git-sync-change-loading-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 50px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-loading-checkbox,
+.git-sync-loading-action,
+.git-sync-loading-line {
+	flex: 0 0 auto;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+}
+
+.git-sync-loading-checkbox {
+	width: 18px;
+	height: 18px;
+}
+
+.git-sync-loading-action {
+	width: 52px;
+	height: 32px;
+}
+
+.git-sync-loading-line {
+	width: min(58%, 240px);
+	height: 16px;
+}
+
+.git-sync-commit-loading-list {
+	margin: 12px 0;
+}
+
+.git-sync-commit-loading-row {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	min-height: 70px;
+	padding: 14px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-loading-line.is-commit-title {
+	width: min(75%, 320px);
+	height: 16px;
+}
+
+.git-sync-loading-line.is-commit-meta {
+	width: min(48%, 200px);
+	height: 12px;
+}
+
 .git-sync-change {
 	display: flex;
 	align-items: center;
