@@ -108,7 +108,7 @@ export async function readChanges(
 		.map(([path, head, workdir, stage]) => ({
 			path,
 			status: statusLabel(head, workdir, stage),
-			staged: head === stage ? false : stage === workdir,
+			staged: head !== stage,
 		}));
 }
 
@@ -145,9 +145,12 @@ export interface RepositorySnapshot {
 export const REPOSITORY_SNAPSHOT_TTL_MS = 120_000;
 
 const repositorySnapshotCache = new Map<string, RepositorySnapshot>();
+const repositorySnapshotGeneration = new Map<string, number>();
 
 export function invalidateRepositorySnapshot(repositoryPath: string): void {
-	repositorySnapshotCache.delete(normalizedRepositoryPath(repositoryPath));
+	const key = normalizedRepositoryPath(repositoryPath);
+	repositorySnapshotCache.delete(key);
+	repositorySnapshotGeneration.set(key, (repositorySnapshotGeneration.get(key) ?? 0) + 1);
 }
 
 /**
@@ -161,6 +164,7 @@ export async function readRepositorySnapshot(
 	repositoryPath: string,
 ): Promise<RepositorySnapshot> {
 	const key = normalizedRepositoryPath(repositoryPath);
+	const generation = repositorySnapshotGeneration.get(key) ?? 0;
 	const cached = repositorySnapshotCache.get(key);
 	if (cached && Date.now() - cached.at < REPOSITORY_SNAPSHOT_TTL_MS) {
 		return cached;
@@ -184,7 +188,7 @@ export async function readRepositorySnapshot(
 			changes.push({
 				path,
 				status: statusLabel(head, workdir, stage),
-				staged: head === stage ? false : stage === workdir,
+			staged: head !== stage,
 			});
 		}
 		if (head !== stage && !(head === 0 && stage === 0)) staged += 1;
@@ -197,29 +201,41 @@ export async function readRepositorySnapshot(
 		counts: { total: changes.length, staged, unstaged, conflicts },
 		changes,
 	};
+	if ((repositorySnapshotGeneration.get(key) ?? 0) !== generation) {
+		return readRepositorySnapshot(adapter, repositoryPath);
+	}
 	repositorySnapshotCache.set(key, snapshot);
 	return snapshot;
 }
 
 export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string | string[]): Promise<void> {
 	invalidateRepositorySnapshot(repositoryPath);
-	const fs = new ObsidianGitFs(adapter);
-	const dir = normalizedRepositoryPath(repositoryPath);
-	const paths = Array.isArray(path) ? path : [path];
-	const present: string[] = [];
-	const missing: string[] = [];
-	for (const candidate of paths) {
-		if (await adapter.exists(pathInRepository(repositoryPath, candidate))) present.push(candidate);
-		else missing.push(candidate);
-	}
-	if (present.length > 0) await git.add({ fs, dir, filepath: present });
-	for (const candidate of missing) {
-		await git.remove({ fs, dir, filepath: candidate });
+	try {
+		const fs = new ObsidianGitFs(adapter);
+		const dir = normalizedRepositoryPath(repositoryPath);
+		const paths = Array.isArray(path) ? path : [path];
+		const present: string[] = [];
+		const missing: string[] = [];
+		for (const candidate of paths) {
+			if (await adapter.exists(pathInRepository(repositoryPath, candidate))) present.push(candidate);
+			else missing.push(candidate);
+		}
+		if (present.length > 0) await git.add({ fs, dir, filepath: present });
+		for (const candidate of missing) {
+			await git.remove({ fs, dir, filepath: candidate });
+		}
+	} finally {
+		invalidateRepositorySnapshot(repositoryPath);
 	}
 }
 
 export async function unstageFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
-	await git.resetIndex({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+	invalidateRepositorySnapshot(repositoryPath);
+	try {
+		await git.resetIndex({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+	} finally {
+		invalidateRepositorySnapshot(repositoryPath);
+	}
 }
 
 export async function unstageFiles(adapter: DataAdapter, repositoryPath: string, paths: string[]): Promise<void> {
@@ -227,17 +243,26 @@ export async function unstageFiles(adapter: DataAdapter, repositoryPath: string,
 	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
 	const cache = {};
-	for (const path of paths) {
-		await git.resetIndex({ fs, dir, filepath: path, cache });
+	try {
+		for (const path of paths) {
+			await git.resetIndex({ fs, dir, filepath: path, cache });
+		}
+	} finally {
+		invalidateRepositorySnapshot(repositoryPath);
 	}
 }
 
 export async function removeFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
 	invalidateRepositorySnapshot(repositoryPath);
-	await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+	try {
+		await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
+	} finally {
+		invalidateRepositorySnapshot(repositoryPath);
+	}
 }
 
 export async function addToGitignore(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
+	invalidateRepositorySnapshot(repositoryPath);
 	const repository = normalizedRepositoryPath(repositoryPath);
 	const gitignorePath = repository === "." ? ".gitignore" : `${repository}/.gitignore`;
 	const current = await adapter.exists(gitignorePath) ? await adapter.read(gitignorePath) : "";
@@ -248,6 +273,7 @@ export async function addToGitignore(adapter: DataAdapter, repositoryPath: strin
 	if (lines.some((line) => line.trim() === normalizedPath)) return;
 	const prefix = current && !current.endsWith("\n") ? `${current}\n` : current;
 	await adapter.write(gitignorePath, `${prefix}${normalizedPath}\n`);
+	invalidateRepositorySnapshot(repositoryPath);
 }
 
 export async function commitChanges(
@@ -257,12 +283,16 @@ export async function commitChanges(
 	author: CommitAuthor,
 ): Promise<string> {
 	invalidateRepositorySnapshot(repositoryPath);
-	return git.commit({
-		fs: new ObsidianGitFs(adapter),
-		dir: normalizedRepositoryPath(repositoryPath),
-		message,
-		author,
-	});
+	try {
+		return await git.commit({
+			fs: new ObsidianGitFs(adapter),
+			dir: normalizedRepositoryPath(repositoryPath),
+			message,
+			author,
+		});
+	} finally {
+		invalidateRepositorySnapshot(repositoryPath);
+	}
 }
 
 export async function readCommits(

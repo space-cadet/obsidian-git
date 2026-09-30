@@ -240,6 +240,63 @@
 	margin: 12px 0;
 }
 
+.git-sync-icon-spinning svg {
+	animation: git-sync-spin 1s linear infinite;
+}
+
+.git-sync-button-loading::after {
+	content: "";
+	display: inline-block;
+	width: 0.85em;
+	height: 0.85em;
+	margin-left: 0.6em;
+	vertical-align: -0.1em;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: git-sync-spin 0.8s linear infinite;
+}
+
+.git-sync-inline-loading::before {
+	content: "";
+	display: inline-block;
+	width: 0.8em;
+	height: 0.8em;
+	margin-right: 0.55em;
+	vertical-align: -0.08em;
+	border: 2px solid var(--interactive-accent);
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: git-sync-spin 0.8s linear infinite;
+}
+
+.git-sync-settings-save-status.is-saving::before {
+	content: "";
+	display: inline-block;
+	width: 0.75em;
+	height: 0.75em;
+	margin-right: 0.5em;
+	vertical-align: -0.06em;
+	border: 2px solid var(--interactive-accent);
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: git-sync-spin 0.8s linear infinite;
+}
+
+@keyframes git-sync-spin {
+	to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.git-sync-icon-spinning svg,
+	.git-sync-button-loading::after,
+	.git-sync-inline-loading::before,
+	.git-sync-change.is-busy::after,
+	.git-sync-settings-save-status.is-saving::before {
+		animation: none;
+	}
+}
+
 @media (max-width: 360px) {
 	.git-sync-change-section-header {
 		gap: 4px;
@@ -492,6 +549,17 @@
 .git-sync-change.is-selected {
 	background: var(--background-modifier-hover);
 	box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+
+.git-sync-change.is-busy::after {
+	content: "";
+	flex: 0 0 auto;
+	width: 15px;
+	height: 15px;
+	border: 2px solid var(--interactive-accent);
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: git-sync-spin 0.8s linear infinite;
 }
 
 .git-sync-change input[type="checkbox"] {

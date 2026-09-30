@@ -17,6 +17,7 @@ import {
 	addToGitignore,
 	commitChanges,
 	inspectLocalRepository,
+	invalidateRepositorySnapshot,
 	LocalCommit,
 	readCommits,
 	readCommitChanges,
@@ -143,6 +144,9 @@ export default class GitSyncPlugin extends Plugin {
 	private remoteOperationQueue: Promise<void> = Promise.resolve();
 	private integrationStageQueue: Promise<void> = Promise.resolve();
 	private settingsSaveTimer: number | null = null;
+	private settingsSaveIndicator: HTMLElement | null = null;
+	private settingsRefreshQueued = false;
+	private remoteHistoryRefreshQueued = false;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -214,8 +218,25 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	async saveSettings(): Promise<void> {
-		await this.persistData();
-		this.refreshViews();
+		this.setSettingsSaveStatus("Saving settings…", true);
+		try {
+			await this.persistData();
+			this.setSettingsSaveStatus("Settings saved.", false);
+		} catch (error) {
+			this.setSettingsSaveStatus("Settings could not be saved.", false);
+			throw error;
+		}
+	}
+
+	setSettingsSaveIndicator(element: HTMLElement): void {
+		this.settingsSaveIndicator = element;
+	}
+
+	private setSettingsSaveStatus(message: string, saving: boolean): void {
+		if (!this.settingsSaveIndicator?.isConnected) return;
+		this.settingsSaveIndicator.setText(message);
+		this.settingsSaveIndicator.toggleClass("is-saving", saving);
+		this.settingsSaveIndicator.setAttribute("aria-busy", String(saving));
 	}
 
 	private persistData(): Promise<void> {
@@ -268,11 +289,24 @@ export default class GitSyncPlugin extends Plugin {
 		new Notice("Plugin data imported. Remote credentials were left unchanged.");
 	}
 
-	scheduleSettingsSave(): void {
+	scheduleSettingsSave(refreshRepository = false, refreshRemoteHistory = false): void {
+		this.settingsRefreshQueued ||= refreshRepository;
+		this.remoteHistoryRefreshQueued ||= refreshRemoteHistory;
+		this.setSettingsSaveStatus("Saving settings…", true);
 		if (this.settingsSaveTimer !== null) window.clearTimeout(this.settingsSaveTimer);
 		this.settingsSaveTimer = window.setTimeout(() => {
 			this.settingsSaveTimer = null;
-			void this.saveSettings();
+			const refreshRepositoryAfterSave = this.settingsRefreshQueued;
+			const refreshRemoteHistoryAfterSave = this.remoteHistoryRefreshQueued;
+			this.settingsRefreshQueued = false;
+			this.remoteHistoryRefreshQueued = false;
+			void this.saveSettings().then(() => {
+				if (refreshRepositoryAfterSave) this.refreshViews("repository-setting-change");
+				else if (refreshRemoteHistoryAfterSave) this.refreshRemoteHistoryViews("branch-setting-change");
+			}).catch((error) => {
+				const detail = error instanceof Error ? error.message : "Unable to save settings.";
+				this.recordActivity(`Settings save failed: ${detail}`, "ERROR");
+			});
 		}, 250);
 	}
 
@@ -465,6 +499,8 @@ export default class GitSyncPlugin extends Plugin {
 					if (name === "Pull" || name === "Force Pull" || name === "Clone") this.markChangesRefreshRequiredViews(name);
 					modal.fail(detail);
 					new Notice(`${name} failed: ${detail}`);
+				} finally {
+					invalidateRepositorySnapshot(this.settings.repositoryPath);
 				}
 			});
 		this.remoteOperationQueue = next;
@@ -595,12 +631,16 @@ class GitSyncView extends ItemView {
 	private repositoryRefreshInProgress = false;
 	private readonly pendingIntegrationStagePaths = new Set<string>();
 	private committing = false;
+	private activeChangeAction = "";
+	private readonly pendingStagePaths = new Set<string>();
+	private readonly pendingFileActions = new Set<string>();
 	private commitMessage = "";
 	private changesContentEl: HTMLElement | null = null;
 	private changesScrollTop = 0;
 	private refreshGeneration = 0;
 	private activityVisibleCount = ACTIVITY_PAGE_SIZE;
 	private commitHistoryLoading = false;
+	private remoteHistoryLoading = false;
 	private lastRepositoryActivity = "";
 
 	constructor(leaf: WorkspaceLeaf, plugin: GitSyncPlugin) {
@@ -682,7 +722,8 @@ class GitSyncView extends ItemView {
 		}
 
 		if (!this.repositoryState || this.repositoryState.kind === "checking") {
-			content.createDiv({ cls: "git-sync-state-title", text: "Checking repository" });
+			const title = content.createDiv({ cls: "git-sync-state-title git-sync-inline-loading", text: "Checking repository" });
+			title.setAttribute("aria-busy", "true");
 			content.createEl("p", {
 				text: "Reading local repository information…",
 				cls: "git-sync-state-description",
@@ -741,16 +782,23 @@ class GitSyncView extends ItemView {
 
 		const refreshButton = branch.createEl("button", {
 			cls: "git-sync-context-action",
-			attr: { type: "button", "aria-label": "Refresh repository", title: "Refresh repository" },
+			attr: {
+				type: "button",
+				"aria-label": this.repositoryRefreshInProgress ? "Refreshing repository" : "Refresh repository",
+				title: this.repositoryRefreshInProgress ? "Refreshing repository" : "Refresh repository",
+				"aria-busy": String(this.repositoryRefreshInProgress),
+			},
 		});
-		setIcon(refreshButton, "refresh-cw");
-		refreshButton.disabled = !repository;
+		setIcon(refreshButton, this.repositoryRefreshInProgress ? "loader" : "refresh-cw");
+		if (this.repositoryRefreshInProgress) refreshButton.addClass("git-sync-icon-spinning");
+		refreshButton.disabled = !repository || this.repositoryRefreshInProgress;
 		refreshButton.addEventListener("click", () => void this.refreshRepositoryState("manual-refresh"));
 
 		const comparisonState = this.getComparisonState(repository);
 		const comparison = context.createDiv({ cls: "git-sync-comparison-status" });
 		const comparisonIcon = comparison.createSpan({ cls: "git-sync-comparison-icon" });
 		comparisonIcon.setAttribute("data-comparison-state", comparisonState.kind);
+		if (comparisonState.kind === "checking") comparisonIcon.addClass("git-sync-icon-spinning");
 		setIcon(comparisonIcon, comparisonState.icon);
 		comparison.createDiv({
 			cls: "git-sync-comparison-text",
@@ -802,6 +850,7 @@ class GitSyncView extends ItemView {
 			}
 		};
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (repositoryPath) invalidateRepositorySnapshot(repositoryPath);
 		if (!repositoryPath) {
 			this.repositoryRefreshInProgress = false;
 			this.repositoryState = null;
@@ -916,13 +965,14 @@ class GitSyncView extends ItemView {
 			"METRIC",
 		);
 		this.recordRepositoryActivity(state);
+		this.repositoryRefreshInProgress = false;
+		invalidateRepositorySnapshot(repositoryPath);
 		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
 			this.renderRepositoryContext(this.contentEl, repositoryPath);
 			this.updateChangesContent();
 		} else {
 			this.render();
 		}
-		this.repositoryRefreshInProgress = false;
 		this.flushPendingIntegrationStagePaths();
 	}
 
@@ -934,7 +984,12 @@ class GitSyncView extends ItemView {
 				text: `The working tree may have changed after ${this.changesRefreshReason}. Refresh the repository to read the current Changes list.`,
 				cls: "git-sync-state-description",
 			});
-			const refresh = notice.createEl("button", { text: "Refresh repository", attr: { type: "button" } });
+			const refresh = notice.createEl("button", {
+				text: this.repositoryRefreshInProgress ? "Refreshing repository…" : "Refresh repository",
+				cls: this.repositoryRefreshInProgress ? "git-sync-button-loading" : "",
+				attr: { type: "button", "aria-busy": String(this.repositoryRefreshInProgress) },
+			});
+			refresh.disabled = this.repositoryRefreshInProgress;
 			refresh.addEventListener("click", () => void this.refreshRepositoryState("manual-refresh"));
 			return;
 		}
@@ -943,7 +998,11 @@ class GitSyncView extends ItemView {
 			return;
 		}
 		if (!this.changes) {
-			content.createEl("p", { text: "Reading local changes…", cls: "git-sync-state-description" });
+			content.createEl("p", {
+				text: "Reading local changes…",
+				cls: "git-sync-state-description git-sync-inline-loading",
+				attr: { "aria-busy": "true" },
+			});
 			return;
 		}
 		const staged = this.changes.filter((change) => change.staged);
@@ -963,7 +1022,12 @@ class GitSyncView extends ItemView {
 			this.commitMessage = message.value;
 		});
 		const commitActions = commit.createDiv({ cls: "git-sync-commit-actions" });
-		const commitButton = commitActions.createEl("button", { text: "Commit", cls: "mod-cta", attr: { type: "button" } });
+		const committing = this.committing && !this.activeChangeAction;
+		const commitButton = commitActions.createEl("button", {
+			text: committing ? "Committing…" : "Commit",
+			cls: committing ? "mod-cta git-sync-button-loading" : "mod-cta",
+			attr: { type: "button", "aria-busy": String(committing) },
+		});
 		commitButton.disabled = stagedCount === 0 || this.committing;
 		commitButton.addEventListener("click", () => void this.commit(message.value));
 	}
@@ -1002,8 +1066,19 @@ class GitSyncView extends ItemView {
 			return;
 		}
 		if (this.commitSource === "remote" && !this.remoteCommits) {
-			content.createEl("p", { text: "Reading remote commit history…", cls: "git-sync-state-description" });
+			content.createEl("p", {
+				text: "Reading remote commit history…",
+				cls: "git-sync-state-description git-sync-inline-loading",
+				attr: { "aria-busy": "true" },
+			});
 			return;
+		}
+		if (this.commitSource === "remote" && this.remoteHistoryLoading) {
+			content.createEl("p", {
+				text: "Refreshing remote history…",
+				cls: "git-sync-state-description git-sync-inline-loading",
+				attr: { "aria-busy": "true" },
+			});
 		}
 		if (this.commitSource === "remote" && !this.remoteHistoryAvailable) {
 			const unavailable = content.createDiv({ cls: "git-sync-history-unavailable" });
@@ -1023,7 +1098,11 @@ class GitSyncView extends ItemView {
 			return;
 		}
 		if (!this.commits) {
-			content.createEl("p", { text: "Reading local commit history…", cls: "git-sync-state-description" });
+			content.createEl("p", {
+				text: "Reading local commit history…",
+				cls: "git-sync-state-description git-sync-inline-loading",
+				attr: { "aria-busy": "true" },
+			});
 			return;
 		}
 		if (commits!.length === 0) {
@@ -1038,8 +1117,8 @@ class GitSyncView extends ItemView {
 		if (this.commitHasMore.get(this.commitSource)) {
 			const loadMore = content.createEl("button", {
 				text: this.commitHistoryLoading ? "Loading commits…" : "Load more commits",
-				cls: "git-sync-load-more",
-				attr: { type: "button" },
+				cls: this.commitHistoryLoading ? "git-sync-load-more git-sync-button-loading" : "git-sync-load-more",
+				attr: { type: "button", "aria-busy": String(this.commitHistoryLoading) },
 			});
 			loadMore.disabled = this.commitHistoryLoading;
 			loadMore.addEventListener("click", () => void this.loadMoreCommits());
@@ -1143,6 +1222,7 @@ class GitSyncView extends ItemView {
 				cls: loadingError ? "git-sync-commit-files-error" : "git-sync-commit-files-loading",
 				text: loadingError ? `Unable to load changed files: ${loadingError}` : "Loading changed files…",
 			});
+			if (!loadingError) details.querySelector(".git-sync-commit-files-loading")?.addClass("git-sync-inline-loading");
 			void this.loadCommitChanges(commit.oid);
 			return;
 		}
@@ -1260,7 +1340,11 @@ class GitSyncView extends ItemView {
 				title: section === "staged" ? "Unstage all" : "Stage all",
 			},
 		});
-		setIcon(sectionAction, section === "staged" ? "minus" : "plus");
+		const sectionActionName = section === "staged" ? "Unstage all" : "Stage all";
+		const sectionActionLoading = this.activeChangeAction === sectionActionName ||
+			this.activeChangeAction === `${section === "staged" ? "Unstage" : "Stage"} selected`;
+		setIcon(sectionAction, sectionActionLoading ? "loader" : section === "staged" ? "minus" : "plus");
+		if (sectionActionLoading) sectionAction.addClass("git-sync-icon-spinning");
 		sectionAction.disabled = changes.length === 0 || this.committing;
 		sectionAction.addEventListener("click", () => void this.applyAllStage(section === "staged"));
 		const collapse = header.createEl("button", {
@@ -1308,7 +1392,10 @@ class GitSyncView extends ItemView {
 					title: bulkAction === "Stage selected" ? "Stage selected files" : "Unstage selected files",
 				},
 			});
-			setIcon(action, section === "staged" ? "arrow-down-to-line" : "arrow-up-to-line");
+			const selectedActionName = section === "staged" ? "Unstage selected" : "Stage selected";
+			const selectedActionLoading = this.activeChangeAction === selectedActionName;
+			setIcon(action, selectedActionLoading ? "loader" : section === "staged" ? "arrow-down-to-line" : "arrow-up-to-line");
+			if (selectedActionLoading) action.addClass("git-sync-icon-spinning");
 			action.disabled = this.committing;
 			action.addEventListener("click", () => void this.applySelectedStage(section, visibleChanges));
 		}
@@ -1417,7 +1504,7 @@ class GitSyncView extends ItemView {
 		visibleChanges: ChangedFile[],
 	): void {
 		const item = list.createEl("li", {
-			cls: this.selectedPaths.has(change.path) ? "git-sync-change is-selected" : "git-sync-change",
+			cls: ["git-sync-change", this.selectedPaths.has(change.path) ? "is-selected" : "", this.pendingFileActions.has(change.path) ? "is-busy" : ""].filter(Boolean).join(" "),
 			attr: { "data-change-path": change.path, "data-change-section": section },
 		});
 		const checkbox = item.createEl("input", {
@@ -1441,8 +1528,10 @@ class GitSyncView extends ItemView {
 				"data-change-path": change.path,
 			},
 		});
-		setIcon(directAction, change.staged ? "minus" : "plus");
-		directAction.disabled = this.committing;
+		const stagePending = this.pendingStagePaths.has(change.path);
+		setIcon(directAction, stagePending ? "loader" : change.staged ? "minus" : "plus");
+		if (stagePending) directAction.addClass("git-sync-icon-spinning");
+		directAction.disabled = this.committing || stagePending || this.pendingFileActions.has(change.path);
 		directAction.addEventListener("click", () => void this.toggleStage(change));
 		const displayName = change.path.split("/").filter(Boolean).pop() ?? change.path;
 		const path = item.createDiv({ cls: "git-sync-change-path", text: displayName });
@@ -1457,7 +1546,7 @@ class GitSyncView extends ItemView {
 			},
 		});
 		setIcon(menuButton, "more-horizontal");
-		menuButton.disabled = this.committing;
+		menuButton.disabled = this.committing || stagePending || this.pendingFileActions.has(change.path);
 		menuButton.addEventListener("click", (event) => this.showChangeMenu(change, event));
 		this.bindLongPressSelection(item, section, change.path, visibleChanges, index);
 	}
@@ -1676,6 +1765,8 @@ class GitSyncView extends ItemView {
 	}
 
 	private async ignoreChangedFile(path: string): Promise<void> {
+		this.pendingFileActions.add(path);
+		this.updateChangesContent();
 		try {
 			await addToGitignore(this.app.vault.adapter, this.plugin.settings.repositoryPath, path);
 			this.plugin.recordActivity(`Added ${path} to .gitignore.`);
@@ -1685,6 +1776,9 @@ class GitSyncView extends ItemView {
 			const detail = error instanceof Error ? error.message : "Unable to update .gitignore.";
 			this.plugin.recordActivity(`Could not update .gitignore: ${detail}`, "ERROR");
 			new Notice(detail);
+		} finally {
+			this.pendingFileActions.delete(path);
+			this.updateChangesContent();
 		}
 	}
 
@@ -1698,6 +1792,8 @@ class GitSyncView extends ItemView {
 	}
 
 	private async removeChangedFile(change: ChangedFile): Promise<void> {
+		this.pendingFileActions.add(change.path);
+		this.updateChangesContent();
 		try {
 			await removeFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
 			this.selectedPaths.delete(change.path);
@@ -1708,6 +1804,9 @@ class GitSyncView extends ItemView {
 			const detail = error instanceof Error ? error.message : "Unable to remove the file with git rm.";
 			this.plugin.recordActivity(`Could not remove ${change.path}: ${detail}`, "ERROR");
 			new Notice(detail);
+		} finally {
+			this.pendingFileActions.delete(change.path);
+			this.updateChangesContent();
 		}
 	}
 
@@ -1776,6 +1875,8 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const action = unstage ? "Unstage all" : "Stage all";
 		this.committing = true;
+		this.activeChangeAction = action;
+		this.render();
 		let completed = false;
 		try {
 			if (unstage) {
@@ -1794,6 +1895,8 @@ class GitSyncView extends ItemView {
 			new Notice(detail);
 		} finally {
 			this.committing = false;
+			this.activeChangeAction = "";
+			this.render();
 		}
 		if (completed) this.applyKnownStagingState(changes, !unstage);
 		else this.markChangesRefreshRequired(unstage ? "unstage all" : "stage all");
@@ -1810,6 +1913,8 @@ class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		const action = unstage ? "Unstage selected" : "Stage selected";
 		this.committing = true;
+		this.activeChangeAction = action;
+		this.render();
 		let completed = false;
 		try {
 			if (unstage) {
@@ -1828,6 +1933,8 @@ class GitSyncView extends ItemView {
 			new Notice(detail);
 		} finally {
 			this.committing = false;
+			this.activeChangeAction = "";
+			this.render();
 		}
 		if (completed) this.applyKnownStagingState(selected, !unstage);
 		else this.markChangesRefreshRequired(unstage ? "unstage selected" : "stage selected");
@@ -1837,6 +1944,8 @@ class GitSyncView extends ItemView {
 	private async toggleStage(change: ChangedFile): Promise<void> {
 		const startedAt = Date.now();
 		const action = change.staged ? "Unstage" : "Stage";
+		this.pendingStagePaths.add(change.path);
+		this.updateChangesContent();
 		try {
 			if (change.staged) {
 				await unstageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
@@ -1851,6 +1960,9 @@ class GitSyncView extends ItemView {
 			const detail = error instanceof Error ? error.message : "Unable to update staging.";
 			this.plugin.recordActivity(`Could not update ${change.path} after ${formatMilliseconds(elapsedMilliseconds(startedAt))}: ${detail}`, "ERROR");
 			new Notice(detail);
+		} finally {
+			this.pendingStagePaths.delete(change.path);
+			this.updateChangesContent();
 		}
 	}
 
@@ -1942,6 +2054,8 @@ class GitSyncView extends ItemView {
 		}
 
 		const generation = ++this.refreshGeneration;
+		this.remoteHistoryLoading = true;
+		if (this.commitSource === "remote") this.render();
 		try {
 			const history = await readRemoteCommits(
 				this.app.vault.adapter,
@@ -1960,6 +2074,8 @@ class GitSyncView extends ItemView {
 			this.remoteHistoryAvailable = false;
 			this.commitHasMore.set("remote", false);
 			this.remoteCommitsError = error instanceof Error ? error.message : "Unable to read remote commits.";
+		} finally {
+			this.remoteHistoryLoading = false;
 		}
 
 		this.plugin.recordActivity(
@@ -2201,9 +2317,11 @@ class GitSyncView extends ItemView {
 
 	private addRefreshButton(content: HTMLElement): void {
 		const refreshButton = content.createEl("button", {
-			text: "Refresh repository",
-			attr: { type: "button" },
+			text: this.repositoryRefreshInProgress ? "Refreshing repository…" : "Refresh repository",
+			cls: this.repositoryRefreshInProgress ? "git-sync-button-loading" : "",
+			attr: { type: "button", "aria-busy": String(this.repositoryRefreshInProgress) },
 		});
+		refreshButton.disabled = this.repositoryRefreshInProgress;
 		refreshButton.addEventListener("click", () => void this.refreshRepositoryState());
 	}
 
@@ -2268,7 +2386,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.repositoryPath);
 				text.onChange((value) => {
 					this.plugin.settings.repositoryPath = value.trim();
-					this.plugin.scheduleSettingsSave();
+					this.plugin.scheduleSettingsSave(true);
 				});
 			});
 
@@ -2314,9 +2432,11 @@ class GitSyncSettingTab extends PluginSettingTab {
 				button.setButtonText("Check for updates").setCta().onClick(async () => {
 					button.setDisabled(true);
 					button.setButtonText("Checking…");
+					button.buttonEl.addClass("git-sync-button-loading");
 					try {
 						await this.plugin.checkForUpdates(true);
 					} finally {
+						button.buttonEl.removeClass("git-sync-button-loading");
 						button.setButtonText("Check for updates");
 						button.setDisabled(false);
 					}
@@ -2394,9 +2514,11 @@ class GitSyncSettingTab extends PluginSettingTab {
 				button.setButtonText("Test connection").onClick(async () => {
 					button.setDisabled(true);
 					button.setButtonText("Testing…");
+					button.buttonEl.addClass("git-sync-button-loading");
 					try {
 						await this.plugin.checkRemoteConnection();
 					} finally {
+						button.buttonEl.removeClass("git-sync-button-loading");
 						button.setButtonText("Test connection");
 						button.setDisabled(false);
 					}
@@ -2411,7 +2533,7 @@ class GitSyncSettingTab extends PluginSettingTab {
 				text.setValue(this.plugin.settings.branchName);
 				text.onChange((value) => {
 					this.plugin.settings.branchName = value.trim();
-					this.plugin.scheduleSettingsSave();
+					this.plugin.scheduleSettingsSave(false, true);
 				});
 			});
 
@@ -2444,10 +2566,12 @@ class GitSyncSettingTab extends PluginSettingTab {
 				});
 			});
 
-		containerEl.createEl("p", {
+		const saveStatus = containerEl.createEl("p", {
 			text: "Settings save automatically when changed.",
-			cls: "setting-item-description",
+			cls: "setting-item-description git-sync-settings-save-status",
+			attr: { "aria-live": "polite", "aria-busy": "false" },
 		});
+		this.plugin.setSettingsSaveIndicator(saveStatus);
 
 		containerEl.createEl("h3", { text: "Plugin data" });
 		containerEl.createEl("p", {
@@ -2470,6 +2594,8 @@ class GitSyncSettingTab extends PluginSettingTab {
 				.setButtonText("Export to vault")
 				.onClick(async () => {
 					button.setDisabled(true);
+					button.setButtonText("Exporting…");
+					button.buttonEl.addClass("git-sync-button-loading");
 					try {
 						const path = await this.plugin.exportDataToVault();
 						new Notice(`Plugin data exported to ${path}.`);
@@ -2478,6 +2604,8 @@ class GitSyncSettingTab extends PluginSettingTab {
 						this.plugin.recordActivity(`Plugin data export failed: ${detail}`, "ERROR");
 						new Notice(`Could not export plugin data: ${detail}`);
 					} finally {
+						button.buttonEl.removeClass("git-sync-button-loading");
+						button.setButtonText("Export to vault");
 						button.setDisabled(false);
 					}
 				}));
