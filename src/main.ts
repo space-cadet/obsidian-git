@@ -1512,7 +1512,7 @@ class GitSyncView extends ItemView {
 		const sectionActionName = section === "staged" ? "Unstage all" : "Stage all";
 		const sectionActionLoading = actionInProgress;
 		const sectionAction = header.createEl("button", {
-			cls: "git-sync-section-action",
+			cls: `git-sync-section-action git-sync-stage-all-action ${section === "staged" ? "is-unstage" : "is-stage"}`,
 			attr: {
 				type: "button",
 				"aria-label": sectionActionLoading ? `${section === "staged" ? "Unstaging" : "Staging"} files` : section === "staged" ? "Unstage all staged files" : "Stage all uncommitted files",
@@ -1520,6 +1520,7 @@ class GitSyncView extends ItemView {
 			},
 		});
 		setIcon(sectionAction, section === "staged" ? "minus" : "plus");
+		sectionAction.createSpan({ text: sectionActionName });
 		sectionAction.disabled = changes.length === 0 || this.committing;
 		sectionAction.addEventListener("click", () => void this.applyAllStage(section === "staged"));
 		const collapse = header.createEl("button", {
@@ -1565,14 +1566,15 @@ class GitSyncView extends ItemView {
 				this.render();
 			});
 			const action = toolbar.createEl("button", {
-				cls: "git-sync-selection-action",
+				cls: `git-sync-selection-action is-stage-selection-action ${section === "staged" ? "is-unstage" : "is-stage"}`,
 				attr: {
 					type: "button",
 					"aria-label": selectedActionLoading ? `${section === "staged" ? "Unstaging" : "Staging"} selected files` : bulkAction === "Stage selected" ? "Stage selected files" : "Unstage selected files",
 					title: selectedActionLoading ? `${section === "staged" ? "Unstaging" : "Staging"} selected files…` : bulkAction === "Stage selected" ? "Stage selected files" : "Unstage selected files",
 				},
 			});
-			setIcon(action, section === "staged" ? "arrow-down-to-line" : "arrow-up-to-line");
+			setIcon(action, section === "staged" ? "minus" : "plus");
+			action.createSpan({ text: section === "staged" ? "Unstage" : "Stage" });
 			action.disabled = this.committing;
 			action.addEventListener("click", () => void this.applySelectedStage(section, visibleChanges));
 		}
@@ -1699,7 +1701,7 @@ class GitSyncView extends ItemView {
 		const stagePending = this.pendingStagePaths.has(change.path);
 		const fileActionPending = this.pendingFileActions.has(change.path);
 		const directAction = item.createEl("button", {
-			cls: "git-sync-change-direct-action",
+			cls: `git-sync-change-direct-action ${change.staged ? "is-unstage" : "is-stage"}`,
 			attr: {
 				type: "button",
 				"aria-label": stagePending ? `${change.staged ? "Unstaging" : "Staging"} ${change.path}` : `${change.staged ? "Unstage" : "Stage"} ${change.path}`,
@@ -1708,6 +1710,9 @@ class GitSyncView extends ItemView {
 			},
 		});
 		setIcon(directAction, change.staged ? "minus" : "plus");
+		directAction.createSpan({
+			text: stagePending ? `${change.staged ? "Unstaging" : "Staging"}…` : change.staged ? "Unstage" : "Stage",
+		});
 		directAction.disabled = this.committing || stagePending || fileActionPending;
 		directAction.addEventListener("click", () => void this.toggleStage(change));
 		const displayName = change.path.split("/").filter(Boolean).pop() ?? change.path;
@@ -2821,9 +2826,7 @@ interface GitProgressModalCallbacks {
 }
 
 class GitProgressModal extends Modal {
-	private readonly startedAt = Date.now();
 	private readonly remoteMessages: string[] = [];
-	private elapsedEl: HTMLElement | null = null;
 	private phaseEl: HTMLElement | null = null;
 	private phaseIconEl: HTMLElement | null = null;
 	private percentEl: HTMLElement | null = null;
@@ -2833,7 +2836,6 @@ class GitProgressModal extends Modal {
 	private detailsEl: HTMLElement | null = null;
 	private resultEl: HTMLElement | null = null;
 	private closeButton: HTMLButtonElement | null = null;
-	private elapsedTimer: number | null = null;
 	private lastPhase = "";
 	private pendingPhase: string | null = null;
 	private pendingProgress: RemoteProgressEvent | null = null;
@@ -2857,11 +2859,6 @@ class GitProgressModal extends Modal {
 		this.contentEl.createDiv({ cls: "git-sync-progress-kicker", text: operationKicker(this.operation) });
 		const heading = this.contentEl.createDiv({ cls: "git-sync-progress-heading" });
 		heading.createEl("h2", { text: `${this.operation} origin/${this.branch}` });
-		this.elapsedEl = heading.createDiv({
-			cls: "git-sync-progress-elapsed",
-			text: "Time elapsed: 00:00",
-		});
-
 		const phase = this.contentEl.createDiv({ cls: "git-sync-progress-phase" });
 		this.phaseIconEl = phase.createSpan({ cls: "git-sync-progress-icon" });
 		setIcon(this.phaseIconEl, "git-branch");
@@ -2889,8 +2886,6 @@ class GitProgressModal extends Modal {
 		this.closeButton.disabled = true;
 		this.closeButton.addEventListener("click", () => this.close());
 
-		this.elapsedTimer = window.setInterval(() => this.updateElapsed(), 1000);
-		this.updateElapsed();
 		if (this.pendingPhase) this.setPhase(this.pendingPhase);
 		if (this.pendingProgress) this.renderProgress(this.pendingProgress);
 		for (const message of this.pendingMessages) this.renderRemoteMessage(message);
@@ -2904,10 +2899,6 @@ class GitProgressModal extends Modal {
 	}
 
 	onClose(): void {
-		if (this.elapsedTimer !== null) {
-			window.clearInterval(this.elapsedTimer);
-			this.elapsedTimer = null;
-		}
 		this.contentEl.empty();
 	}
 
@@ -2993,11 +2984,6 @@ class GitProgressModal extends Modal {
 			this.pendingFinish = { state, result, icon, className };
 			return;
 		}
-		if (this.elapsedTimer !== null) {
-			window.clearInterval(this.elapsedTimer);
-			this.elapsedTimer = null;
-		}
-		this.updateElapsed();
 		this.modalEl.addClass(className);
 		if (this.phaseEl) this.phaseEl.setText(state);
 		if (this.phaseIconEl) {
@@ -3026,9 +3012,6 @@ class GitProgressModal extends Modal {
 		}
 	}
 
-	private updateElapsed(): void {
-		this.elapsedEl?.setText(`Time elapsed: ${formatElapsed(Date.now() - this.startedAt)}`);
-	}
 }
 
 function operationKicker(operation: string): string {
@@ -3058,15 +3041,6 @@ function formatLogTimestamp(timestamp: number): string {
 	const date = new Date(timestamp);
 	const pad = (value: number): string => `0${value}`.slice(-2);
 	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
-function formatElapsed(milliseconds: number): string {
-	const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-	const hours = Math.floor(totalSeconds / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
-	const pad = (value: number): string => `0${value}`.slice(-2);
-	return `${hours > 0 ? `${pad(hours)}:` : ""}${pad(minutes)}:${pad(seconds)}`;
 }
 
 function safeRemoteMessage(message: string): string {

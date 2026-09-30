@@ -149,7 +149,7 @@
 .git-sync-content {
 	flex: 1 1 auto;
 	min-height: 0;
-	padding: 0 12px 16px;
+	padding: 0 12px;
 	overflow: auto;
 	text-align: left;
 }
@@ -292,6 +292,16 @@
 		gap: 6px;
 		padding-inline: 8px;
 	}
+
+	.git-sync-change-direct-action {
+		min-width: 30px;
+		width: 30px;
+		padding: 0;
+	}
+
+	.git-sync-change-direct-action span {
+		display: none;
+	}
 }
 
 .git-sync-changes-list {
@@ -408,6 +418,25 @@
 	height: 18px;
 }
 
+.git-sync-stage-all-action {
+	width: auto;
+	gap: 4px;
+	padding: 0 8px;
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.git-sync-stage-all-action.is-stage,
+.git-sync-selection-action.is-stage {
+	color: var(--interactive-accent);
+}
+
+.git-sync-stage-all-action.is-unstage,
+.git-sync-selection-action.is-unstage {
+	color: var(--text-muted);
+}
+
 .git-sync-change-section-header .git-sync-icon-button {
 	margin-left: auto;
 }
@@ -486,6 +515,15 @@
 	padding: 0 !important;
 }
 
+.git-sync-selection-action.is-stage-selection-action {
+	width: auto;
+	min-width: 64px;
+	gap: 4px;
+	padding: 0 8px !important;
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+}
+
 .git-sync-selection-action svg {
 	width: 17px;
 	height: 17px;
@@ -544,14 +582,23 @@
 	align-items: center;
 	justify-content: center;
 	flex: 0 0 auto;
-	width: 30px;
-	height: 30px;
-	padding: 0;
+	gap: 4px;
+	min-width: 56px;
+	height: 32px;
+	padding: 0 6px;
 	border-radius: var(--radius-s);
 	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	font-weight: 600;
+	white-space: nowrap;
 }
 
 .git-sync-change-direct-action:hover {
+	color: var(--interactive-accent);
+}
+
+.git-sync-change-direct-action.is-stage,
+.git-sync-change-direct-action.is-stage:hover {
 	color: var(--interactive-accent);
 }
 
@@ -954,14 +1001,6 @@
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-
-.git-sync-progress-elapsed {
-	flex: 0 0 auto;
-	color: var(--text-muted);
-	font-size: var(--font-ui-smaller);
-	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 }
 
