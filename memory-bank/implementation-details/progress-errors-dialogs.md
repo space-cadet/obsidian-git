@@ -1,6 +1,6 @@
 # T8: Progress, Errors, and Dialogs
 
-*Last Updated: 2026-09-10 04:05:00 IST*
+*Last Updated: 2026-10-05 14:19:36 IST*
 
 ## Purpose
 
@@ -260,8 +260,9 @@ symbols, and failure reasons while using normal accessible modal controls.
 1. Add progress and message callbacks to the remote operation options.
 2. Forward those callbacks from `src/remote.ts` for Fetch, Pull, Push, and
    Clone.
-3. Keep one live operation state in the existing queued operation path in
-   `src/main.ts`.
+3. Keep one live operation state in the queued operation path in
+   `src/RemoteOperationController.ts`; `src/main.ts` supplies Activity and
+   view-refresh callbacks through the controller's host interface.
 4. Render phase-local progress in the modal and throttle display updates; do
    not write every callback to persistent Activity.
 5. Derive final Fetch/Push results from returned refs and before/after heads.

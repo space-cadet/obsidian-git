@@ -50,3 +50,11 @@ Latency evidence and the manual full-refresh policy are recorded in
 `implementation-details/latency-benchmarking.md`; controlled large-vault
 cold/warm timings remain open.
 Dependencies are added only when a component cannot function without them.
+
+## Cross-Cutting Code Quality and Modularity (T14)
+
+The plugin composition and module ownership map is maintained in
+[`code-quality-modularity.md`](code-quality-modularity.md). The first extraction
+reduced `src/main.ts` to plugin coordination and moved Settings/data, view,
+remote operations, dialogs, and Activity/Commits presentation into focused
+modules. The remaining large `src/GitSyncView.ts` is the next review target.

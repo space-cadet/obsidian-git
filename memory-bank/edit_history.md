@@ -1,8 +1,22 @@
 # Edit History
 
-*Last Updated: 2026-09-30 09:34:50 IST*
+*Last Updated: 2026-10-05 14:19:36 IST*
 
 ---
+
+## 2026-10-05
+
+#### 14:19:36 IST - T14: Register code quality task and document modular refactor
+- Created `memory-bank/tasks/T14.md` - Added the continuing code-quality, review, and modularity task.
+- Modified `memory-bank/tasks.md` - Registered T14 and refreshed task counts.
+- Created `memory-bank/implementation-details/code-quality-modularity.md` - Documented module ownership, component diagrams, verification, and remaining refactor work.
+- Modified `memory-bank/implementation-details/component-map.md` - Linked the T14 architecture record.
+- Modified `memory-bank/implementation-details/progress-errors-dialogs.md` - Corrected the documented owner of remote-operation queuing.
+- Modified `memory-bank/activeContext.md` - Added the T14 focus and current source-refactor status.
+- Modified `memory-bank/progress.md` - Recorded source/build evidence and remaining verification limits.
+- Modified `memory-bank/session_cache.md` - Updated the current session focus and T14 status.
+- Created `memory-bank/sessions/2026-10-05-day.md` - Recorded work, decisions, verification, and follow-up.
+- Created `memory-bank/edits/2026-10-05/141936-T14-code-quality-modularity.md` - Recorded the T14 source and Memory Bank changes.
 
 ## 2026-09-30
 

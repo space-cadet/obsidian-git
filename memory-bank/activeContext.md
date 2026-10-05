@@ -1,9 +1,12 @@
 # Active Context
 
-*Last Updated: 2026-09-30 12:54:30 IST*
+*Last Updated: 2026-10-05 14:19:36 IST*
 
 ## Current Focus
 
+- **T14 META** — ongoing project code quality, review, and modularity; the first
+  `main.ts` extraction pass is documented, with Changes-view decomposition
+  still open
 - **T4, T5, T7, T8, T9, T10** — Changes, Activity, remote operations, release
   publication, progress feedback, and platform/performance verification remain
   active
@@ -54,7 +57,14 @@ not yet been verified.
 - Keep vault-wide Changes scans explicit; use known-state or targeted
   reconciliation for successful mutations and surface uncertainty visibly.
 - Background refresh is event-driven and path-scoped; do not add periodic
-  vault-wide status scans.
+vault-wide status scans.
+
+The first T14 source-organization pass moved plugin-data handling, the Settings
+tab, the sidebar view, remote-operation coordination, dialogs, and focused
+Activity/Commits renderers out of `src/main.ts`. The plugin coordinator is now
+428 lines; `src/GitSyncView.ts` remains 2,061 lines and is the next review
+target. The production build and `git diff --check` passed; installed-host
+behavior has not been rechecked for this refactor.
 - Treat mobile-incompatible remote paths as an explicit compatibility boundary:
   skip and report them on mobile, while preserving complete checkout behavior
   on desktop.
@@ -63,8 +73,10 @@ not yet been verified.
 
 ## Next Actions
 
-1. Rename or remove remote filenames that mobile cannot create.
-2. Capture repeated cold/warm latency timings in the large `typora-notes` vault.
-3. Keep T4 revert and T5 clear/export as the remaining UI refinements.
-4. Determine whether an abortable HTTP path can support real cancellation;
+1. T14: Review shared selection, refresh, and staging ownership in
+   `src/GitSyncView.ts` before selecting its next extraction seam.
+2. Rename or remove remote filenames that mobile cannot create.
+3. Capture repeated cold/warm latency timings in the large `typora-notes` vault.
+4. Keep T4 revert and T5 clear/export as the remaining UI refinements.
+5. Determine whether an abortable HTTP path can support real cancellation;
    continue remote edge-case testing separately.

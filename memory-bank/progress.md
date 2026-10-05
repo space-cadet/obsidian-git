@@ -1,5 +1,17 @@
 # Progress
 
+## 2026-10-05
+
+- Registered T14 as an ongoing project code-quality, review, and modularity task.
+- Extracted Settings/data handling, the Settings tab, sidebar view, remote
+  operation controller, dialogs, operation diagnostics, and Activity/Commits
+  renderers from `src/main.ts`; the plugin coordinator is 428 lines, down from
+  3,547 at the branch base.
+- Added a component ownership map and plugin/remote-operation diagrams in
+  `implementation-details/code-quality-modularity.md`.
+- Production build and `git diff --check` passed. Tests and installed-host
+  behavior were not checked; `src/GitSyncView.ts` remains 2,061 lines.
+
 ## 2026-09-05
 
 - Archived the previous Memory Bank.
