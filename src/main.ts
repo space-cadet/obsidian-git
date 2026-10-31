@@ -34,6 +34,7 @@ import { RemoteOperationController, type RepositoryOperationContext } from "./Re
 import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
 import { repositoryRootsOverlap } from "./repositoryPaths";
 import { inspectLocalRepository } from "./repository";
+import { configureStatusCache, flushStatusCache, invalidateStatusHashCache } from "./RepositoryStatusCache";
 
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
@@ -48,12 +49,32 @@ export default class GitSyncPlugin extends Plugin {
 	private remoteOperations!: RemoteOperationController;
 	private integrationStageQueue: Promise<void> = Promise.resolve();
 	private settingsSaveTimer: number | null = null;
+	private statusCacheSaveTimer: number | null = null;
 	private settingsSaveIndicator: HTMLElement | null = null;
 	private settingsRefreshQueued = false;
 	private remoteHistoryRefreshQueued = false;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
+		const cacheKey = `${this.manifest.id}:verified-hashes-v1`;
+		let savedHashes: unknown;
+		try { savedHashes = this.app.loadLocalStorage(cacheKey); } catch { /* Start uncached if local storage is unavailable. */ }
+		configureStatusCache(this.app.vault.adapter, savedHashes, (value) => this.app.saveLocalStorage(cacheKey, value));
+		const invalidateHashes = (path: string): void => {
+			invalidateStatusHashCache(this.app.vault.adapter, path);
+			if (this.statusCacheSaveTimer !== null) window.clearTimeout(this.statusCacheSaveTimer);
+			this.statusCacheSaveTimer = window.setTimeout(() => {
+				this.statusCacheSaveTimer = null;
+				flushStatusCache(this.app.vault.adapter);
+			}, 1000);
+		};
+		this.registerEvent(this.app.vault.on("create", (file) => invalidateHashes(file.path)));
+		this.registerEvent(this.app.vault.on("modify", (file) => invalidateHashes(file.path)));
+		this.registerEvent(this.app.vault.on("delete", (file) => invalidateHashes(file.path)));
+		this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
+			invalidateHashes(oldPath);
+			invalidateHashes(file.path);
+		}));
 		this.remoteOperations = new RemoteOperationController({
 			app: this.app,
 			getRepositoryOperationContext: () => this.getRepositoryOperationContext(),
@@ -94,6 +115,8 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	onunload(): void {
+		if (this.statusCacheSaveTimer !== null) window.clearTimeout(this.statusCacheSaveTimer);
+		flushStatusCache(this.app.vault.adapter);
 		if (this.settingsSaveTimer !== null) {
 			window.clearTimeout(this.settingsSaveTimer);
 			this.settingsSaveTimer = null;

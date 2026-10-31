@@ -660,7 +660,7 @@ export class GitSyncView extends ItemView {
 		return { kind: "diverged", icon: "git-compare", label: "Branches have diverged" };
 	}
 
-	async refreshRepositoryState(reason = "refresh", refreshChanges = true): Promise<void> {
+	async refreshRepositoryState(reason = "refresh", refreshChanges = true, forceVerify = false): Promise<void> {
 		const settings = { ...this.plugin.settings };
 		const startedAt = Date.now();
 		const phaseDurations: Array<{ label: string; elapsed: number }> = [];
@@ -735,7 +735,7 @@ export class GitSyncView extends ItemView {
 				this.changesRefreshRequired = false;
 				this.changesRefreshReason = "";
 				try {
-					const changes = await timed("changes", () => this.readChangesForRefresh(repositoryPath, reason));
+					const changes = await timed("changes", () => this.readChangesForRefresh(repositoryPath, reason, undefined, forceVerify));
 					if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 					this.changes = changes;
 					const availablePaths = new Set(this.changes.map((change) => change.path));
@@ -1801,6 +1801,8 @@ export class GitSyncView extends ItemView {
 		setIcon(more, "ellipsis");
 		more.addEventListener("click", (event) => {
 			const menu = new Menu();
+			menu.addItem((item) => item.setTitle("Verify all file contents").setIcon("scan-search")
+				.onClick(() => void this.refreshRepositoryState("verify-contents", true, true)));
 			menu.addItem((item) => item.setTitle("Edit .gitignore").setIcon("file-text")
 				.onClick(() => void this.editGitignore()));
 			menu.addSeparator();
@@ -2081,16 +2083,17 @@ export class GitSyncView extends ItemView {
 		);
 	}
 
-	private readChangesForRefresh(repositoryPath: string, reason: string, filepaths?: string[]): Promise<ChangedFile[]> {
+	private readChangesForRefresh(repositoryPath: string, reason: string, filepaths?: string[], forceVerify = false): Promise<ChangedFile[]> {
 		return readChanges(this.app.vault.adapter, repositoryPath, filepaths, (metrics) => {
 			this.plugin.recordActivity(
 				`Changes scan [${reason}; ${filepaths ? `${filepaths.length} paths` : "full"}]: ` +
 				`${metrics.directoryLists} directory lists, ${metrics.statCalls} stat calls (${metrics.indexStatCalls} index), ` +
 				`${metrics.nestedRepositoryChecks} repository-boundary checks, ` +
-				`${metrics.worktreeFileReads} worktree reads (${metrics.worktreeBytesRead} bytes).`,
+				`${metrics.worktreeFileReads} worktree reads (${metrics.worktreeBytesRead} bytes), ` +
+				`${metrics.hashCacheHits} verified hash hits${metrics.cachePersistenceFailed ? "; local hash cache could not be saved" : ""}.`,
 				"METRIC",
 			);
-		});
+		}, { forceVerify });
 	}
 
 	private async refreshChangesSnapshot(reason: string): Promise<void> {

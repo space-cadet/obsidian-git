@@ -3,6 +3,7 @@ import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
 import { normalizeRepositoryFilePath, normalizeRepositoryRoot } from "./repositoryPaths";
 import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
+import { getStatusHashCache, flushStatusCache, invalidateStatusHashCache } from "./RepositoryStatusCache";
 
 const browserGlobal = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
 browserGlobal.Buffer ??= Buffer;
@@ -177,8 +178,9 @@ export async function readChanges(
 	repositoryPath: string,
 	filepaths?: string[],
 	onMetrics?: (metrics: RepositoryScanMetrics) => void,
+	options?: { forceVerify?: boolean },
 ): Promise<ChangedFile[]> {
-	const matrix = await readStatusMatrix(adapter, repositoryPath, filepaths, onMetrics);
+	const matrix = await readStatusMatrix(adapter, repositoryPath, filepaths, onMetrics, options?.forceVerify);
 	return matrix
 		.filter(([, head, workdir, stage]) => head !== workdir || head !== stage)
 		.map(([path, head, workdir, stage]) => ({
@@ -217,6 +219,8 @@ export interface RepositoryScanMetrics {
 	nestedRepositoryChecks: number;
 	worktreeFileReads: number;
 	worktreeBytesRead: number;
+	hashCacheHits: number;
+	cachePersistenceFailed: boolean;
 }
 
 type StatusMatrixRow = [string, 0 | 1, 0 | 1 | 2, 0 | 1 | 2 | 3];
@@ -226,22 +230,72 @@ async function readStatusMatrix(
 	repositoryPath: string,
 	filepaths?: string[],
 	onMetrics?: (metrics: RepositoryScanMetrics) => void,
+	forceVerify = false,
 ): Promise<StatusMatrixRow[]> {
 	const dir = normalizedRepositoryPath(repositoryPath);
 	const paths = filepaths ? filepaths.map(normalizeRepositoryRoot) : ["."];
 	const fs = new ObsidianGitFs(adapter, dir, { filepaths: paths });
 	try {
 		if (paths.length === 0) return [];
-		return await git.statusMatrix({
-			fs,
-			dir,
-			refresh: false,
-			ignored: false,
-			filepaths: paths,
-		});
+		return await readCachedStatusMatrix(adapter, dir, fs, paths, forceVerify);
 	} finally {
+		fs.scanMetrics.cachePersistenceFailed = !flushStatusCache(adapter);
 		onMetrics?.({ ...fs.scanMetrics });
 	}
+}
+
+
+/** Same HEAD/workdir/index status mapping as statusMatrix, with public walker APIs. */
+async function readCachedStatusMatrix(adapter: DataAdapter, dir: string, fs: ObsidianGitFs, paths: string[], forceVerify: boolean): Promise<StatusMatrixRow[]> {
+	const hashes = getStatusHashCache(adapter, dir);
+	const startedAt = Date.now();
+	let config: Uint8Array | string;
+	try { config = await fs.promises.readFile(pathInRepository(dir, ".git/config")); }
+	catch (error) { if (!isMissingPathError(error)) throw error; config = ""; }
+	// Git configuration controls content normalization (notably core.autocrlf).
+	hashes.setSignature((await git.hashBlob({ object: config })).oid);
+	const rows = await git.walk({
+		fs, dir, trees: [git.TREE({ ref: "HEAD" }), git.WORKDIR({ refresh: false }), git.STAGE()],
+		map: async (path, [head, workdir, stage]) => {
+			if (!paths.some((base) => base === "." || path === "." || base === path || base.startsWith(`${path}/`) || path.startsWith(`${base}/`))) return null;
+			if (!head && !stage && workdir && await git.isIgnored({ fs, dir, filepath: path })) return null;
+			const [headType, workdirType, stageType] = await Promise.all([head?.type(), workdir?.type(), stage?.type()]);
+			const isBlob = [headType, workdirType, stageType].some((type) => type === "blob");
+			if ((headType === "tree" || headType === "special") && !isBlob) return;
+			if (headType === "commit") return null;
+			if ((workdirType === "tree" || workdirType === "special") && !isBlob) return;
+			if (stageType === "commit") return null;
+			if ((stageType === "tree" || stageType === "special") && !isBlob) return;
+			const headOid = headType === "blob" ? await head!.oid() : undefined;
+			const stageOid = stageType === "blob" ? await stage!.oid() : undefined;
+			let workdirOid: string | undefined;
+			if (headType !== "blob" && stageType !== "blob" && workdirType === "blob") workdirOid = "42";
+			else if (workdirType === "blob") {
+				const value = await fs.worktreeStat(path);
+				const before = value ? { ...value } : null;
+				workdirOid = before && !forceVerify ? hashes.get(path, before, startedAt) : undefined;
+				if (workdirOid) fs.scanMetrics.hashCacheHits++;
+				else {
+					const revision = hashes.revision;
+					// A changed fingerprint or explicit vault event must bypass Git's
+					// second-resolution index shortcut, including same-size edits.
+					if (forceVerify || hashes.needsHash(path)) {
+						const content = await workdir!.content();
+						workdirOid = content ? (await git.hashBlob({ object: content })).oid : undefined;
+					} else workdirOid = await workdir!.oid();
+					// Cache only hashes verified by an actual content read. Files
+					// already using Git's index shortcut need no extra cache work.
+					if (before && workdirOid && fs.wasWorktreeRead(path)) {
+						const after = await fs.worktreeStat(path, true);
+						hashes.put(path, before, after, workdirOid, revision, startedAt);
+					}
+				}
+			}
+			const entry = [undefined, headOid, workdirOid, stageOid];
+			return [path, ...entry.slice(1).map((oid) => entry.indexOf(oid))] as StatusMatrixRow;
+		},
+	});
+	return rows as StatusMatrixRow[];
 }
 
 export interface RepositorySnapshot {
@@ -612,7 +666,9 @@ export class ObsidianGitFs {
 	private readonly knownFilePaths = new Set<string>();
 	// Only status scans reuse index metadata. Mutating Git operations keep fresh
 	// stats, and each new scan starts with an empty cache.
-	private indexStat: Promise<Stat | null> | null = null;
+	private readonly scanStats = new Map<string, Promise<Stat | null>>();
+	private readonly scanReads = new Map<string, Promise<Uint8Array | string>>();
+	private readonly contentReads = new Set<string>();
 	readonly scanMetrics: RepositoryScanMetrics = {
 		directoryLists: 0,
 		statCalls: 0,
@@ -620,25 +676,20 @@ export class ObsidianGitFs {
 		nestedRepositoryChecks: 0,
 		worktreeFileReads: 0,
 		worktreeBytesRead: 0,
+		hashCacheHits: 0,
+		cachePersistenceFailed: false,
 	};
 
 	readonly promises = {
 		readFile: async (path: string, options?: string | { encoding?: string }): Promise<Uint8Array | string> => {
-			try {
-				const normalizedPath = this.normalized(path);
-				await this.assertRepositoryBoundary(normalizedPath);
-				const encoding = typeof options === "string" ? options : options?.encoding;
-				const data = encoding === "utf8" || encoding === "utf-8"
-					? await this.adapter.read(normalizedPath)
-					: new Uint8Array(await this.adapter.readBinary(normalizedPath));
-				if (!this.isGitMetadata(normalizedPath)) {
-					this.scanMetrics.worktreeFileReads += 1;
-					this.scanMetrics.worktreeBytesRead += typeof data === "string" ? new TextEncoder().encode(data).byteLength : data.byteLength;
-				}
-				return data;
-			} catch (error) {
-				throw this.fileSystemError(path, error);
-			}
+			const normalized = this.normalized(path);
+			const encoding = typeof options === "string" ? options : options?.encoding;
+			const read = () => this.readAdapterFile(normalized, encoding);
+			if (!this.statusScan || (!this.isGitMetadata(normalized) && normalized.split("/").pop() !== ".gitignore")) return read();
+			const key = `${normalized}\0${encoding ?? "binary"}`;
+			let pending = this.scanReads.get(key);
+			if (!pending) { pending = read(); this.scanReads.set(key, pending); }
+			return pending;
 		},
 		writeFile: async (path: string, data: Uint8Array | string): Promise<void> => {
 			this.assertWritable();
@@ -787,12 +838,32 @@ export class ObsidianGitFs {
 	}
 
 	private async readStat(path: string, originalPath: string): Promise<Stat | null> {
-		const isIndex = path === pathInRepository(this.repositoryRoot, ".git/index");
-		if (this.statusScan && isIndex) {
-			this.indexStat ??= this.readAdapterStat(path, originalPath);
-			return this.indexStat;
-		}
-		return this.readAdapterStat(path, originalPath);
+		if (!this.statusScan) return this.readAdapterStat(path, originalPath);
+		let pending = this.scanStats.get(path);
+		if (!pending) { pending = this.readAdapterStat(path, originalPath); this.scanStats.set(path, pending); }
+		return pending;
+	}
+
+	worktreeStat(relativePath: string, fresh = false): Promise<Stat | null> {
+		const path = pathInRepository(this.repositoryRoot, relativePath);
+		return fresh ? this.readAdapterStat(path, path) : this.readStat(path, path);
+	}
+	wasWorktreeRead(relativePath: string): boolean {
+		return this.contentReads.has(pathInRepository(this.repositoryRoot, relativePath));
+	}
+
+	private async readAdapterFile(path: string, encoding?: string): Promise<Uint8Array | string> {
+		try {
+			await this.assertRepositoryBoundary(path);
+			const data = encoding === "utf8" || encoding === "utf-8"
+				? await this.adapter.read(path) : new Uint8Array(await this.adapter.readBinary(path));
+			if (!this.isGitMetadata(path)) {
+				if (encoding !== "utf8" && encoding !== "utf-8") this.contentReads.add(path);
+				this.scanMetrics.worktreeFileReads++;
+				this.scanMetrics.worktreeBytesRead += typeof data === "string" ? new TextEncoder().encode(data).byteLength : data.byteLength;
+			}
+			return data;
+		} catch (error) { throw this.fileSystemError(path, error); }
 	}
 
 	private async readAdapterStat(path: string, originalPath: string): Promise<Stat | null> {
@@ -824,6 +895,7 @@ export class ObsidianGitFs {
 
 	private forgetPath(path: string): void {
 		const normalized = this.normalized(path);
+		if (!this.isGitMetadata(normalized)) invalidateStatusHashCache(this.adapter, normalized);
 		this.knownFilePaths.delete(normalized);
 		this.validatedStats.delete(normalized);
 		this.nestedGitDirectoryCache.delete(normalized);
