@@ -493,7 +493,7 @@
 
 .git-sync-change-section-header {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
+	grid-template-columns: minmax(0, 1fr) auto 36px auto 36px;
 	align-items: center;
 	gap: 6px;
 	min-width: 0;
@@ -1385,12 +1385,12 @@
 }
 
 .git-sync-sidebar .git-sync-stage-all-action {
-	width: 36px;
-	padding: 0;
+	width: auto;
+	padding: 0 6px;
 }
 
 .git-sync-stage-all-action span {
-	display: none;
+	display: inline;
 }
 
 .git-sync-commit-row {
@@ -1460,7 +1460,7 @@
 	.git-sync-change-section-header {
 		gap: 0;
 		padding-block: 4px;
-		grid-template-columns: minmax(0, 1fr) auto repeat(4, 44px);
+		grid-template-columns: minmax(0, 1fr) auto 44px auto 44px;
 	}
 	.git-sync-section-count {
 		min-width: 20px;
@@ -1473,9 +1473,9 @@
 	}
 	.git-sync-log-message { grid-column: 1 / -1; }
 	.git-sync-commit-summary .git-sync-commit-meta { flex-wrap: wrap; gap: 4px 8px; }
-	.git-sync-commit-row { flex-wrap: wrap; }
-	.git-sync-commit-summary { flex-basis: calc(100% - 64px); }
-	.git-sync-commit-time { margin-left: 32px; }
+
+
+
 	.git-sync-commit-details { margin-left: 12px; }
 }
 
@@ -1504,4 +1504,155 @@
 		min-height: 44px;
 		min-width: 44px;
 	}
+}
+
+/* Quiet disclosure controls: generous hit areas without oversized tiles. */
+.git-sync-sidebar .git-sync-folder-toggle,
+.git-sync-sidebar .git-sync-icon-button,
+.git-sync-sidebar .git-sync-change-menu,
+.git-sync-sidebar .git-sync-section-action,
+.git-sync-sidebar .git-sync-add-repository-button {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+}
+
+.git-sync-sidebar .git-sync-folder-toggle {
+	flex: 0 0 32px;
+	width: 32px;
+	min-width: 32px;
+	padding: 0;
+	position: relative;
+}
+
+.git-sync-folder-toggle::before {
+	content: "";
+	position: absolute;
+	inset: 0 -6px;
+}
+
+.git-sync-sidebar .git-sync-folder-toggle svg,
+.git-sync-sidebar .git-sync-icon-button svg,
+.git-sync-sidebar .git-sync-commit-chevron svg {
+	width: 14px;
+	height: 14px;
+	stroke-width: 1.75;
+}
+
+.git-sync-sidebar .git-sync-folder-row {
+	gap: 6px;
+	min-height: 48px;
+	padding-block: 0;
+}
+
+.git-sync-change-tree-children {
+	margin-left: 12px;
+	padding-left: 8px;
+}
+
+.git-sync-repository-context { padding-block: 4px; gap: 0; }
+.git-sync-sidebar .git-sync-repository-select {
+	background-color: transparent;
+	border: 0;
+	padding-left: 4px;
+	font-weight: 600;
+}
+.git-sync-branch-context { gap: 8px; }
+.git-sync-sidebar .git-sync-branch-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	max-width: 45%;
+	padding: 0 4px;
+	background: transparent;
+	border: 0;
+	flex: 0 1 auto;
+}
+.git-sync-branch-name { font-weight: 400; }
+.git-sync-comparison-status {
+	flex: 1 1 0;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
+}
+.git-sync-comparison-icon svg { width: 14px; height: 14px; }
+.git-sync-comparison-text { font-size: var(--font-ui-smaller); }
+.git-sync-section-count,
+.git-sync-folder-count {
+	background: transparent;
+	font-weight: 400;
+	min-width: 0;
+	padding-inline: 4px;
+}
+.git-sync-section-empty-summary {
+	grid-column: 3 / -1;
+	justify-self: end;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+.git-sync-change-section.is-empty .git-sync-change-section-header { min-height: 40px; }
+.git-sync-sidebar .git-sync-stage-all-action { width: auto; min-width: 0; }
+.git-sync-sidebar .git-sync-stage-all-action svg { width: 14px; height: 14px; }
+.git-sync-sidebar .git-sync-commit-row {
+	background: transparent;
+	gap: 8px;
+	align-items: flex-start;
+}
+.git-sync-commit-marker {
+	flex-basis: 8px;
+	width: 8px;
+	height: 8px;
+	border-width: 2px;
+	margin-top: 6px;
+}
+.git-sync-commit-item:not(:last-child)::before { left: 15px; top: 24px; width: 1px; }
+.git-sync-commit-message {
+	white-space: normal;
+	overflow-wrap: anywhere;
+	font-weight: 500;
+	line-height: 1.4;
+}
+.git-sync-commit-author {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	flex: 1 1 auto;
+}
+.git-sync-sidebar .git-sync-commit-meta {
+	flex-wrap: nowrap;
+	gap: 6px;
+	font-weight: 400;
+}
+.git-sync-commit-oid { padding: 0; background: transparent; }
+.git-sync-commit-chevron { margin-top: 4px; }
+.git-sync-commit-time { margin: 0; }
+.git-sync-sidebar .git-sync-source-toggle button { border-radius: 0; }
+.git-sync-sidebar .git-sync-source-toggle button.is-active:hover {
+	background: var(--interactive-accent);
+}
+.git-sync-log-entry:nth-child(even) { background: transparent; }
+.git-sync-log-message { font-size: var(--font-ui-small); line-height: 1.5; }
+.git-sync-log-level { background: transparent; font-weight: 500; padding: 0; }
+
+@container (max-width: 480px) {
+	.git-sync-sidebar .git-sync-branch-button { min-height: 44px; }
+	.git-sync-sidebar .git-sync-folder-toggle { min-width: 32px; }
+	.git-sync-commit-item:not(:last-child)::before { left: 15px; }
+	.git-sync-sidebar .git-sync-stage-all-action { width: auto; min-width: 0; }
+	.git-sync-comparison-icon { display: none; }
+	.git-sync-commit-row { padding-inline: 12px; }
+}
+
+@container (max-width: 480px) {
+	.git-sync-sidebar .git-sync-change-direct-action {
+		width: 44px;
+		padding: 0;
+		background: transparent;
+	}
+	.git-sync-change-direct-action span { display: none; }
+	.git-sync-change-path { order: 1; }
+	.git-sync-change-direct-action { order: 2; }
+	.git-sync-change-menu { order: 3; }
 }

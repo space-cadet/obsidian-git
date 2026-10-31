@@ -112,7 +112,7 @@ export function renderCommitHistoryPanel(
 		return;
 	}
 
-	renderCommitList(content, commits!, state.source === "local" ? "LOCAL" : "ORIGIN", state, actions);
+	renderCommitList(content, commits!, state, actions);
 	if (state.commitHasMore) {
 		const loadMore = content.createEl("button", {
 			text: state.commitHistoryLoading ? "Loading commits…" : "Load more commits",
@@ -146,7 +146,6 @@ function renderCommitLoadingPlaceholder(content: HTMLElement): void {
 function renderCommitList(
 	content: HTMLElement,
 	commits: LocalCommit[],
-	badge: "LOCAL" | "ORIGIN",
 	state: CommitHistoryPanelState,
 	actions: CommitHistoryPanelActions,
 ): void {
@@ -169,9 +168,8 @@ function renderCommitList(
 		title.setAttribute("title", commit.message);
 		const meta = summary.createDiv({ cls: "git-sync-commit-meta" });
 		meta.createSpan({ cls: "git-sync-commit-oid", text: commit.oid.slice(0, 7) });
-		meta.createSpan({ text: commit.author.name || "Unknown author" });
-		meta.createSpan({ cls: badge === "ORIGIN" ? "git-sync-commit-origin-badge" : "git-sync-commit-local-badge", text: badge });
-		const time = button.createSpan({ cls: "git-sync-commit-time", text: formatRelativeCommitTime(commit.author.timestamp) });
+		meta.createSpan({ cls: "git-sync-commit-author", text: commit.author.name || "Unknown author" });
+		const time = meta.createSpan({ cls: "git-sync-commit-time", text: formatRelativeCommitTime(commit.author.timestamp) });
 		time.setAttribute("title", formatCommitTimestamp(commit.author.timestamp));
 		const chevron = button.createSpan({ cls: "git-sync-commit-chevron" });
 		setIcon(chevron, selected ? "chevron-down" : "chevron-right");

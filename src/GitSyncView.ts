@@ -427,21 +427,16 @@ export class GitSyncView extends ItemView {
 		});
 
 		const branch = context.createDiv({ cls: "git-sync-branch-context" });
-		const branchIcon = branch.createSpan({ cls: "git-sync-branch-icon" });
-		setIcon(branchIcon, "git-branch");
 		const branchName = this.repositoryState?.kind === "ready"
 			? this.repositoryState.branch
 			: this.plugin.settings.branchName.trim() || "No branch";
-		branch.createSpan({ cls: "git-sync-branch-name", text: branchName });
 		const branches = branch.createEl("button", {
-			cls: "git-sync-context-action",
-			attr: {
-				type: "button",
-				"aria-label": "Manage branches",
-				title: "Manage branches",
-			},
+			cls: "git-sync-branch-button",
+			attr: { type: "button", "aria-label": `Manage branches: ${branchName}`, title: "Manage branches" },
 		});
-		setIcon(branches, "git-branch");
+		const branchIcon = branches.createSpan({ cls: "git-sync-branch-icon" });
+		setIcon(branchIcon, "git-branch");
+		branches.createSpan({ cls: "git-sync-branch-name", text: branchName });
 		branches.disabled = this.repositoryState?.kind !== "ready" || this.plugin.isRepositorySwitchBlocked();
 		branches.addEventListener("click", () => void this.openBranchManager());
 
@@ -460,7 +455,8 @@ export class GitSyncView extends ItemView {
 		refreshButton.addEventListener("click", () => void this.refreshRepositoryState("manual-refresh"));
 
 		const comparisonState = this.getComparisonState(repository);
-		const comparison = context.createDiv({ cls: "git-sync-comparison-status" });
+		const comparison = branch.createDiv({ cls: "git-sync-comparison-status", attr: { role: "status" } });
+		branch.insertBefore(comparison, refreshButton);
 		const comparisonIcon = comparison.createSpan({ cls: "git-sync-comparison-icon" });
 		comparisonIcon.setAttribute("data-comparison-state", comparisonState.kind);
 		setIcon(comparisonIcon, comparisonState.icon);
@@ -636,10 +632,10 @@ export class GitSyncView extends ItemView {
 	} {
 		if (!repository) return { kind: "unconfigured", icon: "alert-circle", label: "Repository not configured" };
 		if (this.repositoryState?.kind !== "ready") {
-			return { kind: "checking", icon: "git-compare", label: "Checking repository comparison" };
+			return { kind: "checking", icon: "git-compare", label: "Checking…" };
 		}
 		if (!this.commits || this.remoteCommits === null) {
-			return { kind: "deferred", icon: "git-compare", label: "Open Commits for comparison" };
+			return { kind: "deferred", icon: "git-compare", label: "Comparison pending" };
 		}
 		if (!this.remoteHistoryAvailable) {
 			return { kind: "unavailable", icon: "alert-circle", label: "Remote comparison unavailable" };
@@ -1107,34 +1103,24 @@ export class GitSyncView extends ItemView {
 	): void {
 		const sectionEl = content.createDiv({ cls: "git-sync-change-section" });
 		const header = sectionEl.createDiv({ cls: "git-sync-change-section-header" });
-		header.createDiv({ cls: "git-sync-section-title", text: section === "staged" ? "Staged" : "Changes" });
+		header.createDiv({ cls: "git-sync-section-title", text: section === "staged" ? "Staged" : "Unstaged" });
 		const actionInProgress = this.activeChangeAction === (section === "staged" ? "Unstage all" : "Stage all") ||
 			this.activeChangeAction === `${section === "staged" ? "Unstage" : "Stage"} selected`;
 		header.createDiv({
 			cls: "git-sync-section-count",
 			text: loading ? "…" : actionInProgress ? `${section === "staged" ? "Unstaging" : "Staging"}…` : String(changes.length),
 		});
-		const filter = header.createEl("button", {
+		if (!loading && changes.length === 0) {
+			sectionEl.addClass("is-empty");
+			header.createSpan({ cls: "git-sync-section-empty-summary", text: section === "staged" ? "No staged files" : "No changes" });
+			return;
+		}
+		const options = header.createEl("button", {
 			cls: "git-sync-section-action",
-			attr: {
-				type: "button",
-				"aria-label": `Filter ${title.toLowerCase()}`,
-				title: "Filter by status",
-				"data-active": String(this.hasChangeFilter(section)),
-			},
+			attr: { type: "button", "aria-label": `Filter and sort ${title.toLowerCase()}`, title: "Filter and sort", "aria-haspopup": "menu", "data-active": String(this.hasChangeFilter(section)) },
 		});
-		setIcon(filter, "filter");
-		filter.addEventListener("click", (event) => this.showChangeFilterMenu(section, event));
-		const sort = header.createEl("button", {
-			cls: "git-sync-section-action",
-			attr: {
-				type: "button",
-				"aria-label": `Sort ${title.toLowerCase()}`,
-				title: `Sort: ${this.getChangeSortLabel(section)}`,
-			},
-		});
-		setIcon(sort, "arrow-down-up");
-		sort.addEventListener("click", (event) => this.showChangeSortMenu(section, event));
+		setIcon(options, "list-filter");
+		options.addEventListener("click", (event) => this.showChangeOptionsMenu(section, event));
 		const sectionActionName = section === "staged" ? "Unstage all" : "Stage all";
 		const sectionActionLoading = actionInProgress;
 		const sectionAction = header.createEl("button", {
@@ -1416,11 +1402,7 @@ export class GitSyncView extends ItemView {
 		return Boolean(filters && filters.size < CHANGE_STATUS_FILTERS.length);
 	}
 
-	private getChangeSortLabel(section: ChangeSection): string {
-		return CHANGE_SORTS.find((sort) => sort.value === (this.changeSorts.get(section) ?? "path-asc"))?.label ?? "Path (A–Z)";
-	}
-
-	private showChangeFilterMenu(section: ChangeSection, event: MouseEvent): void {
+	private showChangeOptionsMenu(section: ChangeSection, event: MouseEvent): void {
 		const menu = new Menu();
 		const filters = this.changeFilters.get(section);
 		menu.addItem((item) => item
@@ -1437,6 +1419,16 @@ export class GitSyncView extends ItemView {
 				.setChecked(!filters || filters.size === 0 || filters.has(status))
 				.onClick(() => this.toggleChangeFilter(section, status)));
 		}
+		menu.addSeparator();
+		const currentSort = this.changeSorts.get(section) ?? "path-asc";
+		for (const sort of CHANGE_SORTS) {
+			menu.addItem((item) => item.setTitle(`Sort: ${sort.label}`)
+				.setChecked(currentSort === sort.value)
+				.onClick(() => {
+					this.changeSorts.set(section, sort.value);
+					this.render();
+				}));
+		}
 		menu.showAtMouseEvent(event);
 	}
 
@@ -1447,21 +1439,6 @@ export class GitSyncView extends ItemView {
 		if (current.size === 0 || current.size === CHANGE_STATUS_FILTERS.length) this.changeFilters.delete(section);
 		else this.changeFilters.set(section, current);
 		this.render();
-	}
-
-	private showChangeSortMenu(section: ChangeSection, event: MouseEvent): void {
-		const current = this.changeSorts.get(section) ?? "path-asc";
-		const menu = new Menu();
-		for (const sort of CHANGE_SORTS) {
-			menu.addItem((item) => item
-				.setTitle(sort.label)
-				.setChecked(current === sort.value)
-				.onClick(() => {
-					this.changeSorts.set(section, sort.value);
-					this.render();
-				}));
-		}
-		menu.showAtMouseEvent(event);
 	}
 
 	private handleSelectionClick(
