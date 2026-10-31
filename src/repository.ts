@@ -176,8 +176,9 @@ export async function readChanges(
 	adapter: DataAdapter,
 	repositoryPath: string,
 	filepaths?: string[],
+	onMetrics?: (metrics: RepositoryScanMetrics) => void,
 ): Promise<ChangedFile[]> {
-	const matrix = await readStatusMatrix(adapter, repositoryPath, filepaths);
+	const matrix = await readStatusMatrix(adapter, repositoryPath, filepaths, onMetrics);
 	return matrix
 		.filter(([, head, workdir, stage]) => head !== workdir || head !== stage)
 		.map(([path, head, workdir, stage]) => ({
@@ -209,22 +210,38 @@ export async function assertNoNestedRepositoryPaths(
 	}
 }
 
+export interface RepositoryScanMetrics {
+	directoryLists: number;
+	statCalls: number;
+	indexStatCalls: number;
+	nestedRepositoryChecks: number;
+	worktreeFileReads: number;
+	worktreeBytesRead: number;
+}
+
 type StatusMatrixRow = [string, 0 | 1, 0 | 1 | 2, 0 | 1 | 2 | 3];
 
 async function readStatusMatrix(
 	adapter: DataAdapter,
 	repositoryPath: string,
 	filepaths?: string[],
+	onMetrics?: (metrics: RepositoryScanMetrics) => void,
 ): Promise<StatusMatrixRow[]> {
 	const dir = normalizedRepositoryPath(repositoryPath);
-	const fs = new ObsidianGitFs(adapter, dir);
-	return git.statusMatrix({
-		fs,
-		dir,
-		refresh: false,
-		ignored: false,
-		...(filepaths ? { filepaths } : {}),
-	});
+	const paths = filepaths ? filepaths.map(normalizeRepositoryRoot) : ["."];
+	const fs = new ObsidianGitFs(adapter, dir, { filepaths: paths });
+	try {
+		if (paths.length === 0) return [];
+		return await git.statusMatrix({
+			fs,
+			dir,
+			refresh: false,
+			ignored: false,
+			filepaths: paths,
+		});
+	} finally {
+		onMetrics?.({ ...fs.scanMetrics });
+	}
 }
 
 export interface RepositorySnapshot {
@@ -592,21 +609,40 @@ export class ObsidianGitFs {
 	// result for isomorphic-git's immediately following lstat call.
 	private readonly validatedStats = new Map<string, Stat>();
 	private readonly nestedGitDirectoryCache = new Map<string, boolean>();
+	private readonly knownFilePaths = new Set<string>();
+	// Only status scans reuse index metadata. Mutating Git operations keep fresh
+	// stats, and each new scan starts with an empty cache.
+	private indexStat: Promise<Stat | null> | null = null;
+	readonly scanMetrics: RepositoryScanMetrics = {
+		directoryLists: 0,
+		statCalls: 0,
+		indexStatCalls: 0,
+		nestedRepositoryChecks: 0,
+		worktreeFileReads: 0,
+		worktreeBytesRead: 0,
+	};
 
 	readonly promises = {
 		readFile: async (path: string, options?: string | { encoding?: string }): Promise<Uint8Array | string> => {
 			try {
-				await this.assertRepositoryBoundary(path);
+				const normalizedPath = this.normalized(path);
+				await this.assertRepositoryBoundary(normalizedPath);
 				const encoding = typeof options === "string" ? options : options?.encoding;
-				if (encoding === "utf8" || encoding === "utf-8") {
-					return this.adapter.read(this.normalized(path));
+				const data = encoding === "utf8" || encoding === "utf-8"
+					? await this.adapter.read(normalizedPath)
+					: new Uint8Array(await this.adapter.readBinary(normalizedPath));
+				if (!this.isGitMetadata(normalizedPath)) {
+					this.scanMetrics.worktreeFileReads += 1;
+					this.scanMetrics.worktreeBytesRead += typeof data === "string" ? new TextEncoder().encode(data).byteLength : data.byteLength;
 				}
-				return new Uint8Array(await this.adapter.readBinary(this.normalized(path)));
+				return data;
 			} catch (error) {
 				throw this.fileSystemError(path, error);
 			}
 		},
 		writeFile: async (path: string, data: Uint8Array | string): Promise<void> => {
+			this.assertWritable();
+			this.forgetPath(path);
 			const normalizedPath = this.normalized(path);
 			try {
 				await this.assertRepositoryBoundary(normalizedPath);
@@ -623,6 +659,8 @@ export class ObsidianGitFs {
 			}
 		},
 		unlink: async (path: string): Promise<void> => {
+			this.assertWritable();
+			this.forgetPath(path);
 			const normalizedPath = this.normalized(path);
 			try {
 				await this.assertRepositoryBoundary(normalizedPath);
@@ -633,9 +671,11 @@ export class ObsidianGitFs {
 		},
 		readdir: async (path: string): Promise<string[]> => {
 			try {
-				await this.assertRepositoryBoundary(path);
-				const listed = await this.adapter.list(this.normalized(path));
 				const directory = this.normalized(path);
+				await this.assertRepositoryBoundary(directory);
+				if (this.statusScan && !this.isStatusPathRelevant(directory)) return [];
+				this.scanMetrics.directoryLists += 1;
+				const listed = await this.adapter.list(directory);
 				const stripDirectoryPrefix = (entry: string): string => {
 					const normalizedEntry = entry.replace(/^\.\//, "");
 					if (directory !== "." && normalizedEntry.startsWith(`${directory}/`)) {
@@ -648,10 +688,16 @@ export class ObsidianGitFs {
 					entries.map(async (entry) => {
 						const relativePath = stripDirectoryPrefix(entry);
 						const candidatePath = directory === "." ? relativePath : `${directory}/${relativePath}`;
-						if (await this.isNestedGitRepository(candidatePath)) return null;
+						if (this.statusScan && !this.isStatusPathRelevant(candidatePath)) return null;
 						try {
-							const stat = await this.adapter.stat(candidatePath);
-							return stat ? { relativePath, candidatePath, stat } : null;
+							const stat = await this.readStat(candidatePath, candidatePath);
+							if (!stat) return null;
+							if (stat.type === "file") this.knownFilePaths.add(candidatePath);
+							else {
+								this.knownFilePaths.delete(candidatePath);
+								if (await this.isNestedGitRepository(candidatePath)) return null;
+							}
+							return { relativePath, candidatePath, stat };
 						} catch (error) {
 							if (isMissingPathError(error)) return null;
 							throw error;
@@ -670,6 +716,8 @@ export class ObsidianGitFs {
 			}
 		},
 		mkdir: async (path: string): Promise<void> => {
+			this.assertWritable();
+			this.forgetPath(path);
 			const normalizedPath = this.normalized(path);
 			try {
 				await this.assertRepositoryBoundary(normalizedPath);
@@ -679,6 +727,8 @@ export class ObsidianGitFs {
 			}
 		},
 		rmdir: async (path: string): Promise<void> => {
+			this.assertWritable();
+			this.forgetPath(path);
 			const normalizedPath = this.normalized(path);
 			try {
 				await this.assertRepositoryBoundary(normalizedPath);
@@ -700,6 +750,7 @@ export class ObsidianGitFs {
 	constructor(
 		private readonly adapter: DataAdapter,
 		private readonly repositoryRoot = ".",
+		private readonly statusScan?: { filepaths: readonly string[] },
 	) {
 		this.repositoryRoot = normalizeRepositoryRoot(repositoryRoot);
 	}
@@ -736,11 +787,46 @@ export class ObsidianGitFs {
 	}
 
 	private async readStat(path: string, originalPath: string): Promise<Stat | null> {
+		const isIndex = path === pathInRepository(this.repositoryRoot, ".git/index");
+		if (this.statusScan && isIndex) {
+			this.indexStat ??= this.readAdapterStat(path, originalPath);
+			return this.indexStat;
+		}
+		return this.readAdapterStat(path, originalPath);
+	}
+
+	private async readAdapterStat(path: string, originalPath: string): Promise<Stat | null> {
 		try {
+			this.scanMetrics.statCalls += 1;
+			if (path === pathInRepository(this.repositoryRoot, ".git/index")) this.scanMetrics.indexStatCalls += 1;
 			return await this.adapter.stat(path);
 		} catch (error) {
 			throw this.fileSystemError(originalPath, error);
 		}
+	}
+
+	private isGitMetadata(path: string): boolean {
+		const gitdir = pathInRepository(this.repositoryRoot, ".git");
+		return path === gitdir || path.startsWith(`${gitdir}/`);
+	}
+
+	private isStatusPathRelevant(path: string): boolean {
+		if (this.isGitMetadata(path)) return false;
+		const relative = path === this.repositoryRoot ? "."
+			: this.repositoryRoot === "." ? path : path.slice(this.repositoryRoot.length + 1);
+		return this.statusScan!.filepaths.some((target) => target === "." || relative === "." || relative === target ||
+			relative.startsWith(`${target}/`) || target.startsWith(`${relative}/`));
+	}
+
+	private assertWritable(): void {
+		if (this.statusScan) throw new Error("Status scans cannot write repository files.");
+	}
+
+	private forgetPath(path: string): void {
+		const normalized = this.normalized(path);
+		this.knownFilePaths.delete(normalized);
+		this.validatedStats.delete(normalized);
+		this.nestedGitDirectoryCache.delete(normalized);
 	}
 
 	private async assertRepositoryBoundary(path: string): Promise<void> {
@@ -764,9 +850,10 @@ export class ObsidianGitFs {
 
 	private async isNestedGitRepository(path: string): Promise<boolean> {
 		const normalizedPath = this.normalized(path);
-		if (normalizedPath === this.repositoryRoot) return false;
+		if (normalizedPath === this.repositoryRoot || this.knownFilePaths.has(normalizedPath)) return false;
 		const cached = this.nestedGitDirectoryCache.get(normalizedPath);
 		if (cached !== undefined) return cached;
+		this.scanMetrics.nestedRepositoryChecks += 1;
 		const hasMetadata = await this.adapter.exists(`${normalizedPath}/.git`);
 		this.nestedGitDirectoryCache.set(normalizedPath, hasMetadata);
 		return hasMetadata;

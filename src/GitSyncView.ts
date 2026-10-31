@@ -735,7 +735,7 @@ export class GitSyncView extends ItemView {
 				this.changesRefreshRequired = false;
 				this.changesRefreshReason = "";
 				try {
-					const changes = await timed("changes", () => readChanges(this.app.vault.adapter, repositoryPath));
+					const changes = await timed("changes", () => this.readChangesForRefresh(repositoryPath, reason));
 					if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 					this.changes = changes;
 					const availablePaths = new Set(this.changes.map((change) => change.path));
@@ -2081,6 +2081,18 @@ export class GitSyncView extends ItemView {
 		);
 	}
 
+	private readChangesForRefresh(repositoryPath: string, reason: string, filepaths?: string[]): Promise<ChangedFile[]> {
+		return readChanges(this.app.vault.adapter, repositoryPath, filepaths, (metrics) => {
+			this.plugin.recordActivity(
+				`Changes scan [${reason}; ${filepaths ? `${filepaths.length} paths` : "full"}]: ` +
+				`${metrics.directoryLists} directory lists, ${metrics.statCalls} stat calls (${metrics.indexStatCalls} index), ` +
+				`${metrics.nestedRepositoryChecks} repository-boundary checks, ` +
+				`${metrics.worktreeFileReads} worktree reads (${metrics.worktreeBytesRead} bytes).`,
+				"METRIC",
+			);
+		});
+	}
+
 	private async refreshChangesSnapshot(reason: string): Promise<void> {
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
 		if (!repositoryPath) {
@@ -2091,7 +2103,7 @@ export class GitSyncView extends ItemView {
 		const startedAt = Date.now();
 		this.repositoryRefreshInProgress = true;
 		try {
-			const changes = await readChanges(this.app.vault.adapter, repositoryPath);
+			const changes = await this.readChangesForRefresh(repositoryPath, reason);
 			if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 			this.changes = changes;
 			this.changesRefreshRequired = false;
@@ -2137,7 +2149,7 @@ export class GitSyncView extends ItemView {
 		}
 
 		try {
-			const updates = await readChanges(this.app.vault.adapter, repositoryPath, filepaths);
+			const updates = await this.readChangesForRefresh(repositoryPath, reason, filepaths);
 			if (generation !== this.refreshGeneration) return;
 			this.applyKnownChangeUpdates(affectedPaths, updates);
 			this.plugin.recordActivity(
