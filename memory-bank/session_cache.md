@@ -6,11 +6,11 @@
 **Started**: 2026-10-05 14:19 IST
 **Focus Task**: T14 META: Code Quality, Review, and Modularity
 **Session File**: `sessions/2026-10-05-day.md`
-**Status**: 🔄 Active: 10, Paused: 0, Completed: 5
+**Status**: 🔄 Active: 12, Paused: 0, Completed: 5
 
 ## Overview
 
-- Active: 10 | Paused: 0 | Completed: 5
+- Active: 12 | Paused: 0 | Completed: 5
 - Last Session: 2026-09-30
 - Current Period: day
 
@@ -272,3 +272,20 @@ next large-module review target.
 - Remaining: deleted-file staging, incompatible remote filename cleanup, T4
   revert, T5 clear/export, real cancellation, remote edge cases, and broader
   platform/large-vault acceptance.
+
+## T16 Parallel Planning — 2026-10-31 13:41:41 IST
+
+- [T16](tasks/T16.md): planning recorded; T16a–T16e core features pending; T17a–T17c secondary features pending.
+- Next action: T16a repository management, including registry/context migration and focused tests, coordinated with T14 interfaces and T15 infrastructure.
+- Scope: vault folders; full mobile workflows; no native Git. See [acceptance plan](implementation-details/multi-repository-mobile-verification.md).
+- T16/T17 registry additions are included; the other session owns T15 registration and implementation. Existing T14 session focus is preserved.
+
+## Feature-Based Plan — 2026-10-31 13:50:23 IST
+
+- T16 core and T17 secondary features supersede the initial T16a–T16j breakdown. See their task tables for current IDs; T14/T15 work is unchanged.
+- This commit registry: 12 active, 5 completed, 17 total; T15 registration remains with the other session.
+
+## T16/T17 Closeout Scope — 2026-10-31 14:03:15 IST
+
+- Planning complete; implementation pending. Next: T16a repository management.
+- Commit message covers this session's T16/T17 documentation and assessment only. Shared files require selected hunks; other-session T14/T15 source/tests/docs remain excluded. See today's session closeout for the scope handoff.

@@ -80,3 +80,14 @@ behavior has not been rechecked for this refactor.
 4. Keep T4 revert and T5 clear/export as the remaining UI refinements.
 5. Determine whether an abortable HTTP path can support real cancellation;
    continue remote edge-case testing separately.
+
+## T16 Planning — 2026-10-31 13:41:41 IST
+
+- [T16](tasks/T16.md) now owns the vault-only, fully mobile multi-repository Git interface plan. Planning is complete; implementation has not started.
+- Architecture, workflow/backend limits, and mobile verification are linked from the task. Next: T16a repository management, including registry/context migration. T17 owns secondary branch/tag/restore features.
+- T14 modularity and T15 testing continue independently; this documentation update does not change their source work or claim device acceptance.
+
+## T16/T17 Feature Split — 2026-10-31 13:50:23 IST
+
+- T16 is the high-priority core: repository management, clone, changes/commits/history, remote sync, merging/conflicts.
+- [T17](tasks/T17.md) is lower priority: branch management, tags, and selected-file restore. Mobile usability and tests belong to each feature. No implementation has started.

@@ -58,3 +58,22 @@ The plugin composition and module ownership map is maintained in
 reduced `src/main.ts` to plugin coordination and moved Settings/data, view,
 remote operations, dialogs, and Activity/Commits presentation into focused
 modules. The remaining large `src/GitSyncView.ts` is the next review target.
+
+## Planned Mobile Multi-Repository Interface (T16)
+
+*Added: 2026-10-31 13:41:41 IST*
+
+[T16](../tasks/T16.md) plans multiple repositories within vault folders using
+the existing mobile JavaScript Git backend. This is proposed ownership, not a
+change to the implemented module map or T14's current extraction work.
+
+- [Repository identity, boundaries, migration, and operation ownership](multi-repository-architecture.md)
+- [Git workflows and backend capability limits](multi-repository-git-workflows.md)
+- [Mobile verification and acceptance](multi-repository-mobile-verification.md)
+
+### Feature ownership update — 2026-10-31 13:50:23 IST
+
+[T16](../tasks/T16.md) owns core repository management, clone, changes/history,
+sync, and merging/conflicts. [T17](../tasks/T17.md) owns secondary branch/tag
+management and selected-file restore. Mobile usability and verification accompany
+each feature; neither task changes T14 current source ownership.

@@ -1,8 +1,43 @@
 # Edit History
 
-*Last Updated: 2026-10-05 14:19:36 IST*
+*Last Updated: 2026-10-31 14:03:15 IST*
 
 ---
+
+## 2026-10-31
+
+#### 14:03:15 IST - T16: Record the T16 and T17 session-only documentation handoff
+- Modified `memory-bank/sessions/2026-10-31-day.md` - Record session-owned paths, shared-hunk boundaries, verification, and implementation follow-ups.
+- Modified `memory-bank/session_cache.md` - Record the documentation-only closeout scope and next T16 action without changing other-session focus.
+- Created `memory-bank/edits/2026-10-31/140315-T16-T17-session-closeout.md` - Record this user-requested session closeout.
+- Updated `memory-bank/edit_history.md` - Refresh the view with this canonical edit chunk.
+
+#### 13:50:23 IST - T16: Split core and secondary features into T16 and T17
+- Modified `memory-bank/tasks/T16.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Created `memory-bank/tasks/T17.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/tasks.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/implementation-details/multi-repository-architecture.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/implementation-details/multi-repository-git-workflows.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/implementation-details/multi-repository-mobile-verification.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/activeContext.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/session_cache.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/sessions/2026-10-31-day.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Modified `memory-bank/implementation-details/component-map.md` - Define or cross-reference core and secondary feature ownership and acceptance.
+- Created `memory-bank/edits/2026-10-31/135023-T16-core-T17-secondary-features.md` - Record the user-requested feature-based task split.
+- Updated `memory-bank/edit_history.md` - Refresh the view with this canonical edit chunk.
+
+#### 13:41:41 IST - T16: Plan the mobile multi-repository Git interface
+- Created `memory-bank/tasks/T16.md` - Define the T16 plan, scoped subtasks, architecture, workflow limits, or mobile acceptance.
+- Created `memory-bank/implementation-details/multi-repository-architecture.md` - Define the T16 plan, scoped subtasks, architecture, workflow limits, or mobile acceptance.
+- Created `memory-bank/implementation-details/multi-repository-git-workflows.md` - Define the T16 plan, scoped subtasks, architecture, workflow limits, or mobile acceptance.
+- Created `memory-bank/implementation-details/multi-repository-mobile-verification.md` - Define the T16 plan, scoped subtasks, architecture, workflow limits, or mobile acceptance.
+- Modified `memory-bank/activeContext.md` - Link the T16 plan while preserving concurrent modularity and testing records.
+- Modified `memory-bank/session_cache.md` - Link the T16 plan while preserving concurrent modularity and testing records.
+- Modified `memory-bank/sessions/2026-10-31-day.md` - Link the T16 plan while preserving concurrent modularity and testing records.
+- Modified `memory-bank/implementation-details/component-map.md` - Link the T16 plan while preserving concurrent modularity and testing records.
+- Modified `memory-bank/tasks.md` - Register T16 and the existing T15 task and reconcile task counts.
+- Created `memory-bank/edits/2026-10-31/134141-T16-mobile-multi-repository-plan.md` - Record the user-authorized T16 documentation update.
+- Updated `memory-bank/edit_history.md` - Refresh the generated view with this canonical edit chunk.
 
 ## 2026-10-05
 
