@@ -34,7 +34,12 @@ import { RemoteOperationController, type RepositoryOperationContext } from "./Re
 import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
 import { repositoryRootsOverlap } from "./repositoryPaths";
 import { inspectLocalRepository } from "./repository";
-import { configureStatusCache, flushStatusCache, invalidateStatusHashCache } from "./RepositoryStatusCache";
+import {
+	configureStatusCache,
+	flushStatusCache,
+	invalidateStatusHashCache,
+	registerStatusCacheInvalidationEvents,
+} from "./RepositoryStatusCache";
 
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
@@ -68,13 +73,12 @@ export default class GitSyncPlugin extends Plugin {
 				flushStatusCache(this.app.vault.adapter);
 			}, 1000);
 		};
-		this.registerEvent(this.app.vault.on("create", (file) => invalidateHashes(file.path)));
-		this.registerEvent(this.app.vault.on("modify", (file) => invalidateHashes(file.path)));
-		this.registerEvent(this.app.vault.on("delete", (file) => invalidateHashes(file.path)));
-		this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
-			invalidateHashes(oldPath);
-			invalidateHashes(file.path);
-		}));
+		registerStatusCacheInvalidationEvents(
+			this.app.workspace,
+			this.app.vault,
+			(event) => this.registerEvent(event),
+			invalidateHashes,
+		);
 		this.remoteOperations = new RemoteOperationController({
 			app: this.app,
 			getRepositoryOperationContext: () => this.getRepositoryOperationContext(),

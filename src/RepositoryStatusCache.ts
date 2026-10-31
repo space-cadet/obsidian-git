@@ -1,9 +1,30 @@
-import type { DataAdapter, Stat } from "obsidian";
+import type { DataAdapter, EventRef, Stat, Vault, Workspace } from "obsidian";
 import { normalizeRepositoryFilePath, normalizeRepositoryRoot } from "./repositoryPaths";
 
 const VERSION = 1;
 const MAX_ENTRIES = 10_000;
 const stores = new WeakMap<DataAdapter, StatusCacheStore>();
+
+/**
+ * Obsidian emits `create` for every existing file while initially loading a vault.
+ * Registering before layout-ready would invalidate the saved hashes on every reload.
+ */
+export function registerStatusCacheInvalidationEvents(
+	workspace: Pick<Workspace, "onLayoutReady">,
+	vault: Pick<Vault, "on">,
+	registerEvent: (event: EventRef) => void,
+	invalidate: (path: string) => void,
+): void {
+	workspace.onLayoutReady(() => {
+		registerEvent(vault.on("create", (file) => invalidate(file.path)));
+		registerEvent(vault.on("modify", (file) => invalidate(file.path)));
+		registerEvent(vault.on("delete", (file) => invalidate(file.path)));
+		registerEvent(vault.on("rename", (file, oldPath) => {
+			invalidate(oldPath);
+			invalidate(file.path);
+		}));
+	});
+}
 
 interface VerifiedHash {
 	ctime: number;

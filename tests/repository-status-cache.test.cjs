@@ -5,7 +5,11 @@ const { loadTypeScript } = require("./support/load-typescript.cjs");
 const { MemoryAdapter } = require("./support/memory-adapter.cjs");
 const { initializeRepository, stageFile, unstageFile, commitChanges, readChanges, ObsidianGitFs } = loadTypeScript("src/repository.ts");
 // Use the same module instance loaded by repository.ts.
-const { configureStatusCache, invalidateStatusHashCache } = require("../src/RepositoryStatusCache.ts");
+const {
+	configureStatusCache,
+	invalidateStatusHashCache,
+	registerStatusCacheInvalidationEvents,
+} = require("../src/RepositoryStatusCache.ts");
 
 class ObservedAdapter extends MemoryAdapter {
 	constructor() { super(); this.clock = Date.now() - 10_000_000; this.reset(); }
@@ -61,6 +65,40 @@ test("verified hashes survive a simulated app restart and do not rewrite the ind
 	assert.ok(!adapter.reads.some((path) => path.startsWith("notes/")));
 	assert.deepEqual(adapter.writes, []);
 	assert.deepEqual(await adapter.readBinary(".git/index"), index);
+});
+
+test("startup file creation events cannot invalidate restored hashes", async () => {
+	const adapter = await fixture();
+	let saved;
+	configureStatusCache(adapter, null, (value) => { saved = JSON.parse(JSON.stringify(value)); });
+	await scan(adapter);
+	assert.equal(saved.repositories[0].files.length, 8);
+	configureStatusCache(adapter, saved, (value) => { saved = value; });
+
+	let onLayoutReady;
+	const handlers = new Map();
+	const registered = [];
+	registerStatusCacheInvalidationEvents(
+		{ onLayoutReady: (callback) => { onLayoutReady = callback; } },
+		{ on: (name, callback) => { handlers.set(name, callback); return {}; } },
+		(event) => registered.push(event),
+		(path) => invalidateStatusHashCache(adapter, path),
+	);
+	assert.equal(handlers.size, 0);
+	assert.equal(registered.length, 0);
+
+	// Obsidian's startup `create` events occur before layout-ready and therefore
+	// have no cache invalidation listeners attached.
+	onLayoutReady();
+	assert.deepEqual([...handlers.keys()], ["create", "modify", "delete", "rename"]);
+	assert.equal(registered.length, 4);
+	assert.equal((await scan(adapter)).metrics.hashCacheHits, 8);
+
+	adapter.reset();
+	handlers.get("modify")({ path: "notes/file-0.md" });
+	const modified = await scan(adapter);
+	assert.equal(modified.metrics.hashCacheHits, 7);
+	assert.ok(adapter.reads.includes("notes/file-0.md"));
 });
 
 test("millisecond timestamp changes detect same-size edits; staging and unstaging use the current index", async () => {
