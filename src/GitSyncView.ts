@@ -1107,7 +1107,7 @@ export class GitSyncView extends ItemView {
 	): void {
 		const sectionEl = content.createDiv({ cls: "git-sync-change-section" });
 		const header = sectionEl.createDiv({ cls: "git-sync-change-section-header" });
-		header.createDiv({ cls: "git-sync-section-title", text: title });
+		header.createDiv({ cls: "git-sync-section-title", text: section === "staged" ? "Staged" : "Changes" });
 		const actionInProgress = this.activeChangeAction === (section === "staged" ? "Unstage all" : "Stage all") ||
 			this.activeChangeAction === `${section === "staged" ? "Unstage" : "Stage"} selected`;
 		header.createDiv({
@@ -1151,7 +1151,7 @@ export class GitSyncView extends ItemView {
 		sectionAction.addEventListener("click", () => void this.applyAllStage(section === "staged"));
 		const collapse = header.createEl("button", {
 			cls: "git-sync-icon-button",
-			attr: { type: "button", "aria-label": `${this.collapsedSections.has(section) ? "Expand" : "Collapse"} ${title}` },
+			attr: { type: "button", "aria-expanded": String(!this.collapsedSections.has(section)), "aria-label": `${this.collapsedSections.has(section) ? "Expand" : "Collapse"} ${title}` },
 		});
 		setIcon(collapse, this.collapsedSections.has(section) ? "chevron-right" : "chevron-down");
 		collapse.addEventListener("click", () => {
@@ -1787,7 +1787,7 @@ export class GitSyncView extends ItemView {
 	private renderChangesActionBar(root: HTMLElement): HTMLElement {
 		const bar = root.createDiv({ cls: "git-sync-bottom-bar" });
 		const selectAll = bar.createEl("button", {
-			cls: "git-sync-bottom-action is-primary",
+			cls: "git-sync-bottom-action",
 			attr: { type: "button", "aria-label": "Select all changed files", title: "Select all" },
 		});
 		setIcon(selectAll, "check-square");
@@ -1803,26 +1803,12 @@ export class GitSyncView extends ItemView {
 		setIcon(pull, "arrow-down-to-line");
 		pull.addEventListener("click", () => void this.plugin.pullRemote());
 
-		const forcePull = bar.createEl("button", {
-			cls: "git-sync-bottom-action is-destructive",
-			attr: { type: "button", "aria-label": "Reset local branch to remote", title: "Reset local branch to remote" },
-		});
-		setIcon(forcePull, "arrow-down-to-line");
-		forcePull.addEventListener("click", () => this.plugin.forcePullRemote());
-
 		const push = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
 			attr: { type: "button", "aria-label": "Push to remote", title: "Push to remote" },
 		});
 		setIcon(push, "arrow-up-to-line");
 		push.addEventListener("click", () => void this.plugin.pushRemote());
-
-		const forcePush = bar.createEl("button", {
-			cls: "git-sync-bottom-action is-destructive",
-			attr: { type: "button", "aria-label": "Force push to remote", title: "Force push to remote" },
-		});
-		setIcon(forcePush, "arrow-up-to-line");
-		forcePush.addEventListener("click", () => this.plugin.forcePushRemote());
 
 		const refresh = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
@@ -1831,12 +1817,22 @@ export class GitSyncView extends ItemView {
 		setIcon(refresh, "refresh-cw");
 		refresh.addEventListener("click", () => void this.plugin.fetchRemote());
 
-		const editIgnore = bar.createEl("button", {
+		const more = bar.createEl("button", {
 			cls: "git-sync-bottom-action",
-			attr: { type: "button", "aria-label": "Edit .gitignore", title: "Edit .gitignore" },
+			attr: { type: "button", "aria-label": "More repository actions", title: "More actions", "aria-haspopup": "menu" },
 		});
-		setIcon(editIgnore, "file-text");
-		editIgnore.addEventListener("click", () => void this.editGitignore());
+		setIcon(more, "ellipsis");
+		more.addEventListener("click", (event) => {
+			const menu = new Menu();
+			menu.addItem((item) => item.setTitle("Edit .gitignore").setIcon("file-text")
+				.onClick(() => void this.editGitignore()));
+			menu.addSeparator();
+			menu.addItem((item) => item.setTitle("Reset local branch to remote…").setIcon("download")
+				.onClick(() => this.plugin.forcePullRemote()));
+			menu.addItem((item) => item.setTitle("Force push to remote…").setIcon("upload")
+				.onClick(() => this.plugin.forcePushRemote()));
+			menu.showAtMouseEvent(event);
+		});
 		const repositoryReady = this.repositoryState?.kind === "ready";
 		for (const action of Array.from(bar.querySelectorAll<HTMLButtonElement>("button"))) {
 			action.disabled = !repositoryReady;
