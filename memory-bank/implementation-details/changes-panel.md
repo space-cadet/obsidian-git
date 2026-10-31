@@ -1,6 +1,6 @@
 # T4: Changes Panel
 
-*Last Updated: 2026-09-30 09:34:50 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
 ## Purpose
 
@@ -40,6 +40,11 @@ the resulting clean state.
   counts, collapsible headers, selection controls, and icon actions.
 - Desktop Cmd/Ctrl-click, Shift-click ranges, mobile long-press dragging,
   per-section status filters/sorts, and file overflow actions are implemented.
+- `src/ChangeSelection.ts` owns selected paths and per-section range anchors;
+  `GitSyncView` handles gestures, visible folder selection, staging, and refresh
+  reconciliation.
+- `src/ChangeListState.ts` contains pure snapshot updates after staging and
+  path-scoped refreshes; `GitSyncView` owns the current snapshot and async reads.
 - Changed files render in a collapsible folder tree inside their Staged or
   Uncommitted Changes section. Folder selection adds or removes its descendant
   changed-file paths in the existing selection set; a mixed selection uses a

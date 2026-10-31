@@ -1,6 +1,6 @@
 # Code Quality, Review, and Modularity
 
-*Last Updated: 2026-10-05 14:19:36 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
 This document tracks the ongoing T14 code-quality task and the behavior-preserving
 module extraction started on `codex/main-ts-modularity`. It records current
@@ -21,6 +21,19 @@ repository state and Changes interactions; the plugin still owns persisted
 settings and Activity state; remote Git mechanics remain in `src/remote.ts` and
 `src/repository.ts`.
 
+On 2026-10-31, selected paths and per-section range anchors moved into
+`src/ChangeSelection.ts`. Pure stage-result and path-refresh snapshot updates
+moved into `src/ChangeListState.ts`. The view still owns DOM event handling,
+repository refresh, and Git operations; the extracted helpers can be tested
+without Obsidian DOM.
+
+A source-level review of `GitSyncView` found four responsibilities sharing one
+class: Obsidian view/background-event lifecycle, repository and Changes
+refresh, Changes UI and file actions, and commit-history loading/cache/paging.
+The next extraction is commit-history data handling; Changes display and
+repository refresh follow in separate steps with explicit inputs and callbacks.
+The point is clearer ownership of state and work, not a smaller line count.
+
 ## Component Map
 
 | Module | Responsibility | State and operation owner |
@@ -28,7 +41,9 @@ settings and Activity state; remote Git mechanics remain in `src/remote.ts` and
 | `src/main.ts` | Plugin lifecycle, view registration, settings and Activity persistence, plugin API registration, updater wiring, and view-refresh callbacks | `GitSyncPlugin` coordinates plugin-wide state and exposes the existing entry points |
 | `src/pluginData.ts` | Settings/activity types, defaults, decoding, normalization, merging, and line serialization | Pure data helpers; persisted state remains in `GitSyncPlugin` |
 | `src/GitSyncSettingTab.ts` | Obsidian Settings UI, import/export controls, and setting callbacks | UI stays in the Settings tab; persistence and operations are delegated to the plugin |
-| `src/GitSyncView.ts` | Sidebar tabs and repository context; repository reads, Changes selection/staging/commit, background refresh, and Commits/Activity data loading | Main view currently owns shared repository/view state and most Changes behavior |
+| `src/GitSyncView.ts` | Sidebar tabs and repository context; Changes DOM and selection events, repository reads, staging/commit, background refresh, and Commits/Activity data loading | View still owns shared repository/view state and invokes the extracted state helpers |
+| `src/ChangeSelection.ts` | Selected changed-file paths, section range anchors, range selection, and pruning paths no longer present | Selection model owns path-selection state; the view supplies visible paths and renders the result |
+| `src/ChangeListState.ts` | Pure updates to the Changes snapshot after staging or path-scoped refresh | Stateless helpers return a new snapshot; the view owns the resulting snapshot |
 | `src/ActivityPanel.ts` | Renders Activity rows and the Load More control | Stateless renderer; entries and visible count come from the plugin/view |
 | `src/CommitHistoryPanel.ts` | Renders Local/Remote history, commit rows, details, and empty/loading/error states | Stateless renderer; history queries, paging, and lazy detail loading stay in `GitSyncView` |
 | `src/RemoteOperationController.ts` | Queues remote actions, builds operation options, reports progress/results, and requests view refreshes | Controller uses a host interface supplied by `GitSyncPlugin` |
@@ -61,6 +76,158 @@ flowchart TD
     Plugin --> Provider[Integration provider]
 ```
 
+## GitSyncView Ownership Review and Refactoring Plan
+
+The current problem is that unrelated state and work share one class. The
+diagram shows those responsibilities in the source today; it does not suggest
+that every box should become a new file.
+
+### Current source structure
+
+```text
+GitSyncPlugin (src/main.ts)
+|
++-- creates and calls GitSyncView (src/GitSyncView.ts, 2,014 lines)
+    |
+    +-- Obsidian view lifecycle, tabs, and repository header
+    +-- vault events, background refresh queue, and timer
+    +-- repository inspection and Changes refresh/reconciliation
+    +-- Changes tree, rows, filters, selection events, and file actions
+    +-- stage/unstage, commit, and post-mutation refresh
+    +-- commit-history reads, paging, detail cache, and loading/error state
+    +-- Activity and commit panel wiring
+    |
+    +-- calls src/repository.ts for local Git reads and writes
+    +-- uses src/ChangeSelection.ts for selected paths and range anchors
+    +-- uses src/ChangeListState.ts for pure Changes snapshot updates
+    +-- renders src/ActivityPanel.ts and src/CommitHistoryPanel.ts
+    +-- calls plugin methods for settings, Activity, and remote actions
+
+Other callers:
+  GitSyncPlugin callbacks ------> refreshRepositoryState / refreshRemoteHistory
+  Integration provider --------> refreshIntegrationStage
+```
+
+The `CommitHistoryPanel` and `ActivityPanel` only render. Their data loading or
+visible-count state still belongs to `GitSyncView`. The two Changes helper files
+already hold the small state operations that can be tested without Obsidian DOM.
+
+### Intended structure, in stages
+
+```text
+GitSyncPlugin (src/main.ts)
+|
++-- GitSyncView (Obsidian lifecycle, tab shell, and composition)
+    |
+    +-- CommitHistoryController [first]
+    |   +-- local/remote history state and reads
+    |   +-- paging and lazy commit-detail cache
+    |   +-- loading/errors and repository/branch reset
+    |
+    +-- ChangesPanel [second]
+    |   +-- folder tree, rows, filters/sort, focus/scroll rendering
+    |   +-- sends user actions to callbacks; does not run Git writes
+    |
+    +-- RepositoryRefreshController [third]
+    |   +-- repository inspection and full/path-scoped Changes reads
+    |   +-- refresh generation and snapshot reconciliation
+    |
+    +-- ChangeSelection and ChangeListState [existing]
+    +-- ActivityPanel and CommitHistoryPanel [existing renderers]
+    +-- stage/commit actions and user-facing notices [remain in view initially]
+```
+
+The proposed controllers should receive the repository path, branch, adapter,
+and narrowly scoped callbacks as arguments. They should not reach into view DOM
+or depend on the full `GitSyncPlugin` object. The view remains responsible for
+Obsidian lifecycle and presenting the returned state.
+
+### Repository and Changes refresh flow
+
+```text
+Manual refresh / vault event / integration-stage update
+                         |
+                         v
+                    GitSyncView
+                         |
+          RepositoryRefreshController [planned]
+               |                       |
+               v                       v
+        full refresh               known paths
+               |                       |
+               v                       v
+ inspectLocalRepository       readChanges(paths)
+               |                       |
+ readChanges(all paths)                |
+               +-----------+-----------+
+                           |
+                  check generation and repo
+                           |
+                     discard stale result
+                           |
+                 accept current result
+                    |             |
+                    v             v
+             full snapshot   ChangeListState
+                    |             |
+                    +------+------+
+                           |
+                           v
+ GitSyncView prunes ChangeSelection and updates ChangesPanel
+```
+
+Full scans remain for explicit refreshes or when the current snapshot is
+uncertain. Background events and integration staging stay path-scoped when the
+affected paths are known. Generation checks must continue to prevent an older
+async read from replacing newer state.
+
+### Commit-history flow
+
+```text
+User opens Commits / chooses source / loads more / opens a commit
+                              |
+                              v
+                         GitSyncView
+                              |
+                              v
+                  CommitHistoryController
+                    |                 |
+                    v                 v
+             readCommits()     readRemoteCommits()
+                    |                 |
+                    +------ state ----+
+                              |
+                pages, errors, detail cache
+                              |
+                     state snapshot to view
+                              |
+                              v
+                    CommitHistoryPanel
+```
+
+### Implementation order and checks
+
+1. **Commit history:** move history state and reads behind a small controller;
+   keep selection of the displayed source and DOM callbacks in the view unless
+   implementation shows they belong with the history state. Test paging,
+   repository/branch resets, lazy details, failures, and stale results.
+2. **Changes presentation:** move DOM construction and filter/sort display
+   into a panel with explicit data and callbacks. Keep Git writes, Activity
+   reporting, Notices, and refresh policy outside that renderer. Verify folder
+   actions and selection continue to use visible paths.
+3. **Repository refresh:** move inspect/read/reconcile work behind a controller
+   after its generation and cancellation-on-close rules are covered. Keep
+   `ChangeSelection` responsible for selected paths and prune them after a new
+   snapshot is accepted.
+4. **Remaining lifecycle and mutations:** review background event batching and
+   stage/commit actions only after the first three owners are clear. Leave a
+   group in `GitSyncView` if extracting it would just pass shared mutable state
+   back and forth.
+
+Each step should preserve the plugin and integration-provider entry points,
+keep Git mechanics in `repository.ts`/`remote.ts`, and update this map only when
+ownership actually changes.
+
 ## Remote Operation Sequence
 
 ```mermaid
@@ -90,10 +257,16 @@ sequenceDiagram
 - `RemoteOperationController` receives a narrow host interface for settings,
   credentials, Activity, and view refreshes. Remote transport remains in
   `src/remote.ts`.
-- `GitSyncView` remains 2,061 lines. It still combines the sidebar shell,
-  repository refresh lifecycle, and most Changes interaction/rendering and
-  mutation behavior. This is the next review target; split it only after
-  tracing shared selection, refresh, and staging state.
+- `ChangeSelection` owns selected paths and per-section range anchors.
+  `GitSyncView` translates mouse/touch input, applies visible folder/selection
+  actions, reconciles paths after refreshes, and clears selected paths after
+  staging or uncertain changes.
+- `ChangeListState` owns two pure snapshot transformations: applying a known
+  stage result and replacing refreshed paths. The view owns the current list.
+- `GitSyncView` is 2,014 lines and still combines view lifecycle, repository
+  refresh, Changes interaction/actions, and commit-history data handling. The
+  ownership review is complete; the staged plan above starts with the history
+  data controller.
 - The Settings tab, plugin-data model, dialogs, Activity renderer, and commit
   renderer have separate files. Their data/loading ownership is intentionally
   still in the plugin or view where it was before the extraction.
@@ -101,8 +274,10 @@ sequenceDiagram
 
 ## Verification and Limits
 
-- `pnpm build` passed after the source extraction.
-- `git diff --check` passed.
-- No tests or installed Obsidian desktop/mobile checks were run for this pass.
+- The initial extraction passed `pnpm build` and `git diff --check` on 2026-10-05.
+- The 2026-10-31 selection and snapshot-state helpers have focused tests;
+  `pnpm test` passed 8 tests and the production build.
+- Installed Obsidian desktop/mobile behavior remains unverified.
+- No source refactor was performed as part of the ownership review and plan.
 - Build success confirms TypeScript and bundling only; runtime behavior remains
   unverified on the Obsidian host.

@@ -1,17 +1,17 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-10-05 14:19:36 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
-**Started**: 2026-10-05 14:19 IST
+**Started**: 2026-10-31 13:00 IST
 **Focus Task**: T14 META: Code Quality, Review, and Modularity
-**Session File**: `sessions/2026-10-05-day.md`
-**Status**: 🔄 Active: 12, Paused: 0, Completed: 5
+**Session File**: `sessions/2026-10-31-day.md`
+**Status**: 🔄 Active: 13, Paused: 0, Completed: 5
 
 ## Overview
 
-- Active: 12 | Paused: 0 | Completed: 5
-- Last Session: 2026-09-30
+- Active: 13 | Paused: 0 | Completed: 5
+- Last Session: 2026-10-05
 - Current Period: day
 
 ## Active Tasks
@@ -34,23 +34,63 @@ Build the Settings panel immediately after the shell with only the configuration
 **Status:** 🔄 **IN PROGRESS**
 **Priority:** MEDIUM
 **Started:** 2026-10-05
-**Last Active:** 2026-10-05 14:19 IST
+**Last Active:** 2026-10-31 14:07 IST
 **Context**: Ongoing review and modularity work across this repository. The
-first `main.ts` extraction pass is documented; the Changes view remains the
-next large-module review target.
+first `main.ts` extraction pass is documented; selection and snapshot helpers
+are separated, and the `GitSyncView` ownership review has produced a staged
+refactoring plan.
 **Critical Files**: `src/main.ts`, `src/GitSyncView.ts`,
 `memory-bank/implementation-details/code-quality-modularity.md`
 **Progress**:
 1. ✅ Created the module map and two component diagrams for the first extraction pass.
 2. ✅ Registered T14 and recorded source/build evidence.
-3. 🔄 Review Changes state ownership before selecting another extraction.
+3. ✅ Extracted selected paths and range anchors to `src/ChangeSelection.ts`; the
+   view retains DOM handling and repository refresh/staging operations.
+4. ✅ Review refresh and staging ownership; document commit-history, Changes
+   presentation, and refresh-controller extraction order.
+5. 🔄 Define and test the `CommitHistoryController` contract.
+
+### T15: App-Wide Test Coverage
+**Status:** 🔄 **IN PROGRESS**
+**Priority:** HIGH
+**Started:** 2026-10-31
+**Last Active:** 2026-10-31 14:07 IST
+**Context**: Initial Node test coverage is in place for Changes selection and
+snapshot state; broader app workflows and CI execution remain open.
+**Critical Files**: `package.json`, `tests/`,
+`memory-bank/implementation-details/app-wide-test-coverage.md`
+**Progress**:
+1. ✅ Added eight helper tests; `pnpm test` passed with the production build.
+2. 🔄 Add plugin-data/local-repository tests and run the suite in CI.
 
 ## Next Session Focus
 
-1. T14: Review shared selection, refresh, and staging ownership in `GitSyncView.ts`.
-2. T4: Verify the folder tree visually on installed desktop and mobile hosts; finish the planned revert refinement.
-3. T5: Add Log clear/export if still required.
-4. T10: Capture controlled large-vault timings and platform-specific acceptance.
+1. T14: Define and test the `CommitHistoryController` contract; installed-host
+   acceptance for the current Changes behavior remains open under T10.
+2. T15: Add plugin-data/local-repository coverage and wire tests into CI.
+3. T4: Verify the folder tree on installed desktop/mobile and finish the planned revert refinement.
+4. T5: Add Log clear/export if still required.
+5. T10: Capture controlled large-vault timings and platform-specific acceptance.
+
+## 2026-10-31 Session Update
+
+- T14: Extracted selected-path and range-anchor state into `ChangeSelection.ts`.
+  `GitSyncView` still owns DOM events, repository refresh, and staging actions.
+- `pnpm build` passed. `git diff --check` passed for the complete source and
+  Memory Bank change set. No tests or installed Obsidian checks were run.
+- Next: review async refresh-generation and staging-mutation ownership before
+  choosing another extraction seam.
+
+## 2026-10-31 T14/T15 Session Update — 14:07 IST
+
+- T14: Extracted pure Changes snapshot updates into `ChangeListState.ts` and
+  completed the source-level ownership review of `GitSyncView`. Documented the
+  phased plan, beginning with commit-history state/loading.
+- T15: Added the initial Node test harness and eight tests for selection and
+  Changes snapshot state. `pnpm test` passed with the production build; CI still
+  runs only the build.
+- Installed Obsidian desktop/mobile acceptance remains unverified. Next work is
+  the T14 controller contract and T15 plugin-data/local-repository coverage.
 
 ## 2026-09-30 Session Update
 
@@ -278,12 +318,12 @@ next large-module review target.
 - [T16](tasks/T16.md): planning recorded; T16a–T16e core features pending; T17a–T17c secondary features pending.
 - Next action: T16a repository management, including registry/context migration and focused tests, coordinated with T14 interfaces and T15 infrastructure.
 - Scope: vault folders; full mobile workflows; no native Git. See [acceptance plan](implementation-details/multi-repository-mobile-verification.md).
-- T16/T17 registry additions are included; the other session owns T15 registration and implementation. Existing T14 session focus is preserved.
+- Registry now includes the existing T15 record and new T16: 12 active, 5 completed. Existing T14 session focus is preserved.
 
 ## Feature-Based Plan — 2026-10-31 13:50:23 IST
 
 - T16 core and T17 secondary features supersede the initial T16a–T16j breakdown. See their task tables for current IDs; T14/T15 work is unchanged.
-- This commit registry: 12 active, 5 completed, 17 total; T15 registration remains with the other session.
+- Registry: 13 active, 5 completed, 18 total.
 
 ## T16/T17 Closeout Scope — 2026-10-31 14:03:15 IST
 

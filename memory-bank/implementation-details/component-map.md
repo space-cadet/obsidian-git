@@ -57,7 +57,11 @@ The plugin composition and module ownership map is maintained in
 [`code-quality-modularity.md`](code-quality-modularity.md). The first extraction
 reduced `src/main.ts` to plugin coordination and moved Settings/data, view,
 remote operations, dialogs, and Activity/Commits presentation into focused
-modules. The remaining large `src/GitSyncView.ts` is the next review target.
+modules. Selected paths and range anchors live in `src/ChangeSelection.ts`,
+while pure Changes snapshot updates live in `src/ChangeListState.ts`. The
+`GitSyncView` ownership review is complete; the next planned extraction is
+commit-history loading and state, followed by Changes presentation and refresh
+coordination. See `code-quality-modularity.md` for the staged plan and diagrams.
 
 ## Planned Mobile Multi-Repository Interface (T16)
 

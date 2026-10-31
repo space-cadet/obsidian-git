@@ -32,12 +32,14 @@ import { ACTIVITY_PAGE_SIZE } from "./pluginData";
 import { elapsedMilliseconds, formatMilliseconds } from "./operationDiagnostics";
 import { renderActivityPanel } from "./ActivityPanel";
 import { renderCommitHistoryPanel } from "./CommitHistoryPanel";
+import { applyStagingToSnapshot, replaceChangedPaths } from "./ChangeListState";
+import { ChangeSelection, type ChangeSelectionSection } from "./ChangeSelection";
 import type { CommitSource } from "./CommitHistoryPanel";
 import type GitSyncPlugin from "./main";
 
 export const VIEW_TYPE_GIT_SYNC = "git-sync-sidebar";
 const COMMIT_PAGE_SIZE = 100;
-type ChangeSection = "staged" | "uncommitted";
+type ChangeSection = ChangeSelectionSection;
 type ChangeStatusFilter = "Untracked" | "Added" | "Modified" | "Deleted";
 type ChangeSort = "path-asc" | "path-desc" | "status-path" | "folder-name";
 
@@ -81,8 +83,7 @@ export class GitSyncView extends ItemView {
 	private remoteCommitsError: string | null = null;
 	private commitSource: CommitSource = "local";
 	private selectedCommitOid: string | null = null;
-	private readonly selectedPaths = new Set<string>();
-	private readonly selectionAnchors = new Map<ChangeSection, string>();
+	private readonly changeSelection = new ChangeSelection();
 	private readonly commitChangesCache = new Map<string, CommitFileChange[]>();
 	private readonly commitChangesLoading = new Set<string>();
 	private readonly commitChangesErrors = new Map<string, string>();
@@ -462,7 +463,7 @@ export class GitSyncView extends ItemView {
 		if (!refreshChanges) {
 			this.changes = null;
 			this.changesError = null;
-			this.selectedPaths.clear();
+			this.changeSelection.clear();
 		}
 		this.repositoryState = { kind: "checking", repositoryPath };
 		if (this.activeTab === "Changes" && this.changesContentEl?.isConnected) {
@@ -482,9 +483,7 @@ export class GitSyncView extends ItemView {
 					if (generation !== this.refreshGeneration || !this.contentEl.isConnected) return;
 					this.changes = changes;
 					const availablePaths = new Set(this.changes.map((change) => change.path));
-					for (const selectedPath of this.selectedPaths) {
-						if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
-					}
+					this.changeSelection.retainAvailablePaths(availablePaths);
 					this.changesError = null;
 				} catch (error) {
 					this.changes = null;
@@ -918,7 +917,7 @@ export class GitSyncView extends ItemView {
 			return;
 		}
 
-		const selectedInSection = visibleChanges.filter((change) => this.selectedPaths.has(change.path));
+		const selectedInSection = visibleChanges.filter((change) => this.changeSelection.isSelected(change.path));
 		if (selectedInSection.length > 0) {
 			const toolbar = sectionEl.createDiv({ cls: "git-sync-change-toolbar" });
 			const selectedActionName = section === "staged" ? "Unstage selected" : "Stage selected";
@@ -933,7 +932,7 @@ export class GitSyncView extends ItemView {
 			});
 			setIcon(clear, "x");
 			clear.addEventListener("click", () => {
-				for (const change of visibleChanges) this.selectedPaths.delete(change.path);
+				this.changeSelection.clearPaths(visibleChanges.map((change) => change.path));
 				this.render();
 			});
 			const action = toolbar.createEl("button", {
@@ -981,7 +980,7 @@ export class GitSyncView extends ItemView {
 		const renderFolder = (parentList: HTMLElement, folder: ChangeTreeFolder): void => {
 			const item = parentList.createEl("li", { cls: "git-sync-change-folder" });
 			const row = item.createDiv({ cls: "git-sync-folder-row" });
-			const selectedCount = folder.descendants.filter((change) => this.selectedPaths.has(change.path)).length;
+			const selectedCount = this.changeSelection.countSelected(folder.descendants);
 			const folderActionPending = this.pendingFileActions.has(folder.path);
 			const checkbox = row.createEl("input", {
 				attr: {
@@ -995,10 +994,7 @@ export class GitSyncView extends ItemView {
 			checkbox.addEventListener("click", (event) => {
 				event.preventDefault();
 				const select = selectedCount < folder.descendants.length;
-				for (const change of folder.descendants) {
-					if (select) this.selectedPaths.add(change.path);
-					else this.selectedPaths.delete(change.path);
-				}
+				this.changeSelection.setSelected(folder.descendants.map((change) => change.path), select);
 				this.render();
 			});
 
@@ -1070,13 +1066,13 @@ export class GitSyncView extends ItemView {
 		visibleChanges: ChangedFile[],
 	): void {
 		const item = list.createEl("li", {
-			cls: this.selectedPaths.has(change.path) ? "git-sync-change is-selected" : "git-sync-change",
+			cls: this.changeSelection.isSelected(change.path) ? "git-sync-change is-selected" : "git-sync-change",
 			attr: { "data-change-path": change.path, "data-change-section": section },
 		});
 		const checkbox = item.createEl("input", {
 			attr: { type: "checkbox", "aria-label": `Select ${change.path}`, "data-change-path": change.path },
 		});
-		checkbox.checked = this.selectedPaths.has(change.path);
+		checkbox.checked = this.changeSelection.isSelected(change.path);
 		checkbox.disabled = this.committing;
 		checkbox.addEventListener("click", (event) => {
 			event.preventDefault();
@@ -1194,34 +1190,8 @@ export class GitSyncView extends ItemView {
 		event: MouseEvent,
 		visibleChanges: ChangedFile[],
 	): void {
-		if (event.shiftKey) {
-			const anchor = this.selectionAnchors.get(section);
-			if (anchor) this.selectChangeRange(section, anchor, path, visibleChanges);
-			else this.selectedPaths.add(path);
-		} else {
-			if (event.metaKey || event.ctrlKey) {
-				if (this.selectedPaths.has(path)) this.selectedPaths.delete(path);
-				else this.selectedPaths.add(path);
-			} else if (this.selectedPaths.has(path)) {
-				this.selectedPaths.delete(path);
-			} else {
-				this.selectedPaths.add(path);
-			}
-			this.selectionAnchors.set(section, path);
-		}
+		this.changeSelection.handleClick(section, path, event.shiftKey, visibleChanges);
 		this.render();
-	}
-
-	private selectChangeRange(section: ChangeSection, anchor: string, target: string, changes: ChangedFile[]): void {
-		const anchorIndex = changes.findIndex((change) => change.path === anchor);
-		const targetIndex = changes.findIndex((change) => change.path === target);
-		if (anchorIndex === -1 || targetIndex === -1) {
-			this.selectedPaths.add(target);
-			return;
-		}
-		const start = Math.min(anchorIndex, targetIndex);
-		const end = Math.max(anchorIndex, targetIndex);
-		for (const change of changes.slice(start, end + 1)) this.selectedPaths.add(change.path);
 	}
 
 	private bindLongPressSelection(
@@ -1250,8 +1220,7 @@ export class GitSyncView extends ItemView {
 				if (this.longPressState !== state) return;
 				state.active = true;
 				state.suppressClick = true;
-				this.selectionAnchors.set(section, path);
-				this.selectedPaths.add(path);
+				this.changeSelection.beginRange(section, path);
 				item.addClass("is-selected");
 			}, 450);
 			this.longPressState = state;
@@ -1270,7 +1239,7 @@ export class GitSyncView extends ItemView {
 			if (!target || target.dataset.changeSection !== section) return;
 			const targetPath = target.dataset.changePath;
 			if (!targetPath) return;
-			this.selectChangeRange(section, path, targetPath, visibleChanges);
+			this.changeSelection.selectRange(path, targetPath, visibleChanges);
 			this.updateRenderedSelectionState(section);
 		});
 
@@ -1295,7 +1264,7 @@ export class GitSyncView extends ItemView {
 	private updateRenderedSelectionState(section: ChangeSection): void {
 		for (const row of this.contentEl.querySelectorAll<HTMLElement>(`.git-sync-change[data-change-section="${section}"]`)) {
 			const path = row.dataset.changePath;
-			const selected = Boolean(path && this.selectedPaths.has(path));
+			const selected = Boolean(path && this.changeSelection.isSelected(path));
 			row.classList.toggle("is-selected", selected);
 			const checkbox = row.querySelector<HTMLInputElement>("input[type=checkbox]");
 			if (checkbox) checkbox.checked = selected;
@@ -1394,7 +1363,7 @@ export class GitSyncView extends ItemView {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
 			}
 			for (const change of changes) {
-				this.selectedPaths.delete(change.path);
+				this.changeSelection.deselect(change.path);
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 			}
 			completed = true;
@@ -1475,7 +1444,7 @@ export class GitSyncView extends ItemView {
 		this.updateChangesContent();
 		try {
 			await removeFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, change.path);
-			this.selectedPaths.delete(change.path);
+			this.changeSelection.deselect(change.path);
 			this.plugin.recordActivity(`Removed ${change.path} with git rm.`);
 			new Notice("File removed with git rm.");
 			this.applyKnownChangeUpdates([change.path], [{ path: change.path, status: "Deleted", staged: true }]);
@@ -1556,7 +1525,7 @@ export class GitSyncView extends ItemView {
 	}
 
 	private selectAllChanges(): void {
-		for (const change of this.changes ?? []) this.selectedPaths.add(change.path);
+		this.changeSelection.selectAll(this.changes ?? []);
 	}
 
 	private async applyAllStage(unstage: boolean): Promise<void> {
@@ -1576,7 +1545,7 @@ export class GitSyncView extends ItemView {
 				await stageFile(this.app.vault.adapter, this.plugin.settings.repositoryPath, changes.map((change) => change.path));
 			}
 			for (const change of changes) {
-				this.selectedPaths.delete(change.path);
+				this.changeSelection.deselect(change.path);
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
 			}
 			completed = true;
@@ -1597,7 +1566,7 @@ export class GitSyncView extends ItemView {
 	private async applySelectedStage(section: ChangeSection, visibleChanges: ChangedFile[]): Promise<void> {
 		const unstage = section === "staged";
 		const selected = visibleChanges.filter((change) =>
-			this.selectedPaths.has(change.path) && change.staged === unstage,
+			this.changeSelection.isSelected(change.path) && change.staged === unstage,
 		);
 		if (selected.length === 0) return;
 
@@ -1615,7 +1584,7 @@ export class GitSyncView extends ItemView {
 			}
 			for (const change of selected) {
 				this.plugin.recordActivity(`${unstage ? "Unstaged" : "Staged"} ${change.path}.`);
-				this.selectedPaths.delete(change.path);
+				this.changeSelection.deselect(change.path);
 			}
 			completed = true;
 		} catch (error) {
@@ -1658,16 +1627,7 @@ export class GitSyncView extends ItemView {
 	}
 
 	private applyKnownStagingState(changes: ChangedFile[], staged: boolean): void {
-		const paths = new Set(changes.map((change) => change.path));
-		this.changes = this.changes?.map((change) => {
-			if (!paths.has(change.path)) return change;
-			const status = staged && change.status === "Untracked"
-				? "Added"
-				: !staged && change.status === "Added"
-					? "Untracked"
-					: change.status;
-			return { ...change, status, staged };
-		}) ?? null;
+		this.changes = applyStagingToSnapshot(this.changes, changes, staged);
 		this.changesError = null;
 		this.updateChangesContent();
 	}
@@ -1786,7 +1746,7 @@ export class GitSyncView extends ItemView {
 		this.changesRefreshReason = reason;
 		this.changes = null;
 		this.changesError = null;
-		this.selectedPaths.clear();
+		this.changeSelection.clear();
 		this.render();
 	}
 
@@ -1843,9 +1803,7 @@ export class GitSyncView extends ItemView {
 			this.changesRefreshReason = "";
 			this.changesError = null;
 			const availablePaths = new Set(changes.map((change) => change.path));
-			for (const selectedPath of this.selectedPaths) {
-				if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
-			}
+			this.changeSelection.retainAvailablePaths(availablePaths);
 		} catch (error) {
 			if (generation !== this.refreshGeneration) return;
 			this.changes = null;
@@ -1897,15 +1855,10 @@ export class GitSyncView extends ItemView {
 	}
 
 	private applyKnownChangeUpdates(affectedPaths: string[], updates: ChangedFile[]): void {
-		const affected = new Set(affectedPaths);
-		this.changes = (this.changes ?? [])
-			.filter((change) => !affected.has(change.path))
-			.concat(updates);
+		this.changes = replaceChangedPaths(this.changes, affectedPaths, updates);
 		this.changesError = null;
 		const availablePaths = new Set(this.changes.map((change) => change.path));
-		for (const selectedPath of this.selectedPaths) {
-			if (!availablePaths.has(selectedPath)) this.selectedPaths.delete(selectedPath);
-		}
+		this.changeSelection.retainAvailablePaths(availablePaths);
 		this.updateChangesContent();
 	}
 

@@ -1,12 +1,14 @@
 # Active Context
 
-*Last Updated: 2026-10-05 14:19:36 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
 ## Current Focus
 
 - **T14 META** — ongoing project code quality, review, and modularity; the first
-  `main.ts` extraction pass is documented, with Changes-view decomposition
-  still open
+  `main.ts` extraction pass is documented; the `GitSyncView` review is complete
+  and the next planned extraction is commit-history data handling
+- **T15** — app-wide test coverage; the first eight tests cover Changes
+  selection and snapshot state, with broader coverage and CI integration open
 - **T4, T5, T7, T8, T9, T10** — Changes, Activity, remote operations, release
   publication, progress feedback, and platform/performance verification remain
   active
@@ -61,10 +63,11 @@ vault-wide status scans.
 
 The first T14 source-organization pass moved plugin-data handling, the Settings
 tab, the sidebar view, remote-operation coordination, dialogs, and focused
-Activity/Commits renderers out of `src/main.ts`. The plugin coordinator is now
-428 lines; `src/GitSyncView.ts` remains 2,061 lines and is the next review
-target. The production build and `git diff --check` passed; installed-host
-behavior has not been rechecked for this refactor.
+Activity/Commits renderers out of `src/main.ts`. The 2026-10-31 review extracted
+selected paths and range anchors into `src/ChangeSelection.ts`, and pure Changes
+snapshot updates into `src/ChangeListState.ts`. `pnpm test` passed eight tests
+and the production build. Installed-host behavior remains unverified. T14's
+documented next step is the commit-history controller contract and tests.
 - Treat mobile-incompatible remote paths as an explicit compatibility boundary:
   skip and report them on mobile, while preserving complete checkout behavior
   on desktop.
@@ -73,12 +76,13 @@ behavior has not been rechecked for this refactor.
 
 ## Next Actions
 
-1. T14: Review shared selection, refresh, and staging ownership in
-   `src/GitSyncView.ts` before selecting its next extraction seam.
-2. Rename or remove remote filenames that mobile cannot create.
-3. Capture repeated cold/warm latency timings in the large `typora-notes` vault.
-4. Keep T4 revert and T5 clear/export as the remaining UI refinements.
-5. Determine whether an abortable HTTP path can support real cancellation;
+1. T14: Define and test the `CommitHistoryController` contract, then begin the
+   first planned extraction; keep installed-host acceptance open under T10.
+2. T15: Add plugin-data and local-repository tests, then make CI run `pnpm test`.
+3. Rename or remove remote filenames that mobile cannot create.
+4. Capture repeated cold/warm latency timings in the large `typora-notes` vault.
+5. Keep T4 revert and T5 clear/export as the remaining UI refinements.
+6. Determine whether an abortable HTTP path can support real cancellation;
    continue remote edge-case testing separately.
 
 ## T16 Planning — 2026-10-31 13:41:41 IST

@@ -1,10 +1,30 @@
 # Edit History
 
-*Last Updated: 2026-10-31 14:03:15 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
 ---
 
 ## 2026-10-31
+
+#### 14:07:57 IST - T14, T15: Extract Changes state and establish test coverage
+- Created `src/ChangeListState.ts` - Move pure staging and path-refresh snapshot updates out of `GitSyncView`.
+- Modified `src/GitSyncView.ts` - Delegate Changes snapshot transformations to the state helper.
+- Modified `package.json` - Run the Node test suite before the production build.
+- Created `tests/change-selection.test.cjs` - Cover selection, range, and stale-path behavior.
+- Created `tests/change-list-state.test.cjs` - Cover staging and path-scoped snapshot updates.
+- Created `tests/support/load-typescript.cjs` - Load TypeScript helpers for the Node tests.
+- Modified `memory-bank/tasks/T14.md` - Record the ownership review, verification, and staged refactoring plan.
+- Modified `memory-bank/implementation-details/code-quality-modularity.md` - Document current ownership, target structure, flow diagrams, and extraction order.
+- Modified `memory-bank/implementation-details/component-map.md` - Update T14 ownership and next planned extraction.
+- Modified `memory-bank/implementation-details/changes-panel.md` - Record the Changes snapshot helper ownership.
+- Created `memory-bank/tasks/T15.md` - Track app-wide test coverage and acceptance limits.
+- Created `memory-bank/implementation-details/app-wide-test-coverage.md` - Record test layers, current coverage, CI gap, and rollout order.
+- Modified `memory-bank/tasks.md` - Register T15 as an active task.
+- Modified `memory-bank/activeContext.md` - Record current T14/T15 status and next actions.
+- Modified `memory-bank/session_cache.md` - Update T14/T15 progress and next-session focus.
+- Modified `memory-bank/sessions/2026-10-31-day.md` - Record T14/T15 changes and verification.
+- Created `memory-bank/edits/2026-10-31/140757-T14-T15-modularity-test-coverage.md` - Record this T14/T15 closeout.
+- Updated `memory-bank/edit_history.md` - Refresh the generated view from this edit chunk.
 
 #### 14:03:15 IST - T16: Record the T16 and T17 session-only documentation handoff
 - Modified `memory-bank/sessions/2026-10-31-day.md` - Record session-owned paths, shared-hunk boundaries, verification, and implementation follow-ups.
@@ -38,6 +58,19 @@
 - Modified `memory-bank/tasks.md` - Register T16 and the existing T15 task and reconcile task counts.
 - Created `memory-bank/edits/2026-10-31/134141-T16-mobile-multi-repository-plan.md` - Record the user-authorized T16 documentation update.
 - Updated `memory-bank/edit_history.md` - Refresh the generated view with this canonical edit chunk.
+
+#### 13:00:54 IST - T14: Extract selection state from GitSyncView
+- Created `src/ChangeSelection.ts` - Own selected paths, section anchors, click and range selection, and stale-path pruning.
+- Modified `src/GitSyncView.ts` - Delegate selection state while retaining DOM events and repository refresh/staging operations.
+- Modified `memory-bank/tasks/T14.md` - Record the selection-state extraction, build evidence, and remaining ownership review.
+- Modified `memory-bank/implementation-details/code-quality-modularity.md` - Add the selection module and clarify view ownership boundaries.
+- Modified `memory-bank/implementation-details/component-map.md` - Link the selection module and next review scope.
+- Modified `memory-bank/implementation-details/changes-panel.md` - Record selection-state ownership.
+- Modified `memory-bank/activeContext.md` - Update T14 state and next action.
+- Modified `memory-bank/session_cache.md` - Start the current T14 session and record progress.
+- Created `memory-bank/sessions/2026-10-31-day.md` - Record the review, extraction, verification limits, and next work.
+- Created `memory-bank/edits/2026-10-31/130054-T14-change-selection-state.md` - Record this source and Memory Bank update.
+- Updated `memory-bank/edit_history.md` - Regenerate the view from canonical edit chunks.
 
 ## 2026-10-05
 

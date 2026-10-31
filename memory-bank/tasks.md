@@ -1,7 +1,7 @@
 # Memory Bank - Obsidian Git
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-10-31 13:50:23 IST*
+*Last Updated: 2026-10-31 14:07:57 IST*
 
 ## Overview
 
@@ -38,6 +38,7 @@ This is the Memory Bank for the clean Obsidian Git rebuild.
 | T12 | Integration Provider API (Read-Only Git Capabilities) | ✅ | HIGH | 2026-09-18 | T3, T4, T6 | [Details](tasks/T12.md) |
 | T13 | Repository Snapshot Cache for Provider Reads | ✅ | MEDIUM | 2026-09-18 | T12 | [Details](tasks/T13.md) |
 | T14 | META: Code Quality, Review, and Modularity | 🔄 | MEDIUM | 2026-10-05 | - | [Details](tasks/T14.md) |
+| T15 | App-Wide Test Coverage | 🔄 | HIGH | 2026-10-31 | T10, T14 | [Details](tasks/T15.md) |
 | T16 | Core Mobile Multi-Repository Git Interface | 🔄 | HIGH | 2026-10-31 | T2, T3, T4, T6, T7, T8, T10, T12, T39b | [Details](tasks/T16.md) |
 | T17 | Secondary Mobile Git Features | 🔄 | LOW | 2026-10-31 | T16 | [Details](tasks/T17.md) |
 | T39b | Git Write Tools for the Integration Provider | ✅ | HIGH | 2026-09-18 | T11, T12, T13 | [Details](tasks/T39b.md) |
@@ -97,6 +98,8 @@ T12: Integration Provider API (Read-Only Git Capabilities)
 T13: Repository Snapshot Cache for Provider Reads
   └── T12
 T14: META - Code Quality, Review, and Modularity
+T15: App-Wide Test Coverage
+  └── T10, T14
 T16: Core Mobile Multi-Repository Git Interface
   └── T2, T3, T4, T6, T7, T8, T10, T12, T39b
 T17: Secondary Mobile Git Features
@@ -109,7 +112,7 @@ T39b: Git Write Tools for the Integration Provider
 
 ## Status Summary
 
-- **Active**: 12
+- **Active**: 13
 - **Completed**: 5
 - **Paused**: 0
-- **Total**: 17
+- **Total**: 18
