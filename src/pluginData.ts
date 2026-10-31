@@ -1,5 +1,10 @@
+import { normalizeRepositoryRoot } from "./repositoryPaths";
+
+export { normalizeRepositoryRoot } from "./repositoryPaths";
+
 export const PLUGIN_DATA_FORMAT = "obsidian-git-sync";
-export const PLUGIN_DATA_SCHEMA_VERSION = 1 as const;
+export const PLUGIN_DATA_SCHEMA_VERSION = 2 as const;
+export const LEGACY_REMOTE_CREDENTIAL_REF = "git-sync-remote-token";
 export const ACTIVITY_PAGE_SIZE = 100;
 export const MAX_ACTIVITY_ENTRIES = 1000;
 export const ACTIVITY_LOG_COMPACTION_THRESHOLD = MAX_ACTIVITY_ENTRIES + ACTIVITY_PAGE_SIZE;
@@ -31,12 +36,31 @@ export interface StoredPluginData {
 	format: typeof PLUGIN_DATA_FORMAT;
 	schemaVersion: typeof PLUGIN_DATA_SCHEMA_VERSION;
 	settings: GitSyncSettings;
+	repositories: RepositoryConfig[];
+	selectedRepositoryId: string;
 }
 
 export interface DecodedPluginData {
 	settings: Partial<GitSyncSettings>;
 	activity: unknown;
+	repositories: RepositoryConfig[];
+	selectedRepositoryId: string;
 	legacy: boolean;
+}
+
+export interface RepositoryConfig {
+	id: string;
+	name: string;
+	root: string;
+	remoteUrl: string;
+	remoteUsername: string;
+	branchName: string;
+	credentialRef: string | null;
+}
+
+export interface RepositoryRegistry {
+	repositories: RepositoryConfig[];
+	selectedRepositoryId: string;
 }
 
 export const DEFAULT_SETTINGS: GitSyncSettings = {
@@ -61,18 +85,35 @@ export function decodePluginData(
 ): DecodedPluginData {
 	if (!isRecord(value)) {
 		if (requireRecognizedData) throw new Error("Git Sync data must be a JSON object.");
-		return { settings: {}, activity: [], legacy: false };
+		const settings = normalizeSettings({});
+		const registry = normalizeRepositoryRegistry(undefined, settings);
+		return { settings: {}, activity: [], ...registry, legacy: false };
 	}
 	if ("format" in value && value.format !== PLUGIN_DATA_FORMAT) {
 		throw new Error("This file belongs to a different plugin or data format.");
 	}
 
 	if (value.format === PLUGIN_DATA_FORMAT) {
-		if (value.schemaVersion !== PLUGIN_DATA_SCHEMA_VERSION) {
+		if (value.schemaVersion !== 1 && value.schemaVersion !== PLUGIN_DATA_SCHEMA_VERSION) {
 			throw new Error(`Unsupported Git Sync data schema: ${String(value.schemaVersion)}.`);
 		}
 		if (!isRecord(value.settings)) throw new Error("Git Sync data is missing its settings object.");
-		return { settings: value.settings as Partial<GitSyncSettings>, activity: value.activity, legacy: false };
+		const settings = value.settings as Partial<GitSyncSettings>;
+		const hasRegistry = value.schemaVersion === PLUGIN_DATA_SCHEMA_VERSION;
+		const registry = normalizeRepositoryRegistry(
+			hasRegistry ? value.repositories : undefined,
+			settings,
+			hasRegistry ? value.selectedRepositoryId : undefined,
+		);
+		return {
+			settings,
+			activity: value.activity,
+			...registry,
+			legacy: !hasRegistry
+				|| !Array.isArray(value.repositories)
+				|| registry.repositories.length !== value.repositories.length
+				|| registry.selectedRepositoryId !== value.selectedRepositoryId,
+		};
 	}
 
 	if (!allowLegacy) throw new Error("This is not a Git Sync data file.");
@@ -93,10 +134,102 @@ export function decodePluginData(
 	if (requireRecognizedData && !legacyKeys.some((key) => key in value)) {
 		throw new Error("The selected file is not Git Sync plugin data.");
 	}
+	const settings = value as Partial<GitSyncSettings>;
+	const registry = normalizeRepositoryRegistry(undefined, settings);
+	return { settings, activity: value.activity, ...registry, legacy: true };
+}
+
+export function normalizeRepositoryRegistry(
+	value: unknown,
+	settings: Partial<GitSyncSettings>,
+	selectedRepositoryId?: unknown,
+): RepositoryRegistry {
+	const candidates = Array.isArray(value) ? value : [];
+	const repositories: RepositoryConfig[] = [];
+	const ids = new Set<string>();
+	const roots = new Set<string>();
+
+	for (const candidate of candidates) {
+		if (!isRecord(candidate)) throw new Error("Repository registry contains an invalid entry.");
+		const id = nonEmptyString(candidate.id);
+		if (!id) throw new Error("Repository registry entries must have an ID.");
+		if (ids.has(id)) throw new Error(`Repository registry contains duplicate ID "${id}".`);
+		const root = normalizeRepositoryRoot(candidate.root);
+		if (roots.has(root)) continue;
+		ids.add(id);
+		roots.add(root);
+		repositories.push({
+			id,
+			name: nonEmptyString(candidate.name) || repositoryName(root),
+			root,
+			remoteUrl: stringValue(candidate.remoteUrl),
+			remoteUsername: nonEmptyString(candidate.remoteUsername) || DEFAULT_SETTINGS.remoteUsername,
+			branchName: nonEmptyString(candidate.branchName) || DEFAULT_SETTINGS.branchName,
+			credentialRef: nonEmptyString(candidate.credentialRef) || null,
+		});
+	}
+
+	if (repositories.length === 0) {
+		const root = normalizeRepositoryRoot(settings.repositoryPath ?? DEFAULT_SETTINGS.repositoryPath);
+		const repository: RepositoryConfig = {
+			id: "repo-legacy-default",
+			name: repositoryName(root),
+			root,
+			remoteUrl: stringValue(settings.remoteUrl),
+			remoteUsername: nonEmptyString(settings.remoteUsername) || DEFAULT_SETTINGS.remoteUsername,
+			branchName: nonEmptyString(settings.branchName) || DEFAULT_SETTINGS.branchName,
+			credentialRef: LEGACY_REMOTE_CREDENTIAL_REF,
+		};
+		repositories.push(repository);
+	}
+
+	const selected = nonEmptyString(selectedRepositoryId);
 	return {
-		settings: value as Partial<GitSyncSettings>,
-		activity: value.activity,
-		legacy: true,
+		repositories,
+		selectedRepositoryId: repositories.some((repository) => repository.id === selected)
+			? selected
+			: repositories[0].id,
+	};
+}
+
+export function updateSelectedRepositorySettings(
+	registry: RepositoryRegistry,
+	settings: GitSyncSettings,
+): RepositoryRegistry {
+	const root = normalizeRepositoryRoot(settings.repositoryPath);
+	const selectedIndex = registry.repositories.findIndex(
+		(repository) => repository.id === registry.selectedRepositoryId,
+	);
+	if (selectedIndex < 0) throw new Error("The selected repository is no longer registered.");
+	if (registry.repositories.some((repository, index) => index !== selectedIndex && repository.root === root)) {
+		throw new Error(`A repository is already registered at "${root}".`);
+	}
+	const repositories = registry.repositories.slice();
+	const selected = repositories[selectedIndex];
+	repositories[selectedIndex] = {
+		...selected,
+		root,
+		remoteUrl: settings.remoteUrl,
+		remoteUsername: settings.remoteUsername,
+		branchName: settings.branchName,
+	};
+	return { repositories, selectedRepositoryId: registry.selectedRepositoryId };
+}
+
+export function projectSelectedRepositorySettings(
+	settings: GitSyncSettings,
+	registry: RepositoryRegistry,
+): GitSyncSettings {
+	const selected = registry.repositories.find(
+		(repository) => repository.id === registry.selectedRepositoryId,
+	);
+	if (!selected) throw new Error("The selected repository is no longer registered.");
+	return {
+		...settings,
+		repositoryPath: selected.root,
+		remoteUrl: selected.remoteUrl,
+		remoteUsername: selected.remoteUsername,
+		branchName: selected.branchName,
 	};
 }
 
@@ -174,6 +307,10 @@ function normalizeBackgroundRefreshDelay(value: unknown): number {
 
 function activityKey(entry: ActivityEntry): string {
 	return `${entry.timestamp}\u0000${entry.level}\u0000${entry.message}`;
+}
+
+function repositoryName(root: string): string {
+	return root === "." ? "Vault root" : root.split("/").pop() || root;
 }
 
 function stringValue(value: unknown): string {

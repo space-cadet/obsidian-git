@@ -1,4 +1,4 @@
-import { App, Modal, Notice, setIcon } from "obsidian";
+import { App, Modal, Notice, setIcon, SuggestModal, TFolder } from "obsidian";
 import type { RemoteOperationResult, RemoteProgressEvent } from "./remote";
 
 export class ConfirmActionModal extends Modal {
@@ -15,7 +15,7 @@ export class ConfirmActionModal extends Modal {
 	onOpen(): void {
 		this.contentEl.empty();
 		this.contentEl.createEl("h2", { text: this.title });
-		this.contentEl.createEl("p", { text: this.description });
+		this.contentEl.createEl("p", { text: this.description, cls: "git-sync-confirm-description" });
 		const actions = this.contentEl.createDiv({ cls: "git-sync-confirm-actions" });
 		const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
 		cancel.addEventListener("click", () => this.close());
@@ -23,6 +23,164 @@ export class ConfirmActionModal extends Modal {
 		confirm.addEventListener("click", () => {
 			this.close();
 			this.onConfirm();
+		});
+	}
+}
+
+export class RepositoryFolderModal extends SuggestModal<TFolder> {
+	constructor(app: App, private readonly onChooseFolder: (path: string) => void) {
+		super(app);
+		this.setPlaceholder("Search folders in this vault");
+		this.emptyStateText = "No matching vault folders";
+	}
+
+	getSuggestions(query: string): TFolder[] {
+		const normalizedQuery = query.trim().toLocaleLowerCase();
+		return this.app.vault.getAllFolders(true)
+			.filter((folder) => !normalizedQuery || (folder.path || "Vault root").toLocaleLowerCase().includes(normalizedQuery))
+			.sort((left, right) => left.path.localeCompare(right.path));
+	}
+
+	renderSuggestion(folder: TFolder, element: HTMLElement): void {
+		element.createDiv({ text: folder.path || "Vault root (.)" });
+	}
+
+	onChooseSuggestion(folder: TFolder): void {
+		this.onChooseFolder(folder.path || ".");
+	}
+}
+
+export interface CloneRepositoryDetails {
+	remoteUrl: string;
+	branchName: string;
+	remoteUsername: string;
+	credentialToken: string;
+}
+
+export class BranchManagerModal extends Modal {
+	constructor(
+		app: App,
+		private readonly branches: string[],
+		private readonly currentBranch: string,
+		private readonly onSwitch: (branchName: string) => Promise<void>,
+		private readonly onCreate: (branchName: string) => Promise<void>,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.contentEl.empty();
+		this.contentEl.createEl("h2", { text: "Manage branches" });
+		const form = this.contentEl.createDiv({ cls: "git-sync-branch-manager" });
+		const branchLabel = form.createEl("label", { text: "Local branch" });
+		const branchSelect = branchLabel.createEl("select", { attr: { "aria-label": "Local branch" } });
+		for (const branch of this.branches) {
+			branchSelect.createEl("option", { text: branch, attr: { value: branch } });
+		}
+		branchSelect.value = this.currentBranch;
+		const status = this.contentEl.createEl("p", { cls: "git-sync-branch-manager-status", attr: { "aria-live": "polite" } });
+		const actions = this.contentEl.createDiv({ cls: "git-sync-confirm-actions" });
+		const cancel = actions.createEl("button", { text: "Close", attr: { type: "button" } });
+		cancel.addEventListener("click", () => this.close());
+		const switchButton = actions.createEl("button", { text: "Switch branch", attr: { type: "button" } });
+		switchButton.disabled = branchSelect.value === this.currentBranch;
+		branchSelect.addEventListener("change", () => {
+			switchButton.disabled = branchSelect.value === this.currentBranch;
+		});
+		switchButton.addEventListener("click", () => void this.runAction(switchButton, status, () => this.onSwitch(branchSelect.value)));
+
+		const newBranchLabel = form.createEl("label", { text: "Create and switch to a new branch" });
+		const newBranch = newBranchLabel.createEl("input", { attr: { type: "text", autocomplete: "off" } });
+		newBranch.placeholder = "feature/my-branch";
+		const createButton = actions.createEl("button", { text: "Create branch", cls: "mod-cta", attr: { type: "button" } });
+		createButton.addEventListener("click", () => {
+			const name = newBranch.value.trim();
+			if (!name) {
+				status.setText("Enter a branch name.");
+				newBranch.focus();
+				return;
+			}
+			void this.runAction(createButton, status, () => this.onCreate(name));
+		});
+	}
+
+	private async runAction(button: HTMLButtonElement, status: HTMLElement, operation: () => Promise<void>): Promise<void> {
+		button.disabled = true;
+		status.removeClass("is-error");
+		status.setText("Updating branch…");
+		try {
+			await operation();
+			this.close();
+		} catch (error) {
+			status.setText(error instanceof Error ? error.message : "Unable to update the branch.");
+			status.addClass("is-error");
+			button.disabled = false;
+		}
+	}
+}
+
+export class CloneRepositoryModal extends Modal {
+	constructor(
+		app: App,
+		private readonly destination: string,
+		private readonly onClone: (details: CloneRepositoryDetails) => Promise<void>,
+	) {
+		super(app);
+	}
+
+	onOpen(): void {
+		this.contentEl.empty();
+		this.contentEl.createEl("h2", { text: "Clone repository" });
+		this.contentEl.createEl("p", {
+			text: `Clone into ${this.destination}. The destination must be empty.`,
+			cls: "setting-item-description",
+		});
+		const form = this.contentEl.createDiv({ cls: "git-sync-clone-form" });
+		const addField = (labelText: string, type = "text", value = ""): HTMLInputElement => {
+			const label = form.createEl("label", { text: labelText });
+			const input = label.createEl("input", { attr: { type } });
+			input.value = value;
+			return input;
+		};
+		const remoteUrl = addField("Remote URL", "url");
+		remoteUrl.placeholder = "https://github.com/user/repository.git";
+		const branchName = addField("Branch", "text", "main");
+		branchName.autocomplete = "off";
+		const remoteUsername = addField("Remote username", "text", "git");
+		remoteUsername.autocomplete = "username";
+		const credentialToken = addField("Token or password (optional)", "password");
+		credentialToken.autocomplete = "current-password";
+		const actions = this.contentEl.createDiv({ cls: "git-sync-confirm-actions" });
+		const cancel = actions.createEl("button", { text: "Cancel", attr: { type: "button" } });
+		cancel.addEventListener("click", () => this.close());
+		const clone = actions.createEl("button", { text: "Clone", cls: "mod-cta", attr: { type: "button" } });
+		clone.addEventListener("click", () => {
+			const details = {
+				remoteUrl: remoteUrl.value.trim(),
+				branchName: branchName.value.trim(),
+				remoteUsername: remoteUsername.value.trim() || "git",
+				credentialToken: credentialToken.value,
+			};
+			if (!details.remoteUrl) {
+				remoteUrl.focus();
+				new Notice("Enter a remote URL.");
+				return;
+			}
+			if (!details.branchName) {
+				branchName.focus();
+				new Notice("Enter a branch name.");
+				return;
+			}
+			clone.disabled = true;
+			clone.setText("Starting clone…");
+			void this.onClone(details).then(
+				() => this.close(),
+				(error) => {
+					clone.disabled = false;
+					clone.setText("Clone");
+					new Notice(error instanceof Error ? error.message : "Unable to clone this repository.");
+				},
+			);
 		});
 	}
 }

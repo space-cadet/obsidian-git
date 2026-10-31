@@ -1,8 +1,11 @@
 import { DataAdapter, Platform, requestUrl } from "obsidian";
 import * as git from "isomorphic-git";
-import { ObsidianGitFs, validateRepositoryPath } from "./repository";
+import { assertNoNestedRepositoryPaths, ObsidianGitFs, validateRepositoryPath } from "./repository";
+import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
+import { LEGACY_REMOTE_CREDENTIAL_REF } from "./pluginData";
+import { normalizeRepositoryRoot } from "./repositoryPaths";
 
-export const REMOTE_TOKEN_SECRET_ID = "git-sync-remote-token";
+export const REMOTE_TOKEN_SECRET_ID = LEGACY_REMOTE_CREDENTIAL_REF;
 
 export interface RemoteCredential {
 	username: string;
@@ -67,6 +70,10 @@ export async function testRemoteConnection(
 }
 
 export async function fetchRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => fetchRepositoryLocked(options));
+}
+
+async function fetchRepositoryLocked(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
 	const previousRemoteHead = await resolveOptionalRef(fs, dir, `refs/remotes/origin/${branch}`);
 	phase(options, `Contacting origin/${branch}…`);
@@ -98,12 +105,17 @@ export async function fetchRepository(options: RemoteRepositoryOptions): Promise
 }
 
 export async function pullRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => pullRepositoryLocked(options));
+}
+
+async function pullRepositoryLocked(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	if (!options.author?.name || !options.author.email) {
 		throw new Error("Set your commit name and email before pulling.");
 	}
 	const fetched = await fetchBranch(options, "Pull");
 	const { fs, dir, branch, fetchHead } = fetched;
 	if (!fetchHead) throw new Error(`Remote branch origin/${branch} has no commits.`);
+	await assertRemoteUpdateRespectsRepositoryBoundaries(options, fetched, fetchHead);
 	const previousLocalHead = await resolveOptionalRef(fs, dir, branch);
 	phase(options, "Updating local branch…");
 	await git.merge({
@@ -132,10 +144,15 @@ export async function pullRepository(options: RemoteRepositoryOptions): Promise<
 }
 
 export async function forcePullRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => forcePullRepositoryLocked(options));
+}
+
+async function forcePullRepositoryLocked(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const fetched = await fetchBranch(options, "Force pull");
 	const { fs, dir, url, branch } = fetched;
 	const remoteHead = fetched.fetchHead ?? await resolveOptionalRef(fs, dir, `refs/remotes/origin/${branch}`);
 	if (!remoteHead) throw new Error(`Remote branch origin/${branch} has no commits.`);
+	await assertRemoteUpdateRespectsRepositoryBoundaries(options, fetched, remoteHead);
 
 	phase(options, "Discarding local changes and updating branch…");
 	await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: remoteHead, force: true });
@@ -215,11 +232,11 @@ function unsupportedPathDetails(paths: string[]): string[] {
 }
 
 export async function pushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
-	return pushRepositoryWithMode(options, false);
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => pushRepositoryWithMode(options, false));
 }
 
 export async function forcePushRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
-	return pushRepositoryWithMode(options, true);
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => pushRepositoryWithMode(options, true));
 }
 
 async function pushRepositoryWithMode(
@@ -227,6 +244,8 @@ async function pushRepositoryWithMode(
 	force: boolean,
 ): Promise<RemoteOperationResult> {
 	const { fs, dir, url, branch } = await prepareRemote(options);
+	const localFiles = await listTrackedPaths(fs, dir, "HEAD");
+	await assertNoNestedRepositoryPaths(options.adapter, dir, localFiles);
 	const pushPlan: PushPlan = { localOid: "", remoteOid: "" };
 	phase(options, "Preparing local pack and contacting remote…");
 	diagnostic(options, `${force ? "Force push" : "Push"}: sending ${branch} to ${url}.`);
@@ -269,11 +288,35 @@ async function pushRepositoryWithMode(
 	};
 }
 
+async function assertRemoteUpdateRespectsRepositoryBoundaries(
+	options: RemoteRepositoryOptions,
+	fetched: FetchedBranch,
+	remoteHead: string,
+): Promise<void> {
+	const localFiles = await listTrackedPaths(fetched.fs, fetched.dir, "HEAD");
+	const remoteFiles = await listTrackedPaths(fetched.fs, fetched.dir, remoteHead);
+	await assertNoNestedRepositoryPaths(options.adapter, fetched.dir, [...localFiles, ...remoteFiles]);
+}
+
+async function listTrackedPaths(fs: ObsidianGitFs, dir: string, ref: string): Promise<string[]> {
+	try {
+		return await git.listFiles({ fs, dir, ref });
+	} catch (error) {
+		if (error && typeof error === "object" && "code" in error &&
+			(error.code === "NoCommitError" || error.code === "NotFoundError")) return [];
+		throw error;
+	}
+}
+
 export async function cloneRepository(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
+	return repositoryMutationCoordinator.run(options.repositoryPath, () => cloneRepositoryLocked(options));
+}
+
+async function cloneRepositoryLocked(options: RemoteRepositoryOptions): Promise<RemoteOperationResult> {
 	const dir = validateRepositoryDirectory(options.repositoryPath);
 	const url = validateRemoteUrl(options.remoteUrl);
 	const branch = validateBranchName(options.branchName);
-	const fs = new ObsidianGitFs(options.adapter);
+	const fs = new ObsidianGitFs(options.adapter, dir);
 	const listing = await listDirectory(options.adapter, dir);
 	if (listing && (listing.files.length > 0 || listing.folders.length > 0)) {
 		throw new Error(`The clone destination '${dir}' is not empty.`);
@@ -310,20 +353,24 @@ async function prepareRemote(options: RemoteRepositoryOptions): Promise<{
 	const dir = validateRepositoryDirectory(options.repositoryPath);
 	const url = validateRemoteUrl(options.remoteUrl);
 	const branch = validateBranchName(options.branchName);
-	const fs = new ObsidianGitFs(options.adapter);
+	const fs = new ObsidianGitFs(options.adapter, dir);
 	phase(options, "Configuring remote connection…");
 	diagnostic(options, `Remote setup: validated ${dir} and branch ${branch}.`);
-	await git.addRemote({ fs, dir, remote: "origin", url, force: true });
-	diagnostic(options, `Remote setup: origin configured for ${url}.`);
+	const remotes = await git.listRemotes({ fs, dir });
+	const origin = remotes.find((remote) => remote.remote === "origin");
+	if (!origin) {
+		await git.addRemote({ fs, dir, remote: "origin", url });
+		diagnostic(options, `Remote setup: added origin for ${url}.`);
+	} else if (origin.url !== url) {
+		diagnostic(options, `Remote setup: kept existing origin ${origin.url}; this operation uses the URL configured in Git Sync.`);
+	}
 	return { fs, dir, url, branch };
 }
 
 function validateRepositoryDirectory(value: string): string {
 	const error = validateRepositoryPath(value);
 	if (error) throw new Error(error);
-	const path = value.trim().replace(/^\.\/+/, "").replace(/\/+$/, "") || ".";
-	if (path === ".") return path;
-	return path;
+	return normalizeRepositoryRoot(value);
 }
 
 function validateBranchName(value: string): string {

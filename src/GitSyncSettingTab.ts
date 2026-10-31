@@ -14,22 +14,16 @@ export class GitSyncSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		containerEl.addClass("git-sync-settings");
 		containerEl.createEl("h2", { text: "Git Sync settings" });
+		const repositoryPath = this.plugin.settings.repositoryPath || ".";
+		const repositoryLabel = repositoryPath === "." ? "Vault root" : repositoryPath;
 		containerEl.createEl("p", {
-			text: "Configure the repository used by this vault.",
+			text: "Configure the selected repository and vault-wide Git Sync options.",
 			cls: "setting-item-description",
 		});
 
 		new Setting(containerEl)
-			.setName("Repository path")
-			.setDesc("Vault-relative path to the Git repository. Use . for the vault root.")
-			.addText((text) => {
-				text.setPlaceholder("path/to/repository");
-				text.setValue(this.plugin.settings.repositoryPath);
-				text.onChange((value) => {
-					this.plugin.settings.repositoryPath = value.trim();
-					this.plugin.scheduleSettingsSave(true);
-				});
-			});
+			.setName("Selected repository")
+			.setDesc(`${repositoryLabel} — switch or add repositories from the Git Sync panel.`);
 
 		new Setting(containerEl)
 			.setName("Background refresh delay")

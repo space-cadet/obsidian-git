@@ -1,6 +1,8 @@
 import { DataAdapter, Stat } from "obsidian";
 import { Buffer } from "buffer";
 import * as git from "isomorphic-git";
+import { normalizeRepositoryFilePath, normalizeRepositoryRoot } from "./repositoryPaths";
+import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
 
 const browserGlobal = globalThis as typeof globalThis & { Buffer?: typeof Buffer };
 browserGlobal.Buffer ??= Buffer;
@@ -52,11 +54,35 @@ export interface RemoteCommitHistory {
 }
 
 export function validateRepositoryPath(value: string): string | null {
-	const path = value.trim();
-	if (!path) return "Enter a repository path.";
-	if (path.startsWith("/")) return "Use a vault-relative repository path.";
-	if (path.split("/").indexOf("..") !== -1) return "Repository paths cannot leave the vault.";
-	return null;
+	if (!value.trim()) return "Enter a repository path.";
+	try {
+		normalizeRepositoryRoot(value);
+		return null;
+	} catch (error) {
+		return error instanceof Error ? error.message : "Repository root must stay inside the open vault.";
+	}
+}
+
+export async function initializeRepository(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	defaultBranch = "main",
+): Promise<void> {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
+		const validation = validateRepositoryPath(repositoryPath);
+		if (validation) throw new Error(validation);
+		const dir = normalizedRepositoryPath(repositoryPath);
+		const gitEntryPath = pathInRepository(dir, ".git");
+		if (await adapter.exists(gitEntryPath)) {
+			throw new Error(`Git metadata already exists at "${dir}".`);
+		}
+		invalidateRepositorySnapshot(dir);
+		try {
+			await git.init({ fs: new ObsidianGitFs(adapter, dir), dir, defaultBranch });
+		} finally {
+			invalidateRepositorySnapshot(dir);
+		}
+	});
 }
 
 export async function inspectLocalRepository(
@@ -71,21 +97,18 @@ export async function inspectLocalRepository(
 			return { kind: "missing", repositoryPath: path };
 		}
 
-		const head = (await adapter.read(headPath)).trim();
-		if (head.startsWith("ref: ")) {
-			const ref = head.slice("ref: ".length);
-			const branch = ref.replace("refs/heads/", "");
-			const refPath = pathInRepository(path, `.git/${ref}`);
-			const commit = (await adapter.exists(refPath))
-				? (await adapter.read(refPath)).trim()
-				: null;
-			return { kind: "ready", repositoryPath: path, branch, head: commit };
+		const fs = new ObsidianGitFs(adapter, path);
+		const branch = await git.currentBranch({ fs, dir: path, fullname: false });
+		let head: string | null = null;
+		try {
+			head = await git.resolveRef({ fs, dir: path, ref: "HEAD" });
+		} catch {
+			// An initialized repository may not have a commit yet.
 		}
-
 		return {
 			kind: "ready",
 			repositoryPath: path,
-			branch: "Detached HEAD",
+			branch: branch ?? "Detached HEAD",
 			head,
 		};
 	} catch (error) {
@@ -95,6 +118,58 @@ export async function inspectLocalRepository(
 			message: error instanceof Error ? error.message : "Unable to read the repository.",
 		};
 	}
+}
+
+export async function listLocalBranches(adapter: DataAdapter, repositoryPath: string): Promise<string[]> {
+	const dir = normalizedRepositoryPath(repositoryPath);
+	return git.listBranches({ fs: new ObsidianGitFs(adapter, dir), dir });
+}
+
+export async function switchLocalBranch(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	branchName: string,
+): Promise<void> {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
+		const branch = branchName.trim();
+		const branches = await listLocalBranches(adapter, repositoryPath);
+		if (branches.indexOf(branch) === -1) throw new Error(`Local branch "${branch}" does not exist.`);
+		const dir = normalizedRepositoryPath(repositoryPath);
+		const fs = new ObsidianGitFs(adapter, dir);
+		if (await git.currentBranch({ fs, dir, fullname: false }) === branch) return;
+		const changes = await readChanges(adapter, repositoryPath);
+		if (changes.length > 0) throw new Error("Commit or discard local changes before switching branches.");
+		invalidateRepositorySnapshot(repositoryPath);
+		try {
+			await git.checkout({ fs, dir, ref: branch });
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
+}
+
+export async function createAndSwitchLocalBranch(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	branchName: string,
+): Promise<void> {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
+		const branch = branchName.trim();
+		if (!branch) throw new Error("Enter a branch name.");
+		const changes = await readChanges(adapter, repositoryPath);
+		if (changes.length > 0) throw new Error("Commit or discard local changes before creating a branch.");
+		invalidateRepositorySnapshot(repositoryPath);
+		try {
+			await git.branch({
+				fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
+				dir: normalizedRepositoryPath(repositoryPath),
+				ref: branch,
+				checkout: true,
+			});
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function readChanges(
@@ -112,6 +187,28 @@ export async function readChanges(
 		}));
 }
 
+export async function assertNoNestedRepositoryPaths(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	paths: string[],
+): Promise<void> {
+	const root = normalizedRepositoryPath(repositoryPath);
+	const checked = new Set<string>();
+	for (const path of paths) {
+		const safePath = normalizeRepositoryFilePath(path);
+		const segments = safePath.split("/");
+		for (let length = 1; length <= segments.length; length += 1) {
+			const relative = segments.slice(0, length).join("/");
+			const candidate = pathInRepository(root, relative);
+			if (checked.has(candidate)) continue;
+			checked.add(candidate);
+			if (candidate !== root && await adapter.exists(`${candidate}/.git`)) {
+				throw new Error(`Operation blocked because "${candidate}" contains a nested Git repository. Remove or move that repository before continuing.`);
+			}
+		}
+	}
+}
+
 type StatusMatrixRow = [string, 0 | 1, 0 | 1 | 2, 0 | 1 | 2 | 3];
 
 async function readStatusMatrix(
@@ -119,8 +216,8 @@ async function readStatusMatrix(
 	repositoryPath: string,
 	filepaths?: string[],
 ): Promise<StatusMatrixRow[]> {
-	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
+	const fs = new ObsidianGitFs(adapter, dir);
 	return git.statusMatrix({
 		fs,
 		dir,
@@ -210,71 +307,114 @@ export async function readRepositorySnapshot(
 }
 
 export async function stageFile(adapter: DataAdapter, repositoryPath: string, path: string | string[]): Promise<void> {
-	invalidateRepositorySnapshot(repositoryPath);
-	try {
-		const fs = new ObsidianGitFs(adapter);
-		const dir = normalizedRepositoryPath(repositoryPath);
-		const paths = Array.isArray(path) ? path : [path];
-		const present: string[] = [];
-		const missing: string[] = [];
-		for (const candidate of paths) {
-			if (await adapter.exists(pathInRepository(repositoryPath, candidate))) present.push(candidate);
-			else missing.push(candidate);
-		}
-		if (present.length > 0) await git.add({ fs, dir, filepath: present });
-		for (const candidate of missing) {
-			await git.remove({ fs, dir, filepath: candidate });
-		}
-	} finally {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
 		invalidateRepositorySnapshot(repositoryPath);
-	}
+		try {
+			const dir = normalizedRepositoryPath(repositoryPath);
+			const fs = new ObsidianGitFs(adapter, dir);
+			const paths = (Array.isArray(path) ? path : [path]).map(normalizeRepositoryFilePath);
+			assertPathsDoNotTargetGitMetadata(paths);
+			const present: string[] = [];
+			const missing: string[] = [];
+			for (const candidate of paths) {
+				if (await adapter.exists(pathInRepository(repositoryPath, candidate))) present.push(candidate);
+				else missing.push(candidate);
+			}
+			if (present.length > 0) await git.add({ fs, dir, filepath: present });
+			for (const candidate of missing) {
+				await git.remove({ fs, dir, filepath: candidate });
+			}
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function unstageFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
-	invalidateRepositorySnapshot(repositoryPath);
-	try {
-		await git.resetIndex({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
-	} finally {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
 		invalidateRepositorySnapshot(repositoryPath);
-	}
+		try {
+			const safePath = normalizeRepositoryFilePath(path);
+			assertPathsDoNotTargetGitMetadata([safePath]);
+			const dir = normalizedRepositoryPath(repositoryPath);
+			await git.resetIndex({ fs: new ObsidianGitFs(adapter, dir), dir, filepath: safePath });
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function unstageFiles(adapter: DataAdapter, repositoryPath: string, paths: string[]): Promise<void> {
-	invalidateRepositorySnapshot(repositoryPath);
-	const fs = new ObsidianGitFs(adapter);
-	const dir = normalizedRepositoryPath(repositoryPath);
-	const cache = {};
-	try {
-		for (const path of paths) {
-			await git.resetIndex({ fs, dir, filepath: path, cache });
-		}
-	} finally {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
 		invalidateRepositorySnapshot(repositoryPath);
-	}
+		const dir = normalizedRepositoryPath(repositoryPath);
+		const fs = new ObsidianGitFs(adapter, dir);
+		const cache = {};
+		try {
+			for (const path of paths) {
+				const safePath = normalizeRepositoryFilePath(path);
+				assertPathsDoNotTargetGitMetadata([safePath]);
+				await git.resetIndex({ fs, dir, filepath: safePath, cache });
+			}
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
+}
+
+export async function restoreFilesFromIndex(
+	adapter: DataAdapter,
+	repositoryPath: string,
+	paths: string[],
+): Promise<void> {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
+		const safePaths = paths.map(normalizeRepositoryFilePath);
+		if (safePaths.length === 0) throw new Error("Select at least one file to restore.");
+		assertPathsDoNotTargetGitMetadata(safePaths);
+		invalidateRepositorySnapshot(repositoryPath);
+		try {
+			await git.checkout({
+				fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
+				dir: normalizedRepositoryPath(repositoryPath),
+				filepaths: safePaths,
+				noUpdateHead: true,
+				force: true,
+			});
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function removeFile(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
-	invalidateRepositorySnapshot(repositoryPath);
-	try {
-		await git.remove({ fs: new ObsidianGitFs(adapter), dir: normalizedRepositoryPath(repositoryPath), filepath: path });
-	} finally {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
 		invalidateRepositorySnapshot(repositoryPath);
-	}
+		try {
+			const safePath = normalizeRepositoryFilePath(path);
+			assertPathsDoNotTargetGitMetadata([safePath]);
+			const dir = normalizedRepositoryPath(repositoryPath);
+			await git.remove({ fs: new ObsidianGitFs(adapter, dir), dir, filepath: safePath });
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function addToGitignore(adapter: DataAdapter, repositoryPath: string, path: string): Promise<void> {
-	invalidateRepositorySnapshot(repositoryPath);
-	const repository = normalizedRepositoryPath(repositoryPath);
-	const gitignorePath = repository === "." ? ".gitignore" : `${repository}/.gitignore`;
-	const current = await adapter.exists(gitignorePath) ? await adapter.read(gitignorePath) : "";
-	const normalizedPath = path.trim().replace(/^\.\/+/, "");
-	if (!normalizedPath) throw new Error("The file path is empty.");
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
+		invalidateRepositorySnapshot(repositoryPath);
+		const repository = normalizedRepositoryPath(repositoryPath);
+		const gitignorePath = repository === "." ? ".gitignore" : `${repository}/.gitignore`;
+		const current = await adapter.exists(gitignorePath) ? await adapter.read(gitignorePath) : "";
+		const normalizedPath = normalizeRepositoryFilePath(path);
+		assertPathsDoNotTargetGitMetadata([normalizedPath]);
 
-	const lines = current.split(/\r?\n/);
-	if (lines.some((line) => line.trim() === normalizedPath)) return;
-	const prefix = current && !current.endsWith("\n") ? `${current}\n` : current;
-	await adapter.write(gitignorePath, `${prefix}${normalizedPath}\n`);
-	invalidateRepositorySnapshot(repositoryPath);
+		const lines = current.split(/\r?\n/);
+		if (lines.some((line) => line.trim() === normalizedPath)) return;
+		const prefix = current && !current.endsWith("\n") ? `${current}\n` : current;
+		await adapter.write(gitignorePath, `${prefix}${normalizedPath}\n`);
+		invalidateRepositorySnapshot(repositoryPath);
+	});
 }
 
 export async function commitChanges(
@@ -283,17 +423,19 @@ export async function commitChanges(
 	message: string,
 	author: CommitAuthor,
 ): Promise<string> {
-	invalidateRepositorySnapshot(repositoryPath);
-	try {
-		return await git.commit({
-			fs: new ObsidianGitFs(adapter),
-			dir: normalizedRepositoryPath(repositoryPath),
-			message,
-			author,
-		});
-	} finally {
+	return repositoryMutationCoordinator.run(repositoryPath, async () => {
 		invalidateRepositorySnapshot(repositoryPath);
-	}
+		try {
+			return await git.commit({
+				fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
+				dir: normalizedRepositoryPath(repositoryPath),
+				message,
+				author,
+			});
+		} finally {
+			invalidateRepositorySnapshot(repositoryPath);
+		}
+	});
 }
 
 export async function readCommits(
@@ -313,8 +455,8 @@ export async function readCommitChanges(
 	let result: Awaited<ReturnType<typeof git.log>>;
 	try {
 		result = await git.log({
-			fs: new ObsidianGitFs(adapter),
-			dir: normalizedRepositoryPath(repositoryPath),
+				fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
+				dir: normalizedRepositoryPath(repositoryPath),
 			ref: resolvedOid,
 			depth: 1,
 			includeChanges: true,
@@ -333,8 +475,8 @@ export async function readRemoteCommits(
 	branchName: string,
 	depth = 100,
 ): Promise<RemoteCommitHistory> {
-	const fs = new ObsidianGitFs(adapter);
 	const dir = normalizedRepositoryPath(repositoryPath);
+	const fs = new ObsidianGitFs(adapter, dir);
 	const branch = branchName.trim();
 	if (!branch) return { commits: [], available: false, hasMore: false };
 
@@ -358,14 +500,15 @@ async function readCommitsAtRef(
 	let result: Awaited<ReturnType<typeof git.log>>;
 	try {
 		result = await git.log({
-			fs: new ObsidianGitFs(adapter),
-			dir: normalizedRepositoryPath(repositoryPath),
+				fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
+				dir: normalizedRepositoryPath(repositoryPath),
 			ref,
 			depth: depth + 1,
 			includeChanges: false,
 		});
 	} catch (error) {
-		if (error && typeof error === "object" && "code" in error && error.code === "NoCommitError") {
+		if (error && typeof error === "object" && "code" in error &&
+			(error.code === "NoCommitError" || error.code === "NotFoundError")) {
 			return { commits: [], hasMore: false };
 		}
 		throw error;
@@ -401,7 +544,7 @@ async function resolveCommitOid(
 	if (oid.length >= 40) return oid;
 	try {
 		return await git.expandOid({
-			fs: new ObsidianGitFs(adapter),
+			fs: new ObsidianGitFs(adapter, normalizedRepositoryPath(repositoryPath)),
 			dir: normalizedRepositoryPath(repositoryPath),
 			oid,
 		});
@@ -418,12 +561,19 @@ function mapCommitChanges(changes: Awaited<ReturnType<typeof git.log>>[number]["
 }
 
 function normalizedRepositoryPath(path: string): string {
-	const trimmed = path.trim().replace(/^\.\/+/, "").replace(/\/+$/, "");
-	return trimmed || ".";
+	return normalizeRepositoryRoot(path);
 }
 
 function pathInRepository(repositoryPath: string, path: string): string {
-	return repositoryPath === "." ? path : `${repositoryPath}/${path}`;
+	const root = normalizedRepositoryPath(repositoryPath);
+	const safePath = normalizeRepositoryFilePath(path);
+	return root === "." ? safePath : `${root}/${safePath}`;
+}
+
+function assertPathsDoNotTargetGitMetadata(paths: string[]): void {
+	if (paths.some((path) => path === ".git" || path.startsWith(".git/"))) {
+		throw new Error("Git metadata cannot be changed as a repository file.");
+	}
 }
 
 function statusLabel(head: number, workdir: number, stage: number): string {
@@ -441,10 +591,12 @@ export class ObsidianGitFs {
 	// file has been moved or deleted. Validate listed entries once and reuse the
 	// result for isomorphic-git's immediately following lstat call.
 	private readonly validatedStats = new Map<string, Stat>();
+	private readonly nestedGitDirectoryCache = new Map<string, boolean>();
 
 	readonly promises = {
 		readFile: async (path: string, options?: string | { encoding?: string }): Promise<Uint8Array | string> => {
 			try {
+				await this.assertRepositoryBoundary(path);
 				const encoding = typeof options === "string" ? options : options?.encoding;
 				if (encoding === "utf8" || encoding === "utf-8") {
 					return this.adapter.read(this.normalized(path));
@@ -457,6 +609,7 @@ export class ObsidianGitFs {
 		writeFile: async (path: string, data: Uint8Array | string): Promise<void> => {
 			const normalizedPath = this.normalized(path);
 			try {
+				await this.assertRepositoryBoundary(normalizedPath);
 				if (typeof data === "string") {
 					await this.adapter.write(normalizedPath, data);
 					return;
@@ -472,6 +625,7 @@ export class ObsidianGitFs {
 		unlink: async (path: string): Promise<void> => {
 			const normalizedPath = this.normalized(path);
 			try {
+				await this.assertRepositoryBoundary(normalizedPath);
 				await this.adapter.remove(normalizedPath);
 			} catch (error) {
 				throw this.adapterOperationError("remove", normalizedPath, error);
@@ -479,6 +633,7 @@ export class ObsidianGitFs {
 		},
 		readdir: async (path: string): Promise<string[]> => {
 			try {
+				await this.assertRepositoryBoundary(path);
 				const listed = await this.adapter.list(this.normalized(path));
 				const directory = this.normalized(path);
 				const stripDirectoryPrefix = (entry: string): string => {
@@ -493,6 +648,7 @@ export class ObsidianGitFs {
 					entries.map(async (entry) => {
 						const relativePath = stripDirectoryPrefix(entry);
 						const candidatePath = directory === "." ? relativePath : `${directory}/${relativePath}`;
+						if (await this.isNestedGitRepository(candidatePath)) return null;
 						try {
 							const stat = await this.adapter.stat(candidatePath);
 							return stat ? { relativePath, candidatePath, stat } : null;
@@ -516,6 +672,7 @@ export class ObsidianGitFs {
 		mkdir: async (path: string): Promise<void> => {
 			const normalizedPath = this.normalized(path);
 			try {
+				await this.assertRepositoryBoundary(normalizedPath);
 				await this.adapter.mkdir(normalizedPath);
 			} catch (error) {
 				throw this.adapterOperationError("create folder", normalizedPath, error);
@@ -524,6 +681,7 @@ export class ObsidianGitFs {
 		rmdir: async (path: string): Promise<void> => {
 			const normalizedPath = this.normalized(path);
 			try {
+				await this.assertRepositoryBoundary(normalizedPath);
 				await this.adapter.rmdir(normalizedPath, false);
 			} catch (error) {
 				throw this.adapterOperationError("remove folder", normalizedPath, error);
@@ -539,14 +697,20 @@ export class ObsidianGitFs {
 		},
 	};
 
-	constructor(private readonly adapter: DataAdapter) {}
+	constructor(
+		private readonly adapter: DataAdapter,
+		private readonly repositoryRoot = ".",
+	) {
+		this.repositoryRoot = normalizeRepositoryRoot(repositoryRoot);
+	}
 
 	private normalized(path: string): string {
-		return path.replace(/^\.\//, "").replace(/\\/g, "/");
+		return normalizeRepositoryRoot(path);
 	}
 
 	private async stat(path: string): Promise<git.Stat> {
 		const normalizedPath = this.normalized(path);
+		await this.assertRepositoryBoundary(normalizedPath);
 		const validated = this.validatedStats.get(normalizedPath);
 		const value = validated ?? await this.readStat(normalizedPath, path);
 		if (validated) this.validatedStats.delete(normalizedPath);
@@ -577,6 +741,35 @@ export class ObsidianGitFs {
 		} catch (error) {
 			throw this.fileSystemError(originalPath, error);
 		}
+	}
+
+	private async assertRepositoryBoundary(path: string): Promise<void> {
+		const normalizedPath = this.normalized(path);
+		let relativePath: string;
+		if (this.repositoryRoot === ".") relativePath = normalizedPath;
+		else if (normalizedPath === this.repositoryRoot) relativePath = "";
+		else if (normalizedPath.startsWith(`${this.repositoryRoot}/`)) relativePath = normalizedPath.slice(this.repositoryRoot.length + 1);
+		else throw new Error(`Git operation path "${normalizedPath}" escapes repository root "${this.repositoryRoot}".`);
+
+		const segments = relativePath.split("/").filter(Boolean);
+		let candidate = this.repositoryRoot === "." ? "" : this.repositoryRoot;
+		for (const segment of segments) {
+			candidate = candidate ? `${candidate}/${segment}` : segment;
+			if (segment === ".git" && candidate === (this.repositoryRoot === "." ? ".git" : `${this.repositoryRoot}/.git`)) break;
+			if (candidate !== this.repositoryRoot && await this.isNestedGitRepository(candidate)) {
+				throw new Error(`Repository boundary blocked access into nested Git repository at "${candidate}".`);
+			}
+		}
+	}
+
+	private async isNestedGitRepository(path: string): Promise<boolean> {
+		const normalizedPath = this.normalized(path);
+		if (normalizedPath === this.repositoryRoot) return false;
+		const cached = this.nestedGitDirectoryCache.get(normalizedPath);
+		if (cached !== undefined) return cached;
+		const hasMetadata = await this.adapter.exists(`${normalizedPath}/.git`);
+		this.nestedGitDirectoryCache.set(normalizedPath, hasMetadata);
+		return hasMetadata;
 	}
 
 	private fileSystemError(path: string, cause?: unknown): Error & { code: string } {

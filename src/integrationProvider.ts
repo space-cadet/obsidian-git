@@ -25,7 +25,14 @@ const MAX_FILES = 200;
 
 export interface GitSyncPluginLike {
 	app: App;
-	refreshIntegrationStage?: (paths: string[]) => Promise<void>;
+	refreshIntegrationStage?: (paths: string[], repositoryPath?: string) => Promise<void>;
+	repositories?: Array<{ id: string; name: string; root: string }>;
+	selectedRepositoryId?: string;
+	getRepositoryOperationContext?: (repositoryId?: string) => {
+		repositoryId: string;
+		settings: GitSyncPluginLike["settings"];
+		credential: RemoteCredential | null;
+	};
 	settings: {
 		repositoryPath: string;
 		remoteUrl: string;
@@ -44,27 +51,54 @@ type CapabilityExecute = (
 	context: unknown,
 ) => Promise<ToolOutput>;
 
+interface IntegrationCapability {
+	id: string;
+	title: string;
+	description: string;
+	risk: "read" | "write" | "remote-write";
+	inputSchema: Record<string, unknown>;
+	execute: CapabilityExecute;
+}
+
 interface RepositoryAccess {
 	adapter: GitSyncPluginLike["app"]["vault"]["adapter"];
+	repositoryId: string;
 	repositoryPath: string;
 	branch: string | null;
 	head: string | null;
+	settings: GitSyncPluginLike["settings"];
+	credential: RemoteCredential | null;
 }
 
-function repositoryAccess(plugin: GitSyncPluginLike): {
-	adapter: RepositoryAccess["adapter"];
-	repositoryPath: string;
-} {
+function repositoryAccess(plugin: GitSyncPluginLike, repositoryId?: string): Omit<RepositoryAccess, "branch" | "head"> {
+	if (plugin.getRepositoryOperationContext) {
+		const context = plugin.getRepositoryOperationContext(repositoryId);
+		return {
+			adapter: plugin.app.vault.adapter,
+			repositoryId: context.repositoryId,
+			repositoryPath: context.settings.repositoryPath.trim() || ".",
+			settings: context.settings,
+			credential: context.credential,
+		};
+	}
+	if (repositoryId && repositoryId !== plugin.selectedRepositoryId) {
+		throw new Error(`Unknown repository ID "${repositoryId}".`);
+	}
 	return {
 		adapter: plugin.app.vault.adapter,
+		repositoryId: plugin.selectedRepositoryId ?? "selected",
 		repositoryPath: plugin.settings.repositoryPath.trim() || ".",
+		settings: { ...plugin.settings },
+		credential: plugin.getRemoteCredential?.() ?? null,
 	};
 }
 
 async function requireRepository(
 	plugin: GitSyncPluginLike,
+	repositoryId?: string,
 ): Promise<RepositoryAccess | { error: string }> {
-	const { adapter, repositoryPath } = repositoryAccess(plugin);
+	const access = repositoryAccess(plugin, repositoryId);
+	const { adapter, repositoryPath } = access;
 	const state = await inspectLocalRepository(adapter, repositoryPath);
 	if (state.kind === "missing") {
 		return {
@@ -72,8 +106,7 @@ async function requireRepository(
 		};
 	}
 	return {
-		adapter,
-		repositoryPath,
+		...access,
 		branch: "branch" in state ? state.branch : null,
 		head: "head" in state ? state.head : null,
 	};
@@ -90,18 +123,18 @@ function readLimit(value: unknown, fallback: number): number {
 	return Math.max(1, Math.min(limit, MAX_FILES));
 }
 
-function authorFromSettings(plugin: GitSyncPluginLike): {
+function authorFromSettings(settings: GitSyncPluginLike["settings"]): {
 	name: string;
 	email: string;
 } {
 	return {
-		name: plugin.settings.authorName.trim() || "Obsidian",
-		email: plugin.settings.authorEmail.trim() || "obsidian@localhost",
+		name: settings.authorName.trim() || "Obsidian",
+		email: settings.authorEmail.trim() || "obsidian@localhost",
 	};
 }
 
-function remoteUrlFromSettings(plugin: GitSyncPluginLike): string {
-	return plugin.settings.remoteUrl.trim();
+function remoteUrlFromSettings(settings: GitSyncPluginLike["settings"]): string {
+	return settings.remoteUrl.trim();
 }
 
 function readDepth(value: unknown): number {
@@ -123,10 +156,14 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 	}>;
 } {
 	const guard = async (
+		args: Record<string, unknown>,
 		run: (repo: RepositoryAccess) => Promise<ToolOutput>,
 	): Promise<ToolOutput> => {
 		try {
-			const repo = await requireRepository(plugin);
+			if (args.repositoryId !== undefined && (typeof args.repositoryId !== "string" || !args.repositoryId.trim())) {
+				return { error: "repositoryId must be a non-empty repository ID." };
+			}
+			const repo = await requireRepository(plugin, typeof args.repositoryId === "string" ? args.repositoryId.trim() : undefined);
 			if ("error" in repo) return repo;
 			return await run(repo);
 		} catch (error) {
@@ -136,11 +173,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 		}
 	};
 
-	return {
-		id: "obsidian-git",
-		displayName: "Git Sync",
-		apiVersion: INTEGRATION_PROVIDER_API_VERSION,
-		capabilities: [
+	const capabilities: IntegrationCapability[] = [
 			{
 				id: "git.status",
 				title: "Repository status",
@@ -152,8 +185,8 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 					properties: {},
 					additionalProperties: false,
 				},
-				execute: async () =>
-					guard(async (repo) => {
+				execute: async (args) =>
+					guard(args, async (repo) => {
 						const snapshot = await readRepositorySnapshot(
 							repo.adapter,
 							repo.repositoryPath,
@@ -203,7 +236,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 					additionalProperties: false,
 				},
 				execute: async (args) =>
-					guard(async (repo) => {
+					guard(args, async (repo) => {
 						const snapshot = await readRepositorySnapshot(
 							repo.adapter,
 							repo.repositoryPath,
@@ -248,7 +281,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 					additionalProperties: false,
 				},
 				execute: async (args) =>
-					guard(async (repo) => {
+					guard(args, async (repo) => {
 						const history = await readCommits(
 							repo.adapter,
 							repo.repositoryPath,
@@ -286,7 +319,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 					additionalProperties: false,
 				},
 				execute: async (args) =>
-					guard(async (repo) => {
+					guard(args, async (repo) => {
 						const oid = typeof args.oid === "string" ? args.oid.trim() : "";
 						if (!oid) return { error: "Missing required argument: oid." };
 						const changes = await readCommitChanges(repo.adapter, repo.repositoryPath, oid);
@@ -319,8 +352,8 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				required: ["paths"],
 				additionalProperties: false,
 			},
-			execute: async (args) =>
-				guard(async (repo) => {
+		execute: async (args) =>
+			guard(args, async (repo) => {
 					const paths = Array.isArray(args.paths)
 						? args.paths
 								.filter(
@@ -340,8 +373,8 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 							error: `Too many paths (${paths.length}); stage at most ${MAX_FILES} per call.`,
 						};
 					}
-					await stageFile(repo.adapter, repo.repositoryPath, paths);
-					await plugin.refreshIntegrationStage?.(paths);
+						await stageFile(repo.adapter, repo.repositoryPath, paths);
+						await plugin.refreshIntegrationStage?.(paths, repo.repositoryPath);
 					return {
 						success: true,
 						content: `Staged ${paths.length} path(s):\n${paths
@@ -368,7 +401,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				additionalProperties: false,
 			},
 			execute: async (args) =>
-				guard(async (repo) => {
+				guard(args, async (repo) => {
 					const message =
 						typeof args.message === "string" ? args.message.trim() : "";
 					if (!message) {
@@ -378,7 +411,7 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 						repo.adapter,
 						repo.repositoryPath,
 						message,
-						authorFromSettings(plugin),
+						authorFromSettings(repo.settings),
 					);
 					if (!oid) {
 						return { error: "Nothing staged to commit." };
@@ -401,9 +434,9 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				properties: {},
 				additionalProperties: false,
 			},
-			execute: async () =>
-				guard(async (repo) => {
-					const remoteUrl = remoteUrlFromSettings(plugin);
+			execute: async (args) =>
+				guard(args, async (repo) => {
+					const remoteUrl = remoteUrlFromSettings(repo.settings);
 					if (!remoteUrl) {
 						return {
 							error:
@@ -415,9 +448,9 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 						repositoryPath: repo.repositoryPath,
 						remoteUrl,
 						branchName:
-							plugin.settings.branchName.trim() || repo.branch || "main",
-						credential: plugin.getRemoteCredential?.() ?? null,
-						author: authorFromSettings(plugin),
+							repo.settings.branchName.trim() || repo.branch || "main",
+						credential: repo.credential,
+						author: authorFromSettings(repo.settings),
 					});
 					invalidateRepositorySnapshot(repo.repositoryPath);
 					return {
@@ -439,9 +472,9 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 				properties: {},
 				additionalProperties: false,
 			},
-			execute: async () =>
-				guard(async (repo) => {
-					const remoteUrl = remoteUrlFromSettings(plugin);
+			execute: async (args) =>
+				guard(args, async (repo) => {
+					const remoteUrl = remoteUrlFromSettings(repo.settings);
 					if (!remoteUrl) {
 						return {
 							error:
@@ -453,9 +486,9 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 						repositoryPath: repo.repositoryPath,
 						remoteUrl,
 						branchName:
-							plugin.settings.branchName.trim() || repo.branch || "main",
-						credential: plugin.getRemoteCredential?.() ?? null,
-						author: authorFromSettings(plugin),
+							repo.settings.branchName.trim() || repo.branch || "main",
+						credential: repo.credential,
+						author: authorFromSettings(repo.settings),
 					});
 					invalidateRepositorySnapshot(repo.repositoryPath);
 					return {
@@ -466,6 +499,46 @@ export function createIntegrationProvider(plugin: GitSyncPluginLike): {
 					};
 				}),
 			},
+		];
+	return {
+		id: "obsidian-git",
+		displayName: "Git Sync",
+		apiVersion: INTEGRATION_PROVIDER_API_VERSION,
+		capabilities: [
+			{
+				id: "git.repositories",
+				title: "List repositories",
+				description: "List registered vault repositories and identify the selected repository. Read-only.",
+				risk: "read" as const,
+				inputSchema: { type: "object", properties: {}, additionalProperties: false },
+				execute: async () => ({
+					success: true as const,
+					content: JSON.stringify({
+						selectedRepositoryId: plugin.selectedRepositoryId ?? null,
+						repositories: plugin.repositories?.map(({ id, name, root }) => ({ id, name, root })) ?? [{
+							id: plugin.selectedRepositoryId ?? "selected",
+							name: plugin.settings.repositoryPath || "Vault root",
+							root: plugin.settings.repositoryPath || ".",
+						}],
+					}, null, 2),
+				}),
+			},
+			...capabilities.map((capability) => {
+				const properties = capability.inputSchema.properties && typeof capability.inputSchema.properties === "object"
+					? capability.inputSchema.properties as Record<string, unknown>
+					: {};
+				return {
+					...capability,
+					description: `${capability.description} Optional repositoryId targets a registered repository; omitted uses the repository selected when this call starts.`,
+					inputSchema: {
+						...capability.inputSchema,
+						properties: {
+							repositoryId: { type: "string", description: "Registered repository ID. Omit to use the selected repository captured at call start." },
+							...properties,
+						},
+					},
+				};
+			}),
 		],
 	};
 }

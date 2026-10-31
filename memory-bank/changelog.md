@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-31
+
+- Added a vault-scoped multi-repository registry with legacy migration,
+  repository selection, folder initialization/opening, clone flow, and
+  per-repository remote settings/credentials. - T16
+- Scoped local Git state and integration targets by repository; serialized
+  overlapping writes and blocked nested Git roots from parent mutations. - T16
+- Added local branch list/create/switch and confirmed selected-file restore from
+  the index. - T17
+- Added 25 automated tests and made CI run the suite before build artifact
+  checks. Desktop install/reload and UI smoke passed; full desktop workflow,
+  mobile, and remote acceptance remain open. Settings now labels the vault root
+  consistently with the sidebar. - T14, T15, T16, T17
+
 ## 2026-09-30
 
 - Added a collapsible folder tree to Changes. Folder selection includes only

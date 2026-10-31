@@ -23,6 +23,13 @@
 	padding: 0;
 }
 
+.git-sync-context-action {
+	width: 48px;
+	min-width: 48px;
+	height: 48px;
+	min-height: 48px;
+}
+
 .git-sync-settings-button {
 	align-self: center;
 	margin: 0 10px 0 4px;
@@ -67,17 +74,91 @@
 .git-sync-repository-context {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	flex-wrap: wrap;
+	gap: 8px 12px;
 	min-width: 0;
-	min-height: 70px;
 	padding: 10px 12px;
 	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.git-sync-repository-picker {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+}
+
+.git-sync-repository-select {
+	flex: 1 1 auto;
+	min-width: 0;
+	min-height: 48px;
+	margin: 0;
+	text-overflow: ellipsis;
+}
+
+.git-sync-add-repository-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	min-width: 48px;
+	min-height: 48px;
+	height: 48px;
+	gap: 6px;
+	padding: 0 10px;
+	white-space: nowrap;
+}
+
+.git-sync-add-repository-button svg {
+	width: 17px;
+	height: 17px;
+}
+
+.git-sync-clone-form {
+	display: grid;
+	gap: 12px;
+}
+
+.git-sync-clone-form label {
+	display: grid;
+	gap: 6px;
+	min-width: 0;
+}
+
+.git-sync-clone-form input {
+	min-height: 48px;
+	width: 100%;
+}
+
+.git-sync-branch-manager {
+	display: grid;
+	gap: 12px;
+}
+
+.git-sync-branch-manager label {
+	display: grid;
+	gap: 6px;
+}
+
+.git-sync-branch-manager select,
+.git-sync-branch-manager input {
+	min-height: 48px;
+	width: 100%;
+}
+
+.git-sync-branch-manager-status {
+	min-height: 24px;
+}
+
+.git-sync-branch-manager-status.is-error {
+	color: var(--text-error);
 }
 
 .git-sync-branch-context {
 	display: flex;
 	align-items: center;
-	gap: 7px;
+	gap: 8px;
 	min-width: 0;
 	flex: 1 1 52%;
 }
@@ -525,7 +606,7 @@
 
 .git-sync-change-toolbar button {
 	flex: 0 1 auto;
-	min-height: 34px;
+	min-height: 44px;
 	padding: 5px 8px;
 	white-space: nowrap;
 }
@@ -534,14 +615,16 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 34px;
-	min-width: 34px;
+	width: 44px;
+	min-width: 44px;
+	min-height: 44px;
 	padding: 0 !important;
 }
 
 .git-sync-selection-action.is-stage-selection-action {
 	width: auto;
 	min-width: 64px;
+	min-height: 44px;
 	gap: 4px;
 	padding: 0 8px !important;
 	font-size: var(--font-ui-smaller);
@@ -744,8 +827,13 @@
 	margin-top: 20px;
 }
 
+.git-sync-confirm-description {
+	white-space: pre-wrap;
+}
+
 .git-sync-bottom-bar {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 	padding: 10px 12px;
 	border-top: 1px solid var(--background-modifier-border);
@@ -756,9 +844,10 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	flex: 1 1 0;
-	min-width: 0;
-	height: 40px;
+	flex: 1 1 44px;
+	min-width: 44px;
+	min-height: 48px;
+	height: 48px;
 	padding: 0;
 	border-radius: var(--radius-m);
 }

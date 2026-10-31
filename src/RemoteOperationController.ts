@@ -16,23 +16,33 @@ import type { RemoteCredential, RemoteOperationResult, RemoteProgressEvent } fro
 
 interface RemoteOperationHost {
 	app: App;
-	getSettings(): GitSyncSettings;
-	getRemoteCredential(): RemoteCredential | null;
+	getRepositoryOperationContext(): RepositoryOperationContext;
 	recordActivity(message: string, level?: ActivityLevel): void;
 	refreshViews(reason?: string, refreshChanges?: boolean): void;
 	refreshRemoteHistoryViews(reason?: string): void;
 	markChangesRefreshRequiredViews(reason: string): void;
 }
 
+export interface RepositoryOperationContext {
+	repositoryId: string;
+	settings: GitSyncSettings;
+	credential: RemoteCredential | null;
+}
+
 export class RemoteOperationController {
 	private operationQueue: Promise<void> = Promise.resolve();
+	private pendingOperations = 0;
 
 	constructor(private readonly host: RemoteOperationHost) {}
 
+	isBusy(): boolean {
+		return this.pendingOperations > 0;
+	}
+
 	async checkConnection(): Promise<void> {
-		const settings = this.host.getSettings();
+		const { settings, credential } = this.host.getRepositoryOperationContext();
 		try {
-			const info = await testRemoteConnection(settings.remoteUrl, this.host.getRemoteCredential());
+			const info = await testRemoteConnection(settings.remoteUrl, credential);
 			const branch = info.defaultBranch ? ` Default branch: ${info.defaultBranch}.` : "";
 			this.host.recordActivity(`Remote connection succeeded: ${info.remoteUrl}.${branch}`);
 			new Notice(`Remote connection succeeded.${branch}`);
@@ -44,51 +54,53 @@ export class RemoteOperationController {
 	}
 
 	fetch(): Promise<void> {
-		return this.run("Fetch", (modal) => fetchRepository(this.repositoryOptions(modal)));
+		return this.run("Fetch", (context, modal) => fetchRepository(this.repositoryOptions(context, modal))).then(() => undefined);
 	}
 
 	pull(): Promise<void> {
-		return this.run("Pull", (modal) => pullRepository(this.repositoryOptions(modal)));
+		return this.run("Pull", (context, modal) => pullRepository(this.repositoryOptions(context, modal))).then(() => undefined);
 	}
 
 	forcePull(): void {
-		const branchName = this.host.getSettings().branchName;
+		const context = this.host.getRepositoryOperationContext();
+		const branchName = context.settings.branchName;
 		new ConfirmActionModal(
 			this.host.app,
 			"Reset local branch to remote?",
-			`This fetches origin/${branchName} and discards local commits and tracked changes that are not on the remote branch.`,
-			() => void this.run("Force Pull", (modal) => forcePullRepository(this.repositoryOptions(modal))),
+			`This resets ${context.settings.repositoryPath} to origin/${branchName} and discards local commits and tracked changes that are not on that remote branch.`,
+			() => void this.run("Force Pull", (target, modal) => forcePullRepository(this.repositoryOptions(target, modal)), context),
 			"Reset to Remote",
 		).open();
 	}
 
 	push(): Promise<void> {
-		return this.run("Push", (modal) => pushRepository(this.repositoryOptions(modal)));
+		return this.run("Push", (context, modal) => pushRepository(this.repositoryOptions(context, modal))).then(() => undefined);
 	}
 
 	forcePush(): void {
-		const branchName = this.host.getSettings().branchName;
+		const context = this.host.getRepositoryOperationContext();
+		const branchName = context.settings.branchName;
 		new ConfirmActionModal(
 			this.host.app,
 			"Force push to remote?",
-			`This overwrites origin/${branchName} with the local branch and may discard commits currently on the remote.`,
-			() => void this.run("Force Push", (modal) => forcePushRepository(this.repositoryOptions(modal))),
+			`This overwrites origin/${branchName} for ${context.settings.repositoryPath} and may discard commits currently on the remote.`,
+			() => void this.run("Force Push", (target, modal) => forcePushRepository(this.repositoryOptions(target, modal)), context),
 			"Force Push",
 		).open();
 	}
 
-	clone(): Promise<void> {
-		return this.run("Clone", (modal) => cloneRepository(this.repositoryOptions(modal)));
+	clone(context?: RepositoryOperationContext): Promise<boolean> {
+		return this.run("Clone", (target, modal) => cloneRepository(this.repositoryOptions(target, modal)), context);
 	}
 
-	private repositoryOptions(progressModal?: GitProgressModal) {
-		const settings = this.host.getSettings();
+	private repositoryOptions(context: RepositoryOperationContext, progressModal?: GitProgressModal) {
+		const { settings } = context;
 		return {
 			adapter: this.host.app.vault.adapter,
 			repositoryPath: settings.repositoryPath,
 			remoteUrl: settings.remoteUrl,
 			branchName: settings.branchName,
-			credential: this.host.getRemoteCredential(),
+			credential: context.credential,
 			author: {
 				name: settings.authorName.trim(),
 				email: settings.authorEmail.trim(),
@@ -106,22 +118,30 @@ export class RemoteOperationController {
 		};
 	}
 
-	private run(name: string, operation: (modal: GitProgressModal) => Promise<RemoteOperationResult>): Promise<void> {
-		this.host.recordActivity(`${name} requested.`);
+	private run(
+		name: string,
+		operation: (context: RepositoryOperationContext, modal: GitProgressModal) => Promise<RemoteOperationResult>,
+		requestedContext?: RepositoryOperationContext,
+	): Promise<boolean> {
+		const target = requestedContext ?? this.host.getRepositoryOperationContext();
+		let succeeded = false;
+		this.pendingOperations += 1;
+		this.host.recordActivity(`${name} requested for ${target.settings.repositoryPath} (${target.settings.branchName}).`);
 		const next = this.operationQueue
 			.catch(() => undefined)
 			.then(async () => {
-				const settings = this.host.getSettings();
-				this.host.recordActivity(`${name} started for ${settings.branchName}.`);
+				const { settings } = target;
+				this.host.recordActivity(`${name} started for ${settings.repositoryPath} on ${settings.branchName}.`);
 				const startedAt = Date.now();
-				const modal = new GitProgressModal(this.host.app, name, settings.branchName, {
+				const modal = new GitProgressModal(this.host.app, name, `${settings.repositoryPath} · ${settings.branchName}`, {
 					onPhase: (phase) => this.host.recordActivity(`${name}: ${phase}.`, "DEBUG"),
 					onMessage: (message) => this.host.recordActivity(`${name}: ${safeRemoteMessage(message)}`, "DEBUG"),
 				});
 				modal.open();
 				try {
-					const result = await operation(modal);
-					this.host.recordActivity(`${name} completed for ${settings.branchName}.`);
+					const result = await operation(target, modal);
+					succeeded = true;
+					this.host.recordActivity(`${name} completed for ${settings.repositoryPath} on ${settings.branchName}.`);
 					this.host.recordActivity(`${name} completed in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`, "METRIC");
 					this.host.recordActivity(`${name}: ${result.summary}`);
 					for (const detail of result.details) this.host.recordActivity(`${name}: ${detail}`, "DEBUG");
@@ -140,10 +160,14 @@ export class RemoteOperationController {
 					modal.fail(detail);
 					new Notice(`${name} failed: ${detail}`);
 				} finally {
-					invalidateRepositorySnapshot(this.host.getSettings().repositoryPath);
+					invalidateRepositorySnapshot(target.settings.repositoryPath);
 				}
-			});
-		this.operationQueue = next;
-		return next;
+			})
+			.then(
+				() => { this.pendingOperations -= 1; },
+				(error) => { this.pendingOperations -= 1; throw error; },
+			);
+		this.operationQueue = next.then(() => undefined, () => undefined);
+		return next.then(() => succeeded);
 	}
 }

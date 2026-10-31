@@ -59,17 +59,21 @@ reduced `src/main.ts` to plugin coordination and moved Settings/data, view,
 remote operations, dialogs, and Activity/Commits presentation into focused
 modules. Selected paths and range anchors live in `src/ChangeSelection.ts`,
 while pure Changes snapshot updates live in `src/ChangeListState.ts`. The
-`GitSyncView` ownership review is complete; the next planned extraction is
-commit-history loading and state, followed by Changes presentation and refresh
-coordination. See `code-quality-modularity.md` for the staged plan and diagrams.
+`GitSyncView` ownership review is complete. Commit-history extraction is
+scheduled with T16c; Changes presentation and refresh extraction will follow
+T16/T17 feature needs. See `code-quality-modularity.md` for the staged plan.
 
 ## Planned Mobile Multi-Repository Interface (T16)
 
 *Added: 2026-10-31 13:41:41 IST*
 
-[T16](../tasks/T16.md) plans multiple repositories within vault folders using
-the existing mobile JavaScript Git backend. This is proposed ownership, not a
-change to the implemented module map or T14's current extraction work.
+[T16](../tasks/T16.md) adds multiple repositories within vault folders using
+the existing mobile JavaScript Git backend. The schema-v2 registry and
+selected ID live in `src/pluginData.ts`. Source now includes selector/add/open/
+initialize/clone controls, per-repository settings and credentials, local
+branch controls, selected index restore, captured remote/provider contexts,
+and write coordination. Named remotes/upstreams, merge conflict recovery,
+tags, full T17 branch/restore scope, and installed-host acceptance remain open.
 
 - [Repository identity, boundaries, migration, and operation ownership](multi-repository-architecture.md)
 - [Git workflows and backend capability limits](multi-repository-git-workflows.md)
@@ -79,5 +83,14 @@ change to the implemented module map or T14's current extraction work.
 
 [T16](../tasks/T16.md) owns core repository management, clone, changes/history,
 sync, and merging/conflicts. [T17](../tasks/T17.md) owns secondary branch/tag
-management and selected-file restore. Mobile usability and verification accompany
-each feature; neither task changes T14 current source ownership.
+management and selected-file restore. Feature-specific tests land with these
+features under the shared T15 runner/CI gate. T14 extraction work follows the
+repository-aware seams needed by each feature.
+
+### Source implementation update — 2026-10-31 15:06:54 IST
+
+`pnpm test` passed 25 tests and the production build. Simulated-adapter cases
+cover two-repository local isolation, integration-provider IDs, local branch
+switching, index restore, nested boundaries, packed refs, path safety, and
+mutation coordination. The running Obsidian 1.14.5 host still has the earlier
+plugin build, so the new repository controls have not received visual acceptance.

@@ -13,23 +13,32 @@ import {
 	mergeActivity,
 	normalizeActivity,
 	normalizeSettings,
+	projectSelectedRepositorySettings,
 	parseActivityEntry,
 	serializeActivityEntry,
+	normalizeRepositoryRoot,
+	updateSelectedRepositorySettings,
 } from "./pluginData";
 import type {
 	ActivityEntry,
 	ActivityLevel,
 	DecodedPluginData,
 	GitSyncSettings,
+	RepositoryConfig,
 	StoredPluginData,
 } from "./pluginData";
 import { AvailableBuildsModal, PluginUpdater, UpdateAvailableModal } from "./updater/PluginUpdater";
 import { REMOTE_TOKEN_SECRET_ID } from "./remote";
 import type { RemoteCredential } from "./remote";
-import { RemoteOperationController } from "./RemoteOperationController";
+import { RemoteOperationController, type RepositoryOperationContext } from "./RemoteOperationController";
+import { repositoryMutationCoordinator } from "./RepositoryMutationCoordinator";
+import { repositoryRootsOverlap } from "./repositoryPaths";
+import { inspectLocalRepository } from "./repository";
 
 export default class GitSyncPlugin extends Plugin {
 	settings: GitSyncSettings = DEFAULT_SETTINGS;
+	repositories: RepositoryConfig[] = [];
+	selectedRepositoryId = "";
 	private activity: ActivityEntry[] = [];
 	private persistedActivity: ActivityEntry[] = [];
 	private activityLogEntryCount = 0;
@@ -47,8 +56,7 @@ export default class GitSyncPlugin extends Plugin {
 		await this.loadSettings();
 		this.remoteOperations = new RemoteOperationController({
 			app: this.app,
-			getSettings: () => this.settings,
-			getRemoteCredential: () => this.getRemoteCredential(),
+			getRepositoryOperationContext: () => this.getRepositoryOperationContext(),
 			recordActivity: (message, level) => this.recordActivity(message, level),
 			refreshViews: (reason, refreshChanges) => this.refreshViews(reason, refreshChanges),
 			refreshRemoteHistoryViews: (reason) => this.refreshRemoteHistoryViews(reason),
@@ -113,7 +121,12 @@ export default class GitSyncPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const decoded = decodePluginData(await this.loadData(), true);
-		this.settings = normalizeSettings(decoded.settings);
+		this.repositories = decoded.repositories;
+		this.selectedRepositoryId = decoded.selectedRepositoryId;
+		this.settings = projectSelectedRepositorySettings(
+			normalizeSettings(decoded.settings),
+			{ repositories: this.repositories, selectedRepositoryId: this.selectedRepositoryId },
+		);
 		const logActivity = await this.loadActivityLog();
 		const legacyActivity = normalizeActivity(decoded.activity);
 		this.activity = mergeActivity(logActivity, legacyActivity);
@@ -130,6 +143,128 @@ export default class GitSyncPlugin extends Plugin {
 			this.setSettingsSaveStatus("Settings could not be saved.", false);
 			throw error;
 		}
+	}
+
+	async selectRepository(repositoryId: string): Promise<void> {
+		if (repositoryId !== this.selectedRepositoryId && this.isRepositorySwitchBlocked()) throw new Error("Finish the active Git operation before switching repositories.");
+		const selected = this.repositories.find((repository) => repository.id === repositoryId);
+		if (!selected) throw new Error("That repository is no longer registered.");
+
+		const currentRegistry = updateSelectedRepositorySettings(
+			{ repositories: this.repositories, selectedRepositoryId: this.selectedRepositoryId },
+			this.settings,
+		);
+		if (repositoryId === this.selectedRepositoryId) {
+			this.repositories = currentRegistry.repositories;
+			await this.saveSettings();
+			return;
+		}
+		const previousRepositories = this.repositories;
+		const previousSelection = this.selectedRepositoryId;
+		const previousSettings = this.settings;
+		this.repositories = currentRegistry.repositories;
+		this.selectedRepositoryId = repositoryId;
+		this.settings = projectSelectedRepositorySettings(this.settings, {
+			repositories: this.repositories,
+			selectedRepositoryId: repositoryId,
+		});
+		try {
+			await this.saveSettings();
+		} catch (error) {
+			this.repositories = previousRepositories;
+			this.selectedRepositoryId = previousSelection;
+			this.settings = previousSettings;
+			throw error;
+		}
+		this.recordActivity(`Selected repository: ${selected.name} (${selected.root}).`);
+		this.refreshViews("repository-switch");
+	}
+
+	async registerRepository(
+		rootValue: string,
+		branchName: string,
+		remoteUrl = "",
+		remoteUsername = "git",
+		credentialToken = "",
+	): Promise<void> {
+		if (this.isRepositorySwitchBlocked()) throw new Error("Finish the active Git operation before changing repositories.");
+		const root = normalizeRepositoryRoot(rootValue);
+		const currentRegistry = updateSelectedRepositorySettings(
+			{ repositories: this.repositories, selectedRepositoryId: this.selectedRepositoryId },
+			this.settings,
+		);
+		const existing = currentRegistry.repositories.find((repository) => repository.root === root);
+		if (existing) {
+			this.repositories = currentRegistry.repositories;
+			await this.selectRepository(existing.id);
+			return;
+		}
+		const overlap = currentRegistry.repositories.find((repository) => repositoryRootsOverlap(root, repository.root));
+		if (overlap) {
+			const overlapState = await inspectLocalRepository(this.app.vault.adapter, overlap.root);
+			const overlapGitEntry = overlap.root === "." ? ".git" : `${overlap.root}/.git`;
+			if (overlapState.kind === "ready" || await this.app.vault.adapter.exists(overlapGitEntry)) {
+				throw new Error(`Repository "${root}" overlaps registered repository "${overlap.root}". Parent and child Git repositories cannot be used together.`);
+			}
+		}
+
+		let id = "";
+		do {
+			const random = globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+			id = `repo-${random}`;
+		} while (currentRegistry.repositories.some((repository) => repository.id === id));
+		const credentialRef = credentialToken.trim() ? `${REMOTE_TOKEN_SECRET_ID}:${id}` : null;
+		if (credentialRef) this.app.secretStorage.setSecret(credentialRef, credentialToken.trim());
+		const repository: RepositoryConfig = {
+			id,
+			name: root === "." ? "Vault root" : root.split("/").pop() || root,
+			root,
+			remoteUrl: remoteUrl.trim(),
+			remoteUsername: remoteUsername.trim() || "git",
+			branchName: branchName.trim() || "main",
+			credentialRef,
+		};
+
+		const previousRepositories = this.repositories;
+		const previousSelection = this.selectedRepositoryId;
+		const previousSettings = this.settings;
+		this.repositories = [...currentRegistry.repositories, repository];
+		this.selectedRepositoryId = repository.id;
+		this.settings = projectSelectedRepositorySettings(this.settings, {
+			repositories: this.repositories,
+			selectedRepositoryId: repository.id,
+		});
+		try {
+			await this.saveSettings();
+		} catch (error) {
+			this.repositories = previousRepositories;
+			this.selectedRepositoryId = previousSelection;
+			this.settings = previousSettings;
+			throw error;
+		}
+		this.recordActivity(`Added repository: ${repository.name} (${repository.root}).`);
+		this.refreshViews("repository-added");
+	}
+
+	async setSelectedRepositoryBranch(branchName: string, repositoryRoot: string): Promise<void> {
+		if (normalizeRepositoryRoot(this.settings.repositoryPath) !== normalizeRepositoryRoot(repositoryRoot)) {
+			throw new Error("The selected repository changed before the branch setting could be saved.");
+		}
+		const previous = this.settings;
+		this.settings = { ...this.settings, branchName: branchName.trim() };
+		try {
+			await this.saveSettings();
+		} catch (error) {
+			this.settings = previous;
+			throw error;
+		}
+	}
+
+	isRepositorySwitchBlocked(): boolean {
+		if (this.remoteOperations?.isBusy()) return true;
+		if (repositoryMutationCoordinator.isBusy(this.settings.repositoryPath)) return true;
+		return this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC).some((leaf) =>
+			leaf.view instanceof GitSyncView && leaf.view.hasPendingRepositoryMutation());
 	}
 
 	setSettingsSaveIndicator(element: HTMLElement): void {
@@ -152,10 +287,17 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	private createStoredData(): StoredPluginData {
+		const registry = updateSelectedRepositorySettings(
+			{ repositories: this.repositories, selectedRepositoryId: this.selectedRepositoryId },
+			this.settings,
+		);
+		this.repositories = registry.repositories;
 		return {
 			format: PLUGIN_DATA_FORMAT,
 			schemaVersion: PLUGIN_DATA_SCHEMA_VERSION,
 			settings: { ...this.settings },
+			repositories: registry.repositories,
+			selectedRepositoryId: registry.selectedRepositoryId,
 		};
 	}
 
@@ -184,7 +326,12 @@ export default class GitSyncPlugin extends Plugin {
 		}
 
 		if (!window.confirm("Import Git Sync settings and activity? Existing plugin data will be replaced.")) return;
-		this.settings = normalizeSettings(decoded.settings);
+		this.repositories = decoded.repositories;
+		this.selectedRepositoryId = decoded.selectedRepositoryId;
+		this.settings = projectSelectedRepositorySettings(
+			normalizeSettings(decoded.settings),
+			{ repositories: this.repositories, selectedRepositoryId: this.selectedRepositoryId },
+		);
 		this.activity = normalizeActivity(decoded.activity);
 		await this.replaceActivityLog(this.activity);
 		await this.persistData();
@@ -281,21 +428,61 @@ export default class GitSyncPlugin extends Plugin {
 	}
 
 	getRemoteToken(): string | null {
-		return this.app.secretStorage.getSecret(REMOTE_TOKEN_SECRET_ID);
+		return this.getRemoteTokenForRepository(this.selectedRepositoryId);
+	}
+
+	getRemoteTokenForRepository(repositoryId: string): string | null {
+		const selected = this.repositories.find((repository) => repository.id === repositoryId);
+		return selected?.credentialRef ? this.app.secretStorage.getSecret(selected.credentialRef) : null;
 	}
 
 	getRemoteCredential(): RemoteCredential | null {
-		const token = this.getRemoteToken();
+		return this.getRemoteCredentialForRepository(this.selectedRepositoryId, this.settings);
+	}
+
+	getRemoteCredentialForRepository(repositoryId: string, settings?: GitSyncSettings): RemoteCredential | null {
+		const token = this.getRemoteTokenForRepository(repositoryId);
 		if (!token) return null;
 		return {
-			username: this.settings.remoteUsername.trim() || "git",
+			username: settings?.remoteUsername.trim() || "git",
 			token,
+		};
+	}
+
+	getRepositoryOperationContext(repositoryId = this.selectedRepositoryId): {
+		repositoryId: string;
+		settings: GitSyncSettings;
+		credential: RemoteCredential | null;
+	} {
+		const settings = projectSelectedRepositorySettings(this.settings, {
+			repositories: this.repositories,
+			selectedRepositoryId: repositoryId,
+		});
+		return {
+			repositoryId,
+			settings,
+			credential: this.getRemoteCredentialForRepository(repositoryId, settings),
 		};
 	}
 
 	saveRemoteToken(value: string): void {
 		const token = value.trim();
-		this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, token);
+		const selectedIndex = this.repositories.findIndex((repository) => repository.id === this.selectedRepositoryId);
+		if (selectedIndex < 0) {
+			this.app.secretStorage.setSecret(REMOTE_TOKEN_SECRET_ID, token);
+			return;
+		}
+		const selected = this.repositories[selectedIndex];
+		const credentialRef = selected.credentialRef || `${REMOTE_TOKEN_SECRET_ID}:${selected.id}`;
+		this.app.secretStorage.setSecret(credentialRef, token);
+		if (selected.credentialRef !== credentialRef) {
+			this.repositories = this.repositories.slice();
+			this.repositories[selectedIndex] = { ...selected, credentialRef };
+			void this.persistData().catch((error) => {
+				const detail = error instanceof Error ? error.message : "Unable to save repository credentials.";
+				this.recordActivity(`Credential reference save failed: ${detail}`, "ERROR");
+			});
+		}
 	}
 
 	async checkRemoteConnection(): Promise<void> {
@@ -322,8 +509,8 @@ export default class GitSyncPlugin extends Plugin {
 		this.remoteOperations.forcePush();
 	}
 
-	async cloneRemote(): Promise<void> {
-		return this.remoteOperations.clone();
+	async cloneRemote(context?: RepositoryOperationContext): Promise<boolean> {
+		return this.remoteOperations.clone(context);
 	}
 
 	async checkForUpdates(manual: boolean): Promise<void> {
@@ -395,14 +582,14 @@ export default class GitSyncPlugin extends Plugin {
 		}
 	}
 
-	refreshIntegrationStage(paths: string[]): Promise<void> {
+	refreshIntegrationStage(paths: string[], repositoryPath?: string): Promise<void> {
 		this.integrationStageQueue = this.integrationStageQueue
 			.catch(() => undefined)
 			.then(async () => {
 				const views = this.app.workspace.getLeavesOfType(VIEW_TYPE_GIT_SYNC)
 					.map((leaf) => leaf.view)
 					.filter((view): view is GitSyncView => view instanceof GitSyncView);
-				await Promise.all(views.map((view) => view.refreshIntegrationStage(paths)));
+					await Promise.all(views.map((view) => view.refreshIntegrationStage(paths, repositoryPath)));
 			});
 		return this.integrationStageQueue;
 	}

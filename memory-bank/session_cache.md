@@ -1,10 +1,10 @@
 # Session Cache
 
 *Created: 2026-09-05 23:35:25 IST*
-*Last Updated: 2026-10-31 14:07:57 IST*
+*Last Updated: 2026-10-31 15:26:08 IST*
 
 **Started**: 2026-10-31 13:00 IST
-**Focus Task**: T14 META: Code Quality, Review, and Modularity
+**Focus Task**: T16/T17 Multi-Repository Source Implementation
 **Session File**: `sessions/2026-10-31-day.md`
 **Status**: 🔄 Active: 13, Paused: 0, Completed: 5
 
@@ -34,11 +34,10 @@ Build the Settings panel immediately after the shell with only the configuration
 **Status:** 🔄 **IN PROGRESS**
 **Priority:** MEDIUM
 **Started:** 2026-10-05
-**Last Active:** 2026-10-31 14:07 IST
-**Context**: Ongoing review and modularity work across this repository. The
-first `main.ts` extraction pass is documented; selection and snapshot helpers
-are separated, and the `GitSyncView` ownership review has produced a staged
-refactoring plan.
+**Last Active:** 2026-10-31 15:26 IST
+**Context**: Cross-cutting code review and modularity. Extract history state
+with T16c; make Changes/refresh extractions only where repository-scoped
+features need them.
 **Critical Files**: `src/main.ts`, `src/GitSyncView.ts`,
 `memory-bank/implementation-details/code-quality-modularity.md`
 **Progress**:
@@ -46,31 +45,65 @@ refactoring plan.
 2. ✅ Registered T14 and recorded source/build evidence.
 3. ✅ Extracted selected paths and range anchors to `src/ChangeSelection.ts`; the
    view retains DOM handling and repository refresh/staging operations.
-4. ✅ Review refresh and staging ownership; document commit-history, Changes
-   presentation, and refresh-controller extraction order.
-5. 🔄 Define and test the `CommitHistoryController` contract.
+4. ✅ Review refresh and staging ownership; align future extraction work with
+   T16/T17 feature seams.
+5. 🔄 Move history state with T16c and keep the module map current.
 
 ### T15: App-Wide Test Coverage
 **Status:** 🔄 **IN PROGRESS**
 **Priority:** HIGH
 **Started:** 2026-10-31
-**Last Active:** 2026-10-31 14:07 IST
-**Context**: Initial Node test coverage is in place for Changes selection and
-snapshot state; broader app workflows and CI execution remain open.
+**Last Active:** 2026-10-31 15:26 IST
+**Context**: Initial Node tests cover Changes selection/snapshot state and
+repository registry migration; broader Git workflows remain open. CI runs
+`pnpm test` before artifact checks.
 **Critical Files**: `package.json`, `tests/`,
 `memory-bank/implementation-details/app-wide-test-coverage.md`
 **Progress**:
-1. ✅ Added eight helper tests; `pnpm test` passed with the production build.
-2. 🔄 Add plugin-data/local-repository tests and run the suite in CI.
+1. ✅ Added eight helper tests for selection and Changes snapshot state.
+2. ✅ Added eight registry/migration tests and configured the CI test gate.
+3. 🔄 Add isolated local-Git, remote/provider, and plugin workflow coverage.
+
+### T16: Core Mobile Multi-Repository Git Interface
+**Status:** 🔄 **IN PROGRESS**
+**Priority:** HIGH
+**Started:** 2026-10-31
+**Last Active:** 2026-10-31 15:26 IST
+**Context**: Source now has repo selector/add/open/init/clone, per-repository
+settings and credentials, local branches/index restore, captured operation
+contexts, and isolated local Git/provider operations. Desktop install/reload
+and UI smoke passed; Settings now labels the vault root consistently with the
+sidebar. Full multi-repository workflow, named remotes/upstreams, merge recovery,
+and Android/iOS acceptance remain open.
+**Critical Files**: `src/pluginData.ts`, `src/main.ts`,
+`memory-bank/implementation-details/multi-repository-architecture.md`
+**Progress**:
+1. ✅ Persist registry and selected ID; normalize vault-relative roots.
+2. ✅ Add repository controls, clone flow, and captured operation contexts.
+3. 🔄 Implement named remotes/upstreams and merge/conflict recovery; record host acceptance.
+
+### T17: Secondary Mobile Git Features
+**Status:** 🔄 **IN PROGRESS**
+**Priority:** LOW
+**Started:** 2026-10-31
+**Last Active:** 2026-10-31 15:21 IST
+**Context**: Local branch list/create/switch and selected restore from index
+have source implementations and focused tests; the branch manager rendered in
+desktop Obsidian. Tags, branch rename/delete/tracking, commit restore, and full
+desktop/mobile workflow acceptance remain open.
+**Critical Files**: `src/repository.ts`, `src/remote.ts`, `src/GitSyncView.ts`
+**Progress**:
+1. ✅ Feature split and shared ownership/test approach recorded.
+2. ✅ Add local branch and index-restore flows with repository-scoped tests.
+3. 🔄 Add tag workflows and remaining branch/restore behavior; record host acceptance.
 
 ## Next Session Focus
 
-1. T14: Define and test the `CommitHistoryController` contract; installed-host
-   acceptance for the current Changes behavior remains open under T10.
-2. T15: Add plugin-data/local-repository coverage and wire tests into CI.
-3. T4: Verify the folder tree on installed desktop/mobile and finish the planned revert refinement.
-4. T5: Add Log clear/export if still required.
-5. T10: Capture controlled large-vault timings and platform-specific acceptance.
+1. T16d/e: Add named remote/upstream configuration and merge/conflict recovery with focused tests.
+2. T17: Add tags, branch rename/delete/tracking, and restore from selected commits.
+3. T16c/T14: Extract repository-scoped commit-history loading and state.
+4. T10: Complete desktop multi-repository workflow acceptance in a safe vault,
+   then record Android and iOS acceptance separately.
 
 ## 2026-10-31 Session Update
 
@@ -91,6 +124,34 @@ snapshot state; broader app workflows and CI execution remain open.
   runs only the build.
 - Installed Obsidian desktop/mobile acceptance remains unverified. Next work is
   the T14 controller contract and T15 plugin-data/local-repository coverage.
+
+## 2026-10-31 T16a/T14/T15 Session Update — 14:38 IST
+
+- T16a: Added schema-v2 registry persistence, schema-v1 and flat-settings
+  migration, selected repository projection, and vault-relative root checks.
+- T15: Added eight registry/migration tests; all 16 tests and the production
+  build passed. The CI workflow is configured to run `pnpm test` before artifact checks.
+- T14: Scheduled history extraction with T16c; Changes/refresh extractions will
+  follow repository-scoped feature needs. T17 tests will be added with its
+  branch/tag/restore features.
+- Registry UI, operation-context capture, local Git workflow tests, and
+  installed desktop/mobile acceptance remain open.
+
+## 2026-10-31 T16/T17 Implementation Update — 15:06 IST
+
+- T16 source now includes repository selection, add/open/initialize, clone,
+  per-repository settings and credentials, local Git isolation, captured remote
+  and provider targets, and nested-root safeguards.
+- T17 source includes local branch list/create/switch and confirmed restore from
+  the index. Tag management, branch rename/delete/tracking, and restore from a
+  chosen commit remain open.
+- T15 now has 25 tests. `pnpm test` passed the full suite and production build;
+  the suite covers local repository isolation, provider IDs, branches, index
+  restore, packed refs, mutation locking, nested boundaries, and path safety.
+- The running Obsidian 1.14.5 host still has the earlier plugin build; the new
+  controls need an install/reload before visual acceptance. Android and iOS
+  acceptance remains unverified. T14 history extraction,
+  networked remote tests, and plugin reload checks also remain open.
 
 ## 2026-09-30 Session Update
 

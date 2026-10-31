@@ -14,6 +14,7 @@ import {
 	CommitFileChange,
 	addToGitignore,
 	commitChanges,
+	initializeRepository,
 	inspectLocalRepository,
 	invalidateRepositorySnapshot,
 	LocalCommit,
@@ -21,14 +22,20 @@ import {
 	readCommitChanges,
 	readRemoteCommits,
 	readChanges,
+	listLocalBranches,
 	removeFile,
+	restoreFilesFromIndex,
+	createAndSwitchLocalBranch,
+	switchLocalBranch,
 	RepositoryState,
 	stageFile,
 	unstageFile,
 	unstageFiles,
 } from "./repository";
-import { ConfirmActionModal, GitignoreEditorModal } from "./dialogs";
-import { ACTIVITY_PAGE_SIZE } from "./pluginData";
+import { BranchManagerModal, CloneRepositoryModal, ConfirmActionModal, GitignoreEditorModal, RepositoryFolderModal } from "./dialogs";
+import type { CloneRepositoryDetails } from "./dialogs";
+import { ACTIVITY_PAGE_SIZE, normalizeRepositoryRoot } from "./pluginData";
+import { repositoryRootsOverlap } from "./repositoryPaths";
 import { elapsedMilliseconds, formatMilliseconds } from "./operationDiagnostics";
 import { renderActivityPanel } from "./ActivityPanel";
 import { renderCommitHistoryPanel } from "./CommitHistoryPanel";
@@ -105,6 +112,7 @@ export class GitSyncView extends ItemView {
 	private repositoryRefreshInProgress = false;
 	private readonly pendingIntegrationStagePaths = new Set<string>();
 	private committing = false;
+	private branchMutationInProgress = false;
 	private activeChangeAction = "";
 	private readonly pendingStagePaths = new Set<string>();
 	private readonly pendingFileActions = new Set<string>();
@@ -251,6 +259,15 @@ export class GitSyncView extends ItemView {
 		if (this.activeTab === "Log") this.render();
 	}
 
+	hasPendingRepositoryMutation(): boolean {
+		return this.committing
+			|| this.branchMutationInProgress
+			|| this.activeChangeAction !== ""
+			|| this.pendingStagePaths.size > 0
+			|| this.pendingFileActions.size > 0
+			|| this.pendingIntegrationStagePaths.size > 0;
+	}
+
 	render(): void {
 		this.cancelLongPressSelection();
 		this.captureChangesScrollTop();
@@ -355,6 +372,60 @@ export class GitSyncView extends ItemView {
 	private renderRepositoryContext(root: HTMLElement, repository: string): void {
 		const context = root.querySelector<HTMLElement>(".git-sync-repository-context") ?? root.createDiv({ cls: "git-sync-repository-context" });
 		context.empty();
+		const repositoryPicker = context.createDiv({ cls: "git-sync-repository-picker" });
+		const repositorySelect = repositoryPicker.createEl("select", {
+			cls: "git-sync-repository-select",
+			attr: { "aria-label": "Selected Git repository" },
+		});
+		for (const registered of this.plugin.repositories) {
+			const leafName = registered.root === "." ? "Vault root" : registered.root.split("/").pop();
+			const label = registered.root === "."
+				? "Vault root"
+				: registered.name === leafName
+					? registered.root
+					: `${registered.name} (${registered.root})`;
+			repositorySelect.createEl("option", {
+				text: label,
+				attr: { value: registered.id },
+			});
+		}
+		repositorySelect.value = this.plugin.selectedRepositoryId;
+		repositorySelect.disabled = this.plugin.isRepositorySwitchBlocked();
+		repositorySelect.addEventListener("change", () => {
+			void this.plugin.selectRepository(repositorySelect.value).catch((error) => {
+				new Notice(error instanceof Error ? error.message : "Unable to switch repositories.");
+				repositorySelect.value = this.plugin.selectedRepositoryId;
+			});
+		});
+		const addRepository = repositoryPicker.createEl("button", {
+			cls: "git-sync-add-repository-button",
+			attr: {
+				type: "button",
+				"aria-label": "Add or open a repository",
+				title: "Add or open a repository",
+			},
+		});
+		setIcon(addRepository, "plus");
+		addRepository.createSpan({ text: "Add" });
+		addRepository.disabled = this.plugin.isRepositorySwitchBlocked();
+		addRepository.addEventListener("click", () => {
+			new RepositoryFolderModal(this.app, (path) => void this.addOrOpenRepository(path)).open();
+		});
+		const cloneRepository = repositoryPicker.createEl("button", {
+			cls: "git-sync-add-repository-button git-sync-clone-repository-button",
+			attr: {
+				type: "button",
+				"aria-label": "Clone a repository into this vault",
+				title: "Clone a repository into this vault",
+			},
+		});
+		setIcon(cloneRepository, "download");
+		cloneRepository.createSpan({ text: "Clone" });
+		cloneRepository.disabled = this.plugin.isRepositorySwitchBlocked();
+		cloneRepository.addEventListener("click", () => {
+			new RepositoryFolderModal(this.app, (path) => this.openCloneRepositoryModal(path)).open();
+		});
+
 		const branch = context.createDiv({ cls: "git-sync-branch-context" });
 		const branchIcon = branch.createSpan({ cls: "git-sync-branch-icon" });
 		setIcon(branchIcon, "git-branch");
@@ -362,6 +433,17 @@ export class GitSyncView extends ItemView {
 			? this.repositoryState.branch
 			: this.plugin.settings.branchName.trim() || "No branch";
 		branch.createSpan({ cls: "git-sync-branch-name", text: branchName });
+		const branches = branch.createEl("button", {
+			cls: "git-sync-context-action",
+			attr: {
+				type: "button",
+				"aria-label": "Manage branches",
+				title: "Manage branches",
+			},
+		});
+		setIcon(branches, "git-branch");
+		branches.disabled = this.repositoryState?.kind !== "ready" || this.plugin.isRepositorySwitchBlocked();
+		branches.addEventListener("click", () => void this.openBranchManager());
 
 		const refreshButton = branch.createEl("button", {
 			cls: "git-sync-context-action",
@@ -386,6 +468,165 @@ export class GitSyncView extends ItemView {
 			cls: "git-sync-comparison-text",
 			text: comparisonState.label,
 		});
+	}
+
+	private async addOrOpenRepository(pathValue: string): Promise<void> {
+		try {
+			if (this.plugin.isRepositorySwitchBlocked()) {
+				throw new Error("Finish the active Git operation before changing repositories.");
+			}
+			const root = normalizeRepositoryRoot(pathValue);
+			const state = await inspectLocalRepository(this.app.vault.adapter, root);
+			if (state.kind === "error") throw new Error(state.message);
+			const gitEntry = root === "." ? ".git" : `${root}/.git`;
+			if (state.kind === "ready") {
+				const conflict = await this.findOverlappingRepository(root);
+				if (conflict) throw new Error(`Repository "${root}" overlaps Git repository "${conflict}". Parent and child repositories are not supported; choose a separate folder.`);
+				await this.plugin.registerRepository(root, state.branch);
+				new Notice(`Repository ready: ${root}.`);
+				return;
+			}
+			if (await this.app.vault.adapter.exists(gitEntry)) {
+				throw new Error(`Git metadata exists at "${root}" but is unsupported or incomplete. The folder was left unchanged.`);
+			}
+			const conflict = await this.findOverlappingRepository(root);
+			if (conflict) throw new Error(`Repository "${root}" overlaps Git repository "${conflict}". Parent and child repositories are not supported; choose a separate folder.`);
+			new ConfirmActionModal(
+				this.app,
+				"Initialize a Git repository?",
+				`This creates Git metadata in "${root}" and keeps the files already in that folder.`,
+				() => void this.initializeAndRegisterRepository(root),
+				"Initialize",
+			).open();
+		} catch (error) {
+			new Notice(error instanceof Error ? error.message : "Unable to add this repository.");
+		}
+	}
+
+	private openCloneRepositoryModal(pathValue: string): void {
+		new CloneRepositoryModal(this.app, pathValue, (details) => this.cloneIntoRepository(pathValue, details)).open();
+	}
+
+	private async cloneIntoRepository(pathValue: string, details: CloneRepositoryDetails): Promise<void> {
+		const root = normalizeRepositoryRoot(pathValue);
+		if (this.plugin.repositories.some((repository) => repository.root === root)) {
+			throw new Error(`A repository is already registered at "${root}".`);
+		}
+		const conflict = await this.findOverlappingRepository(root);
+		if (conflict) throw new Error(`Repository "${root}" overlaps Git repository "${conflict}". Choose a separate vault folder.`);
+		if (this.plugin.isRepositorySwitchBlocked()) throw new Error("Finish the active Git operation before cloning a repository.");
+
+		const current = this.plugin.getRepositoryOperationContext();
+		const settings = {
+			...current.settings,
+			repositoryPath: root,
+			remoteUrl: details.remoteUrl,
+			remoteUsername: details.remoteUsername,
+			branchName: details.branchName,
+		};
+		const context = {
+			repositoryId: `clone:${root}`,
+			settings,
+			credential: details.credentialToken
+				? { username: details.remoteUsername, token: details.credentialToken }
+				: null,
+		};
+		const cloned = await this.plugin.cloneRemote(context);
+		if (!cloned) throw new Error(`Clone did not complete. Check the remote details; any partial files at "${root}" were left in place.`);
+		const state = await inspectLocalRepository(this.app.vault.adapter, root);
+		if (state.kind !== "ready") throw new Error(`Clone finished, but Git Sync could not verify the repository at "${root}".`);
+		await this.plugin.registerRepository(
+			root,
+			state.branch,
+			details.remoteUrl,
+			details.remoteUsername,
+			details.credentialToken,
+		);
+		new Notice(`Cloned repository into ${root}.`);
+	}
+
+	private async openBranchManager(): Promise<void> {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		if (this.repositoryState?.kind !== "ready") return;
+		const currentBranch = this.repositoryState.branch;
+		try {
+			const branches = await listLocalBranches(this.app.vault.adapter, repositoryPath);
+			if (repositoryPath !== this.plugin.settings.repositoryPath.trim()) return;
+			new BranchManagerModal(
+				this.app,
+				branches,
+				currentBranch,
+				(branchName) => this.changeBranch(repositoryPath, branchName, false),
+				(branchName) => this.changeBranch(repositoryPath, branchName, true),
+			).open();
+		} catch (error) {
+			new Notice(error instanceof Error ? error.message : "Unable to list local branches.");
+		}
+	}
+
+	private async changeBranch(repositoryPath: string, branchName: string, create: boolean): Promise<void> {
+		if (repositoryPath !== this.plugin.settings.repositoryPath.trim()) {
+			throw new Error("The selected repository changed. Open the branch manager again.");
+		}
+		this.branchMutationInProgress = true;
+		let branchChanged = false;
+		try {
+			if (create) await createAndSwitchLocalBranch(this.app.vault.adapter, repositoryPath, branchName);
+			else await switchLocalBranch(this.app.vault.adapter, repositoryPath, branchName);
+			branchChanged = true;
+			await this.plugin.setSelectedRepositoryBranch(branchName, repositoryPath);
+			this.plugin.recordActivity(`${create ? "Created and switched to" : "Switched to"} branch ${branchName} in ${repositoryPath || "."}.`);
+		} finally {
+			this.branchMutationInProgress = false;
+			if (branchChanged) await this.refreshRepositoryState("branch-switch");
+		}
+	}
+
+	private async initializeAndRegisterRepository(root: string): Promise<void> {
+		try {
+			if (this.plugin.isRepositorySwitchBlocked()) {
+				throw new Error("Finish the active Git operation before changing repositories.");
+			}
+			const conflict = await this.findOverlappingRepository(root);
+			if (conflict) throw new Error(`Repository "${root}" overlaps Git repository "${conflict}". The folder was not initialized.`);
+			await initializeRepository(this.app.vault.adapter, root, "main");
+			const state = await inspectLocalRepository(this.app.vault.adapter, root);
+			if (state.kind !== "ready") throw new Error("Git Sync could not verify the new repository.");
+			await this.plugin.registerRepository(root, state.branch);
+			new Notice(`Initialized repository: ${root}.`);
+		} catch (error) {
+			new Notice(error instanceof Error ? error.message : "Unable to initialize this repository.");
+		}
+	}
+
+	private async findOverlappingRepository(root: string): Promise<string | null> {
+		const adapter = this.app.vault.adapter;
+		const registeredRoots = this.plugin.repositories
+			.filter((repository) => repository.root !== root && repositoryRootsOverlap(root, repository.root))
+			.map((repository) => repository.root);
+		for (const registeredRoot of registeredRoots) {
+			const state = await inspectLocalRepository(adapter, registeredRoot);
+			const gitEntry = registeredRoot === "." ? ".git" : `${registeredRoot}/.git`;
+			if (state.kind === "ready" || await adapter.exists(gitEntry)) return registeredRoot;
+		}
+
+		let ancestor = root;
+		while (ancestor !== ".") {
+			const separator = ancestor.lastIndexOf("/");
+			ancestor = separator < 0 ? "." : ancestor.slice(0, separator) || ".";
+			const gitEntry = ancestor === "." ? ".git" : `${ancestor}/.git`;
+			if (await adapter.exists(gitEntry)) return ancestor;
+		}
+
+		const prefix = root === "." ? "" : `${root}/`;
+		const descendantRoots = this.app.vault.getAllFolders(true)
+			.map((folder) => normalizeRepositoryRoot(folder.path || "."))
+			.filter((folderRoot) => folderRoot !== root && folderRoot.startsWith(prefix));
+		for (const descendantRoot of descendantRoots) {
+			const gitEntry = descendantRoot === "." ? ".git" : `${descendantRoot}/.git`;
+			if (await adapter.exists(gitEntry)) return descendantRoot;
+		}
+		return null;
 	}
 
 	private getComparisonState(repository: string): {
@@ -424,6 +665,7 @@ export class GitSyncView extends ItemView {
 	}
 
 	async refreshRepositoryState(reason = "refresh", refreshChanges = true): Promise<void> {
+		const settings = { ...this.plugin.settings };
 		const startedAt = Date.now();
 		const phaseDurations: Array<{ label: string; elapsed: number }> = [];
 		const timed = async <T>(label: string, operation: () => Promise<T>): Promise<T> => {
@@ -434,7 +676,7 @@ export class GitSyncView extends ItemView {
 				phaseDurations.push({ label, elapsed: Date.now() - phaseStartedAt });
 			}
 		};
-		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const repositoryPath = settings.repositoryPath.trim();
 		if (repositoryPath) invalidateRepositorySnapshot(repositoryPath);
 		if (!repositoryPath) {
 			this.repositoryRefreshInProgress = false;
@@ -443,8 +685,26 @@ export class GitSyncView extends ItemView {
 			this.plugin.recordActivity(`Repository refresh [${reason}] skipped: no repository path configured.`, "METRIC");
 			return;
 		}
-		const branchName = this.plugin.settings.branchName.trim();
+		const branchName = settings.branchName.trim();
 		if (this.commitHistoryRepositoryPath !== repositoryPath) {
+			this.changes = null;
+			this.changesError = null;
+			this.commits = null;
+			this.remoteCommits = null;
+			this.remoteHistoryAvailable = false;
+			this.commitsError = null;
+			this.remoteCommitsError = null;
+			this.selectedCommitOid = null;
+			this.changeSelection.clear();
+			this.commitChangesCache.clear();
+			this.commitChangesLoading.clear();
+			this.commitChangesErrors.clear();
+			this.changeFilters.clear();
+			this.changeSorts.clear();
+			this.collapsedSections.clear();
+			this.collapsedChangeFolders.clear();
+			this.pendingBackgroundRefreshPaths.clear();
+			this.commitMessage = "";
 			this.commitDepth.set("local", COMMIT_PAGE_SIZE);
 			this.commitDepth.set("remote", COMMIT_PAGE_SIZE);
 			this.commitHasMore.clear();
@@ -514,7 +774,7 @@ export class GitSyncView extends ItemView {
 					const remoteCommitHistory = await timed("remote-commits", () => readRemoteCommits(
 						this.app.vault.adapter,
 						repositoryPath,
-						this.plugin.settings.branchName,
+						settings.branchName,
 						this.commitDepth.get("remote") ?? COMMIT_PAGE_SIZE,
 					));
 					this.remoteCommits = this.hydrateCommitChanges(remoteCommitHistory.commits, repositoryPath);
@@ -575,7 +835,8 @@ export class GitSyncView extends ItemView {
 
 	private async loadCommitHistories(reason: string): Promise<void> {
 		if (this.commitHistoryRefreshInProgress || this.repositoryRefreshInProgress) return;
-		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const settings = { ...this.plugin.settings };
+		const repositoryPath = settings.repositoryPath.trim();
 		if (!repositoryPath || this.repositoryState?.kind !== "ready") return;
 
 		const startedAt = Date.now();
@@ -591,7 +852,7 @@ export class GitSyncView extends ItemView {
 			const remoteRequest = readRemoteCommits(
 					this.app.vault.adapter,
 					repositoryPath,
-					this.plugin.settings.branchName,
+					settings.branchName,
 					this.commitDepth.get("remote") ?? COMMIT_PAGE_SIZE,
 				).then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));
 			const [localResult, remoteResult] = await Promise.all([localRequest, remoteRequest]);
@@ -727,7 +988,9 @@ export class GitSyncView extends ItemView {
 	private async loadMoreCommits(): Promise<void> {
 		if (this.commitHistoryLoading || !this.commitHasMore.get(this.commitSource)) return;
 		const source = this.commitSource;
-		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const settings = { ...this.plugin.settings };
+		const repositoryPath = settings.repositoryPath.trim();
+		const generation = this.refreshGeneration;
 		const previousDepth = this.commitDepth.get(source) ?? COMMIT_PAGE_SIZE;
 		const nextDepth = previousDepth + COMMIT_PAGE_SIZE;
 		this.commitDepth.set(source, nextDepth);
@@ -745,19 +1008,22 @@ export class GitSyncView extends ItemView {
 				const history = await readRemoteCommits(
 					this.app.vault.adapter,
 					repositoryPath,
-					this.plugin.settings.branchName,
+					settings.branchName,
 					nextDepth,
 				);
+				if (generation !== this.refreshGeneration || repositoryPath !== this.plugin.settings.repositoryPath.trim()) return;
 				this.remoteCommits = this.hydrateCommitChanges(history.commits, repositoryPath);
 				this.remoteHistoryAvailable = history.available;
 				this.commitHasMore.set(source, history.hasMore);
 				this.remoteCommitsError = null;
 			}
+			if (generation !== this.refreshGeneration || repositoryPath !== this.plugin.settings.repositoryPath.trim()) return;
 			this.plugin.recordActivity(
 				`Loaded ${source} commits through ${nextDepth} entries in ${formatMilliseconds(elapsedMilliseconds(startedAt))}.`,
 				"METRIC",
 			);
 		} catch (error) {
+			if (generation !== this.refreshGeneration || repositoryPath !== this.plugin.settings.repositoryPath.trim()) return;
 			this.commitDepth.set(source, previousDepth);
 			if (source === "local") {
 				this.commitsError = error instanceof Error ? error.message : "Unable to load more local commits.";
@@ -766,7 +1032,7 @@ export class GitSyncView extends ItemView {
 			}
 		} finally {
 			this.commitHistoryLoading = false;
-			this.render();
+			if (generation === this.refreshGeneration && repositoryPath === this.plugin.settings.repositoryPath.trim()) this.render();
 		}
 	}
 
@@ -781,6 +1047,7 @@ export class GitSyncView extends ItemView {
 
 	private async loadCommitChanges(commitOid: string): Promise<void> {
 		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const generation = this.refreshGeneration;
 		const cacheKey = this.commitChangesCacheKey(commitOid, repositoryPath);
 		if (this.commitChangesLoading.has(cacheKey)) return;
 		const cached = this.commitChangesCache.get(cacheKey);
@@ -795,7 +1062,9 @@ export class GitSyncView extends ItemView {
 		try {
 			const changes = await readCommitChanges(this.app.vault.adapter, repositoryPath, commitOid);
 			this.commitChangesCache.set(cacheKey, changes);
-			this.applyLoadedCommitChanges(commitOid, changes);
+			if (generation === this.refreshGeneration && repositoryPath === this.plugin.settings.repositoryPath.trim()) {
+				this.applyLoadedCommitChanges(commitOid, changes);
+			}
 			this.plugin.recordActivity(
 				`Commit ${commitOid.slice(0, 7)} changed-file details loaded in ${formatMilliseconds(elapsedMilliseconds(startedAt))} (${changes.length} files).`,
 				"METRIC",
@@ -812,7 +1081,7 @@ export class GitSyncView extends ItemView {
 			);
 		} finally {
 			this.commitChangesLoading.delete(cacheKey);
-			if (this.selectedCommitOid === commitOid) this.render();
+			if (generation === this.refreshGeneration && this.selectedCommitOid === commitOid) this.render();
 		}
 	}
 
@@ -947,6 +1216,17 @@ export class GitSyncView extends ItemView {
 			action.createSpan({ text: section === "staged" ? "Unstage" : "Stage" });
 			action.disabled = this.committing;
 			action.addEventListener("click", () => void this.applySelectedStage(section, visibleChanges));
+			const restore = toolbar.createEl("button", {
+				cls: "git-sync-selection-action",
+				attr: {
+					type: "button",
+					"aria-label": "Restore selected files from the index",
+					title: "Replace selected working copies with their staged versions",
+				},
+			});
+			setIcon(restore, "rotate-ccw");
+			restore.disabled = this.committing;
+			restore.addEventListener("click", () => this.confirmRestoreSelectedFromIndex(selectedInSection));
 		}
 
 		const list = sectionEl.createEl("ul", { cls: "git-sync-changes-list" });
@@ -1430,6 +1710,47 @@ export class GitSyncView extends ItemView {
 		}
 	}
 
+	private confirmRestoreSelectedFromIndex(changes: ChangedFile[]): void {
+		const repositoryPath = this.plugin.settings.repositoryPath.trim();
+		const paths = changes.map((change) => change.path);
+		const preview = paths.slice(0, 8).map((path) => `• ${path}`).join("\n");
+		const remaining = paths.length > 8 ? `\n…and ${paths.length - 8} more selected files.` : "";
+		new ConfirmActionModal(
+			this.app,
+			"Restore selected files from the index?",
+			`In ${repositoryPath || "."}, replace the selected working copies with their staged versions. Unstaged edits to these files will be discarded; the index and all other files stay unchanged.\n\n${preview}${remaining}`,
+			() => {
+				if (this.plugin.settings.repositoryPath.trim() !== repositoryPath) {
+					new Notice("The selected repository changed. Select the files again before restoring.");
+					return;
+				}
+				void this.restoreSelectedFromIndex(repositoryPath, paths);
+			},
+			"Restore selected",
+		).open();
+	}
+
+	private async restoreSelectedFromIndex(repositoryPath: string, paths: string[]): Promise<void> {
+		this.committing = true;
+		this.activeChangeAction = "Restore selected";
+		this.render();
+		try {
+			await restoreFilesFromIndex(this.app.vault.adapter, repositoryPath, paths);
+			this.changeSelection.clearPaths(paths);
+			this.plugin.recordActivity(`Restored ${paths.length} selected file${paths.length === 1 ? "" : "s"} from the index in ${repositoryPath || "."}.`);
+			new Notice("Selected files restored from the index.");
+			await this.refreshRepositoryState("restore-from-index");
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : "Unable to restore the selected files.";
+			this.plugin.recordActivity(`Restore from index failed: ${detail}`, "ERROR");
+			new Notice(detail);
+		} finally {
+			this.committing = false;
+			this.activeChangeAction = "";
+			this.render();
+		}
+	}
+
 	private confirmRemoveChangedFile(change: ChangedFile): void {
 		new ConfirmActionModal(
 			this.app,
@@ -1750,7 +2071,8 @@ export class GitSyncView extends ItemView {
 		this.render();
 	}
 
-	async refreshIntegrationStage(paths: string[]): Promise<void> {
+	async refreshIntegrationStage(paths: string[], repositoryPath?: string): Promise<void> {
+		if (repositoryPath && this.plugin.settings.repositoryPath.trim() !== repositoryPath) return;
 		const affectedPaths = [...new Set(paths)];
 		if (affectedPaths.length === 0) return;
 		if (this.repositoryRefreshInProgress) {

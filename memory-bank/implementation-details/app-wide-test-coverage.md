@@ -1,6 +1,6 @@
 # T15: App-Wide Test Coverage
 
-*Last Updated: 2026-10-31 14:07:57 IST*
+*Last Updated: 2026-10-31 15:26:08 IST*
 
 This document defines a focused testing plan for the main Obsidian Git Sync
 workflows. It follows the project guidance to test feature behavior through
@@ -9,15 +9,24 @@ separate from builds and automated tests.
 
 ## Current Baseline
 
-- `tests/change-selection.test.cjs` and
-  `tests/change-list-state.test.cjs` contain eight Node built-in tests for
-  selection/range behavior and Changes snapshot transformations.
-- `pnpm test` runs those tests and then `pnpm run build`.
-- `.github/workflows/build.yml` currently runs `pnpm run build` directly; CI
-  does not run the test command before artifact checks or development releases.
-- No test currently exercises Obsidian UI rendering, repository operations,
-  remote operations, plugin lifecycle/persistence, integration-provider calls,
-  or updater installation behavior.
+- The Node suite contains 25 tests across Changes selection/snapshot state,
+  schema-v2 registry migration/normalization, mutation coordination, and local
+  repository behavior through a simulated `DataAdapter`.
+- Local Git cases cover two independent subfolder repositories, explicit
+  integration-provider repository IDs, index restore, local branch switching,
+  parent/child boundary behavior, packed refs, and root/path safety.
+- `pnpm test` runs the suite and then `pnpm run build`.
+- `.github/workflows/build.yml` is configured to run `pnpm test` before artifact
+  checks; release steps depend on the successful build job.
+- Local evidence: `pnpm test` passed all 25 tests and the production build on
+  2026-10-31. This is not CI, installed-host, or remote-network evidence.
+- Automated tests do not yet cover Obsidian UI rendering, remote HTTP workflows,
+  plugin lifecycle/reload persistence, or updater installation. A desktop
+  Obsidian 1.14.5 install/reload smoke check confirmed the current build loads
+  and its repository controls/dialogs render; no multi-repository Git action or
+  mobile workflow was exercised. A follow-up Settings label change passed the
+  production build and was verified after another reload; automated tests were
+  not rerun for this presentation-only change.
 
 ## Testing Boundaries
 
@@ -29,6 +38,8 @@ separate from builds and automated tests.
   be covered with the current tools.
 - Use an isolated temporary vault/repository for local Git integration tests;
   never rely on the developer's active vault or remote account.
+- T16/T17 feature tasks own their focused tests alongside each feature change.
+  T15 keeps the shared runner, CI gate, and cross-feature coverage/evidence plan.
 - Test the workflows users perform. Use T10 for a small supported-platform
   acceptance set instead of building a large compatibility matrix.
 - Record unit, integration, build, CI artifact, release, install, and host
@@ -80,6 +91,8 @@ Git flow itself matters, use a local bare remote. Cover:
   checkout behavior.
 - Integration-provider read/write calls and repository snapshot invalidation
   after stage, commit, pull, and push.
+- Repository switching while remote work is queued, per-repository credentials,
+  and remote failure/progress behavior against a local bare remote or fake HTTP.
 
 ### 4. Plugin and UI Workflows
 
@@ -100,9 +113,8 @@ the installed-host acceptance set:
 
 ## CI and Platform Acceptance
 
-- Make the CI build job run `pnpm test` before its existing generated-artifact
-  checks. Keep artifact upload and development-release steps dependent on that
-  successful job.
+- CI runs `pnpm test` before its generated-artifact checks. Keep artifact
+  upload and development-release steps dependent on that successful job.
 - T10 remains the owner of installed desktop, Android, and iOS evidence.
   Record tested host identity, install/reload result, workflow steps, and any
   platform-specific failure. Do not infer these results from unit tests or a

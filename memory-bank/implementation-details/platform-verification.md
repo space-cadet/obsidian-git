@@ -1,6 +1,6 @@
 # T10: Platform Integration and Verification
 
-*Last Updated: 2026-09-10 04:05:00 IST*
+*Last Updated: 2026-10-31 15:26:08 IST*
 
 ## Purpose
 
@@ -33,6 +33,13 @@ verified the Log and Changes behavior.
 
 ## Current session evidence
 
+- 2026-10-31: Installed the current working-tree plugin assets in the open
+  `typora-notes` vault and reloaded Obsidian 1.14.5. The plugin loaded; the
+  repository selector, Add/Clone actions, add-folder picker, clone setup form,
+  and branch manager rendered. No repository or branch was changed and no Git
+  operation ran. This is UI smoke only; desktop core workflow and Android/iOS
+  acceptance remain open. A follow-up build changed the selected-root Settings
+  label from “.” to “Vault root”; the refreshed text was verified live.
 - pnpm 9 `install --frozen-lockfile` and the production build passed.
 - The temporary local Git flow passed through untracked, staged, committed, and
   clean states.

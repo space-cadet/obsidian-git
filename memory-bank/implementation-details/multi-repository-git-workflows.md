@@ -1,9 +1,9 @@
 # T16: Git Workflows and Backend Limits
 
 *Created: 2026-10-31 13:41:41 IST*
-*Last Updated: 2026-10-31 13:50:23 IST*
+*Last Updated: 2026-10-31 15:06:54 IST*
 
-**State:** assessed capabilities and proposed workflows, not delivered features.
+**State:** Source-level implementation is partial; automated and installed-host acceptance are tracked separately.
 **Owners:** [T16](../tasks/T16.md) core repository/clone/changes/sync/merge features; [T17](../tasks/T17.md) branches, tags, and selected-file restore.
 **Baseline:** installed isomorphic-git 1.41.9, inspected 2026-10-31.
 
@@ -22,14 +22,14 @@ needed to merge an already selected fetched/local ref under T16e.
 
 | Workflow | Existing support | Required extension |
 |----------|------------------|--------------------|
-| Init/open | Backend init available; adapter probe passed | Init empty or populated vault folder; register and inspect without an initial commit requirement. |
-| Clone | Plugin supports empty destinations, configured branch, singleBranch | Discover remote default branch, optional branch/depth selection, scoped auth, consistent path policy, and partial-destination recovery. |
-| Status/stage/commit/history | Existing plugin operations | Explicit repository context, boundaries, packed-ref-aware inspection, and per-repository state. |
-| Fetch/pull/push | Existing HTTP(S) workflows | Named remotes, tracking/upstream configuration, per-repo credentials, and preserved remote configuration. |
-| Branches | Backend create/list/checkout/rename/delete APIs | Mobile controls, dirty-worktree preflight, clear deletion rules, upstream awareness, and errors. |
-| Tags | Backend lightweight/annotated/list/delete APIs | Controls and explicit remote tag actions; local tag creation does not imply publication. |
-| Restore | Backend checkout supports selected filepaths | Separate unstaging from discarding edits; show affected paths and preserve unrelated files. |
-| Merge | Clean divergent merge probed; current plugin only fast-forwards | Fetch/compare, explicit merge workflow, conflict handling, completion, and abort. |
+| Init/open | Source has add/open, populated-folder init, registry selection, and overlap checks | Installed-host workflow and reload persistence. |
+| Clone | Source clones into a selected empty vault folder with branch, HTTP credential, progress, and partial-folder reporting | Remote default discovery, shallow clone, consistent mobile filename handling, retry/restart recovery, and remote acceptance. |
+| Status/stage/commit/history | Repository-scoped local operations, packed-ref-aware inspection, stale history guards, and provider repository IDs; adapter tests pass | Installed UI, reload persistence, performance, and history-controller extraction. |
+| Fetch/pull/push | Captured per-repository URL/credentials, shared write coordination, scoped force confirmations, and existing-origin preservation | Named remotes/upstreams and controlled remote tests. |
+| Branches | Source lists/creates/switches local branches with dirty-worktree checks | Rename/delete, upstream awareness, and mobile acceptance. |
+| Tags | No feature UI or operations implemented | Local/remote tag controls and tests. |
+| Restore | Source restores selected files from the index with confirmation and preserves the index | Restore from arbitrary commits and installed-host acceptance. |
+| Merge | No divergence/conflict workflow implemented; ordinary Pull remains fast-forward-only | Explicit merge, conflict handling, completion, recovery, and abort. |
 
 ## Merge and Conflict Lifecycle
 

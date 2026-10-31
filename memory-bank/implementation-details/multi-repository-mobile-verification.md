@@ -1,7 +1,7 @@
 # T16: Mobile Verification and Acceptance
 
 *Created: 2026-10-31 13:41:41 IST*
-*Last Updated: 2026-10-31 13:50:23 IST*
+*Last Updated: 2026-10-31 15:26:08 IST*
 
 **State:** acceptance plan; no installed T16 mobile acceptance yet.
 **Owners:** Each feature in [T16](../tasks/T16.md) and [T17](../tasks/T17.md), [T15](../tasks/T15.md) automated coverage,
@@ -21,6 +21,28 @@ src/repository.ts, backed by a simulated DataAdapter over temporary files:
 These are feasibility probes, not committed regression tests, network tests,
 mobile filesystem tests, or installed Obsidian acceptance. They do not establish
 conflict, stash, interruption, or large-repository behavior.
+
+## Current Automated Source Evidence — 2026-10-31
+
+`pnpm test` passed 25 tests and the production build. New tests use a simulated
+Obsidian `DataAdapter` with isomorphic-git and cover independent subfolder
+repositories, provider repository IDs, local branches, index restore, parent /
+child boundaries, packed refs, path safety, and write coordination. These tests
+do not use a live remote or Obsidian UI.
+
+After the user unlocked the Mac, the current working-tree build was installed
+in the `typora-notes` vault and Obsidian 1.14.5 was reloaded. The plugin loaded
+its schema-v2 registry and displayed the Vault root selector, Add/Clone actions,
+and branch controls. The add-folder picker, clone setup form, and branch manager
+opened and closed. This is installed desktop UI smoke evidence only: no second
+repository was added, no Git mutation was run, and Android/iOS workflows remain
+unverified. The active vault already has a Git repository at its root, so its
+parent/child protection prevents using a nested folder for a live multi-repo
+switching check. A follow-up Settings build now labels the selected root
+“Vault root” consistently with the sidebar; this was checked after reload. The
+original parent-child probe above describes pre-fix
+behavior; the current regression test confirms that untracked child repository
+paths are hidden from parent status and blocked from parent staging.
 
 ## Automated Cases to Add
 
